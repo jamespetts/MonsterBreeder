@@ -585,3 +585,37 @@ The goal is not perfect balance, but avoiding dominant strategies and ensuring d
 
 27. One-Sentence Pitch
 Breed a lineage of autonomous, genetically varied monsters to defend treasure from increasingly dangerous adventurers across procedurally generated raids, using wild monsters to refresh the bloodline before inbreeding, age, injury and greed destroy the hoard.
+
+- Nutrition and Feeding
+Nutrition is an intended campaign and raid system, but it should be implemented after the basic season loop, captive-monster roster, deployment selection, wild-monster capture, and between-season UI are stable.
+
+Design intent:
+- Each monster has a per-season nutrition requirement.
+- The default nutrition requirement is 10 food per monster per season.
+- Later genetics, age, size, injury, activity level, metabolism and possibly pregnancy/egg-laying may modify this requirement.
+- Monsters can satisfy nutrition during raids by eating killed adventurers or macrofauna.
+- A human normally provides 1 food.
+- Macrofauna provide food according to species and size; larger macrofauna such as deer or seals should provide about 10 food.
+- Eating during a raid takes time. The base eating duration should initially be simple, then later modified by genetics, mouth anatomy, size, hunger and temperament.
+- A fully nourished monster normally does not stop to eat a kill, but this should later be genetically modifiable so that greedy, compulsive or low-self-control monsters may still feed.
+- A monster that is held in reserve during a raid, or that does not meet its nutrition requirement during the raid, must be fed between seasons at the player's expense if enough treasure remains.
+- Feeding is automatic rather than a separate shop/micromanagement screen.
+- Food cost varies by biome/environment. The default cost is 1 credit per food.
+- Treasure values are measured in credits: bronze coin = 10 credits, silver coin = 30 credits, gold coin = 100 credits, with gems higher.
+- The game keeps a running total of food expenditure and shows it in the UI.
+- Food expenditure is deducted from final remaining-treasure scoring.
+- Automatic feeding must not reduce treasure below zero.
+- If the player cannot or does not fully feed a monster, nutrition debt creates health states.
+
+Suggested early health states:
+- Nourished: full requirement met.
+- Malnourished: some food shortage; mild health, speed, fertility and disease-risk penalties.
+- Severely malnourished: major penalties and high disease/death risk.
+- Starved: monster dies.
+
+Architecture notes:
+- Long-term nutrition state belongs to persistent monster data in GameState.
+- Raid-time feeding/eating behaviour belongs to Monster/Raid behaviour and must be reflected in authoritative worker snapshots.
+- Food value should be data on edible corpses or carcasses, not hard-coded into the rendering layer.
+- Main-thread UI may display nutrition, cost and food expenditure, but must not calculate authoritative feeding results.
+- Nutrition should be deterministic under the seeded simulation so that headless balance tests can include food cost, malnutrition, starvation, and campaign-loss pressure.
