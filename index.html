@@ -3,13 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Monster Breeder MVP - Object Architecture</title>
+<title>Monster Breeder</title>
 <style>
 html, body { margin: 0; min-height: 100%; font-family: system-ui, sans-serif; color: #1f2730; background: #f0eee6; }
 body { overflow-y: auto; }
 #topBar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.75rem 1rem; background: #2f3d2f; color: white; box-sizing: border-box; }
 #topBar h1 { margin: 0; font-size: 1.35rem; }
 #topBar p { margin: 0.25rem 0 0; opacity: 0.9; }
+
+#seasonDisplay { align-self: center; border: 1px solid rgba(255,255,255,0.35); border-radius: 999px; padding: 0.35rem 0.75rem; background: rgba(255,255,255,0.12); font-weight: 800; white-space: nowrap; }
+#monsterManagementTab { position: absolute; top: 0; left: 50%; transform: translate(-50%, -2px); z-index: 6; border-radius: 0 0 0.65rem 0.65rem; padding: 0.35rem 1rem 0.45rem; background: #394732; color: white; box-shadow: 0 3px 10px rgba(0,0,0,0.25); }
+#monsterManagementTab:hover { background: #4b5d42; }
+#viewportTopControls { position: absolute; top: 0; left: 50%; transform: translate(-50%, -2px); z-index: 7; display: flex; align-items: stretch; gap: 0.35rem; }
+#viewportTopControls #monsterManagementTab { position: static; transform: none; }
+#viewportTopControls #startSeasonButton { border-radius: 0 0 0.65rem 0.65rem; padding: 0.35rem 1rem 0.45rem; box-shadow: 0 3px 10px rgba(0,0,0,0.25); }
+#closeManagementButton { position: sticky; float: right; top: 0; z-index: 7; width: 1.8rem; height: 1.8rem; padding: 0; border-radius: 999px; background: #d1d5db; color: #374151; font-size: 1.15rem; line-height: 1.8rem; }
+#closeManagementButton:hover { background: #e5e7eb; }
 #controls { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 button { border: 0; border-radius: 0.4rem; padding: 0.55rem 0.75rem; cursor: pointer; background: #f2c14e; color: #1f2730; font-weight: 700; }
 button:hover { background: #ffd768; }
@@ -18,6 +27,44 @@ button:hover { background: #ffd768; }
 #mapPanel { min-height: 320px; }
 #raidCanvas { display: block; width: 100%; border: 2px solid #394732; background: #9fc4d9; box-sizing: border-box; cursor: grab; touch-action: none; }
 #raidCanvas.dragging { cursor: grabbing; }
+#mapPanel { position: relative; overflow: hidden; }
+#managementDrawer { position: absolute; left: 0.75rem; right: 0.75rem; top: 0.75rem; max-height: 52%; overflow: auto; background: rgba(255, 252, 240, 0.97); border: 2px solid #394732; border-radius: 0.6rem; box-shadow: 0 6px 22px rgba(0, 0, 0, 0.28); padding: 0.75rem; box-sizing: border-box; z-index: 5; transition: transform 0.18s ease, opacity 0.18s ease; }
+#managementDrawer.drawerHidden { transform: translateY(-110%); opacity: 0; pointer-events: none; }
+#monsterTooltip { position: absolute; z-index: 8; max-width: 270px; padding: 0.45rem 0.55rem; border-radius: 0.45rem; background: rgba(31,39,48,0.92); color: white; font-size: 0.86rem; white-space: pre-line; pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,0.28); }
+#monsterTooltip.tooltipHidden { display: none; }
+#managementDrawer.raidDrawer { max-height: 46%; }
+.deployNowButton { padding: 0.25rem 0.45rem; font-size: 0.82rem; }
+#managementDrawer h2 { margin: 0 0 0.25rem; font-size: 1.05rem; }
+#managementDrawer p { margin: 0.25rem 0 0.6rem; }
+.rosterRow { display: grid; grid-template-columns: auto 1fr auto auto; gap: 0.55rem; align-items: center; padding: 0.45rem 0.55rem; border: 1px solid #d8d0b8; border-radius: 0.45rem; background: #fffaf0; }
+.rosterRow.dead { opacity: 0.55; }
+.rosterName { font-weight: 700; }
+.rosterMeta { color: #526052; font-size: 0.9rem; }
+.rosterBadge { border-radius: 999px; padding: 0.2rem 0.45rem; background: #e9dfbd; font-size: 0.82rem; }
+#startSeasonButton { margin-right: 0.5rem; }
+#managementBody { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(220px, 300px); gap: 0.75rem; align-items: stretch; }
+#cageViewport { min-height: 190px; border: 2px solid #6b5a3a; border-radius: 0.55rem; background: linear-gradient(180deg, #d8c7a1 0%, #b99b68 100%); box-shadow: inset 0 0 0 3px rgba(255,255,255,0.18); padding: 0.55rem; overflow: auto; }
+#rosterList { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 0.55rem; margin: 0; }
+.monsterCard { position: relative; min-height: 150px; display: grid; grid-template-rows: auto 1fr auto; gap: 0.25rem; border: 2px solid rgba(57,71,50,0.55); border-radius: 0.55rem; background: rgba(255,250,240,0.92); padding: 0.45rem; text-align: left; box-sizing: border-box; cursor: pointer; }
+.monsterCard:hover { background: #fff8dc; border-color: #394732; }
+.monsterCard.selected { outline: 3px solid #f2c14e; border-color: #1f2730; }
+.monsterCard.dead { opacity: 0.55; cursor: default; }
+.monsterCard svg { width: 100%; height: 78px; display: block; }
+.monsterCardHeader { display: flex; align-items: center; justify-content: space-between; gap: 0.35rem; }
+.monsterCardName { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.monsterDeployControl { display: flex; gap: 0.3rem; align-items: center; font-size: 0.82rem; font-weight: 700; }
+.monsterCardMeta { display: flex; justify-content: space-between; gap: 0.35rem; font-size: 0.82rem; color: #526052; }
+.monsterHpBar { height: 0.42rem; border-radius: 999px; background: #5a1f1f; overflow: hidden; border: 1px solid rgba(31,39,48,0.5); }
+.monsterHpFill { height: 100%; background: #2f855a; }
+.monsterHpFill.low { background: #c05621; }
+#selectedMonsterPanel { border: 1px solid #d8d0b8; border-radius: 0.55rem; background: #fffaf0; padding: 0.65rem; min-height: 190px; box-sizing: border-box; }
+#selectedMonsterPanel h3 { margin: 0 0 0.35rem; }
+#selectedMonsterPanel svg { width: 100%; max-height: 105px; display: block; margin-bottom: 0.4rem; }
+.monsterDetailGrid { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 0.6rem; font-size: 0.9rem; }
+.monsterDetailGrid dt { font-weight: 700; color: #526052; }
+.monsterDetailGrid dd { margin: 0; }
+#managementActions { margin-top: 0.65rem; }
+@media (max-width: 900px) { #managementBody { grid-template-columns: 1fr; } }
 .hint { margin: 0.5rem 0 0; color: #526052; }
 #sidePanel { margin-top: 0.75rem; display: grid; grid-template-columns: minmax(220px, 1fr) minmax(180px, 260px) minmax(280px, 2fr); gap: 0.75rem; align-items: start; }
 #sidePanel h2 { margin: 0 0 0.35rem; font-size: 1rem; }
@@ -33,8 +80,8 @@ button:hover { background: #ffd768; }
 </style>
 </head>
 <body>
-<header id="topBar"><div><h1>Monster Breeder MVP</h1><p>Persistent world architecture with object-oriented raid simulation.</p></div><div id="controls"><button id="newRaidButton" type="button">New World</button><button id="pauseButton" type="button">Pause</button><button id="resumeButton" type="button">Resume</button><button id="releaseButton" type="button">Release Monster</button><button id="harnessButton" type="button">Run Harness</button></div></header>
-<main id="layout"><section id="mapPanel"><canvas id="raidCanvas" width="960" height="540" aria-label="Raid map"></canvas><p class="hint">Use WASD/arrow keys or drag the map to pan. Shift+mouse wheel pans the camera; normal mouse wheel scrolls the page to the logs.</p></section><aside id="sidePanel"><section id="statusSection"><h2>Status</h2><div id="statusBox">Starting main thread...</div></section><section id="monsterSection"><h2>Monster</h2><div id="monsterPortrait"></div></section><section id="logSection"><h2>Event Log</h2><ol id="eventLog"></ol></section></aside></main>
+<header id="topBar"><div><h1>Monster Breeder</h1><p>Breed and deploy a persistent brood of collared monsters across seasons.</p></div><div id="seasonDisplay" aria-live="polite">Season 1</div><div id="controls"><button id="newRaidButton" type="button">New Campaign</button><button id="pauseButton" type="button">Pause</button><button id="resumeButton" type="button">Resume</button><button id="harnessButton" type="button">Run Harness</button></div></header>
+<main id="layout"><section id="mapPanel"><div id="viewportTopControls"><button id="monsterManagementTab" type="button" aria-label="Show monster management">Monster Management</button><button id="startSeasonButton" type="button">Start Season</button></div><div id="managementDrawer"><button id="closeManagementButton" type="button" aria-label="Close monster management">×</button><h2>Monster Management</h2><p id="managementSummary">Choose which collared monsters to release for the next season.</p><div id="managementBody"><div id="cageViewport"><div id="rosterList" aria-label="Captive monster cage"></div></div><aside id="selectedMonsterPanel"><h3>Cage</h3><p>Select a monster to inspect it.</p></aside></div><div id="managementActions"><span id="managementHint" class="hint"></span></div></div><canvas id="raidCanvas" width="960" height="540" aria-label="Raid map"></canvas><div id="monsterTooltip" class="tooltipHidden"></div><p class="hint">Use WASD/arrow keys or drag the map to pan. Mouse wheel zooms the map around the pointer; pinch zoom works on touch screens.</p></section><aside id="sidePanel"><section id="statusSection"><h2>Status</h2><div id="statusBox">Starting main thread...</div></section><section id="monsterSection"><h2>Monster</h2><div id="monsterPortrait"></div></section><section id="logSection"><h2>Event Log</h2><ol id="eventLog"></ol></section></aside></main>
 <script id="simulationWorkerSource" type="text/plain">
 
 // SPDX-License-Identifier: GPL-3.0-only
@@ -88,6 +135,12 @@ button:hover { background: #ffd768; }
     var PATH_MONSTER_REPATH_COOLDOWN_TICKS = 10;
     var MONSTER_ATTACK_RANGE = 26;
     var COMBAT_COOLDOWN_TICKS = 8;
+    var WILD_MONSTER_COUNT_MIN = 1;
+    var WILD_MONSTER_COUNT_MAX = 3;
+    var WILD_MONSTER_FIRST_SPAWN_TICK_MIN = 45;
+    var WILD_MONSTER_FIRST_SPAWN_TICK_MAX = 180;
+    var WILD_MONSTER_SPAWN_GAP_MIN = 150;
+    var WILD_MONSTER_SPAWN_GAP_MAX = 360;
 
     var TERRAIN_TYPE = {
         GRASS: 0,
@@ -1366,9 +1419,13 @@ button:hover { background: #ffd768; }
         constructor(id, x, y, rng, options) {
             super(id, x, y, 16, options && options.speed ? options.speed : 165);
             this.agentKind = 'monster';
-            this.name = options && options.name ? options.name : Monster.randomName(rng);
+            this.name = options && options.name ? options.name : (options && options.owned === false ? '' : Monster.randomName(rng));
             this.owned = options && options.owned !== undefined ? options.owned : true;
-            this.collared = this.owned;
+            this.collared = options && options.collared !== undefined ? options.collared : this.owned;
+            this.wild = options && options.wild !== undefined ? options.wild : !this.owned;
+            this.entryEdge = options && options.entryEdge ? options.entryEdge : null;
+            this.capturedThisRaid = false;
+            this.selectedForDeployment = options && options.selectedForDeployment !== undefined ? options.selectedForDeployment : this.owned;
             this.deployed = false;
             this.bodyHealth = new BodyHealth(20);
             this.maxHealth = this.bodyHealth.maxTotal();
@@ -1389,6 +1446,44 @@ button:hover { background: #ffd768; }
             this.x = RIGHT_EDGE_X;
             this.y = rng.range(120, world.height - 120);
             this.behaviourState = 'roaming';
+        }
+        enterWild(world, rng) {
+            this.enterWildFromEdge(world, rng);
+        }
+        enterWildFromEdge(world, rng) {
+            this.deployed = true;
+            this.escaped = false;
+            this.x = rng.range(120, world.width - 120);
+            if (rng.nextFloat() < 0.5) {
+                this.y = 0;
+                this.entryEdge = 'top';
+            } else {
+                this.y = world.height;
+                this.entryEdge = 'bottom';
+            }
+            this.behaviourState = 'wildRoaming';
+        }
+        capture(rng) {
+            if (this.owned || !this.alive) {
+                return false;
+            }
+            this.owned = true;
+            this.collared = true;
+            this.wild = false;
+            this.capturedThisRaid = true;
+            if (!this.name) {
+                this.name = Monster.randomName(rng);
+            }
+            this.selectedForDeployment = false;
+            return true;
+        }
+        resetForManagement() {
+            this.deployed = false;
+            this.escaped = false;
+            this.path = [];
+            this.pathKey = '';
+            this.pathIntentKey = '';
+            this.behaviourState = this.alive ? 'captive' : 'dead';
         }
 
         update(raid) {
@@ -1439,9 +1534,13 @@ button:hover { background: #ffd768; }
         getSnapshot() {
             var s = super.getSnapshot();
             s.agentKind = this.agentKind;
-            s.name = this.name;
+            s.name = this.collared || this.owned ? this.name : '';
             s.owned = this.owned;
             s.collared = this.collared;
+            s.wild = this.wild;
+            s.entryEdge = this.entryEdge;
+            s.capturedThisRaid = this.capturedThisRaid;
+            s.selectedForDeployment = this.selectedForDeployment;
             s.deployed = this.deployed;
             s.health = this.health;
             s.maxHealth = this.maxHealth;
@@ -1487,8 +1586,55 @@ button:hover { background: #ffd768; }
         constructor(rng, mode) {
             this.mode = mode || 'campaign';
             this.campaignStats = this.mode === 'campaign' ? new CampaignStats() : null;
-            this.ownedMonsters = [new Monster('monster_1', RIGHT_EDGE_X, rng.range(120, MAP_HEIGHT - 120), rng, { owned: true, name: 'Gribble' })];
+            this.nextMonsterId = 2;
+            this.ownedMonsters = [new Monster('monster_1', RIGHT_EDGE_X, rng.range(120, MAP_HEIGHT - 120), rng, { owned: true, name: 'Gribble', selectedForDeployment: true })];
             this.eggs = [];
+        }
+        createMonsterId(prefix) {
+            var id = (prefix || 'monster') + '_' + this.nextMonsterId;
+            this.nextMonsterId += 1;
+            return id;
+        }
+        getLivingOwnedMonsters() {
+            return this.ownedMonsters.filter(function (monster) {
+                return monster.alive;
+            });
+        }
+        setMonsterDeploymentSelection(monsterId, selected) {
+            var monster = this.ownedMonsters.find(function (m) {
+                return m.id === monsterId;
+            });
+            if (!monster || !monster.alive) {
+                return { ok: false, reason: 'No living captive monster has that id.' };
+            }
+            monster.selectedForDeployment = !!selected;
+            return { ok: true };
+        }
+        addCapturedMonster(monster) {
+            if (this.ownedMonsters.indexOf(monster) < 0) {
+                this.ownedMonsters.push(monster);
+            }
+        }
+        resetAllOwnedForManagement() {
+            this.ownedMonsters = this.ownedMonsters.filter(function (monster) {
+                return monster.alive;
+            });
+            this.ownedMonsters.forEach(function (monster) {
+                monster.resetForManagement();
+            });
+        }
+        cullDeadOwnedMonsters() {
+            this.ownedMonsters = this.ownedMonsters.filter(function (monster) {
+                return monster.alive;
+            });
+        }
+        getManagementSnapshot() {
+            return {
+                ownedMonsters: this.ownedMonsters.map(function (monster) {
+                    return monster.getSnapshot();
+                }),
+                eggs: this.eggs.slice(0)
+            };
         }
     }
 
@@ -1504,7 +1650,10 @@ button:hover { background: #ffd768; }
             this.raidResult = 'Raid in progress';
             this.events = [];
             this.adventurers = this.createAdventurers();
-            this.monsters = gameState.ownedMonsters;
+            this.wildMonsters = [];
+            this.pendingWildMonsters = this.createWildMonsters();
+            this.monsters = gameState.ownedMonsters.concat(this.wildMonsters);
+            this.deploySelectedOwnedMonsters();
             this.droppedTreasure = [];
             this.nextDroppedTreasureId = 1;
             this.addEvent('Season ' + this.seasonNumber + ' raid started in world seed ' + this.world.seed + '.');
@@ -1522,6 +1671,50 @@ button:hover { background: #ffd768; }
             return adventurers;
         }
 
+
+        createWildMonsters() {
+            var wildMonsters = [];
+            var count = this.rng.integer(WILD_MONSTER_COUNT_MIN, WILD_MONSTER_COUNT_MAX);
+            var spawnTick = this.rng.integer(WILD_MONSTER_FIRST_SPAWN_TICK_MIN, WILD_MONSTER_FIRST_SPAWN_TICK_MAX);
+            for (var i = 0; i < count; i += 1) {
+                var monster = new Monster(this.gameState.createMonsterId('wild'), 0, 0, this.rng, {
+                    owned: false,
+                    collared: false,
+                    wild: true,
+                    selectedForDeployment: false
+                });
+                monster.spawnTick = spawnTick;
+                monster.deployed = false;
+                monster.behaviourState = 'offMapWild';
+                wildMonsters.push(monster);
+                spawnTick += this.rng.integer(WILD_MONSTER_SPAWN_GAP_MIN, WILD_MONSTER_SPAWN_GAP_MAX);
+            }
+            return wildMonsters;
+        }
+        spawnDueWildMonsters() {
+            for (var i = this.pendingWildMonsters.length - 1; i >= 0; i -= 1) {
+                var monster = this.pendingWildMonsters[i];
+                if (monster.spawnTick > this.tickNumber) {
+                    continue;
+                }
+                this.pendingWildMonsters.splice(i, 1);
+                monster.enterWildFromEdge(this.world, this.rng);
+                this.wildMonsters.push(monster);
+                this.monsters.push(monster);
+                this.addEvent('A wild uncollared monster wandered onto the map.');
+            }
+        }
+
+        deploySelectedOwnedMonsters() {
+            this.gameState.ownedMonsters.forEach(function (monster) {
+                monster.resetForManagement();
+                if (monster.alive && monster.selectedForDeployment) {
+                    monster.enterFromRight(this.world, this.rng);
+                    this.addEvent(monster.name + ' was released for this season.');
+                }
+            }, this);
+        }
+
         addEvent(text) {
             this.events.push({ tickNumber: this.tickNumber, text: text });
         }
@@ -1532,8 +1725,11 @@ button:hover { background: #ffd768; }
             return result;
         }
 
-        releaseMonster() {
-            var monster = this.monsters.find(function (m) {
+        releaseMonster(monsterId) {
+            var monster = this.gameState.ownedMonsters.find(function (m) {
+                if (monsterId && m.id !== monsterId) {
+                    return false;
+                }
                 return m.alive && !m.deployed;
             });
 
@@ -1546,12 +1742,31 @@ button:hover { background: #ffd768; }
             return { ok: true };
         }
 
+        captureWildMonster(monsterId) {
+            var monster = this.wildMonsters.find(function (m) {
+                return m.id === monsterId;
+            });
+
+            if (!monster || !monster.alive) {
+                return { ok: false, reason: 'No living wild monster with that id is available to capture.' };
+            }
+
+            if (!monster.capture(this.rng)) {
+                return { ok: false, reason: 'That monster is already collared.' };
+            }
+
+            this.gameState.addCapturedMonster(monster);
+            this.addEvent(monster.name + ' was collared and will join the captive monsters if it survives.');
+            return { ok: true };
+        }
+
         tick() {
             if (this.raidEnded) {
                 return;
             }
 
             this.tickNumber += 1;
+            this.spawnDueWildMonsters();
             this.tickCooldowns();
             this.adventurers.forEach(function (adventurer) { adventurer.update(this); }, this);
             this.monsters.forEach(function (monster) { monster.update(this); }, this);
@@ -1656,41 +1871,145 @@ button:hover { background: #ffd768; }
             this.paused = false;
             this.mode = options && options.mode ? options.mode : 'campaign';
             this.seasonNumber = 1;
+            this.phase = 'management';
             this.gameState = new GameState(this.rng, this.mode);
             this.world = WorldGenerator.createWorld(this.seed, options && options.worldOptions ? options.worldOptions : {});
-            this.currentRaid = new Raid(this.world, this.gameState, this.rng.integer(1, 0x7fffffff), this.seasonNumber);
+            this.currentRaid = null;
+            this.pendingEvents = [{ tickNumber: 0, text: 'Campaign created. Choose monsters for season 1.' }];
         }
 
         tick() {
-            if (!this.paused && this.currentRaid) {
+            if (!this.paused && this.currentRaid && this.phase === 'raid') {
                 this.currentRaid.tick();
+                if (this.currentRaid.raidEnded) {
+                    this.finishRaid();
+                }
             }
+        }
+
+        finishRaid() {
+            if (!this.currentRaid || this.phase !== 'raid') {
+                return;
+            }
+
+            var finishedTickNumber = this.currentRaid.tickNumber;
+            this.phase = 'management';
+            this.gameState.resetAllOwnedForManagement();
+            this.currentRaid = null;
+            this.seasonNumber += 1;
+            this.pendingEvents.push({ tickNumber: finishedTickNumber, text: 'Season ended. Choose monsters for the next season.' });
+        }
+
+        startSeason() {
+            if (this.phase === 'raid') {
+                return { ok: false, reason: 'A raid is already in progress.' };
+            }
+if (this.currentRaid) {
+                this.world = WorldGenerator.createWorld(this.rng.integer(1, 0x7fffffff), {});
+            }
+
+            this.currentRaid = new Raid(this.world, this.gameState, this.rng.integer(1, 0x7fffffff), this.seasonNumber);
+            this.phase = 'raid';
+            this.paused = false;
+            return { ok: true };
+        }
+
+        setMonsterDeploymentSelection(monsterId, selected) {
+            if (this.phase === 'raid') {
+                return { ok: false, reason: 'Deployment choices are locked during a raid.' };
+            }
+
+            return this.gameState.setMonsterDeploymentSelection(monsterId, selected);
+        }
+
+        captureWildMonster(monsterId) {
+            if (!this.currentRaid || this.phase !== 'raid') {
+                return { ok: false, reason: 'Wild monsters can be captured only during a raid.' };
+            }
+
+            return this.currentRaid.captureWildMonster(monsterId);
+        }
+
+        deployCaptiveMonster(monsterId) {
+            if (!this.currentRaid || this.phase !== 'raid') {
+                return { ok: false, reason: 'Captive monsters can be deployed only during a raid.' };
+            }
+            return this.currentRaid.releaseMonster(monsterId);
         }
 
         pause() {
             this.paused = true;
-            this.currentRaid.addEvent('Raid paused.');
+            if (this.currentRaid) {
+                this.currentRaid.addEvent('Raid paused.');
+            }
         }
 
         resume() {
             this.paused = false;
-            this.currentRaid.addEvent('Raid resumed.');
+            if (this.currentRaid) {
+                this.currentRaid.addEvent('Raid resumed.');
+            }
         }
 
         releaseMonster() {
+            if (!this.currentRaid || this.phase !== 'raid') {
+                return { ok: false, reason: 'Reserve monsters can be released only during a raid.' };
+            }
+
             return this.currentRaid.releaseMonster();
         }
 
         takeEvents() {
-            return this.currentRaid ? this.currentRaid.takeEvents() : [];
+            var events = this.pendingEvents;
+            this.pendingEvents = [];
+            if (this.currentRaid) {
+                events = events.concat(this.currentRaid.takeEvents());
+            }
+            return events;
         }
 
         getStaticSnapshot() {
-            return this.currentRaid.getStaticSnapshot();
+            if (this.currentRaid) {
+                return this.currentRaid.getStaticSnapshot();
+            }
+
+            return {
+                worldSeed: this.world.seed,
+                mapWidth: this.world.width,
+                mapHeight: this.world.height,
+                world: this.world.getStaticSnapshot(),
+                obstacles: this.world.getObstacleSnapshots(),
+                terrainObjects: this.world.getObstacleSnapshots()
+            };
         }
 
         getSnapshot() {
-            return this.currentRaid.getSnapshot(this.paused);
+            if (this.currentRaid) {
+                var raidSnapshot = this.currentRaid.getSnapshot(this.paused);
+                raidSnapshot.phase = this.phase;
+                raidSnapshot.management = this.gameState.getManagementSnapshot();
+                return raidSnapshot;
+            }
+
+            var treasureSnapshots = this.world.getTreasureSnapshots();
+            return {
+                seed: this.seed,
+                worldSeed: this.world.seed,
+                tickNumber: 0,
+                seasonNumber: this.seasonNumber,
+                phase: this.phase,
+                mapWidth: this.world.width,
+                mapHeight: this.world.height,
+                paused: this.paused,
+                raidEnded: false,
+                raidResult: 'Choose monsters for the next season.',
+                treasures: treasureSnapshots,
+                treasureDeposits: treasureSnapshots,
+                droppedTreasure: [],
+                monsters: this.gameState.ownedMonsters.map(function (monster) { return monster.getSnapshot(); }),
+                adventurers: [],
+                management: this.gameState.getManagementSnapshot()
+            };
         }
     }
 
@@ -1699,10 +2018,10 @@ button:hover { background: #ffd768; }
     // ============================================================================
     function RunSingleHeadlessRaid(seed, maxTicks) {
         var session = new GameSession(seed, { mode: 'quick' });
-        var releaseResult = session.releaseMonster();
+        var releaseResult = session.startSeason();
         var ticksRun = 0;
 
-        while (!session.currentRaid.raidEnded && ticksRun < maxTicks) {
+        while (session.currentRaid && !session.currentRaid.raidEnded && ticksRun < maxTicks) {
             session.tick();
             ticksRun += 1;
         }
@@ -1717,7 +2036,7 @@ button:hover { background: #ffd768; }
 
         return {
             seed: seed,
-            releasedMonster: releaseResult.ok,
+            startedSeason: releaseResult.ok,
             ticksRun: ticksRun,
             raidEnded: snapshot.raidEnded,
             raidResult: snapshot.raidResult,
@@ -1863,6 +2182,36 @@ button:hover { background: #ffd768; }
                     SendSnapshotAndEvents(command.messageId);
                     break;
 
+                case 'START_SEASON':
+                    EnsureGameSession();
+                    var startResult = gameSession.startSeason();
+                    Post(startResult.ok ? { replyTo: command.messageId, type: 'COMMAND_ACCEPTED' } : { replyTo: command.messageId, type: 'COMMAND_REJECTED', payload: { reason: startResult.reason } });
+                    if (startResult.ok) {
+                        SendWorldSnapshot(command.messageId);
+                    }
+                    SendSnapshotAndEvents(command.messageId);
+                    break;
+
+                case 'SET_MONSTER_DEPLOYMENT':
+                    EnsureGameSession();
+                    var selectionResult = gameSession.setMonsterDeploymentSelection(command.payload && command.payload.monsterId, command.payload && command.payload.selected);
+                    Post(selectionResult.ok ? { replyTo: command.messageId, type: 'COMMAND_ACCEPTED' } : { replyTo: command.messageId, type: 'COMMAND_REJECTED', payload: { reason: selectionResult.reason } });
+                    SendSnapshotAndEvents(command.messageId);
+                    break;
+
+                case 'CAPTURE_WILD_MONSTER':
+                    EnsureGameSession();
+                    var captureResult = gameSession.captureWildMonster(command.payload && command.payload.monsterId);
+                    Post(captureResult.ok ? { replyTo: command.messageId, type: 'COMMAND_ACCEPTED' } : { replyTo: command.messageId, type: 'COMMAND_REJECTED', payload: { reason: captureResult.reason } });
+                    SendSnapshotAndEvents(command.messageId);
+                    break;
+                case 'DEPLOY_CAPTIVE_MONSTER':
+                    EnsureGameSession();
+                    var deployResult = gameSession.deployCaptiveMonster(command.payload && command.payload.monsterId);
+                    Post(deployResult.ok ? { replyTo: command.messageId, type: 'COMMAND_ACCEPTED' } : { replyTo: command.messageId, type: 'COMMAND_REJECTED', payload: { reason: deployResult.reason } });
+                    SendSnapshotAndEvents(command.messageId);
+                    break;
+
                 case 'RELEASE_MONSTER':
                     EnsureGameSession();
                     var result = gameSession.releaseMonster();
@@ -1929,18 +2278,20 @@ button:hover { background: #ffd768; }
     // ============================================================================
     // Browser-only state for canvas, controls, rendering snapshots and input.
     var PROTOCOL_VERSION=1, TILE_SIZE=100, ISO_W=92, ISO_H=46, WORLD_WIDTH=1800, WORLD_HEIGHT=1200, MAP_VIEW_MARGIN=120;
-    var canvas=document.getElementById('raidCanvas'), ctx=canvas.getContext('2d'), statusBox=document.getElementById('statusBox'), eventLog=document.getElementById('eventLog'), monsterPortrait=document.getElementById('monsterPortrait');
+    var canvas=document.getElementById('raidCanvas'), ctx=canvas.getContext('2d'), statusBox=document.getElementById('statusBox'), eventLog=document.getElementById('eventLog'), monsterPortrait=document.getElementById('monsterPortrait'), managementDrawer=document.getElementById('managementDrawer'), managementSummary=document.getElementById('managementSummary'), rosterList=document.getElementById('rosterList'), selectedMonsterPanel=document.getElementById('selectedMonsterPanel'), startSeasonButton=document.getElementById('startSeasonButton'), managementHint=document.getElementById('managementHint'), monsterTooltip=document.getElementById('monsterTooltip'), monsterManagementTab=document.getElementById('monsterManagementTab'), closeManagementButton=document.getElementById('closeManagementButton'), seasonDisplay=document.getElementById('seasonDisplay');
     var latestWorldSnapshot=null,latestStaticObstacles=[];
     var latestSnapshot=null,previousSnapshot=null,currentSnapshot=null,previousSnapshotTime=0,currentSnapshotTime=0,nextMessageId=1,keys=new Set();
     var RENDER_INTERPOLATION_DELAY_MS=50;
     var camera={
-        x:0,y:240,width:canvas.width,height:canvas.height,speed:480
+        x:0,y:240,width:canvas.width,height:canvas.height,speed:480,zoom:1
     }
     ;
-    var isDragging=false, lastMouseX=0, lastMouseY=0;
+    var isDragging=false, lastMouseX=0, lastMouseY=0, pointerDownX=0, pointerDownY=0;
+    var activePointersForZoom={}, lastPinchDistance=0;
     var visualFacingById={
     }
     ;
+    var selectedRosterMonsterId=null, lastManagementRenderKey='', managementDrawerVisible=true, hoveredMonsterId=null, hoveredMonster=null, lastSnapshotPhase=null;
     monsterPortrait.innerHTML='<svg viewBox="0 0 180 120" role="img" aria-label="Purple starter monster"><ellipse cx="90" cy="70" rx="55" ry="30" fill="#6b2d83"/><circle cx="62" cy="57" r="8" fill="white"/><circle cx="118" cy="57" r="8" fill="white"/><circle cx="64" cy="58" r="4" fill="#1f2730"/><circle cx="116" cy="58" r="4" fill="#1f2730"/><rect x="52" y="68" width="76" height="8" rx="4" fill="#f2c14e"/></svg>';
     // ============================================================================
     // MODULE: VIEW TRANSFORMS AND WORKER COMMANDS
@@ -1954,11 +2305,22 @@ button:hover { background: #ffd768; }
         ;
     }
     function ToScreen(x,y){
-        var p=Iso(x,y);
-        return{
-            x:p.x+canvas.width/2-camera.x,y:p.y+40-camera.y
-        }
-        ;
+        return Iso(x,y);
+    }
+    function ScreenToIso(screenX,screenY){
+        return {
+            x:(screenX-canvas.width/2)/camera.zoom+camera.x,
+            y:(screenY-40)/camera.zoom+camera.y
+        };
+    }
+    function BeginWorldRenderTransform(){
+        ctx.save();
+        ctx.translate(canvas.width/2,40);
+        ctx.scale(camera.zoom,camera.zoom);
+        ctx.translate(-camera.x,-camera.y);
+    }
+    function EndWorldRenderTransform(){
+        ctx.restore();
     }
     function SendCommand(type,payload){
         worker.postMessage({
@@ -2005,14 +2367,12 @@ button:hover { background: #ffd768; }
         var availableWidth=Math.max(360, window.innerWidth - 24);
         var usedHeight=topBar.getBoundingClientRect().height + (hint ? hint.getBoundingClientRect().height : 0) + 62;
         var availableHeight=Math.max(300, window.innerHeight - usedHeight);
-        var projectedMapWidth=(WORLD_WIDTH+WORLD_HEIGHT)*(ISO_W/TILE_SIZE/2)+MAP_VIEW_MARGIN;
-        var projectedMapHeight=(WORLD_WIDTH+WORLD_HEIGHT)*(ISO_H/TILE_SIZE/2)+MAP_VIEW_MARGIN;
-        var cssWidth=Math.floor(Math.min(availableWidth - 24, projectedMapWidth));
-        var cssHeight=Math.floor(Math.min(availableHeight, projectedMapHeight));
-        cssWidth=Math.max(360, cssWidth);
-        cssHeight=Math.max(300, cssHeight);
+        var cssWidth=Math.floor(Math.max(360, availableWidth - 24));
+        var cssHeight=Math.floor(Math.max(300, availableHeight));
+        canvas.style.width='100%';
         canvas.style.height=cssHeight+'px';
-        if(canvas.width!==cssWidth) canvas.width=cssWidth;
+        var actualWidth=Math.floor(canvas.getBoundingClientRect().width || cssWidth);
+        if(canvas.width!==actualWidth) canvas.width=actualWidth;
         if(canvas.height!==cssHeight) canvas.height=cssHeight;
         camera.width=canvas.width;
         camera.height=canvas.height;
@@ -2029,11 +2389,179 @@ button:hover { background: #ffd768; }
         var tr=s.treasures.filter(function(t){
             return !t.stolen;
         }
-        ).length, adv=s.adventurers.filter(function(a){
+        ).length;
+        var adv=s.adventurers.filter(function(a){
             return a.alive&&!a.escaped;
         }
-        ).length, m=s.monsters[0];
-        statusBox.textContent=['Seed: '+s.seed,'Result: '+s.raidResult,'Paused: '+s.paused,'Treasure remaining: '+tr+' / '+s.treasures.length,'Active adventurers: '+adv,'Monster: '+(m.deployed?'deployed':'waiting at right edge')+' ('+m.health+'/'+m.maxHealth+' hp)','Tick: '+s.tickNumber].join('\n');
+        ).length;
+        var owned=s.monsters.filter(function(m){
+            return m.owned;
+        }
+        );
+        var deployed=owned.filter(function(m){
+            return m.deployed&&m.alive;
+        }
+        ).length;
+        var wild=s.monsters.filter(function(m){
+            return !m.owned&&m.alive;
+        }
+        ).length;
+        seasonDisplay.textContent='Season '+s.seasonNumber;
+        statusBox.textContent=['Season: '+s.seasonNumber,'Phase: '+(s.phase||'raid'),'Result: '+s.raidResult,'Paused: '+s.paused,'Treasure deposits remaining: '+tr+' / '+s.treasures.length,'Active adventurers: '+adv,'Captive monsters: '+owned.length+'  Deployed: '+deployed+'  Wild: '+wild,'Tick: '+s.tickNumber].join('\\n');
+    }
+    function BuildManagementRenderKey(s, monsters){
+        return [s.phase||'raid',s.seasonNumber,managementDrawerVisible?1:0].concat(monsters.map(function(monster){
+            return [monster.id,monster.name,monster.alive?1:0,monster.selectedForDeployment?1:0,monster.deployed?1:0,monster.capturedThisRaid?1:0,Math.round(monster.health),Math.round(monster.maxHealth)].join(':');
+        })).join('|');
+    }
+    function MonsterIconSvg(monster){
+        var body=monster.alive?'#6b2d83':'#6b7280';
+        var dark=monster.alive?'#1f2730':'#374151';
+        var collar=monster.collared?'#f2c14e':'transparent';
+        var eye=monster.alive?'white':'#d1d5db';
+        return '<svg viewBox="0 0 180 110" role="img" aria-label="Monster icon">'
+            + '<ellipse cx="90" cy="82" rx="54" ry="11" fill="rgba(0,0,0,0.18)"/>'
+            + '<path d="M35 66 C44 38 86 29 126 42 C150 50 157 74 139 84 C109 100 58 94 35 66 Z" fill="'+body+'" stroke="'+dark+'" stroke-width="4"/>'
+            + '<path d="M39 61 C22 56 16 45 15 37 C32 43 44 49 55 58 Z" fill="#4a1f5d" stroke="'+dark+'" stroke-width="3"/>'
+            + '<path d="M122 42 C143 30 164 37 169 52 C154 50 141 54 130 64 Z" fill="'+body+'" stroke="'+dark+'" stroke-width="4"/>'
+            + '<circle cx="144" cy="46" r="8" fill="'+eye+'"/><circle cx="147" cy="47" r="4" fill="'+dark+'"/>'
+            + '<path d="M151 58 Q139 66 126 58" fill="none" stroke="'+dark+'" stroke-width="3" stroke-linecap="round"/>'
+            + '<path d="M71 36 L77 18 L84 38 Z M98 35 L106 16 L112 40 Z" fill="#e6d8a9" stroke="'+dark+'" stroke-width="3"/>'
+            + '<path d="M128 68 Q145 75 158 70" stroke="'+collar+'" stroke-width="7" stroke-linecap="round" fill="none"/>'
+            + '</svg>';
+    }
+    function RenderSelectedMonsterPanel(monster){
+        selectedMonsterPanel.innerHTML='';
+        if(!monster){
+            var title=document.createElement('h3');
+            title.textContent='Monster Management';
+            var p=document.createElement('p');
+            p.textContent='Select a monster to inspect it.';
+            selectedMonsterPanel.appendChild(title);
+            selectedMonsterPanel.appendChild(p);
+            return;
+        }
+        var title=document.createElement('h3');
+        title.textContent=monster.name;
+        var icon=document.createElement('div');
+        icon.innerHTML=MonsterIconSvg(monster);
+        var details=document.createElement('dl');
+        details.className='monsterDetailGrid';
+        [['Status',monster.alive?'Alive':'Dead'],['Health',Math.round(monster.health)+' / '+Math.round(monster.maxHealth)],['Collar',monster.collared?'Collared':'Uncollared'],['Raid state',monster.deployed?'Deployed':'In cage'],['Season order',monster.selectedForDeployment?'Deploy at start':'Reserve'],['Origin',monster.capturedThisRaid?'Captured wild monster':'Captive monsters']].forEach(function(row){
+            var dt=document.createElement('dt');
+            var dd=document.createElement('dd');
+            dt.textContent=row[0];
+            dd.textContent=row[1];
+            details.appendChild(dt);
+            details.appendChild(dd);
+        });
+        selectedMonsterPanel.appendChild(title);
+        selectedMonsterPanel.appendChild(icon);
+        selectedMonsterPanel.appendChild(details);
+    }
+    function UpdateManagementDrawer(s){
+        var phase=s.phase||'raid';
+        var management=s.management||{ ownedMonsters:s.monsters.filter(function(m){ return m.owned; }) };
+        var visible=managementDrawerVisible;
+        managementDrawer.classList.toggle('drawerHidden',!visible);
+        managementDrawer.classList.toggle('raidDrawer',phase==='raid');
+        monsterManagementTab.textContent=visible?'Monster Management ▲':'Monster Management ▼';
+        if(!visible){
+            return;
+        }
+        var monsters=management.ownedMonsters||[];
+        if(!selectedRosterMonsterId&&monsters.length>0){ selectedRosterMonsterId=monsters[0].id; }
+        if(selectedRosterMonsterId&&!monsters.some(function(monster){ return monster.id===selectedRosterMonsterId; })){ selectedRosterMonsterId=monsters.length>0?monsters[0].id:null; }
+        var renderKey=BuildManagementRenderKey(s,monsters)+'|selected:'+selectedRosterMonsterId;
+        if(renderKey===lastManagementRenderKey){ return; }
+        lastManagementRenderKey=renderKey;
+        managementSummary.textContent=phase==='raid'?'Raid in progress: inspect the captive monsters and deploy living reserve monsters when needed.':'Choose which collared captive monsters to release for season '+s.seasonNumber+'. Captured wild monsters appear here after they are collared.';
+        rosterList.innerHTML='';
+        if(monsters.length===0){
+            var empty=document.createElement('div');
+            empty.className='monsterCard dead';
+            empty.textContent='No captive monsters remain.';
+            rosterList.appendChild(empty);
+            RenderSelectedMonsterPanel(null);
+        }
+        monsters.forEach(function(monster){
+            var card=document.createElement('div');
+            card.setAttribute('role','button');
+            card.tabIndex=monster.alive?0:-1;
+            card.className='monsterCard'+(monster.alive?'':' dead')+(monster.id===selectedRosterMonsterId?' selected':'');
+            card.setAttribute('aria-disabled',monster.alive?'false':'true');
+            card.addEventListener('click',function(){ if(!monster.alive){ return; } selectedRosterMonsterId=monster.id; lastManagementRenderKey=''; UpdateManagementDrawer(s); });
+            card.addEventListener('keydown',function(event){ if((event.key==='Enter'||event.key===' ')&&monster.alive){ event.preventDefault(); selectedRosterMonsterId=monster.id; lastManagementRenderKey=''; UpdateManagementDrawer(s); } });
+            var header=document.createElement('div');
+            header.className='monsterCardHeader';
+            var name=document.createElement('span');
+            name.className='monsterCardName';
+            name.textContent=monster.name;
+            header.appendChild(name);
+            if(phase==='raid'){
+                if(monster.alive&&!monster.deployed){
+                    var deployButton=document.createElement('button');
+                    deployButton.type='button';
+                    deployButton.className='deployNowButton';
+                    deployButton.textContent='Deploy';
+                    deployButton.addEventListener('click',function(event){ event.stopPropagation(); SendCommand('DEPLOY_CAPTIVE_MONSTER',{ monsterId:monster.id }); });
+                    header.appendChild(deployButton);
+                } else {
+                    var deployedBadge=document.createElement('span');
+                    deployedBadge.className='rosterBadge';
+                    deployedBadge.textContent=monster.deployed?'Deployed':'Unavailable';
+                    header.appendChild(deployedBadge);
+                }
+            } else {
+                var deployLabel=document.createElement('label');
+                deployLabel.className='monsterDeployControl';
+                deployLabel.addEventListener('click',function(event){ event.stopPropagation(); });
+                var checkbox=document.createElement('input');
+                checkbox.type='checkbox';
+                checkbox.checked=!!monster.selectedForDeployment;
+                checkbox.disabled=!monster.alive;
+                checkbox.addEventListener('change',function(event){ event.stopPropagation(); lastManagementRenderKey='';
+                    SendCommand('SET_MONSTER_DEPLOYMENT',{ monsterId:monster.id,selected:checkbox.checked }); });
+                var deployText=document.createElement('span');
+                deployText.textContent='Deploy';
+                deployLabel.appendChild(checkbox);
+                deployLabel.appendChild(deployText);
+                header.appendChild(deployLabel);
+            }
+            var icon=document.createElement('div');
+            icon.innerHTML=MonsterIconSvg(monster);
+            var hpRatio=monster.maxHealth>0?Math.max(0,Math.min(1,monster.health/monster.maxHealth)):0;
+            var hpBar=document.createElement('div');
+            hpBar.className='monsterHpBar';
+            var hpFill=document.createElement('div');
+            hpFill.className='monsterHpFill'+(hpRatio<0.45?' low':'');
+            hpFill.style.width=Math.round(hpRatio*100)+'%';
+            hpBar.appendChild(hpFill);
+            var meta=document.createElement('div');
+            meta.className='monsterCardMeta';
+            var status=document.createElement('span');
+            status.textContent=monster.alive?'HP '+Math.round(monster.health)+'/'+Math.round(monster.maxHealth):'dead';
+            var state=document.createElement('span');
+            state.textContent=phase==='raid'?(monster.deployed?'deployed':'in cage'):(monster.capturedThisRaid?'new capture':(monster.selectedForDeployment?'deploy':'reserve'));
+            meta.appendChild(status);
+            meta.appendChild(state);
+            card.appendChild(header);
+            card.appendChild(icon);
+            card.appendChild(hpBar);
+            card.appendChild(meta);
+            rosterList.appendChild(card);
+        });
+        var selectedMonster=monsters.find(function(monster){ return monster.id===selectedRosterMonsterId; })||null;
+        RenderSelectedMonsterPanel(selectedMonster);
+        var selected=monsters.filter(function(monster){ return monster.alive&&monster.selectedForDeployment; }).length;
+        startSeasonButton.style.display=phase==='raid'?'none':'';
+        startSeasonButton.disabled=false;
+        if(phase==='raid'){
+            var reserves=monsters.filter(function(monster){ return monster.alive&&!monster.deployed; }).length;
+            managementHint.textContent=reserves+' reserve monster'+(reserves===1?'':'s')+' available.';
+        } else {
+            managementHint.textContent=selected+' monster'+(selected===1?'':'s')+' selected for deployment.';
+        }
     }
     // ============================================================================
     // MODULE: STATIC WORLD RENDERING
@@ -2534,14 +3062,23 @@ else {
             ctx.fill();
             ctx.stroke();
         }
-        ctx.strokeStyle='#f2c14e';
-        ctx.lineWidth=5;
-        ctx.beginPath();
-        ctx.moveTo(headX-lx*12-fx*6,headY+9);
-        ctx.quadraticCurveTo(headX,headY+15,headX+lx*12-fx*6,headY+9);
-        ctx.stroke();
-        ctx.fillStyle='#f2c14e';
-        ctx.fillRect(headX-fx*3-2,headY+10,5,6);
+        if(m.collared){
+            ctx.strokeStyle='#f2c14e';
+            ctx.lineWidth=5;
+            ctx.beginPath();
+            ctx.moveTo(headX-lx*12-fx*6,headY+9);
+            ctx.quadraticCurveTo(headX,headY+15,headX+lx*12-fx*6,headY+9);
+            ctx.stroke();
+            ctx.fillStyle='#f2c14e';
+            ctx.fillRect(headX-fx*3-2,headY+10,5,6);
+        }
+        if(m.id===hoveredMonsterId){
+            ctx.strokeStyle=m.collared?'rgba(242,193,78,0.9)':'rgba(255,255,255,0.95)';
+            ctx.lineWidth=4;
+            ctx.beginPath();
+            ctx.ellipse(0,-34,43,29,rot,0,Math.PI*2);
+            ctx.stroke();
+        }
         if(hurtRatio<0.35){
             ctx.fillStyle='rgba(190,39,39,0.18)';
             ctx.beginPath();
@@ -2625,8 +3162,10 @@ else {
     // ============================================================================
     // Sorts and draws visible raid objects without mutating simulation state.
     function RenderRaid(s,now){
+        ctx.setTransform(1,0,0,1,0,0);
         ctx.fillStyle='#9fc4d9';
         ctx.fillRect(0,0,canvas.width,canvas.height);
+        BeginWorldRenderTransform();
         var cols=Math.ceil(s.mapWidth/TILE_SIZE),rows=Math.ceil(s.mapHeight/TILE_SIZE),x,y,p;
         for(y=0;
         y<rows;
@@ -2635,7 +3174,7 @@ else {
             x<cols;
             x+=1){
                 p=ToScreen(x*TILE_SIZE+TILE_SIZE/2,y*TILE_SIZE+TILE_SIZE/2);
-                if(p.x<-100||p.x>canvas.width+100||p.y<-80||p.y>canvas.height+80)continue;
+                if(p.x<camera.x-canvas.width/camera.zoom-160||p.x>camera.x+canvas.width/camera.zoom+160||p.y<camera.y-canvas.height/camera.zoom-160||p.y>camera.y+canvas.height/camera.zoom+160)continue;
                 DrawDiamond(p.x,p.y,ISO_W,ISO_H,(x+y)%2===0?'#7fa85b':'#88b463','#648a45');
             }
         }
@@ -2682,13 +3221,62 @@ else if(r.kind==='adventurer')DrawAdventurer(r.obj,now);
 else DrawMonster(r.obj,now);
         }
         );
-        ctx.fillStyle='rgba(31,39,48,0.82)';
-        ctx.fillRect(10,10,330,72);
-        ctx.fillStyle='white';
-        ctx.font='14px system-ui';
-        ctx.fillText('Isometric renderer only; simulation remains normal x/y.',22,34);
-        ctx.fillText('Camera: '+Math.round(camera.x)+', '+Math.round(camera.y)+'  Tick: '+s.tickNumber,22,56);
-        ctx.fillText('Left edge: adventurers. Right edge: collared monsters.',22,76);
+        EndWorldRenderTransform();
+    }
+    function FindMonsterAt(clientX,clientY){
+        var renderSnapshot=MakeRenderSnapshot(performance.now());
+        if(!renderSnapshot||!renderSnapshot.monsters){ return null; }
+        var rect=canvas.getBoundingClientRect();
+        var sx=(clientX-rect.left)*(canvas.width/Math.max(1,rect.width));
+        var sy=(clientY-rect.top)*(canvas.height/Math.max(1,rect.height));
+        var worldPoint=ScreenToIso(sx,sy);
+        var best=null;
+        var bestDistance=32/Math.max(0.1,camera.zoom);
+        renderSnapshot.monsters.forEach(function(monster){
+            if(!monster.alive||!monster.deployed){ return; }
+            var p=ToScreen(monster.x,monster.y);
+            var d=Math.hypot(p.x-worldPoint.x,p.y-worldPoint.y);
+            if(d<bestDistance){ bestDistance=d; best=monster; }
+        });
+        return best;
+    }
+    function MonsterDisplayName(monster){
+        return monster.name || (monster.collared ? 'Collared monster' : 'Uncollared wild monster');
+    }
+    function BuildMonsterTooltip(monster){
+        var lines=[];
+        lines.push(MonsterDisplayName(monster));
+        lines.push('Health: '+Math.round(monster.health)+' / '+Math.round(monster.maxHealth));
+        lines.push(monster.collared?'Collared':'Uncollared');
+        lines.push(monster.deployed?'Currently on the map':'In cage');
+        if(!monster.owned){
+            lines.push('Click to collar');
+        }
+        return lines.join('\n');
+    }
+    function UpdateMonsterHover(clientX,clientY){
+        var monster=FindMonsterAt(clientX,clientY);
+        hoveredMonster=monster;
+        hoveredMonsterId=monster?monster.id:null;
+        if(!monster){
+            monsterTooltip.classList.add('tooltipHidden');
+            canvas.style.cursor=isDragging?'grabbing':'grab';
+            return;
+        }
+        canvas.style.cursor=monster.owned?'grab':'pointer';
+        monsterTooltip.textContent=BuildMonsterTooltip(monster);
+        var panelRect=document.getElementById('mapPanel').getBoundingClientRect();
+        monsterTooltip.style.left=(clientX-panelRect.left+12)+'px';
+        monsterTooltip.style.top=(clientY-panelRect.top+12)+'px';
+        monsterTooltip.classList.remove('tooltipHidden');
+    }
+    function TryCaptureWildMonsterAt(clientX,clientY){
+        var best=FindMonsterAt(clientX,clientY);
+        if(best&&!best.owned){
+            SendCommand('CAPTURE_WILD_MONSTER',{ monsterId:best.id });
+            return true;
+        }
+        return false;
     }
     // ============================================================================
     // MODULE: WORKER MESSAGE HANDLING
@@ -2709,7 +3297,7 @@ else DrawMonster(r.obj,now);
         }
         switch(message.type){
             case'READY':AppendLog('Simulation worker ready.');
-            SendCommand('NEW_RAID',{
+            SendCommand('NEW_WORLD',{
                 seed:Date.now()
             }
             );
@@ -2727,6 +3315,12 @@ else DrawMonster(r.obj,now);
             currentSnapshotTime=performance.now();
             latestSnapshot=currentSnapshot;
             UpdateStatus(latestSnapshot);
+            if(latestSnapshot.phase==='management'&&lastSnapshotPhase==='raid'){
+                managementDrawerVisible=true;
+                lastManagementRenderKey='';
+            }
+            lastSnapshotPhase=latestSnapshot.phase||'raid';
+            UpdateManagementDrawer(latestSnapshot);
             break;
             case'RAID_EVENTS':message.payload.events.forEach(function(e){
                 AppendLog('['+e.tickNumber+'] '+e.text);
@@ -2745,10 +3339,26 @@ else DrawMonster(r.obj,now);
     // ============================================================================
     // Converts user input into worker commands or camera-only UI changes.
     document.getElementById('newRaidButton').addEventListener('click',function(){
-        SendCommand('NEW_RAID',{
+        SendCommand('NEW_WORLD',{
             seed:Date.now()
         }
         );
+    }
+    );
+    monsterManagementTab.addEventListener('click',function(){
+        managementDrawerVisible=!managementDrawerVisible;
+        lastManagementRenderKey='';
+        if(latestSnapshot){
+            UpdateManagementDrawer(latestSnapshot);
+        }
+    }
+    );
+    closeManagementButton.addEventListener('click',function(){
+        managementDrawerVisible=false;
+        lastManagementRenderKey='';
+        if(latestSnapshot){
+            UpdateManagementDrawer(latestSnapshot);
+        }
     }
     );
     document.getElementById('pauseButton').addEventListener('click',function(){
@@ -2759,15 +3369,20 @@ else DrawMonster(r.obj,now);
         SendCommand('RESUME_RAID');
     }
     );
-    document.getElementById('releaseButton').addEventListener('click',function(){
-        SendCommand('RELEASE_MONSTER');
-    }
-    );
     document.getElementById('harnessButton').addEventListener('click',function(){
         SendCommand('RUN_HEADLESS_TESTS',{
             seed:100000,count:3,maxTicks:600
         }
         );
+    }
+    );
+    startSeasonButton.addEventListener('click',function(){
+        managementDrawerVisible=false;
+        lastManagementRenderKey='';
+        if(latestSnapshot){
+            UpdateManagementDrawer(latestSnapshot);
+        }
+        SendCommand('START_SEASON');
     }
     );
     window.addEventListener('keydown',function(e){
@@ -2779,38 +3394,84 @@ else DrawMonster(r.obj,now);
     }
     );
     canvas.addEventListener('wheel',function(e){
-        if(!e.shiftKey){
-            return;
-        }
         e.preventDefault();
-        camera.x += e.deltaX;
-        camera.y += e.deltaY;
+        var rect=canvas.getBoundingClientRect();
+        var sx=(e.clientX-rect.left)*(canvas.width/Math.max(1,rect.width));
+        var sy=(e.clientY-rect.top)*(canvas.height/Math.max(1,rect.height));
+        var before=ScreenToIso(sx,sy);
+        var zoomFactor=Math.exp(-e.deltaY*0.0012);
+        camera.zoom=Math.max(0.45,Math.min(2.4,camera.zoom*zoomFactor));
+        var after=ScreenToIso(sx,sy);
+        camera.x+=before.x-after.x;
+        camera.y+=before.y-after.y;
     }
     ,{
         passive:false
     }
     );
     canvas.addEventListener('pointerdown',function(e){
+        activePointersForZoom[e.pointerId]={ x:e.clientX, y:e.clientY };
+        if(Object.keys(activePointersForZoom).length>=2){
+            var points=Object.keys(activePointersForZoom).map(function(key){ return activePointersForZoom[key]; });
+            lastPinchDistance=Math.hypot(points[0].x-points[1].x,points[0].y-points[1].y);
+            isDragging=false;
+            return;
+        }
         isDragging=true;
         lastMouseX=e.clientX;
         lastMouseY=e.clientY;
+        pointerDownX=e.clientX;
+        pointerDownY=e.clientY;
         canvas.classList.add('dragging');
+        monsterTooltip.classList.add('tooltipHidden');
         canvas.setPointerCapture(e.pointerId);
     }
     );
     canvas.addEventListener('pointermove',function(e){
-        if(!isDragging)return;
+        if(activePointersForZoom[e.pointerId]){
+            activePointersForZoom[e.pointerId]={ x:e.clientX, y:e.clientY };
+        }
+        if(Object.keys(activePointersForZoom).length>=2){
+            var keysList=Object.keys(activePointersForZoom);
+            var a=activePointersForZoom[keysList[0]];
+            var b=activePointersForZoom[keysList[1]];
+            var distance=Math.hypot(a.x-b.x,a.y-b.y);
+            if(lastPinchDistance>0){
+                var rect=canvas.getBoundingClientRect();
+                var sx=(((a.x+b.x)/2)-rect.left)*(canvas.width/Math.max(1,rect.width));
+                var sy=(((a.y+b.y)/2)-rect.top)*(canvas.height/Math.max(1,rect.height));
+                var before=ScreenToIso(sx,sy);
+                camera.zoom=Math.max(0.45,Math.min(2.4,camera.zoom*(distance/lastPinchDistance)));
+                var after=ScreenToIso(sx,sy);
+                camera.x+=before.x-after.x;
+                camera.y+=before.y-after.y;
+            }
+            lastPinchDistance=distance;
+            return;
+        }
+        if(!isDragging){
+            UpdateMonsterHover(e.clientX,e.clientY);
+            return;
+        }
+        monsterTooltip.classList.add('tooltipHidden');
         var dx=e.clientX-lastMouseX;
         var dy=e.clientY-lastMouseY;
         lastMouseX=e.clientX;
         lastMouseY=e.clientY;
-        camera.x -= dx;
-        camera.y -= dy;
+        camera.x -= dx/camera.zoom;
+        camera.y -= dy/camera.zoom;
     }
     );
     canvas.addEventListener('pointerup',function(e){
+        delete activePointersForZoom[e.pointerId];
+        lastPinchDistance=0;
+        var clickDistance=Math.hypot(e.clientX-pointerDownX,e.clientY-pointerDownY);
+        if(clickDistance<6){
+            TryCaptureWildMonsterAt(e.clientX,e.clientY);
+        }
         isDragging=false;
         canvas.classList.remove('dragging');
+        UpdateMonsterHover(e.clientX,e.clientY);
         try{
             canvas.releasePointerCapture(e.pointerId);
         }
@@ -2818,8 +3479,13 @@ catch (ignore){
         }
     }
     );
-    canvas.addEventListener('pointercancel',function(){
+    canvas.addEventListener('pointercancel',function(e){
+        delete activePointersForZoom[e.pointerId];
+        lastPinchDistance=0;
         isDragging=false;
+        hoveredMonsterId=null;
+        hoveredMonster=null;
+        monsterTooltip.classList.add('tooltipHidden');
         canvas.classList.remove('dragging');
     }
     );
