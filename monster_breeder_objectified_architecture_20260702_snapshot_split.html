@@ -1,0 +1,2853 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monster Breeder MVP - Object Architecture</title>
+<style>
+html, body { margin: 0; min-height: 100%; font-family: system-ui, sans-serif; color: #1f2730; background: #f0eee6; }
+body { overflow-y: auto; }
+#topBar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.75rem 1rem; background: #2f3d2f; color: white; box-sizing: border-box; }
+#topBar h1 { margin: 0; font-size: 1.35rem; }
+#topBar p { margin: 0.25rem 0 0; opacity: 0.9; }
+#controls { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+button { border: 0; border-radius: 0.4rem; padding: 0.55rem 0.75rem; cursor: pointer; background: #f2c14e; color: #1f2730; font-weight: 700; }
+button:hover { background: #ffd768; }
+#layout { display: block; padding: 0.75rem; box-sizing: border-box; }
+#mapPanel, #sidePanel { background: white; border-radius: 0.6rem; box-shadow: 0 1px 5px rgba(0, 0, 0, 0.18); padding: 0.75rem; box-sizing: border-box; }
+#mapPanel { min-height: 320px; }
+#raidCanvas { display: block; width: 100%; border: 2px solid #394732; background: #9fc4d9; box-sizing: border-box; cursor: grab; touch-action: none; }
+#raidCanvas.dragging { cursor: grabbing; }
+.hint { margin: 0.5rem 0 0; color: #526052; }
+#sidePanel { margin-top: 0.75rem; display: grid; grid-template-columns: minmax(220px, 1fr) minmax(180px, 260px) minmax(280px, 2fr); gap: 0.75rem; align-items: start; }
+#sidePanel h2 { margin: 0 0 0.35rem; font-size: 1rem; }
+#statusBox { white-space: pre-line; line-height: 1.45; }
+#monsterPortrait svg { width: 140px; height: 100px; }
+#eventLog { max-height: 10rem; overflow: auto; padding-left: 1.4rem; margin-top: 0; }
+#eventLog li { margin-bottom: 0.35rem; }
+#statusSection, #monsterSection, #logSection { min-width: 0; }
+@media (max-width: 900px) {
+    #topBar { align-items: flex-start; flex-direction: column; }
+    #sidePanel { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<header id="topBar"><div><h1>Monster Breeder MVP</h1><p>Persistent world architecture with object-oriented raid simulation.</p></div><div id="controls"><button id="newRaidButton" type="button">New World</button><button id="pauseButton" type="button">Pause</button><button id="resumeButton" type="button">Resume</button><button id="releaseButton" type="button">Release Monster</button><button id="harnessButton" type="button">Run Harness</button></div></header>
+<main id="layout"><section id="mapPanel"><canvas id="raidCanvas" width="960" height="540" aria-label="Raid map"></canvas><p class="hint">Use WASD/arrow keys or drag the map to pan. Shift+mouse wheel pans the camera; normal mouse wheel scrolls the page to the logs.</p></section><aside id="sidePanel"><section id="statusSection"><h2>Status</h2><div id="statusBox">Starting main thread...</div></section><section id="monsterSection"><h2>Monster</h2><div id="monsterPortrait"></div></section><section id="logSection"><h2>Event Log</h2><ol id="eventLog"></ol></section></aside></main>
+<script id="simulationWorkerSource" type="text/plain">
+
+// SPDX-License-Identifier: GPL-3.0-only
+// @ts-check
+(function () {
+    'use strict';
+
+    // ============================================================================
+    // AI MAINTAINER NOTES - FILE SHAPE, STYLE AND ARCHITECTURE
+    // ============================================================================
+    // This project is deliberately kept in one HTML file for collaboration through
+    // M365 Copilot, where file upload limits and file-memory drift make multi-file
+    // projects unreliable. Do not split this into separate source files unless the
+    // human maintainer explicitly asks for that.
+    //
+    // Committees > gods architectural rule:
+    // - GameSession is a high-level coordinator only, not a god object.
+    // - World owns persistent physical place data.
+    // - GameState owns persistent player-owned monsters/eggs and optional campaign
+    //   statistics.
+    // - Raid owns temporary live raid state.
+    // - Agent owns pathfinding, movement and visibility algorithms in the purer
+    //   object-oriented style chosen by the human maintainer.
+    //
+    // Formatting rule: no compressed one-line control flow. Preserve readable
+    // whitespace, section headings and plain-data worker snapshots.
+    //
+    // Snapshot rule: do not send static world scenery every tick. Send static world
+    // data once with WORLD_SNAPSHOT after world creation, then send small dynamic
+    // RAID_SNAPSHOT messages for agents, raid state, treasure amounts and drops.
+    // ============================================================================
+
+    // ============================================================================
+    // MODULE: CONSTANTS, ENUMS AND PROFILES
+    // ============================================================================
+    var PROTOCOL_VERSION = 1;
+    var MAP_WIDTH = 1800;
+    var MAP_HEIGHT = 1200;
+    var TILE_SIZE = 100;
+    var LEFT_EDGE_X = 0;
+    var RIGHT_EDGE_X = MAP_WIDTH;
+    var TICK_DT = 1 / 30;
+    var TICK_MS = 33;
+    var NAV_CELL_SIZE = 60;
+    var NAV_CLEARANCE = 18;
+    var MOVEMENT_CLEARANCE_MARGIN = 3;
+    var PATH_REACHED_DISTANCE = 14;
+    var PATH_STUCK_REPATH_TICKS = 8;
+    var PATH_TARGET_MOVE_REPATH_DISTANCE = 90;
+    var PATH_DEFAULT_REPATH_COOLDOWN_TICKS = 18;
+    var PATH_MONSTER_REPATH_COOLDOWN_TICKS = 10;
+    var MONSTER_ATTACK_RANGE = 26;
+    var COMBAT_COOLDOWN_TICKS = 8;
+
+    var TERRAIN_TYPE = {
+        GRASS: 0,
+        ROCKY: 1,
+        FOREST: 2,
+        MARSH: 3,
+        STREAM: 4,
+        LAKE: 5,
+        TUNDRA: 6,
+        ICE: 7,
+        DESERT: 8
+    };
+
+    var TERRAIN_NAMES = [
+        'grass',
+        'rocky',
+        'forest',
+        'marsh',
+        'stream',
+        'lake',
+        'tundra',
+        'ice',
+        'desert'
+    ];
+
+    var TREASURE_TYPES = {
+        bronze: { id: 'bronze', displayName: 'bronze coins', unitValue: 1, colour: '#b7791f' },
+        silver: { id: 'silver', displayName: 'silver coins', unitValue: 3, colour: '#c0c7d1' },
+        gold: { id: 'gold', displayName: 'gold coins', unitValue: 7, colour: '#f2c14e' },
+        rubies: { id: 'rubies', displayName: 'rubies', unitValue: 20, colour: '#b91c1c' },
+        emeralds: { id: 'emeralds', displayName: 'emeralds', unitValue: 30, colour: '#047857' }
+    };
+
+    var ADVENTURER_PROFILE = {
+        villager: {
+            className: 'villager',
+            speedMin: 86,
+            speedMax: 112,
+            bodyPartHealth: 12,
+            carryCapacity: 15,
+            courageMin: 0.18,
+            courageMax: 0.55,
+            intelligenceMin: 0.12,
+            intelligenceMax: 0.42,
+            perceptionMin: 0.12,
+            perceptionMax: 0.48,
+            strengthMin: 0.25,
+            strengthMax: 0.6
+        }
+    };
+
+    // ============================================================================
+    // MODULE: UTILITY
+    // ============================================================================
+    class SeededRng {
+        constructor(seed) {
+            this.state = seed >>> 0;
+
+            if (this.state === 0) {
+                this.state = 0x6d2b79f5;
+            }
+        }
+
+        nextFloat() {
+            this.state = (this.state + 0x6d2b79f5) >>> 0;
+            var t = this.state;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        }
+
+        range(min, max) {
+            return min + (max - min) * this.nextFloat();
+        }
+
+        integer(min, maxInclusive) {
+            return Math.floor(this.range(min, maxInclusive + 1));
+        }
+
+        pick(items) {
+            return items[this.integer(0, items.length - 1)];
+        }
+    }
+
+    function Distance(ax, ay, bx, by) {
+        return Math.hypot(ax - bx, ay - by);
+    }
+
+    function Clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    // ============================================================================
+    // MODULE: TERRAIN RULES
+    // ============================================================================
+    // The World stores facts. Rules interpret those facts. Do not store direct
+    // unit modifiers such as mountedKnightModifier on biome/environment data.
+    var TerrainRules = {
+        movementCostFor: function (agent, terrainType, slope) {
+            var base = 1;
+
+            if (terrainType === TERRAIN_TYPE.ROCKY) {
+                base = 1.35;
+            } else if (terrainType === TERRAIN_TYPE.FOREST) {
+                base = 1.2;
+            } else if (terrainType === TERRAIN_TYPE.MARSH) {
+                base = agent.isMounted ? 9999 : 2.4;
+            } else if (terrainType === TERRAIN_TYPE.STREAM) {
+                base = agent.isMounted ? 1.9 : 1.55;
+            } else if (terrainType === TERRAIN_TYPE.LAKE) {
+                base = 9999;
+            } else if (terrainType === TERRAIN_TYPE.ICE) {
+                base = 1.7;
+            } else if (terrainType === TERRAIN_TYPE.DESERT) {
+                base = 1.25;
+            }
+
+            return base + Math.max(0, slope) * 0.25;
+        },
+
+        canTraverse: function (agent, terrainType, slope) {
+            return this.movementCostFor(agent, terrainType, slope) < 9999;
+        },
+
+        visibilityPenaltyFor: function (terrainType, slope) {
+            if (terrainType === TERRAIN_TYPE.FOREST) {
+                return 0.18 + slope * 0.03;
+            }
+
+            if (terrainType === TERRAIN_TYPE.MARSH) {
+                return 0.12 + slope * 0.02;
+            }
+
+            return Math.max(0, slope * 0.03);
+        }
+    };
+
+    // ============================================================================
+    // MODULE: COMPACT TERRAIN GRID
+    // ============================================================================
+    // Tiles are compact array data, not one object per tile. Query methods provide
+    // a clean interface without object-per-tile maintenance and memory overhead.
+    class TerrainGrid {
+        constructor(width, height, tileSize, terrainTypes, heights) {
+            this.width = width;
+            this.height = height;
+            this.tileSize = tileSize;
+            this.cols = Math.ceil(width / tileSize);
+            this.rows = Math.ceil(height / tileSize);
+            this.terrainTypes = terrainTypes;
+            this.heights = heights;
+        }
+
+        index(tx, ty) {
+            return Clamp(ty, 0, this.rows - 1) * this.cols + Clamp(tx, 0, this.cols - 1);
+        }
+
+        worldToTile(x, y) {
+            return {
+                tx: Clamp(Math.floor(x / this.tileSize), 0, this.cols - 1),
+                ty: Clamp(Math.floor(y / this.tileSize), 0, this.rows - 1)
+            };
+        }
+
+        getTerrainTypeAtTile(tx, ty) {
+            return this.terrainTypes[this.index(tx, ty)];
+        }
+
+        getTerrainTypeAtWorld(x, y) {
+            var tile = this.worldToTile(x, y);
+            return this.getTerrainTypeAtTile(tile.tx, tile.ty);
+        }
+
+        getHeightAtTile(tx, ty) {
+            return this.heights[this.index(tx, ty)];
+        }
+
+        getHeightAtWorld(x, y) {
+            var tile = this.worldToTile(x, y);
+            return this.getHeightAtTile(tile.tx, tile.ty);
+        }
+
+        getSlopeAtTile(tx, ty) {
+            var here = this.getHeightAtTile(tx, ty);
+            var east = this.getHeightAtTile(tx + 1, ty);
+            var west = this.getHeightAtTile(tx - 1, ty);
+            var south = this.getHeightAtTile(tx, ty + 1);
+            var north = this.getHeightAtTile(tx, ty - 1);
+            return Math.max(Math.abs(here - east), Math.abs(here - west), Math.abs(here - south), Math.abs(here - north));
+        }
+
+        getSlopeAtWorld(x, y) {
+            var tile = this.worldToTile(x, y);
+            return this.getSlopeAtTile(tile.tx, tile.ty);
+        }
+    }
+
+    // ============================================================================
+    // MODULE: WORLD ENTITY BASE CLASS
+    // ============================================================================
+    // WorldEntity is intentionally very thin: identity plus spatial footprint only.
+    // Do not add lifecycle, health, animation, pathfinding, AI or rendering logic
+    // to this class without explicit human-reviewer instructions.
+    class WorldEntity {
+        constructor(id, x, y, radius) {
+            this.id = id;
+            this.x = x;
+            this.y = y;
+            this.radius = radius || 8;
+        }
+
+        distanceTo(other) {
+            return Distance(this.x, this.y, other.x, other.y);
+        }
+
+        getSnapshot() {
+            return {
+                id: this.id,
+                x: this.x,
+                y: this.y,
+                radius: this.radius
+            };
+        }
+    }
+
+    // ============================================================================
+    // MODULE: TERRAIN OBJECTS
+    // ============================================================================
+    class TerrainObject extends WorldEntity {
+        constructor(id, type, x, y, radius, blocksMovement) {
+            super(id, x, y, radius);
+            this.type = type;
+            this.blocksMovement = !!blocksMovement;
+            this.blockingRadius = radius;
+            this.blocksVisionAmount = 0;
+            this.variant = 0;
+        }
+
+        getSnapshot() {
+            var s = super.getSnapshot();
+            s.type = this.type;
+            s.blocksMovement = this.blocksMovement;
+            s.blockingRadius = this.blockingRadius;
+            s.blocksVisionAmount = this.blocksVisionAmount;
+            s.variant = this.variant;
+            return s;
+        }
+    }
+
+    class Tree extends TerrainObject {
+        constructor(id, x, y, rng, environment) {
+            var radius = rng.range(20, 34 + environment.vegetationDensity * 14);
+            super(id, 'tree', x, y, radius, true);
+            this.canopyDensity = Clamp(rng.range(0.25, 0.55) + environment.vegetationDensity * 0.45, 0.1, 0.95);
+            this.blockingRadius = 10;
+            this.blocksVisionAmount = this.canopyDensity;
+            this.variant = rng.integer(0, 2);
+        }
+
+        getSnapshot() {
+            var s = super.getSnapshot();
+            s.canopyDensity = this.canopyDensity;
+            return s;
+        }
+    }
+
+    class TerrainRock extends TerrainObject {
+        constructor(id, x, y, rng) {
+            super(id, 'bigRock', x, y, rng.range(28, 50), true);
+            this.blocksVisionAmount = 0.55;
+            this.variant = rng.integer(0, 3);
+        }
+    }
+
+    class ThrowableRock extends TerrainObject {
+        constructor(id, x, y, rng) {
+            var weight = rng.range(1, 6);
+            super(id, 'smallRock', x, y, Clamp(6 + weight * 1.8, 7, 17), false);
+            this.carryable = true;
+            this.throwable = true;
+            this.weight = weight;
+            this.damage = Math.round(4 + weight * 2.4);
+            this.variant = rng.integer(0, 3);
+        }
+
+        getSnapshot() {
+            var s = super.getSnapshot();
+            s.carryable = this.carryable;
+            s.throwable = this.throwable;
+            s.weight = this.weight;
+            s.damage = this.damage;
+            return s;
+        }
+    }
+
+    class Stick extends TerrainObject {
+        constructor(id, x, y, rng) {
+            super(id, 'stick', x, y, 7, false);
+            this.carryable = true;
+            this.throwable = false;
+            this.weight = rng.range(0.4, 1.2);
+            this.damage = 5;
+            this.variant = rng.integer(0, 2);
+        }
+    }
+
+    // ============================================================================
+    // MODULE: TREASURE
+    // ============================================================================
+    // Treasure is piles/deposits, not chests. A World may have multiple piles; each
+    // pile contains exactly one treasure type. Dropped treasure is raid-time state.
+    class TreasureDeposit extends WorldEntity {
+        constructor(id, x, y, treasureType, amount) {
+            super(id, x, y, 20);
+            this.type = 'treasure';
+            this.kind = 'treasureDeposit';
+            this.treasureType = treasureType;
+            this.startingAmount = amount;
+            this.amountRemaining = amount;
+        }
+
+        isEmpty() {
+            return this.amountRemaining <= 0;
+        }
+
+        take(maxAmount) {
+            var amount = Math.min(maxAmount, this.amountRemaining);
+            this.amountRemaining -= amount;
+            return amount;
+        }
+
+        getSnapshot() {
+            var profile = TREASURE_TYPES[this.treasureType];
+            var s = super.getSnapshot();
+            s.type = 'treasure';
+            s.kind = this.kind;
+            s.treasureType = this.treasureType;
+            s.treasureDisplayName = profile.displayName;
+            s.colour = profile.colour;
+            s.unitValue = profile.unitValue;
+            s.startingAmount = this.startingAmount;
+            s.amountRemaining = this.amountRemaining;
+            s.value = this.amountRemaining * profile.unitValue;
+            s.stolen = this.isEmpty();
+            return s;
+        }
+    }
+
+    class DroppedTreasure extends WorldEntity {
+        constructor(id, x, y, treasureType, amount, sourceAgentId) {
+            super(id, x, y, 12);
+            this.type = 'droppedTreasure';
+            this.kind = 'droppedTreasure';
+            this.treasureType = treasureType;
+            this.amountRemaining = amount;
+            this.sourceAgentId = sourceAgentId;
+        }
+
+        getSnapshot() {
+            var profile = TREASURE_TYPES[this.treasureType];
+            var s = super.getSnapshot();
+            s.type = this.type;
+            s.kind = this.kind;
+            s.treasureType = this.treasureType;
+            s.colour = profile.colour;
+            s.amountRemaining = this.amountRemaining;
+            s.value = this.amountRemaining * profile.unitValue;
+            return s;
+        }
+    }
+
+    // ============================================================================
+    // MODULE: WORLD GENERATOR AND WORLD
+    // ============================================================================
+    // WorldGenerator owns all world generation: terrain, terrain objects, treasure
+    // and settlement distance. World is data/query state, not its own factory.
+    class WorldGenerator {
+        static createWorld(seed, options) {
+            var rng = new SeededRng(seed);
+            var settings = options || {};
+            var environment = WorldGenerator.createEnvironment(rng, settings);
+            var grid = WorldGenerator.createTerrainGrid(rng, environment);
+            var objects = WorldGenerator.createTerrainObjects(rng, environment, grid);
+            var deposits = WorldGenerator.createTreasureDeposits(rng, grid, objects);
+            var distance = WorldGenerator.createSettlementDistanceMiles(rng, environment, settings);
+            return new World(seed, MAP_WIDTH, MAP_HEIGHT, grid, environment, distance, objects, deposits);
+        }
+
+        static createEnvironment(rng, settings) {
+            var temperature = Number.isFinite(settings.temperature) ? settings.temperature : rng.range(0.25, 0.8);
+            var moisture = Number.isFinite(settings.moisture) ? settings.moisture : rng.range(0.2, 0.85);
+            var altitude = Number.isFinite(settings.altitude) ? settings.altitude : rng.range(0.05, 0.65);
+            var ruggedness = Number.isFinite(settings.ruggedness) ? settings.ruggedness : rng.range(0.05, 0.55);
+            var waterAbundance = Number.isFinite(settings.waterAbundance) ? settings.waterAbundance : Clamp(moisture + rng.range(-0.18, 0.22), 0, 1);
+            var vegetationDensity = Number.isFinite(settings.vegetationDensity) ? settings.vegetationDensity : Clamp(moisture * 0.75 + temperature * 0.2 + rng.range(-0.12, 0.18), 0, 1);
+            return {
+                temperature: temperature,
+                moisture: moisture,
+                altitude: altitude,
+                ruggedness: ruggedness,
+                waterAbundance: waterAbundance,
+                vegetationDensity: vegetationDensity
+            };
+        }
+
+        static createSettlementDistanceMiles(rng, environment, settings) {
+            if (Number.isFinite(settings.distanceToSettlementMiles)) {
+                return Math.max(1, Math.floor(settings.distanceToSettlementMiles));
+            }
+
+            var habitability = Clamp(
+                0.45 + environment.temperature * 0.25 + environment.moisture * 0.18 - environment.altitude * 0.25 - environment.ruggedness * 0.18,
+                0,
+                1
+            );
+            return Clamp(5 + Math.round((1 - habitability) * 22) + rng.integer(-4, 8), 1, 40);
+        }
+
+        static createTerrainGrid(rng, environment) {
+            var cols = Math.ceil(MAP_WIDTH / TILE_SIZE);
+            var rows = Math.ceil(MAP_HEIGHT / TILE_SIZE);
+            var terrainTypes = [];
+            var heights = [];
+
+            for (var y = 0; y < rows; y += 1) {
+                for (var x = 0; x < cols; x += 1) {
+                    var nx = x / Math.max(1, cols - 1);
+                    var ny = y / Math.max(1, rows - 1);
+                    var ridge = Math.sin((nx * 3.1 + ny * 2.2 + environment.altitude) * Math.PI) * environment.ruggedness;
+                    var height = Math.round(Clamp(4 + environment.altitude * 12 + ridge * 8 + rng.range(-1, 1) * environment.ruggedness * 6, 0, 24));
+                    var type = TERRAIN_TYPE.GRASS;
+
+                    if (environment.waterAbundance > 0.72 && (ny > 0.82 || nx < 0.08)) {
+                        type = TERRAIN_TYPE.LAKE;
+                    } else if (environment.waterAbundance > 0.58 && Math.abs(nx - 0.52) < 0.035 + environment.waterAbundance * 0.025) {
+                        type = TERRAIN_TYPE.STREAM;
+                    } else if (environment.moisture > 0.72 && height < 8 && rng.nextFloat() < 0.24) {
+                        type = TERRAIN_TYPE.MARSH;
+                    } else if (environment.moisture < 0.28 && environment.temperature > 0.55) {
+                        type = TERRAIN_TYPE.DESERT;
+                    } else if (environment.temperature < 0.28 && rng.nextFloat() < 0.45) {
+                        type = TERRAIN_TYPE.TUNDRA;
+                    } else if (environment.ruggedness > 0.34 && rng.nextFloat() < environment.ruggedness * 0.35) {
+                        type = TERRAIN_TYPE.ROCKY;
+                    } else if (environment.vegetationDensity > 0.5 && rng.nextFloat() < environment.vegetationDensity * 0.45) {
+                        type = TERRAIN_TYPE.FOREST;
+                    }
+
+                    terrainTypes.push(type);
+                    heights.push(height);
+                }
+            }
+
+            return new TerrainGrid(MAP_WIDTH, MAP_HEIGHT, TILE_SIZE, terrainTypes, heights);
+        }
+
+        static createTerrainObjects(rng, environment, grid) {
+            var objects = [];
+            var treeCount = Math.round(8 + environment.vegetationDensity * 34);
+            var rockCount = Math.round(5 + environment.ruggedness * 18 + environment.altitude * 7);
+            var throwableRockCount = Math.round(8 + environment.ruggedness * 18);
+            var stickCount = Math.round(environment.vegetationDensity * 22);
+            var i;
+            var p;
+
+            for (i = 0; i < treeCount; i += 1) {
+                p = WorldGenerator.findOpenPoint(rng, grid, objects, 120, false);
+
+                if (p) {
+                    objects.push(new Tree('tree_' + i, p.x, p.y, rng, environment));
+                }
+            }
+
+            for (i = 0; i < rockCount; i += 1) {
+                p = WorldGenerator.findOpenPoint(rng, grid, objects, 130, false);
+
+                if (p) {
+                    objects.push(new TerrainRock('big_rock_' + i, p.x, p.y, rng));
+                }
+            }
+
+            for (i = 0; i < throwableRockCount; i += 1) {
+                p = WorldGenerator.findOpenPoint(rng, grid, objects, 75, true);
+
+                if (p) {
+                    objects.push(new ThrowableRock('small_rock_' + i, p.x, p.y, rng));
+                }
+            }
+
+            for (i = 0; i < stickCount; i += 1) {
+                p = WorldGenerator.findOpenPoint(rng, grid, objects, 70, true);
+
+                if (p) {
+                    objects.push(new Stick('stick_' + i, p.x, p.y, rng));
+                }
+            }
+
+            return objects;
+        }
+
+        static createTreasureDeposits(rng, grid, objects) {
+            var deposits = [];
+            var types = ['bronze', 'silver', 'gold', 'rubies', 'emeralds'];
+            var count = rng.integer(3, 5);
+
+            for (var i = 0; i < count; i += 1) {
+                var p = WorldGenerator.findOpenPoint(rng, grid, objects.concat(deposits), 210, false);
+
+                if (!p) {
+                    p = WorldGenerator.findOpenPoint(rng, grid, deposits, 150, false);
+                }
+
+                if (!p) {
+                    p = WorldGenerator.findOpenPoint(rng, grid, deposits, 100, true);
+                }
+
+                if (!p) {
+                    p = {
+                        x: MAP_WIDTH * (0.35 + 0.1 * i),
+                        y: MAP_HEIGHT * (0.35 + 0.07 * i)
+                    };
+                }
+
+                deposits.push(new TreasureDeposit('treasure_' + (i + 1), p.x, p.y, types[i], rng.integer(35, 90)));
+            }
+
+            return deposits;
+        }
+
+        static findOpenPoint(rng, grid, things, minDistance, allowEdge) {
+            for (var attempt = 0; attempt < 400; attempt += 1) {
+                var margin = allowEdge ? 80 : 150;
+                var x = rng.range(margin, MAP_WIDTH - margin);
+                var y = rng.range(margin, MAP_HEIGHT - margin);
+                var terrainType = grid.getTerrainTypeAtWorld(x, y);
+
+                if (terrainType === TERRAIN_TYPE.LAKE || terrainType === TERRAIN_TYPE.STREAM) {
+                    continue;
+                }
+
+                if (!allowEdge && (x < 320 || x > MAP_WIDTH - 320)) {
+                    continue;
+                }
+
+                var clear = true;
+
+                for (var i = 0; i < things.length; i += 1) {
+                    if (Distance(x, y, things[i].x, things[i].y) < minDistance) {
+                        clear = false;
+                        break;
+                    }
+                }
+
+                if (clear) {
+                    return { x: x, y: y };
+                }
+            }
+
+            return null;
+        }
+    }
+
+    class World {
+        constructor(seed, width, height, terrainGrid, environment, distanceToSettlementMiles, terrainObjects, treasureDeposits) {
+            this.seed = seed >>> 0;
+            this.width = width;
+            this.height = height;
+            this.terrainGrid = terrainGrid;
+            this.environment = environment;
+            this.distanceToSettlementMiles = distanceToSettlementMiles;
+            this.terrainObjects = terrainObjects;
+            this.treasureDeposits = treasureDeposits;
+        }
+
+        getBlockingTerrainObjects() {
+            return this.terrainObjects.filter(function (object) {
+                return object.blocksMovement;
+            });
+        }
+
+        getObstacleSnapshots() {
+            return this.terrainObjects.map(function (object) {
+                return object.getSnapshot();
+            });
+        }
+
+        getTreasureSnapshots() {
+            return this.treasureDeposits.map(function (deposit) {
+                return deposit.getSnapshot();
+            });
+        }
+
+        getRemainingTreasureValue() {
+            var total = 0;
+
+            for (var i = 0; i < this.treasureDeposits.length; i += 1) {
+                var deposit = this.treasureDeposits[i];
+                total += deposit.amountRemaining * TREASURE_TYPES[deposit.treasureType].unitValue;
+            }
+
+            return total;
+        }
+
+        hasTreasureRemaining() {
+            return this.treasureDeposits.some(function (deposit) {
+                return !deposit.isEmpty();
+            });
+        }
+
+        getStaticSnapshot() {
+            return {
+                seed: this.seed,
+                width: this.width,
+                height: this.height,
+                environment: Object.assign({}, this.environment),
+                distanceToSettlementMiles: this.distanceToSettlementMiles,
+                terrainObjects: this.getObstacleSnapshots()
+            };
+        }
+
+        getSnapshot() {
+            var snapshot = this.getStaticSnapshot();
+            snapshot.treasureDeposits = this.getTreasureSnapshots();
+            snapshot.remainingTreasureValue = this.getRemainingTreasureValue();
+            return snapshot;
+        }
+    }
+
+    // ============================================================================
+    // MODULE: BODY HEALTH
+    // ============================================================================
+    class BodyHealth {
+        constructor(maxEach) {
+            this.maxEach = maxEach;
+            this.head = maxEach;
+            this.torso = maxEach;
+            this.leftArm = maxEach;
+            this.rightArm = maxEach;
+            this.leftLeg = maxEach;
+            this.rightLeg = maxEach;
+        }
+
+        total() {
+            return this.head + this.torso + this.leftArm + this.rightArm + this.leftLeg + this.rightLeg;
+        }
+
+        maxTotal() {
+            return this.maxEach * 6;
+        }
+
+        applyGeneralDamage(amount, rng) {
+            var parts = ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'];
+            var part = rng.pick(parts);
+            this[part] = Math.max(0, this[part] - amount);
+            return part;
+        }
+
+        isDead() {
+            return this.head <= 0 || this.torso <= 0 || this.total() <= this.maxEach * 1.35;
+        }
+
+        movementMultiplier() {
+            return Clamp(0.35 + ((this.leftLeg + this.rightLeg) / (this.maxEach * 2)) * 0.65, 0.35, 1);
+        }
+
+        armsCanCarry() {
+            return this.leftArm > this.maxEach * 0.25 || this.rightArm > this.maxEach * 0.25;
+        }
+
+        getSnapshot() {
+            return {
+                head: this.head,
+                torso: this.torso,
+                leftArm: this.leftArm,
+                rightArm: this.rightArm,
+                leftLeg: this.leftLeg,
+                rightLeg: this.rightLeg,
+                maxEach: this.maxEach
+            };
+        }
+    }
+
+    // ============================================================================
+    // MODULE: AGENTS
+    // ============================================================================
+    // Multithreaded pathfinding is viable later via Worker queues, but it needs
+    // immutable requests, stale-path handling, priorities and deterministic tick
+    // application. Do not implement this until the single-threaded architecture is
+    // stable.
+    //
+    // Collision/pathfinding rule: terrain objects may have a visual radius and a
+    // separate blockingRadius. Trees use canopy-sized visual radii but trunk-sized
+    // blocking radii, otherwise the canopy makes the map artificially impassable.
+    // Movement must also retain axis-sliding fallback so agents can scrape around
+    // obstacle edges rather than freezing against them.
+    //
+    // Repathing rule: do not include the start cell in the normal path intent key.
+    // Agents should continue following an existing path as they cross cells, and
+    // should only run A* when the target/intent has changed materially, the path is
+    // absent, the next waypoint becomes invalid, or the agent is genuinely stuck.
+    //
+    // Stuck-prevention rule: never reset stuckTicks merely because an axis-slide
+    // changed x or y. Reset it only when the attempted move makes meaningful
+    // progress toward the current waypoint/target. If an agent starts inside a
+    // blocked footprint, use the explicit blocked-position escape move; ordinary
+    // collision-checked movement cannot leave a blocked footprint because every
+    // intermediate point is still blocked.
+    //
+    // Local steering rule: A* waypoints are only broad guidance. Before following
+    // a waypoint, validate that the segment to it is clear. For actual movement,
+    // try a fan of small angular detours rather than only X/Y axis slides; this
+    // prevents agents wedging against circular obstacle shoulders.
+    class Agent extends WorldEntity {
+        constructor(id, x, y, radius, speed) {
+            super(id, x, y, radius);
+            this.speed = speed;
+            this.path = [];
+            this.pathKey = '';
+            this.pathIntentKey = '';
+            this.pathTargetX = null;
+            this.pathTargetY = null;
+            this.pathRepathCooldownTicks = 0;
+            this.pathFindCount = 0;
+            this.stuckTicks = 0;
+            this.alive = true;
+            this.escaped = false;
+            this.behaviourState = 'idle';
+            this.attackCooldownTicks = 0;
+            this.isMounted = false;
+            this.sightRange = 360;
+            this.eyeHeight = 4;
+        }
+
+        isActive() {
+            return this.alive && !this.escaped;
+        }
+
+        tickCooldowns() {
+            if (this.attackCooldownTicks > 0) {
+                this.attackCooldownTicks -= 1;
+            }
+
+            if (this.pathRepathCooldownTicks > 0) {
+                this.pathRepathCooldownTicks -= 1;
+            }
+        }
+
+        navCols(world) {
+            return Math.floor(world.width / NAV_CELL_SIZE) + 1;
+        }
+
+        navRows(world) {
+            return Math.floor(world.height / NAV_CELL_SIZE) + 1;
+        }
+
+        worldToCell(world, x, y) {
+            return {
+                cx: Clamp(Math.floor(x / NAV_CELL_SIZE), 0, this.navCols(world) - 1),
+                cy: Clamp(Math.floor(y / NAV_CELL_SIZE), 0, this.navRows(world) - 1)
+            };
+        }
+
+        cellCentre(world, cx, cy) {
+            return {
+                x: Clamp(cx * NAV_CELL_SIZE + NAV_CELL_SIZE / 2, 0, world.width),
+                y: Clamp(cy * NAV_CELL_SIZE + NAV_CELL_SIZE / 2, 0, world.height)
+            };
+        }
+
+        cellKey(cx, cy) {
+            return cx + ',' + cy;
+        }
+
+        isInsideObstacle(world, x, y) {
+            var terrainType = world.terrainGrid.getTerrainTypeAtWorld(x, y);
+            var slope = world.terrainGrid.getSlopeAtWorld(x, y);
+
+            if (!TerrainRules.canTraverse(this, terrainType, slope)) {
+                return true;
+            }
+
+            var obstacles = world.getBlockingTerrainObjects();
+
+            for (var i = 0; i < obstacles.length; i += 1) {
+                var blockingRadius = obstacles[i].blockingRadius !== undefined ? obstacles[i].blockingRadius : obstacles[i].radius;
+
+                var clearance = blockingRadius + this.radius + MOVEMENT_CLEARANCE_MARGIN;
+
+                if (Distance(x, y, obstacles[i].x, obstacles[i].y) < clearance) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        cellIsBlocked(world, cx, cy) {
+            var centre = this.cellCentre(world, cx, cy);
+            return this.isInsideObstacle(world, centre.x, centre.y);
+        }
+
+        nearestOpenCell(world, cell) {
+            if (!this.cellIsBlocked(world, cell.cx, cell.cy)) {
+                return cell;
+            }
+
+            var maxRadius = Math.max(this.navCols(world), this.navRows(world));
+
+            for (var r = 1; r < maxRadius; r += 1) {
+                for (var dx = -r; dx <= r; dx += 1) {
+                    for (var dy = -r; dy <= r; dy += 1) {
+                        if (Math.abs(dx) !== r && Math.abs(dy) !== r) {
+                            continue;
+                        }
+
+                        var cx = cell.cx + dx;
+                        var cy = cell.cy + dy;
+
+                        if (cx < 0 || cy < 0 || cx >= this.navCols(world) || cy >= this.navRows(world)) {
+                            continue;
+                        }
+
+                        if (!this.cellIsBlocked(world, cx, cy)) {
+                            return { cx: cx, cy: cy };
+                        }
+                    }
+                }
+            }
+
+            return cell;
+        }
+
+        segmentIsClear(world, ax, ay, bx, by) {
+            var steps = Math.max(2, Math.ceil(Distance(ax, ay, bx, by) / 24));
+
+            for (var i = 1; i <= steps; i += 1) {
+                var t = i / steps;
+                var x = ax + (bx - ax) * t;
+                var y = ay + (by - ay) * t;
+
+                if (this.isInsideObstacle(world, x, y)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        findPath(world, gx, gy) {
+            this.pathFindCount += 1;
+            var start = this.nearestOpenCell(world, this.worldToCell(world, this.x, this.y));
+            var goal = this.nearestOpenCell(world, this.worldToCell(world, gx, gy));
+            var open = [{ cx: start.cx, cy: start.cy, g: 0, f: 0 }];
+            var came = {};
+            var gScore = {};
+            var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+            gScore[this.cellKey(start.cx, start.cy)] = 0;
+
+            while (open.length > 0) {
+                open.sort(function (a, b) { return a.f - b.f; });
+                var current = open.shift();
+                var ck = this.cellKey(current.cx, current.cy);
+
+                if (current.cx === goal.cx && current.cy === goal.cy) {
+                    var cells = [];
+
+                    while (came[ck]) {
+                        var parts = ck.split(',');
+                        cells.push({ cx: Number(parts[0]), cy: Number(parts[1]) });
+                        ck = came[ck];
+                    }
+
+                    cells.reverse();
+                    return cells.map(function (cell) {
+                        return this.cellCentre(world, cell.cx, cell.cy);
+                    }, this);
+                }
+
+                for (var i = 0; i < dirs.length; i += 1) {
+                    var nx = current.cx + dirs[i][0];
+                    var ny = current.cy + dirs[i][1];
+
+                    if (nx < 0 || ny < 0 || nx >= this.navCols(world) || ny >= this.navRows(world)) {
+                        continue;
+                    }
+
+                    if (this.cellIsBlocked(world, nx, ny)) {
+                        continue;
+                    }
+
+                    if (dirs[i][0] !== 0 && dirs[i][1] !== 0) {
+                        if (this.cellIsBlocked(world, current.cx + dirs[i][0], current.cy) || this.cellIsBlocked(world, current.cx, current.cy + dirs[i][1])) {
+                            continue;
+                        }
+                    }
+
+                    var nk = this.cellKey(nx, ny);
+                    var step = (dirs[i][0] === 0 || dirs[i][1] === 0) ? 1 : 1.414;
+                    var centre = this.cellCentre(world, nx, ny);
+                    var terrainType = world.terrainGrid.getTerrainTypeAtWorld(centre.x, centre.y);
+                    var slope = world.terrainGrid.getSlopeAtWorld(centre.x, centre.y);
+                    var tentative = current.g + step * TerrainRules.movementCostFor(this, terrainType, slope);
+
+                    if (gScore[nk] === undefined || tentative < gScore[nk]) {
+                        came[nk] = this.cellKey(current.cx, current.cy);
+                        gScore[nk] = tentative;
+                        open.push({ cx: nx, cy: ny, g: tentative, f: tentative + Math.hypot(goal.cx - nx, goal.cy - ny) });
+                    }
+                }
+            }
+
+            return [];
+        }
+
+        getRepathCooldownTicks() {
+            return PATH_DEFAULT_REPATH_COOLDOWN_TICKS;
+        }
+
+        getTargetMoveRepathDistance() {
+            return PATH_TARGET_MOVE_REPATH_DISTANCE;
+        }
+
+        targetMovedEnoughForRepath(tx, ty) {
+            if (this.pathTargetX === null || this.pathTargetY === null) {
+                return true;
+            }
+
+            return Distance(this.pathTargetX, this.pathTargetY, tx, ty) >= this.getTargetMoveRepathDistance();
+        }
+
+        nextWaypointIsBlocked(world) {
+            if (!this.path || this.path.length === 0) {
+                return false;
+            }
+
+            return this.isInsideObstacle(world, this.path[0].x, this.path[0].y);
+        }
+
+        forceMoveToward(world, tx, ty, distance) {
+            var dx = tx - this.x;
+            var dy = ty - this.y;
+            var len = Math.hypot(dx, dy);
+
+            if (len <= 0.0001) {
+                return;
+            }
+
+            this.x = Clamp(this.x + (dx / len) * distance, 0, world.width);
+            this.y = Clamp(this.y + (dy / len) * distance, 0, world.height);
+        }
+
+        recordProgressToward(oldDistance, newDistance) {
+            if (newDistance < oldDistance - 0.05) {
+                this.stuckTicks = 0;
+            } else {
+                this.stuckTicks += 1;
+            }
+        }
+
+        moveToward(world, tx, ty, distance) {
+            var dx = tx - this.x;
+            var dy = ty - this.y;
+            var len = Math.hypot(dx, dy);
+
+            if (len <= 0.0001) {
+                return;
+            }
+
+            var oldDistance = Distance(this.x, this.y, tx, ty);
+            var baseAngle = Math.atan2(dy, dx);
+            var angleOffsets = [0, Math.PI / 10, -Math.PI / 10, Math.PI / 5, -Math.PI / 5, Math.PI / 3, -Math.PI / 3, Math.PI / 2, -Math.PI / 2, Math.PI * 0.75, -Math.PI * 0.75, Math.PI];
+            var distanceMultipliers = [1, 0.7, 0.4];
+            var bestCandidate = null;
+            var bestScore = Infinity;
+
+            for (var d = 0; d < distanceMultipliers.length; d += 1) {
+                var stepDistance = distance * distanceMultipliers[d];
+
+                for (var i = 0; i < angleOffsets.length; i += 1) {
+                    var angle = baseAngle + angleOffsets[i];
+                    var nx = Clamp(this.x + Math.cos(angle) * stepDistance, 0, world.width);
+                    var ny = Clamp(this.y + Math.sin(angle) * stepDistance, 0, world.height);
+
+                    if (this.isInsideObstacle(world, nx, ny)) {
+                        continue;
+                    }
+
+                    var newDistance = Distance(nx, ny, tx, ty);
+                    var turnPenalty = Math.abs(angleOffsets[i]) * 2.5;
+                    var shortStepPenalty = (1 - distanceMultipliers[d]) * 8;
+                    var score = newDistance + turnPenalty + shortStepPenalty;
+
+                    if (score < bestScore) {
+                        bestScore = score;
+                        bestCandidate = { x: nx, y: ny, distance: newDistance };
+                    }
+                }
+            }
+
+            if (bestCandidate) {
+                this.x = bestCandidate.x;
+                this.y = bestCandidate.y;
+                this.recordProgressToward(oldDistance, bestCandidate.distance);
+                return;
+            }
+
+            this.stuckTicks += 1;
+        }
+        moveWithPath(world, tx, ty, distance, pathKey) {
+            if (this.isInsideObstacle(world, this.x, this.y)) {
+                var openCell = this.nearestOpenCell(world, this.worldToCell(world, this.x, this.y));
+                var openCentre = this.cellCentre(world, openCell.cx, openCell.cy);
+                this.forceMoveToward(world, openCentre.x, openCentre.y, Math.max(distance, NAV_CELL_SIZE / 3));
+                this.path = [];
+                this.pathKey = '';
+                this.pathIntentKey = '';
+                this.pathRepathCooldownTicks = 0;
+                this.stuckTicks += 1;
+                return;
+            }
+
+            var targetCell = this.worldToCell(world, tx, ty);
+            var intentKey = pathKey + '|' + targetCell.cx + ',' + targetCell.cy;
+            var targetMovedEnough = this.targetMovedEnoughForRepath(tx, ty);
+            var hasNoPath = !this.path || this.path.length === 0;
+            var intentChanged = this.pathIntentKey !== intentKey;
+            var emergencyRepath = this.stuckTicks >= PATH_STUCK_REPATH_TICKS || this.nextWaypointIsBlocked(world);
+            var canUseThrottle = this.pathRepathCooldownTicks > 0 && !emergencyRepath && !hasNoPath;
+
+            if (this.segmentIsClear(world, this.x, this.y, tx, ty)) {
+                this.path = [];
+                this.pathKey = intentKey;
+                this.pathIntentKey = intentKey;
+                this.pathTargetX = tx;
+                this.pathTargetY = ty;
+                this.moveToward(world, tx, ty, distance);
+                return;
+            }
+
+            if (hasNoPath || emergencyRepath || ((intentChanged || targetMovedEnough) && !canUseThrottle)) {
+                this.path = this.findPath(world, tx, ty);
+                this.pathKey = intentKey;
+                this.pathIntentKey = intentKey;
+                this.pathTargetX = tx;
+                this.pathTargetY = ty;
+                this.stuckTicks = 0;
+                this.pathRepathCooldownTicks = this.getRepathCooldownTicks();
+            }
+
+            if (!this.path || this.path.length === 0) {
+                this.moveToward(world, tx, ty, distance);
+                return;
+            }
+
+            var waypoint = this.path[0];
+
+            if (Distance(this.x, this.y, waypoint.x, waypoint.y) < PATH_REACHED_DISTANCE) {
+                this.path.shift();
+                waypoint = this.path[0];
+            }
+
+            if (waypoint) {
+                if (!this.segmentIsClear(world, this.x, this.y, waypoint.x, waypoint.y)) {
+                    this.path = [];
+                    this.pathKey = '';
+                    this.pathIntentKey = '';
+                    this.pathRepathCooldownTicks = 0;
+                    this.stuckTicks = PATH_STUCK_REPATH_TICKS;
+                    this.moveToward(world, tx, ty, distance);
+                    return;
+                }
+
+                this.moveToward(world, waypoint.x, waypoint.y, distance);
+            }
+        }
+        canSee(world, target) {
+            var distance = this.distanceTo(target);
+
+            if (distance > this.sightRange) {
+                return false;
+            }
+
+            var steps = Math.max(2, Math.ceil(distance / 60));
+            var observerHeight = world.terrainGrid.getHeightAtWorld(this.x, this.y) + this.eyeHeight;
+            var targetHeight = world.terrainGrid.getHeightAtWorld(target.x, target.y) + (target.eyeHeight || 2);
+            var penalty = 0;
+
+            for (var i = 1; i < steps; i += 1) {
+                var t = i / steps;
+                var x = this.x + (target.x - this.x) * t;
+                var y = this.y + (target.y - this.y) * t;
+                var lineHeight = observerHeight + (targetHeight - observerHeight) * t;
+                var terrainHeight = world.terrainGrid.getHeightAtWorld(x, y);
+                var terrainType = world.terrainGrid.getTerrainTypeAtWorld(x, y);
+                var slope = world.terrainGrid.getSlopeAtWorld(x, y);
+
+                if (terrainHeight > lineHeight + 1.5) {
+                    return false;
+                }
+
+                penalty += TerrainRules.visibilityPenaltyFor(terrainType, slope);
+            }
+
+            return penalty < 1.2;
+        }
+
+        getSnapshot() {
+            var s = super.getSnapshot();
+            s.speed = this.speed;
+            s.alive = this.alive;
+            s.escaped = this.escaped;
+            s.behaviourState = this.behaviourState;
+            s.attackCooldownTicks = this.attackCooldownTicks;
+            s.pathFindCount = this.pathFindCount;
+            s.pathRepathCooldownTicks = this.pathRepathCooldownTicks;
+            s.pathLength = this.path ? this.path.length : 0;
+            s.stuckTicks = this.stuckTicks;
+            return s;
+        }
+    }
+
+    // ============================================================================
+    // MODULE: ADVENTURERS
+    // ============================================================================
+    class Adventurer extends Agent {
+        constructor(id, x, y, rng, profile) {
+            super(id, x, y, 12, rng.range(profile.speedMin, profile.speedMax));
+            this.agentKind = 'adventurer';
+            this.className = profile.className;
+            this.bodyHealth = new BodyHealth(profile.bodyPartHealth);
+            this.maxHealth = this.bodyHealth.maxTotal();
+            this.health = this.bodyHealth.total();
+            this.carryCapacity = profile.carryCapacity;
+            this.carryingAmount = 0;
+            this.carryingTreasure = false;
+            this.carryingTreasureType = null;
+            this.targetTreasureId = null;
+            this.fleeing = false;
+            this.courage = rng.range(profile.courageMin, profile.courageMax);
+            this.intelligence = rng.range(profile.intelligenceMin, profile.intelligenceMax);
+            this.perception = rng.range(profile.perceptionMin, profile.perceptionMax);
+            this.strength = rng.range(profile.strengthMin, profile.strengthMax);
+            this.sightRange = 280 + this.perception * 180;
+            this.eyeHeight = 5;
+        }
+
+        update(raid) {
+            if (!this.isActive()) {
+                return;
+            }
+
+            if (this.fleeing || this.carryingTreasure) {
+                this.behaviourState = this.fleeing ? 'fleeing' : 'escapingWithTreasure';
+                this.moveWithPath(raid.world, LEFT_EDGE_X, this.y, this.speed * this.bodyHealth.movementMultiplier() * TICK_DT, this.id + '_exit');
+
+                if (this.x <= 12) {
+                    this.escaped = true;
+                    raid.addEvent(this.carryingTreasure ? 'An adventurer escaped with treasure.' : 'A wounded adventurer fled off the map.');
+                }
+
+                return;
+            }
+
+            var target = this.chooseTreasure(raid);
+            this.targetTreasureId = target ? target.id : null;
+
+            if (!target) {
+                this.fleeing = true;
+                raid.addEvent('An adventurer found no accessible treasure and retreated.');
+                return;
+            }
+
+            this.behaviourState = 'seekingTreasure';
+            this.moveWithPath(raid.world, target.x, target.y, this.speed * this.bodyHealth.movementMultiplier() * TICK_DT, this.id + '_' + target.id);
+
+            if (this.distanceTo(target) < 24) {
+                this.collectTreasure(raid, target);
+            }
+        }
+
+        chooseTreasure(raid) {
+            var available = raid.world.treasureDeposits.filter(function (deposit) {
+                return !deposit.isEmpty();
+            }).concat(raid.droppedTreasure.filter(function (drop) {
+                return drop.amountRemaining > 0;
+            }));
+
+            if (available.length === 0) {
+                return null;
+            }
+
+            available.sort(function (a, b) {
+                return Distance(this.x, this.y, a.x, a.y) - Distance(this.x, this.y, b.x, b.y);
+            }.bind(this));
+
+            return available[0];
+        }
+
+        collectTreasure(raid, treasure) {
+            var amount = treasure.take ? treasure.take(this.carryCapacity) : Math.min(this.carryCapacity, treasure.amountRemaining);
+
+            if (!treasure.take) {
+                treasure.amountRemaining -= amount;
+            }
+
+            if (amount > 0) {
+                this.carryingAmount = amount;
+                this.carryingTreasure = true;
+                this.carryingTreasureType = treasure.treasureType;
+                raid.addEvent('An adventurer took ' + amount + ' units of ' + TREASURE_TYPES[treasure.treasureType].displayName + '.');
+            }
+        }
+
+        applyDamage(amount, rng, raid) {
+            var part = this.bodyHealth.applyGeneralDamage(amount, rng);
+            this.health = this.bodyHealth.total();
+
+            if (this.carryingTreasure && !this.bodyHealth.armsCanCarry()) {
+                this.dropTreasure(raid, 'arm injury');
+            }
+
+            if (this.bodyHealth.isDead()) {
+                this.alive = false;
+                this.dropTreasure(raid, 'death');
+            } else if (!this.fleeing && this.health < this.maxHealth * 0.35) {
+                this.fleeing = true;
+            }
+
+            return part;
+        }
+
+        dropTreasure(raid, reason) {
+            if (!this.carryingTreasure || this.carryingAmount <= 0) {
+                return;
+            }
+
+            raid.droppedTreasure.push(new DroppedTreasure('dropped_' + raid.nextDroppedTreasureId, this.x, this.y, this.carryingTreasureType, this.carryingAmount, this.id));
+            raid.nextDroppedTreasureId += 1;
+            raid.addEvent('An adventurer dropped treasure due to ' + reason + '.');
+            this.carryingAmount = 0;
+            this.carryingTreasure = false;
+            this.carryingTreasureType = null;
+        }
+
+        getSnapshot() {
+            var s = super.getSnapshot();
+            s.agentKind = this.agentKind;
+            s.className = this.className;
+            s.health = this.health;
+            s.maxHealth = this.maxHealth;
+            s.bodyHealth = this.bodyHealth.getSnapshot();
+            s.carryCapacity = this.carryCapacity;
+            s.carryingAmount = this.carryingAmount;
+            s.carryingTreasure = this.carryingTreasure;
+            s.carryingTreasureType = this.carryingTreasureType;
+            s.targetTreasureId = this.targetTreasureId;
+            s.fleeing = this.fleeing;
+            return s;
+        }
+    }
+
+    class Villager extends Adventurer {
+        constructor(id, x, y, rng) {
+            super(id, x, y, rng, ADVENTURER_PROFILE.villager);
+        }
+    }
+
+    // ============================================================================
+    // MODULE: MONSTERS
+    // ============================================================================
+    // Monsters are one interbreedable species with subspecies-like variation. They
+    // should broadly read as dog/crocodile blends: long snout, many teeth, fur,
+    // long in-line tail and agile medium-length legs. Genome/chromosome/gene,
+    // phenotype, age, fertility, diseases and detailed morphology come later.
+    class Monster extends Agent {
+        constructor(id, x, y, rng, options) {
+            super(id, x, y, 16, options && options.speed ? options.speed : 165);
+            this.agentKind = 'monster';
+            this.name = options && options.name ? options.name : Monster.randomName(rng);
+            this.owned = options && options.owned !== undefined ? options.owned : true;
+            this.collared = this.owned;
+            this.deployed = false;
+            this.bodyHealth = new BodyHealth(20);
+            this.maxHealth = this.bodyHealth.maxTotal();
+            this.health = this.bodyHealth.total();
+        }
+
+        static randomName(rng) {
+            return rng.pick(['Gr', 'Sn', 'Dr', 'Br', 'Kr', 'Mog']) + rng.pick(['ibble', 'ash', 'og', 'fang', 'mire', 'snout']);
+        }
+
+        getRepathCooldownTicks() {
+            return PATH_MONSTER_REPATH_COOLDOWN_TICKS;
+        }
+
+        enterFromRight(world, rng) {
+            this.deployed = true;
+            this.escaped = false;
+            this.x = RIGHT_EDGE_X;
+            this.y = rng.range(120, world.height - 120);
+            this.behaviourState = 'roaming';
+        }
+
+        update(raid) {
+            if (!this.isActive() || !this.deployed) {
+                return;
+            }
+
+            var target = this.chooseTarget(raid);
+
+            if (!target) {
+                return;
+            }
+
+            if (this.distanceTo(target) > MONSTER_ATTACK_RANGE) {
+                this.behaviourState = 'stalking';
+                this.moveWithPath(raid.world, target.x, target.y, this.speed * TICK_DT, this.id + '_' + target.id);
+            } else {
+                this.behaviourState = 'attacking';
+            }
+        }
+
+        chooseTarget(raid) {
+            var candidates = raid.adventurers.filter(function (adventurer) {
+                return adventurer.isActive();
+            });
+
+            if (candidates.length === 0) {
+                return null;
+            }
+
+            candidates.sort(function (a, b) {
+                return this.distanceTo(a) - this.distanceTo(b);
+            }.bind(this));
+
+            return candidates[0];
+        }
+
+        applyDamage(amount, rng) {
+            this.bodyHealth.applyGeneralDamage(amount, rng);
+            this.health = this.bodyHealth.total();
+
+            if (this.bodyHealth.isDead()) {
+                this.alive = false;
+                this.behaviourState = 'dead';
+            }
+        }
+
+        getSnapshot() {
+            var s = super.getSnapshot();
+            s.agentKind = this.agentKind;
+            s.name = this.name;
+            s.owned = this.owned;
+            s.collared = this.collared;
+            s.deployed = this.deployed;
+            s.health = this.health;
+            s.maxHealth = this.maxHealth;
+            s.bodyHealth = this.bodyHealth.getSnapshot();
+            return s;
+        }
+    }
+
+    // ============================================================================
+    // MODULE: FAUNA PLACEHOLDERS
+    // ============================================================================
+    class MicrofaunaEmitter {
+        constructor(id, species, x, y) {
+            this.id = id;
+            this.species = species;
+            this.x = x;
+            this.y = y;
+        }
+    }
+
+    class Macrofauna extends Agent {
+        constructor(id, species, x, y, speed) {
+            super(id, x, y, 10, speed);
+            this.agentKind = 'macrofauna';
+            this.species = species;
+            this.behaviourState = 'grazing';
+        }
+    }
+
+    // ============================================================================
+    // MODULE: GAME STATE, CAMPAIGN STATS, RAID AND GAME SESSION
+    // ============================================================================
+    class CampaignStats {
+        constructor() {
+            this.worldsCompleted = 0;
+            this.worldsLost = 0;
+            this.cumulativeScore = 0;
+            this.worldHistory = [];
+        }
+    }
+
+    class GameState {
+        constructor(rng, mode) {
+            this.mode = mode || 'campaign';
+            this.campaignStats = this.mode === 'campaign' ? new CampaignStats() : null;
+            this.ownedMonsters = [new Monster('monster_1', RIGHT_EDGE_X, rng.range(120, MAP_HEIGHT - 120), rng, { owned: true, name: 'Gribble' })];
+            this.eggs = [];
+        }
+    }
+
+    class Raid {
+        constructor(world, gameState, seed, seasonNumber) {
+            this.world = world;
+            this.gameState = gameState;
+            this.seed = seed >>> 0;
+            this.rng = new SeededRng(this.seed);
+            this.seasonNumber = seasonNumber;
+            this.tickNumber = 0;
+            this.raidEnded = false;
+            this.raidResult = 'Raid in progress';
+            this.events = [];
+            this.adventurers = this.createAdventurers();
+            this.monsters = gameState.ownedMonsters;
+            this.droppedTreasure = [];
+            this.nextDroppedTreasureId = 1;
+            this.addEvent('Season ' + this.seasonNumber + ' raid started in world seed ' + this.world.seed + '.');
+        }
+
+        createAdventurers() {
+            var settlementFactor = Clamp((35 - this.world.distanceToSettlementMiles) / 35, 0.15, 1);
+            var count = Clamp(1 + Math.round(settlementFactor * 2 + this.world.getRemainingTreasureValue() / 900), 1, 5);
+            var adventurers = [];
+
+            for (var i = 0; i < count; i += 1) {
+                adventurers.push(new Villager('adventurer_' + (i + 1), LEFT_EDGE_X, this.rng.range(120, this.world.height - 120), this.rng));
+            }
+
+            return adventurers;
+        }
+
+        addEvent(text) {
+            this.events.push({ tickNumber: this.tickNumber, text: text });
+        }
+
+        takeEvents() {
+            var result = this.events;
+            this.events = [];
+            return result;
+        }
+
+        releaseMonster() {
+            var monster = this.monsters.find(function (m) {
+                return m.alive && !m.deployed;
+            });
+
+            if (!monster) {
+                return { ok: false, reason: 'No living reserve monster is available.' };
+            }
+
+            monster.enterFromRight(this.world, this.rng);
+            this.addEvent(monster.name + ' entered from the far right edge.');
+            return { ok: true };
+        }
+
+        tick() {
+            if (this.raidEnded) {
+                return;
+            }
+
+            this.tickNumber += 1;
+            this.tickCooldowns();
+            this.adventurers.forEach(function (adventurer) { adventurer.update(this); }, this);
+            this.monsters.forEach(function (monster) { monster.update(this); }, this);
+            this.resolveCombat();
+            this.checkRaidEnd();
+        }
+
+        tickCooldowns() {
+            this.adventurers.forEach(function (adventurer) { adventurer.tickCooldowns(); });
+            this.monsters.forEach(function (monster) { monster.tickCooldowns(); });
+        }
+
+        resolveCombat() {
+            for (var i = 0; i < this.monsters.length; i += 1) {
+                var monster = this.monsters[i];
+
+                if (!monster.isActive() || !monster.deployed) {
+                    continue;
+                }
+
+                for (var j = 0; j < this.adventurers.length; j += 1) {
+                    var adventurer = this.adventurers[j];
+
+                    if (!adventurer.isActive() || monster.distanceTo(adventurer) > MONSTER_ATTACK_RANGE) {
+                        continue;
+                    }
+
+                    if (monster.attackCooldownTicks <= 0) {
+                        monster.attackCooldownTicks = COMBAT_COOLDOWN_TICKS;
+
+                        if (this.rng.nextFloat() <= 0.82) {
+                            var part = adventurer.applyDamage(this.rng.integer(18, 34), this.rng, this);
+                            this.addEvent(monster.name + ' hit a ' + adventurer.className + ' in the ' + part + '.');
+                        }
+                    }
+
+                    if (adventurer.isActive() && adventurer.attackCooldownTicks <= 0) {
+                        adventurer.attackCooldownTicks = COMBAT_COOLDOWN_TICKS;
+
+                        if (this.rng.nextFloat() <= 0.62) {
+                            monster.applyDamage(this.rng.integer(7, 17), this.rng);
+                            this.addEvent('An adventurer wounded ' + monster.name + '.');
+                        }
+                    }
+                }
+            }
+        }
+
+        checkRaidEnd() {
+            var active = this.adventurers.some(function (adventurer) {
+                return adventurer.isActive();
+            });
+
+            if (active) {
+                return;
+            }
+
+            this.raidEnded = true;
+            var escapedWithTreasure = this.adventurers.some(function (adventurer) {
+                return adventurer.escaped && adventurer.carryingTreasure;
+            });
+            this.raidResult = escapedWithTreasure ? 'Raid ended: treasure was lost.' : 'Raid ended: treasure defended.';
+            this.addEvent(this.raidResult);
+        }
+
+        getStaticSnapshot() {
+            return {
+                worldSeed: this.world.seed,
+                mapWidth: this.world.width,
+                mapHeight: this.world.height,
+                world: this.world.getStaticSnapshot(),
+                obstacles: this.world.getObstacleSnapshots(),
+                terrainObjects: this.world.getObstacleSnapshots()
+            };
+        }
+
+        getSnapshot(paused) {
+            var treasureSnapshots = this.world.getTreasureSnapshots();
+            return {
+                seed: this.seed,
+                worldSeed: this.world.seed,
+                tickNumber: this.tickNumber,
+                seasonNumber: this.seasonNumber,
+                mapWidth: this.world.width,
+                mapHeight: this.world.height,
+                paused: paused,
+                raidEnded: this.raidEnded,
+                raidResult: this.raidResult,
+                treasures: treasureSnapshots,
+                treasureDeposits: treasureSnapshots,
+                droppedTreasure: this.droppedTreasure.map(function (drop) { return drop.getSnapshot(); }),
+                monsters: this.monsters.map(function (monster) { return monster.getSnapshot(); }),
+                adventurers: this.adventurers.map(function (adventurer) { return adventurer.getSnapshot(); })
+            };
+        }
+    }
+
+    class GameSession {
+        constructor(seed, options) {
+            this.seed = seed >>> 0;
+            this.rng = new SeededRng(this.seed);
+            this.paused = false;
+            this.mode = options && options.mode ? options.mode : 'campaign';
+            this.seasonNumber = 1;
+            this.gameState = new GameState(this.rng, this.mode);
+            this.world = WorldGenerator.createWorld(this.seed, options && options.worldOptions ? options.worldOptions : {});
+            this.currentRaid = new Raid(this.world, this.gameState, this.rng.integer(1, 0x7fffffff), this.seasonNumber);
+        }
+
+        tick() {
+            if (!this.paused && this.currentRaid) {
+                this.currentRaid.tick();
+            }
+        }
+
+        pause() {
+            this.paused = true;
+            this.currentRaid.addEvent('Raid paused.');
+        }
+
+        resume() {
+            this.paused = false;
+            this.currentRaid.addEvent('Raid resumed.');
+        }
+
+        releaseMonster() {
+            return this.currentRaid.releaseMonster();
+        }
+
+        takeEvents() {
+            return this.currentRaid ? this.currentRaid.takeEvents() : [];
+        }
+
+        getStaticSnapshot() {
+            return this.currentRaid.getStaticSnapshot();
+        }
+
+        getSnapshot() {
+            return this.currentRaid.getSnapshot(this.paused);
+        }
+    }
+
+    // ============================================================================
+    // MODULE: HEADLESS HARNESS AND WORKER PROTOCOL
+    // ============================================================================
+    function RunSingleHeadlessRaid(seed, maxTicks) {
+        var session = new GameSession(seed, { mode: 'quick' });
+        var releaseResult = session.releaseMonster();
+        var ticksRun = 0;
+
+        while (!session.currentRaid.raidEnded && ticksRun < maxTicks) {
+            session.tick();
+            ticksRun += 1;
+        }
+
+        var snapshot = session.getSnapshot();
+        var treasureRemaining = snapshot.treasures.reduce(function (sum, treasure) {
+            return sum + treasure.amountRemaining;
+        }, 0);
+        var adventurersKilled = snapshot.adventurers.filter(function (a) { return !a.alive; }).length;
+        var escapedWithTreasure = snapshot.adventurers.filter(function (a) { return a.escaped && a.carryingTreasure; }).length;
+        var monstersAlive = snapshot.monsters.filter(function (m) { return m.alive; }).length;
+
+        return {
+            seed: seed,
+            releasedMonster: releaseResult.ok,
+            ticksRun: ticksRun,
+            raidEnded: snapshot.raidEnded,
+            raidResult: snapshot.raidResult,
+            treasureRemaining: treasureRemaining,
+            treasurePileCount: snapshot.treasures.length,
+            adventurersKilled: adventurersKilled,
+            adventurersEscapedWithTreasure: escapedWithTreasure,
+            monstersAlive: monstersAlive,
+            monsterTotal: snapshot.monsters.length
+        };
+    }
+
+    function RunHeadlessTests(payload) {
+        var options = payload || {};
+        var count = Number.isFinite(options.count) ? Math.max(1, Math.floor(options.count)) : 20;
+        var firstSeed = Number.isFinite(options.seed) ? Math.floor(options.seed) : 100000;
+        var maxTicks = Number.isFinite(options.maxTicks) ? Math.max(1, Math.floor(options.maxTicks)) : 3600;
+        var results = [];
+        var endedCount = 0;
+        var treasureRemainingTotal = 0;
+        var adventurersKilledTotal = 0;
+        var escapedTotal = 0;
+        var monstersAliveTotal = 0;
+
+        for (var i = 0; i < count; i += 1) {
+            var result = RunSingleHeadlessRaid(firstSeed + i, maxTicks);
+            results.push(result);
+
+            if (result.raidEnded) {
+                endedCount += 1;
+            }
+
+            treasureRemainingTotal += result.treasureRemaining;
+            adventurersKilledTotal += result.adventurersKilled;
+            escapedTotal += result.adventurersEscapedWithTreasure;
+            monstersAliveTotal += result.monstersAlive;
+        }
+
+        return {
+            count: count,
+            firstSeed: firstSeed,
+            maxTicks: maxTicks,
+            endedCount: endedCount,
+            timedOutCount: count - endedCount,
+            averageTreasureRemaining: treasureRemainingTotal / count,
+            averageAdventurersKilled: adventurersKilledTotal / count,
+            averageEscapedWithTreasure: escapedTotal / count,
+            averageMonstersAlive: monstersAliveTotal / count,
+            results: results
+        };
+    }
+
+    var gameSession = null;
+    var intervalId = 0;
+
+    function Post(message) {
+        self.postMessage(Object.assign({ protocolVersion: PROTOCOL_VERSION }, message));
+    }
+
+    function EnsureGameSession() {
+        if (!gameSession) {
+            gameSession = new GameSession(123456789, { mode: 'quick' });
+        }
+    }
+
+    function SendWorldSnapshot(replyTo) {
+        if (!gameSession) {
+            return;
+        }
+
+        var msg = {
+            type: 'WORLD_SNAPSHOT',
+            payload: { snapshot: gameSession.getStaticSnapshot() }
+        };
+
+        if (replyTo !== undefined) {
+            msg.replyTo = replyTo;
+        }
+
+        Post(msg);
+    }
+
+    function SendSnapshotAndEvents(replyTo) {
+        if (!gameSession) {
+            return;
+        }
+
+        var msg = {
+            type: 'RAID_SNAPSHOT',
+            payload: { snapshot: gameSession.getSnapshot() }
+        };
+
+        if (replyTo !== undefined) {
+            msg.replyTo = replyTo;
+        }
+
+        Post(msg);
+        var events = gameSession.takeEvents();
+
+        if (events.length > 0) {
+            Post({ type: 'RAID_EVENTS', payload: { events: events } });
+        }
+    }
+
+    function StartTicker() {
+        if (intervalId) {
+            return;
+        }
+
+        intervalId = setInterval(function () {
+            if (!gameSession) {
+                return;
+            }
+
+            gameSession.tick();
+            var events = gameSession.takeEvents();
+
+            if (events.length > 0) {
+                Post({ type: 'RAID_EVENTS', payload: { events: events } });
+            }
+
+            Post({ type: 'RAID_SNAPSHOT', payload: { snapshot: gameSession.getSnapshot() } });
+        }, TICK_MS);
+    }
+
+    function HandleCommand(command) {
+        if (!command || command.protocolVersion !== PROTOCOL_VERSION) {
+            Post({ replyTo: command && command.messageId, type: 'COMMAND_REJECTED', payload: { reason: 'Unsupported protocol version.' } });
+            return;
+        }
+
+        try {
+            switch (command.type) {
+                case 'NEW_RAID':
+                case 'NEW_WORLD':
+                    gameSession = new GameSession(command.payload && Number.isFinite(command.payload.seed) ? command.payload.seed : Date.now(), {
+                        mode: command.payload && command.payload.mode ? command.payload.mode : 'quick',
+                        worldOptions: command.payload && command.payload.worldOptions ? command.payload.worldOptions : {}
+                    });
+                    StartTicker();
+                    Post({ replyTo: command.messageId, type: 'COMMAND_ACCEPTED' });
+                    SendWorldSnapshot(command.messageId);
+                    SendSnapshotAndEvents(command.messageId);
+                    break;
+
+                case 'RELEASE_MONSTER':
+                    EnsureGameSession();
+                    var result = gameSession.releaseMonster();
+                    Post(result.ok ? { replyTo: command.messageId, type: 'COMMAND_ACCEPTED' } : { replyTo: command.messageId, type: 'COMMAND_REJECTED', payload: { reason: result.reason } });
+                    SendSnapshotAndEvents(command.messageId);
+                    break;
+
+                case 'PAUSE_RAID':
+                    EnsureGameSession();
+                    gameSession.pause();
+                    Post({ replyTo: command.messageId, type: 'COMMAND_ACCEPTED' });
+                    SendSnapshotAndEvents(command.messageId);
+                    break;
+
+                case 'RESUME_RAID':
+                    EnsureGameSession();
+                    gameSession.resume();
+                    Post({ replyTo: command.messageId, type: 'COMMAND_ACCEPTED' });
+                    SendSnapshotAndEvents(command.messageId);
+                    break;
+
+                case 'RUN_HEADLESS_TESTS':
+                    Post({ replyTo: command.messageId, type: 'HEADLESS_TEST_RESULTS', payload: RunHeadlessTests(command.payload) });
+                    break;
+
+                default:
+                    Post({ replyTo: command.messageId, type: 'COMMAND_REJECTED', payload: { reason: 'Unknown command: ' + command.type } });
+            }
+        } catch (error) {
+            Post({ replyTo: command.messageId, type: 'WORKER_ERROR', payload: { message: String(error && error.message ? error.message : error) } });
+        }
+    }
+
+    self.onmessage = function (event) {
+        HandleCommand(event.data);
+    };
+
+    Post({ type: 'READY' });
+}());
+</script>
+<script>
+// SPDX-License-Identifier: GPL-3.0-only
+// @ts-check
+(function(){
+    'use strict';
+    // ============================================================================
+    // AI MAINTAINER NOTES - MAIN THREAD RESPONSIBILITIES
+    // ============================================================================
+    // This main-thread script owns browser UI, input, canvas sizing, rendering,
+    // visual interpolation and event log presentation only. It must not become the
+    // gameplay simulation. Authoritative raid state lives in the worker script.
+    //
+    // Single source of truth rule:
+    // - Worker snapshots are authoritative.
+    // - currentSnapshot/latestSnapshot are copies for display.
+    // - Interpolated render snapshots are visual-only and must never be sent back
+    //   to the worker.
+    //
+    // Formatting rule: preserve readable whitespace. Do not collapse loops,
+    // conditionals or statement sequences into long single lines.
+    // ============================================================================
+    // ============================================================================
+    // MODULE: MAIN-THREAD STATE AND DOM REFERENCES
+    // ============================================================================
+    // Browser-only state for canvas, controls, rendering snapshots and input.
+    var PROTOCOL_VERSION=1, TILE_SIZE=100, ISO_W=92, ISO_H=46, WORLD_WIDTH=1800, WORLD_HEIGHT=1200, MAP_VIEW_MARGIN=120;
+    var canvas=document.getElementById('raidCanvas'), ctx=canvas.getContext('2d'), statusBox=document.getElementById('statusBox'), eventLog=document.getElementById('eventLog'), monsterPortrait=document.getElementById('monsterPortrait');
+    var latestWorldSnapshot=null,latestStaticObstacles=[];
+    var latestSnapshot=null,previousSnapshot=null,currentSnapshot=null,previousSnapshotTime=0,currentSnapshotTime=0,nextMessageId=1,keys=new Set();
+    var RENDER_INTERPOLATION_DELAY_MS=50;
+    var camera={
+        x:0,y:240,width:canvas.width,height:canvas.height,speed:480
+    }
+    ;
+    var isDragging=false, lastMouseX=0, lastMouseY=0;
+    var visualFacingById={
+    }
+    ;
+    monsterPortrait.innerHTML='<svg viewBox="0 0 180 120" role="img" aria-label="Purple starter monster"><ellipse cx="90" cy="70" rx="55" ry="30" fill="#6b2d83"/><circle cx="62" cy="57" r="8" fill="white"/><circle cx="118" cy="57" r="8" fill="white"/><circle cx="64" cy="58" r="4" fill="#1f2730"/><circle cx="116" cy="58" r="4" fill="#1f2730"/><rect x="52" y="68" width="76" height="8" rx="4" fill="#f2c14e"/></svg>';
+    // ============================================================================
+    // MODULE: VIEW TRANSFORMS AND WORKER COMMANDS
+    // ============================================================================
+    // Converts simulation x/y coordinates into isometric screen positions and sends
+    // plain-data commands to the worker.
+    function Iso(x,y){
+        return{
+            x:(x-y)*(ISO_W/TILE_SIZE/2),y:(x+y)*(ISO_H/TILE_SIZE/2)
+        }
+        ;
+    }
+    function ToScreen(x,y){
+        var p=Iso(x,y);
+        return{
+            x:p.x+canvas.width/2-camera.x,y:p.y+40-camera.y
+        }
+        ;
+    }
+    function SendCommand(type,payload){
+        worker.postMessage({
+            protocolVersion:PROTOCOL_VERSION,messageId:nextMessageId++,type:type,payload:payload
+        }
+        );
+    }
+    function AttachStaticWorldData(snapshot){
+        if(!snapshot) return snapshot;
+        if(latestWorldSnapshot){
+            snapshot.world=latestWorldSnapshot.world;
+            snapshot.obstacles=latestStaticObstacles;
+            snapshot.terrainObjects=latestStaticObstacles;
+            snapshot.mapWidth=latestWorldSnapshot.mapWidth;
+            snapshot.mapHeight=latestWorldSnapshot.mapHeight;
+        }
+        return snapshot;
+    }
+    function AppendLog(text){
+        var item=document.createElement('li');
+        item.textContent=text;
+        eventLog.prepend(item);
+        while(eventLog.children.length>45)eventLog.removeChild(eventLog.lastChild);
+    }
+    function RenderPlaceholder(text){
+        ctx.fillStyle='#9fc4d9';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle='#1f2730';
+        ctx.font='20px system-ui';
+        ctx.fillText(text,30,60);
+    }
+    // ============================================================================
+    // MODULE: CANVAS LAYOUT
+    // ============================================================================
+    // UI-only viewport sizing. This must not affect simulation map dimensions.
+    function ResizeCanvas(){
+        // Renderer-only QoL commitment:
+        // - Canvas resizing and mouse scrolling are UI concerns on the main thread.
+        // - They must not affect authoritative simulation state in the worker.
+        // - The viewport should fill available space but should not grow beyond the projected map plus a small margin.
+        var topBar=document.getElementById('topBar');
+        var mapPanel=document.getElementById('mapPanel');
+        var hint=mapPanel.querySelector('.hint');
+        var availableWidth=Math.max(360, window.innerWidth - 24);
+        var usedHeight=topBar.getBoundingClientRect().height + (hint ? hint.getBoundingClientRect().height : 0) + 62;
+        var availableHeight=Math.max(300, window.innerHeight - usedHeight);
+        var projectedMapWidth=(WORLD_WIDTH+WORLD_HEIGHT)*(ISO_W/TILE_SIZE/2)+MAP_VIEW_MARGIN;
+        var projectedMapHeight=(WORLD_WIDTH+WORLD_HEIGHT)*(ISO_H/TILE_SIZE/2)+MAP_VIEW_MARGIN;
+        var cssWidth=Math.floor(Math.min(availableWidth - 24, projectedMapWidth));
+        var cssHeight=Math.floor(Math.min(availableHeight, projectedMapHeight));
+        cssWidth=Math.max(360, cssWidth);
+        cssHeight=Math.max(300, cssHeight);
+        canvas.style.height=cssHeight+'px';
+        if(canvas.width!==cssWidth) canvas.width=cssWidth;
+        if(canvas.height!==cssHeight) canvas.height=cssHeight;
+        camera.width=canvas.width;
+        camera.height=canvas.height;
+    }
+    ResizeCanvas();
+    window.addEventListener('resize', ResizeCanvas);
+    RenderPlaceholder('Creating simulation worker...');
+    statusBox.textContent='Main thread loaded. Creating Blob worker...';
+    var workerSource=document.getElementById('simulationWorkerSource').textContent, workerBlob=new Blob([workerSource],{
+        type:'text/javascript'
+    }
+    ), workerUrl=URL.createObjectURL(workerBlob), worker=new Worker(workerUrl);
+    function UpdateStatus(s){
+        var tr=s.treasures.filter(function(t){
+            return !t.stolen;
+        }
+        ).length, adv=s.adventurers.filter(function(a){
+            return a.alive&&!a.escaped;
+        }
+        ).length, m=s.monsters[0];
+        statusBox.textContent=['Seed: '+s.seed,'Result: '+s.raidResult,'Paused: '+s.paused,'Treasure remaining: '+tr+' / '+s.treasures.length,'Active adventurers: '+adv,'Monster: '+(m.deployed?'deployed':'waiting at right edge')+' ('+m.health+'/'+m.maxHealth+' hp)','Tick: '+s.tickNumber].join('\n');
+    }
+    // ============================================================================
+    // MODULE: STATIC WORLD RENDERING
+    // ============================================================================
+    // Draws terrain tiles, rocks, trees, treasure and health bars from snapshots.
+    function DrawDiamond(cx,cy,w,h,fill,stroke){
+        ctx.beginPath();
+        ctx.moveTo(cx,cy-h/2);
+        ctx.lineTo(cx+w/2,cy);
+        ctx.lineTo(cx,cy+h/2);
+        ctx.lineTo(cx-w/2,cy);
+        ctx.closePath();
+        ctx.fillStyle=fill;
+        ctx.fill();
+        if(stroke){
+            ctx.strokeStyle=stroke;
+            ctx.stroke();
+        }
+    }
+    function DrawTree(o){
+        var p=ToScreen(o.x,o.y);
+        ctx.fillStyle='#6b4423';
+        ctx.fillRect(p.x-5,p.y-28,10,34);
+        ctx.fillStyle=['#2f6b3a','#357a3f','#285a32'][o.variant%3];
+        ctx.beginPath();
+        ctx.arc(p.x,p.y-42,o.radius*0.72,0,Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle='rgba(255,255,255,0.12)';
+        ctx.beginPath();
+        ctx.arc(p.x-8,p.y-50,o.radius*0.28,0,Math.PI*2);
+        ctx.fill();
+    }
+    function DrawRock(o){
+        var p=ToScreen(o.x,o.y), r=o.radius*(o.type==='smallRock'?0.9:1.1);
+        ctx.fillStyle=o.type==='smallRock'?'#8d8d84':'#74756f';
+        ctx.beginPath();
+        ctx.moveTo(p.x-r,p.y);
+        ctx.lineTo(p.x-r*0.45,p.y-r*0.45);
+        ctx.lineTo(p.x+r*0.25,p.y-r*0.55);
+        ctx.lineTo(p.x+r,p.y-r*0.05);
+        ctx.lineTo(p.x+r*0.45,p.y+r*0.38);
+        ctx.lineTo(p.x-r*0.4,p.y+r*0.35);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle='#4e504a';
+        ctx.stroke();
+    }
+    function DrawChest(t){
+        var p=ToScreen(t.x,t.y);
+        ctx.globalAlpha=t.stolen?0.25:1;
+        ctx.fillStyle='#7b4a22';
+        ctx.fillRect(p.x-18,p.y-24,36,24);
+        ctx.fillStyle='#9a632d';
+        ctx.beginPath();
+        ctx.moveTo(p.x-18,p.y-24);
+        ctx.lineTo(p.x,p.y-38);
+        ctx.lineTo(p.x+18,p.y-24);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle='#f2c14e';
+        ctx.fillRect(p.x-3,p.y-28,6,28);
+        ctx.strokeStyle='#3a2412';
+        ctx.strokeRect(p.x-18,p.y-24,36,24);
+        ctx.globalAlpha=1;
+    }
+    function DrawHealthBar(p,w,h,health,maxHealth){
+        var ratio=maxHealth>0?Math.max(0,Math.min(1,health/maxHealth)):0;
+        ctx.fillStyle='#5a1f1f';
+        ctx.fillRect(p.x-w/2,p.y-h,w,h);
+        ctx.fillStyle=ratio>0.45?'#2f855a':'#c05621';
+        ctx.fillRect(p.x-w/2,p.y-h,w*ratio,h);
+        ctx.strokeStyle='#1f2730';
+        ctx.strokeRect(p.x-w/2,p.y-h,w,h);
+    }
+    function StablePhase(id){
+        var hash=0;
+        for(var i=0;
+        i<id.length;
+        i+=1){
+            hash=((hash<<5)-hash+id.charCodeAt(i))|0;
+        }
+        return Math.abs(hash%628)/100;
+    }
+    function QuantizeAngleToOctant(angle){
+        var octant=Math.round(angle/(Math.PI/4));
+        octant=((octant%8)+8)%8;
+        return octant;
+    }
+    function FacingFromOctant(octant){
+        var worldAngle=octant*(Math.PI/4);
+        var projected=Iso(Math.cos(worldAngle)*TILE_SIZE,Math.sin(worldAngle)*TILE_SIZE);
+        var length=Math.hypot(projected.x,projected.y);
+        if(length<0.0001){
+            projected={
+                x:1,y:0
+            }
+            ;
+            length=1;
+        }
+        var fx=projected.x/length;
+        var fy=projected.y/length;
+        return {
+            octant:octant,
+            facingX:fx,
+            facingY:fy,
+            lateralX:-fy,
+            lateralY:fx,
+            side:fx>=0?1:-1,
+            toward:fy>0.32,
+            away:fy<-0.32
+        }
+        ;
+    }
+    // ============================================================================
+    // MODULE: VISUAL FACING AND ANIMATION HELPERS
+    // ============================================================================
+    // Renderer-only facing memory and limb animation. Never feed this back into
+    // simulation decisions.
+    function FacingForEntity(entity,defaultOctant){
+        // 8-direction animation commitment:
+        // - Each animated agent keeps a renderer-only facing octant derived from its movement vector.
+        // - The renderer must support all 8 facings: E, SE, S, SW, W, NW, N, NE.
+        // - Idle agents retain their last visual octant so they do not snap back to a default direction.
+        // - Facing/animation are visual only and must never be sent back to the authoritative worker.
+        if(entity.renderMoving&&Number.isFinite(entity.renderAngle)){
+            visualFacingById[entity.id]=QuantizeAngleToOctant(entity.renderAngle);
+        }
+        if(visualFacingById[entity.id]===undefined){
+            visualFacingById[entity.id]=defaultOctant;
+        }
+        return FacingFromOctant(visualFacingById[entity.id]);
+    }
+    function DrawSegmentedLimb(ax,ay,bx,by,cx,cy,outerWidth,innerWidth,innerColour,outline){
+        ctx.lineCap='round';
+        ctx.lineJoin='round';
+        ctx.strokeStyle=outline;
+        ctx.lineWidth=outerWidth;
+        ctx.beginPath();
+        ctx.moveTo(ax,ay);
+        ctx.lineTo(bx,by);
+        ctx.lineTo(cx,cy);
+        ctx.stroke();
+        ctx.strokeStyle=innerColour;
+        ctx.lineWidth=innerWidth;
+        ctx.beginPath();
+        ctx.moveTo(ax,ay);
+        ctx.lineTo(bx,by);
+        ctx.lineTo(cx,cy);
+        ctx.stroke();
+        ctx.fillStyle=outline;
+        ctx.beginPath();
+        ctx.arc(bx,by,Math.max(2,innerWidth*0.62),0,Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle=innerColour;
+        ctx.beginPath();
+        ctx.arc(bx,by,Math.max(1.2,innerWidth*0.36),0,Math.PI*2);
+        ctx.fill();
+    }
+    function DrawHumanLeg(hipX,hipY,side,phase,front,trouser,outline,facing){
+        // Humanoid walk commitment:
+        // - Legs must have a visible thigh, knee and shin.
+        // - Feet remain on their own side of the pelvis in all 8 directions.
+        // - Gait direction follows the renderer-only facing octant so people do not appear to walk sideways/backwards.
+        var stride=Math.sin(phase)*7;
+        var lift=Math.max(0,Math.cos(phase))*5;
+        var lateralX=facing.lateralX;
+        var lateralY=facing.lateralY*0.45;
+        var forwardX=facing.facingX;
+        var forwardY=facing.facingY*0.4;
+        var hipScreenX=hipX+lateralX*side*4;
+        var hipScreenY=hipY+lateralY*side*2;
+        var kneeX=hipScreenX+lateralX*side*2+forwardX*stride*0.45;
+        var kneeY=hipScreenY+12-lift+forwardY*stride*0.35;
+        var footX=hipX+lateralX*side*8+forwardX*stride;
+        var footY=hipY+27-lift*0.25+forwardY*stride*0.45+lateralY*side*2;
+        DrawSegmentedLimb(hipScreenX,hipScreenY,kneeX,kneeY,footX,footY,front?7:6,front?4:3,trouser,outline);
+        ctx.fillStyle=outline;
+        ctx.beginPath();
+        ctx.ellipse(footX+forwardX*2,footY+1,5,2.4,Math.atan2(forwardY,forwardX),0,Math.PI*2);
+        ctx.fill();
+    }
+    function DrawArm(x,y,length,phase,colour,outline,holdingWeapon,facing,side){
+        var lateralX=facing.lateralX;
+        var lateralY=facing.lateralY*0.35;
+        var forwardX=facing.facingX;
+        var forwardY=facing.facingY*0.25;
+        var swing=Math.sin(phase)*5;
+        var elbowX=x+lateralX*side*3+forwardX*swing*0.35;
+        var elbowY=y+length*0.47+lateralY*side*2+forwardY*swing;
+        var handX=elbowX+lateralX*side*5+forwardX*swing*0.6;
+        var handY=elbowY+length*0.48+forwardY*swing*0.5;
+        DrawSegmentedLimb(x,y,elbowX,elbowY,handX,handY,6,3,colour,outline);
+        if(holdingWeapon){
+            ctx.strokeStyle='#6f4e2a';
+            ctx.lineWidth=4;
+            ctx.lineCap='round';
+            ctx.beginPath();
+            ctx.moveTo(handX-forwardX*2,handY-forwardY*2);
+            ctx.lineTo(handX+forwardX*18+lateralX*side*7,handY+forwardY*10+lateralY*side*4);
+            ctx.stroke();
+        }
+    }
+    function DrawClaw(x,y,flip){
+        ctx.strokeStyle='#e6d8a9';
+        ctx.lineWidth=2;
+        ctx.beginPath();
+        ctx.moveTo(x,y);
+        ctx.lineTo(x+flip*5,y+4);
+        ctx.moveTo(x+flip*2,y+1);
+        ctx.lineTo(x+flip*7,y+5);
+        ctx.stroke();
+    }
+    // ============================================================================
+    // MODULE: ADVENTURER RENDERING
+    // ============================================================================
+    // Draws humanoid adventurers based on authoritative snapshot state plus visual
+    // interpolation/facing.
+    function DrawAdventurer(a,now){
+        var p=ToScreen(a.x,a.y);
+        var facing=FacingForEntity(a,0);
+        var moving=!!a.renderMoving&&a.alive&&!a.escaped;
+        var phaseBase=now*0.014+StablePhase(a.id);
+        var walk=moving?phaseBase:StablePhase(a.id)*0.35;
+        var bob=moving?Math.sin(walk*2)*1.8:Math.sin(now*0.002+StablePhase(a.id))*0.45;
+        var hurtRatio=a.maxHealth>0?a.health/a.maxHealth:1;
+        var bodyColour=a.carryingTreasure?'#b7791f':(a.fleeing?'#6b7280':'#2b6cb0');
+        var dark='#1f2730';
+        ctx.globalAlpha=!a.alive?0.25:a.escaped?0.12:1;
+        ctx.save();
+        ctx.translate(p.x,p.y+bob);
+        ctx.scale(0.74,0.74);
+        // 8-direction adventurer commitment:
+        // - Body parts shift according to the renderer-only facing octant.
+        // - Rear/side/front presentation changes for all 8 facings so the figure does not walk backwards.
+        // - The humanoid walk has explicit knees and boots, not a cross-legged stick motion.
+        ctx.fillStyle='rgba(0,0,0,0.18)';
+        ctx.beginPath();
+        ctx.ellipse(0,3,16,6,0,0,Math.PI*2);
+        ctx.fill();
+        DrawHumanLeg(-5,-23,-1,walk+Math.PI,false,'#5b3a24',dark,facing);
+        DrawHumanLeg(6,-23,1,walk,true,'#6f472b',dark,facing);
+        var torsoLeanX=facing.facingX*3;
+        var headX=facing.facingX*4;
+        var headY=-61+facing.facingY*2;
+        if(a.carryingTreasure){
+            var sackX=-facing.facingX*12+facing.lateralX*8;
+            var sackY=-31-facing.facingY*2;
+            ctx.fillStyle='#8b5a2b';
+            ctx.strokeStyle=dark;
+            ctx.lineWidth=2;
+            ctx.beginPath();
+            ctx.ellipse(sackX,sackY,9,12,-0.3,0,Math.PI*2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle='#f2c14e';
+            ctx.fillRect(sackX-3,sackY-10,6,5);
+        }
+        ctx.fillStyle=bodyColour;
+        ctx.strokeStyle=dark;
+        ctx.lineWidth=2;
+        ctx.beginPath();
+        ctx.moveTo(-12+torsoLeanX*0.25,-48);
+        ctx.lineTo(12+torsoLeanX*0.25,-48);
+        ctx.lineTo(15+torsoLeanX,-25);
+        ctx.lineTo(7+torsoLeanX*0.35,-18);
+        ctx.lineTo(-8+torsoLeanX*0.35,-18);
+        ctx.lineTo(-15+torsoLeanX,-25);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle='#3f2a1d';
+        ctx.fillRect(-12+torsoLeanX*0.35,-31,24,4);
+        var weaponSide=facing.side;
+        var shieldSide=-weaponSide;
+        DrawArm(weaponSide*11+torsoLeanX*0.35,-43,24,walk,'#f1c27d',dark,true,facing,weaponSide);
+        DrawArm(shieldSide*11+torsoLeanX*0.35,-43,24,walk+Math.PI,'#f1c27d',dark,false,facing,shieldSide);
+        ctx.fillStyle='#6b7280';
+        ctx.strokeStyle=dark;
+        ctx.lineWidth=2;
+        ctx.beginPath();
+        ctx.ellipse(shieldSide*18+facing.facingX*2,-31+facing.facingY*2,7,10,-0.25,0,Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle='#f1c27d';
+        ctx.strokeStyle=dark;
+        ctx.lineWidth=2;
+        ctx.fillRect(-4+headX*0.35,-52,8,8);
+        ctx.strokeRect(-4+headX*0.35,-52,8,8);
+        ctx.beginPath();
+        ctx.arc(headX,headY,10,0,Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle='#5b3317';
+        if(facing.away){
+            ctx.beginPath();
+            ctx.arc(headX,headY-2,10,0,Math.PI*2);
+            ctx.fill();
+        }
+else {
+            ctx.beginPath();
+            ctx.arc(headX,headY-5,10,Math.PI,Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle=dark;
+            ctx.beginPath();
+            ctx.arc(headX-3+facing.facingX*2,headY,1.5,0,Math.PI*2);
+            ctx.arc(headX+4+facing.facingX*2,headY,1.5,0,Math.PI*2);
+            ctx.fill();
+            ctx.strokeStyle=(a.fleeing||hurtRatio<0.35)?'#7f1d1d':dark;
+            ctx.lineWidth=1.6;
+            ctx.beginPath();
+            if(a.fleeing||hurtRatio<0.35){
+                ctx.moveTo(headX-4,headY+6);
+                ctx.lineTo(headX+4,headY+7);
+            }
+else {
+                ctx.arc(headX+facing.facingX,headY+5,4,0.1,Math.PI-0.1);
+            }
+            ctx.stroke();
+        }
+        DrawHealthBar({
+            x:0,y:-76
+        }
+        ,32,5,a.health,a.maxHealth);
+        ctx.restore();
+        ctx.globalAlpha=1;
+    }
+    // ============================================================================
+    // MODULE: MONSTER RENDERING
+    // ============================================================================
+    // Draws current monster visuals. Future genotype-driven SVG/canvas appearance
+    // should read phenotype data from snapshots rather than calculating gameplay.
+    function DrawMonsterLeg(hipX,hipY,side,phase,colour,outline,facing){
+        var stride=Math.sin(phase)*7;
+        var lift=Math.max(0,Math.cos(phase))*3.5;
+        var lateralX=facing.lateralX;
+        var lateralY=facing.lateralY*0.35;
+        var forwardX=facing.facingX;
+        var forwardY=facing.facingY*0.35;
+        var kneeX=hipX+lateralX*side*2+forwardX*stride*0.35;
+        var kneeY=hipY+10-lift+forwardY*stride*0.2;
+        var footX=hipX+lateralX*side*6+forwardX*stride;
+        var footY=hipY+22-lift*0.2+forwardY*stride*0.35;
+        DrawSegmentedLimb(hipX,hipY,kneeX,kneeY,footX,footY,7,4,colour,outline);
+        DrawClaw(footX,footY,side>=0?1:-1);
+    }
+    function DrawMonster(m,now){
+        var p=ToScreen(m.x,m.y);
+        var facing=FacingForEntity(m,4);
+        var moving=!!m.renderMoving&&m.alive&&m.deployed;
+        var phaseBase=now*0.013+StablePhase(m.id);
+        var walk=moving?phaseBase:StablePhase(m.id)*0.3;
+        var breathe=Math.sin(now*0.003+StablePhase(m.id))*1.1;
+        var bob=moving?Math.sin(walk*2)*1.7:breathe*0.55;
+        var hurtRatio=m.maxHealth>0?m.health/m.maxHealth:1;
+        ctx.globalAlpha=!m.alive?0.25:!m.deployed?0.55:1;
+        ctx.save();
+        ctx.translate(p.x,p.y+bob);
+        ctx.scale(0.66,0.66);
+        // 8-direction monster commitment:
+        // - Head, snout, tail, legs and dorsal plates follow the renderer-only facing octant.
+        // - The monster must not appear to walk backward or sideways when pathing changes direction.
+        // - Dorsal plates are anchored inside the body silhouette in every direction.
+        var dark='#1f2730';
+        var body='#6b2d83';
+        var bodyDark='#4a1f5d';
+        var belly='#8b5fb0';
+        var fx=facing.facingX;
+        var fy=facing.facingY*0.45;
+        var len=Math.hypot(fx,fy);
+        if(len<0.0001){
+            fx=-1;
+            fy=0;
+            len=1;
+        }
+        fx/=len;
+        fy/=len;
+        var lx=-fy;
+        var ly=fx;
+        var rot=Math.atan2(fy,fx);
+        ctx.fillStyle='rgba(0,0,0,0.22)';
+        ctx.beginPath();
+        ctx.ellipse(0,2,30,9,0,0,Math.PI*2);
+        ctx.fill();
+        var tailBaseX=-fx*25;
+        var tailBaseY=-32-fy*10;
+        var tailTipX=-fx*48+lx*Math.sin(walk)*6;
+        var tailTipY=-30-fy*14+ly*Math.sin(walk)*4;
+        ctx.strokeStyle=dark;
+        ctx.lineWidth=9;
+        ctx.lineCap='round';
+        ctx.beginPath();
+        ctx.moveTo(tailBaseX,tailBaseY);
+        ctx.quadraticCurveTo(-fx*38+lx*8,-38-fy*12+ly*4,tailTipX,tailTipY);
+        ctx.stroke();
+        ctx.strokeStyle=bodyDark;
+        ctx.lineWidth=6;
+        ctx.beginPath();
+        ctx.moveTo(tailBaseX,tailBaseY);
+        ctx.quadraticCurveTo(-fx*38+lx*8,-38-fy*12+ly*4,tailTipX,tailTipY);
+        ctx.stroke();
+        DrawMonsterLeg(-fx*14+lx*13,-25+ly*4,-1,walk+Math.PI,bodyDark,dark,facing);
+        DrawMonsterLeg(fx*12-lx*12,-24-ly*4,1,walk+0.65,bodyDark,dark,facing);
+        ctx.fillStyle=bodyDark;
+        ctx.strokeStyle=dark;
+        ctx.lineWidth=2.5;
+        ctx.beginPath();
+        ctx.ellipse(0,-34,32+breathe,19+breathe*0.3,rot,0,Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle=body;
+        ctx.beginPath();
+        ctx.ellipse(-fx*4,-38-fy*2,28+breathe,16+breathe*0.25,rot,0,Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle=belly;
+        ctx.beginPath();
+        ctx.ellipse(-fx*4,-31,15,7,rot,0,Math.PI*2);
+        ctx.fill();
+        DrawMonsterLeg(-fx*8-lx*14,-24-ly*4,-1,walk,body,dark,facing);
+        DrawMonsterLeg(fx*16+lx*14,-24+ly*4,1,walk+Math.PI,body,dark,facing);
+        var headX=fx*30;
+        var headY=-48+fy*11;
+        var snoutX=headX+fx*15;
+        var snoutY=headY+fy*8;
+        ctx.fillStyle=body;
+        ctx.strokeStyle=dark;
+        ctx.lineWidth=2.5;
+        ctx.beginPath();
+        ctx.ellipse(headX,headY,18,15,rot*0.35,0,Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle='#7d3f98';
+        ctx.beginPath();
+        ctx.ellipse(snoutX,snoutY,10,7,rot*0.35,0,Math.PI*2);
+        ctx.fill();
+        ctx.strokeStyle=dark;
+        ctx.stroke();
+        ctx.fillStyle='#e6d8a9';
+        ctx.strokeStyle=dark;
+        ctx.lineWidth=2;
+        for(var h=-1;
+        h<=1;
+        h+=2){
+            var hornBaseX=headX+lx*h*7-fx*3;
+            var hornBaseY=headY+ly*h*4-11;
+            ctx.beginPath();
+            ctx.moveTo(hornBaseX-lx*h*4,hornBaseY+4);
+            ctx.lineTo(hornBaseX+lx*h*2,hornBaseY-17);
+            ctx.lineTo(hornBaseX+lx*h*7,hornBaseY+5);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+        if(!facing.away){
+            ctx.fillStyle='white';
+            ctx.beginPath();
+            ctx.ellipse(headX+lx*6+fx*2,headY-4+ly*2,5,6,0,0,Math.PI*2);
+            ctx.ellipse(headX-lx*5+fx*2,headY-5-ly*2,5,6,0,0,Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle=dark;
+            ctx.beginPath();
+            ctx.ellipse(headX+lx*6+fx*4,headY-4+ly*2,2,3,0,0,Math.PI*2);
+            ctx.ellipse(headX-lx*5+fx*4,headY-5-ly*2,2,3,0,0,Math.PI*2);
+            ctx.fill();
+            ctx.strokeStyle=dark;
+            ctx.lineWidth=2;
+            ctx.beginPath();
+            ctx.moveTo(snoutX+lx*5,snoutY+4);
+            ctx.quadraticCurveTo(snoutX+fx*5,snoutY+10,snoutX-lx*5,snoutY+5);
+            ctx.stroke();
+            ctx.fillStyle='#f3f0dc';
+            ctx.beginPath();
+            ctx.moveTo(snoutX-lx*2,snoutY+5);
+            ctx.lineTo(snoutX+fx*2,snoutY+12);
+            ctx.lineTo(snoutX+lx*3,snoutY+5);
+            ctx.closePath();
+            ctx.fill();
+        }
+else {
+            ctx.fillStyle='#5b216e';
+            ctx.beginPath();
+            ctx.ellipse(headX,headY-4,12,7,rot,0,Math.PI*2);
+            ctx.fill();
+        }
+        ctx.fillStyle='#5b216e';
+        ctx.strokeStyle=dark;
+        ctx.lineWidth=1.5;
+        var spineOffsets=[-18,-6,7,19];
+        for(var i=0;
+        i<spineOffsets.length;
+        i+=1){
+            var sx=fx*spineOffsets[i]+lx*3;
+            var sy=-51+fy*spineOffsets[i]*0.35+ly*3;
+            ctx.beginPath();
+            ctx.moveTo(sx-lx*6,sy+7);
+            ctx.lineTo(sx,sy-9);
+            ctx.lineTo(sx+lx*6,sy+7);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+        ctx.strokeStyle='#f2c14e';
+        ctx.lineWidth=5;
+        ctx.beginPath();
+        ctx.moveTo(headX-lx*12-fx*6,headY+9);
+        ctx.quadraticCurveTo(headX,headY+15,headX+lx*12-fx*6,headY+9);
+        ctx.stroke();
+        ctx.fillStyle='#f2c14e';
+        ctx.fillRect(headX-fx*3-2,headY+10,5,6);
+        if(hurtRatio<0.35){
+            ctx.fillStyle='rgba(190,39,39,0.18)';
+            ctx.beginPath();
+            ctx.ellipse(0,-34,33,20,rot,0,Math.PI*2);
+            ctx.fill();
+        }
+        DrawHealthBar({
+            x:0,y:-82
+        }
+        ,44,5,m.health,m.maxHealth);
+        ctx.restore();
+        ctx.globalAlpha=1;
+    }
+    function Clamp01(value){
+        return Math.max(0,Math.min(1,value));
+    }
+    function IndexById(list){
+        var result={
+        }
+        ;
+        for(var i=0;
+        i<list.length;
+        i+=1){
+            result[list[i].id]=list[i];
+        }
+        return result;
+    }
+    function InterpolateEntityList(previousList,currentList,alpha){
+        var previousById=IndexById(previousList||[]);
+        return (currentList||[]).map(function(current){
+            var item=Object.assign({
+            }
+            ,current);
+            var previous=previousById[current.id];
+            if(previous&&Number.isFinite(previous.x)&&Number.isFinite(previous.y)&&Number.isFinite(current.x)&&Number.isFinite(current.y)){
+                item.x=previous.x+(current.x-previous.x)*alpha;
+                item.y=previous.y+(current.y-previous.y)*alpha;
+                var dx=current.x-previous.x;
+                var dy=current.y-previous.y;
+                item.renderMoving=Math.hypot(dx,dy)>0.2;
+                item.renderAngle=Math.atan2(dy,dx);
+            }
+else {
+                item.renderMoving=false;
+                item.renderAngle=0;
+            }
+            return item;
+        }
+        );
+    }
+    // ============================================================================
+    // MODULE: RENDER SNAPSHOT INTERPOLATION
+    // ============================================================================
+    // Creates visual-only interpolated entity positions between authoritative worker
+    // snapshots.
+    function MakeRenderSnapshot(now){
+        // Renderer-only smoothness commitment:
+        // - The worker remains authoritative and discrete.
+        // - The main thread may interpolate between worker snapshots for smoother drawing only.
+        // - Interpolated positions must never be sent back to the worker or used as authoritative gameplay state.
+        if(!currentSnapshot)return null;
+        AttachStaticWorldData(currentSnapshot);
+        if(previousSnapshot) AttachStaticWorldData(previousSnapshot);
+        if(!previousSnapshot||currentSnapshotTime<=previousSnapshotTime)return currentSnapshot;
+        var targetTime=now-RENDER_INTERPOLATION_DELAY_MS;
+        var alpha=Clamp01((targetTime-previousSnapshotTime)/(currentSnapshotTime-previousSnapshotTime));
+        var result=Object.assign({
+        }
+        ,currentSnapshot);
+        result.adventurers=InterpolateEntityList(previousSnapshot.adventurers,currentSnapshot.adventurers,alpha);
+        result.monsters=InterpolateEntityList(previousSnapshot.monsters,currentSnapshot.monsters,alpha);
+        result.treasures=currentSnapshot.treasures;
+        result.droppedTreasure=currentSnapshot.droppedTreasure;
+        result.obstacles=currentSnapshot.obstacles || latestStaticObstacles;
+        result.terrainObjects=result.obstacles;
+        result.world=latestWorldSnapshot ? latestWorldSnapshot.world : currentSnapshot.world;
+        return result;
+    }
+    // ============================================================================
+    // MODULE: RAID SCENE COMPOSITION
+    // ============================================================================
+    // Sorts and draws visible raid objects without mutating simulation state.
+    function RenderRaid(s,now){
+        ctx.fillStyle='#9fc4d9';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        var cols=Math.ceil(s.mapWidth/TILE_SIZE),rows=Math.ceil(s.mapHeight/TILE_SIZE),x,y,p;
+        for(y=0;
+        y<rows;
+        y+=1){
+            for(x=0;
+            x<cols;
+            x+=1){
+                p=ToScreen(x*TILE_SIZE+TILE_SIZE/2,y*TILE_SIZE+TILE_SIZE/2);
+                if(p.x<-100||p.x>canvas.width+100||p.y<-80||p.y>canvas.height+80)continue;
+                DrawDiamond(p.x,p.y,ISO_W,ISO_H,(x+y)%2===0?'#7fa85b':'#88b463','#648a45');
+            }
+        }
+        var renderables=[];
+        (s.obstacles||[]).forEach(function(o){
+            renderables.push({
+                sort:o.x+o.y,kind:'obstacle',obj:o
+            }
+            );
+        }
+        );
+        s.treasures.forEach(function(t){
+            renderables.push({
+                sort:t.x+t.y,kind:'treasure',obj:t
+            }
+            );
+        }
+        );
+        s.adventurers.forEach(function(a){
+            renderables.push({
+                sort:a.x+a.y+12,kind:'adventurer',obj:a
+            }
+            );
+        }
+        );
+        s.monsters.forEach(function(m){
+            renderables.push({
+                sort:m.x+m.y+12,kind:'monster',obj:m
+            }
+            );
+        }
+        );
+        renderables.sort(function(a,b){
+            return a.sort-b.sort;
+        }
+        );
+        renderables.forEach(function(r){
+            if(r.kind==='obstacle'){
+                if(r.obj.type==='tree')DrawTree(r.obj);
+else DrawRock(r.obj);
+            }
+else if(r.kind==='treasure')DrawChest(r.obj);
+else if(r.kind==='adventurer')DrawAdventurer(r.obj,now);
+else DrawMonster(r.obj,now);
+        }
+        );
+        ctx.fillStyle='rgba(31,39,48,0.82)';
+        ctx.fillRect(10,10,330,72);
+        ctx.fillStyle='white';
+        ctx.font='14px system-ui';
+        ctx.fillText('Isometric renderer only; simulation remains normal x/y.',22,34);
+        ctx.fillText('Camera: '+Math.round(camera.x)+', '+Math.round(camera.y)+'  Tick: '+s.tickNumber,22,56);
+        ctx.fillText('Left edge: adventurers. Right edge: collared monsters.',22,76);
+    }
+    // ============================================================================
+    // MODULE: WORKER MESSAGE HANDLING
+    // ============================================================================
+    // Receives authoritative snapshots, events, errors and headless harness results.
+    worker.onerror=function(event){
+        var message='Worker failed: '+event.message+' at '+event.filename+':'+event.lineno;
+        statusBox.textContent=message;
+        AppendLog(message);
+        RenderPlaceholder('Worker failed. See status panel and browser console.');
+    }
+    ;
+    worker.onmessage=function(event){
+        var message=event.data;
+        if(!message||message.protocolVersion!==PROTOCOL_VERSION){
+            AppendLog('Ignored message with unsupported protocol.');
+            return;
+        }
+        switch(message.type){
+            case'READY':AppendLog('Simulation worker ready.');
+            SendCommand('NEW_RAID',{
+                seed:Date.now()
+            }
+            );
+            break;
+            case'COMMAND_REJECTED':AppendLog('Command rejected: '+message.payload.reason);
+            break;
+            case'WORLD_SNAPSHOT':latestWorldSnapshot=message.payload.snapshot;
+            latestStaticObstacles=latestWorldSnapshot.obstacles || latestWorldSnapshot.terrainObjects || [];
+            if(currentSnapshot) AttachStaticWorldData(currentSnapshot);
+            AppendLog('World snapshot received: '+latestStaticObstacles.length+' static scenery objects.');
+            break;
+            case'RAID_SNAPSHOT':previousSnapshot=currentSnapshot;
+            previousSnapshotTime=currentSnapshotTime;
+            currentSnapshot=AttachStaticWorldData(message.payload.snapshot);
+            currentSnapshotTime=performance.now();
+            latestSnapshot=currentSnapshot;
+            UpdateStatus(latestSnapshot);
+            break;
+            case'RAID_EVENTS':message.payload.events.forEach(function(e){
+                AppendLog('['+e.tickNumber+'] '+e.text);
+            }
+            );
+            break;
+            case'WORKER_ERROR':AppendLog('Worker error: '+message.payload.message);
+            break;
+            case'HEADLESS_TEST_RESULTS':AppendLog('Harness: '+message.payload.endedCount+'/'+message.payload.count+' raids ended; avg treasure remaining '+message.payload.averageTreasureRemaining.toFixed(2)+'.');
+            break;
+        }
+    }
+    ;
+    // ============================================================================
+    // MODULE: INPUT HANDLERS
+    // ============================================================================
+    // Converts user input into worker commands or camera-only UI changes.
+    document.getElementById('newRaidButton').addEventListener('click',function(){
+        SendCommand('NEW_RAID',{
+            seed:Date.now()
+        }
+        );
+    }
+    );
+    document.getElementById('pauseButton').addEventListener('click',function(){
+        SendCommand('PAUSE_RAID');
+    }
+    );
+    document.getElementById('resumeButton').addEventListener('click',function(){
+        SendCommand('RESUME_RAID');
+    }
+    );
+    document.getElementById('releaseButton').addEventListener('click',function(){
+        SendCommand('RELEASE_MONSTER');
+    }
+    );
+    document.getElementById('harnessButton').addEventListener('click',function(){
+        SendCommand('RUN_HEADLESS_TESTS',{
+            seed:100000,count:3,maxTicks:600
+        }
+        );
+    }
+    );
+    window.addEventListener('keydown',function(e){
+        keys.add(e.key.toLowerCase());
+    }
+    );
+    window.addEventListener('keyup',function(e){
+        keys.delete(e.key.toLowerCase());
+    }
+    );
+    canvas.addEventListener('wheel',function(e){
+        if(!e.shiftKey){
+            return;
+        }
+        e.preventDefault();
+        camera.x += e.deltaX;
+        camera.y += e.deltaY;
+    }
+    ,{
+        passive:false
+    }
+    );
+    canvas.addEventListener('pointerdown',function(e){
+        isDragging=true;
+        lastMouseX=e.clientX;
+        lastMouseY=e.clientY;
+        canvas.classList.add('dragging');
+        canvas.setPointerCapture(e.pointerId);
+    }
+    );
+    canvas.addEventListener('pointermove',function(e){
+        if(!isDragging)return;
+        var dx=e.clientX-lastMouseX;
+        var dy=e.clientY-lastMouseY;
+        lastMouseX=e.clientX;
+        lastMouseY=e.clientY;
+        camera.x -= dx;
+        camera.y -= dy;
+    }
+    );
+    canvas.addEventListener('pointerup',function(e){
+        isDragging=false;
+        canvas.classList.remove('dragging');
+        try{
+            canvas.releasePointerCapture(e.pointerId);
+        }
+catch (ignore){
+        }
+    }
+    );
+    canvas.addEventListener('pointercancel',function(){
+        isDragging=false;
+        canvas.classList.remove('dragging');
+    }
+    );
+    function UpdateCamera(dt){
+        var dx=0,dy=0;
+        if(keys.has('arrowleft')||keys.has('a'))dx-=1;
+        if(keys.has('arrowright')||keys.has('d'))dx+=1;
+        if(keys.has('arrowup')||keys.has('w'))dy-=1;
+        if(keys.has('arrowdown')||keys.has('s'))dy+=1;
+        camera.x+=dx*camera.speed*dt;
+        camera.y+=dy*camera.speed*dt;
+    }
+    // ============================================================================
+    // MODULE: MAIN RENDER LOOP
+    // ============================================================================
+    // Drives camera panning and drawing. Simulation ticks happen in the worker.
+    var lastTime=performance.now();
+    function Frame(now){
+        var dt=Math.min(0.1,(now-lastTime)/1000);
+        lastTime=now;
+        UpdateCamera(dt);
+        var renderSnapshot=MakeRenderSnapshot(now);
+        if(renderSnapshot)RenderRaid(renderSnapshot,now);
+        requestAnimationFrame(Frame);
+    }
+    requestAnimationFrame(Frame);
+}
+());
+</script>
+</body>
+</html>

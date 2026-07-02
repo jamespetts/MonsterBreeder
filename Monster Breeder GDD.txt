@@ -1,0 +1,587 @@
+Monster Breeder - Concise Game Design Document
+Updated for the object-oriented worker architecture and snapshot-split rendering pipeline, 2026-07-02
+
+1. High Concept
+Monster Breeder is a semi-turn-based monster-breeding defence game. The player breeds a genetically evolving population of autonomous monsters and deploys them to defend procedurally generated treasure sites from human adventurers.
+
+The player's main control is artificial selection: choosing which monsters to breed, which to deploy, which to hold in reserve, and which wild monsters to capture to broaden the gene pool. During raids, monsters act autonomously according to inherited traits and immediate circumstances.
+
+The player loses the campaign if all treasure is depleted.
+
+2. Core Fantasy
+The player is the keeper of a monster brood defending treasure from greedy humans. Over many rounds, the player develops bloodlines of monsters suited to different terrains, treasure layouts and adventurer threats.
+
+The game should feel like Creatures meets reverse tower defence / Dungeon Keeper, with genetics as the long-term strategy layer.
+
+3. Overall Structure
+The game proceeds in repeated rounds.
+
+Each round has three broad phases.
+
+3.1 Management/Breeding Phase
+The player may:
+- inspect surviving monsters;
+- breed monsters;
+- manage eggs and hatchlings;
+- choose which monsters to release into the landscape;
+- hold monsters in reserve;
+- import/export monsters if desired;
+- proceed when ready.
+
+3.2 Real-Time Raid Phase
+Adventurers enter the landscape. Adventurers try to steal treasure and escape. Released monsters roam autonomously and attack humans.
+
+Player intervention is deliberately limited:
+- deploy reserve monsters;
+- recall deployed monsters to base;
+- click wild monsters to capture them for future rounds.
+
+There is no detailed RTS-style command structure.
+
+3.3 Aftermath
+The game calculates stolen and remaining treasure. Injuries, deaths, ageing, disease checks and egg progression occur.
+
+If adventurers fail to escape with treasure for 4 consecutive raid turns/waves, the round ends successfully and the player scores the remaining treasure value.
+
+If all treasure is depleted, the campaign is lost.
+
+Surviving owned monsters carry forward to later rounds.
+
+4. Treasure
+There are five treasure types:
+- Bronze coins
+- Silver coins
+- Gold coins
+- Rubies
+- Emeralds
+
+Treasure types differ by value. Higher-value treasure attracts stronger adventurers.
+
+Each adventurer has a fixed carrying capacity for each treasure class. All adventurers prefer higher-value treasure over lower-value treasure, subject to what they can reach and carry.
+
+5. Adventurer Classes
+There are four intended adventurer classes. The current MVP may implement only villagers at first, but the architecture should allow the other classes to be added without redesigning the simulation.
+
+5.1 Villagers
+- Always possible.
+- Unarmed by default.
+- Low intelligence.
+- Poor combat skill.
+- Can pick up environmental rocks and sticks as improvised weapons.
+- Easily deterred by casualties and failed raids.
+- More likely if the treasure site is close to a human settlement.
+- Prefer valuable treasure but may behave crudely and opportunistically.
+
+5.2 Explorers
+- Begin appearing when silver coins are present.
+- More common once gold or better treasure exists.
+- More intelligent than villagers.
+- Wear leather armour.
+- Armed with daggers.
+- Better at route choice and avoiding obvious danger.
+- Moderately deterred by casualties and recent failures.
+
+5.3 Warriors
+- Begin appearing when gold coins are present.
+- More common once rubies or better treasure exists.
+- Skilled close-combat fighters.
+- Wear chain-mail armour.
+- Armed with broad swords.
+- Less deterred by casualties than lower classes.
+- Likely to engage monsters blocking access to valuable treasure.
+
+5.4 Knights
+- Begin appearing when gems are present.
+- Appear in small numbers when rubies are the best treasure.
+- Appear in much greater numbers when emeralds are present.
+- Mounted when terrain permits.
+- Wear plate armour.
+- Armed with long swords and lances.
+- Dangerous in open ground.
+- Can dismount in unsuitable terrain.
+- Dismounted knights should still be at least as effective as warriors.
+- Much less deterred by previous casualties or failures.
+
+6. Adventurer Generation
+Each round has a procedurally generated context including:
+- treasure distribution;
+- terrain;
+- distance to nearest human settlement;
+- environmental availability of rocks/sticks;
+- hiding places/ambush terrain;
+- movement difficulty.
+
+Adventurer numbers depend on:
+- highest treasure tier present;
+- total treasure value;
+- distance to settlement;
+- casualties in recent rounds;
+- amount of treasure successfully stolen in recent rounds;
+- class-specific deterrence.
+
+The game remembers up to the last 4 rounds for deterrence purposes.
+
+General rules:
+- Lower-class adventurers are more numerous.
+- Maximum number per class decreases as class increases.
+- Villagers and explorers are strongly affected by settlement proximity and recent failures.
+- Warriors are less affected.
+- Knights are least affected.
+- Higher treasure tiers increase the chance and number of stronger adventurers.
+
+Example progression:
+- Bronze only: mostly villagers.
+- Bronze + silver: villagers plus some explorers.
+- Gold present: more explorers, some warriors.
+- Rubies present: warriors common, a few knights.
+- Emeralds present: large mixed raids including many strong adventurers.
+
+Late rounds should remain variable. For example, a later round may contain only bronze and silver but be very close to a village, causing a large villager rush in open, rock-filled terrain.
+
+7. Adventurer Individual Variation
+Each adventurer has randomised scalar traits in addition to class defaults.
+
+Possible traits:
+- bravery;
+- greed;
+- intelligence;
+- combat skill;
+- pain tolerance;
+- speed;
+- strength;
+- perception;
+- caution;
+- likelihood of fleeing;
+- preference for high-value treasure;
+- willingness to fight monsters;
+- ability to use terrain.
+
+Class determines baseline ranges. Individual variation modifies behaviour within those ranges.
+
+8. Monster Population
+All monsters belong to one interbreeding population. They are not separate species, because interbreeding is central to gameplay.
+
+Monsters vary procedurally by:
+- body size;
+- body shape;
+- limbs;
+- mouth/claws/horns/spines/armour;
+- colour;
+- patterning;
+- senses;
+- movement;
+- temperament;
+- aggression;
+- fearfulness;
+- intelligence;
+- territoriality;
+- terrain affinity;
+- fertility;
+- lifespan;
+- disease resistance;
+- injury resistance.
+
+Owned monsters are visually marked with collars. Wild monsters are not collared.
+
+9. Monster Control Philosophy
+Monsters are autonomous. The player should not issue detailed combat orders.
+
+During the raid phase, the player may only:
+- release reserve monsters;
+- recall owned monsters to base;
+- capture wild monsters by clicking them.
+
+Released monsters choose targets and behaviours based on:
+- inherited behavioural traits;
+- sensory capabilities;
+- nearby adventurers;
+- nearby treasure;
+- own injuries/fear;
+- terrain;
+- threat level;
+- hunger/territorial aggression if implemented;
+- immediate combat circumstances.
+
+The game should reward breeding appropriate behaviour rather than micromanagement.
+
+10. Genetics
+The genetic model should be complex enough to create emergent qualities, but simpler than a fully realistic biological simulation.
+
+There should not be simple genes for fast or strong. Instead, genes influence underlying components that combine into emergent capabilities.
+
+Example gene categories:
+- limb length genes;
+- muscle type genes;
+- body mass genes;
+- joint robustness genes;
+- metabolic genes;
+- sensory genes;
+- reaction-time genes;
+- aggression genes;
+- fear genes;
+- pain tolerance genes;
+- armour/skin genes;
+- claw/horn/jaw genes;
+- fertility genes;
+- lifespan genes;
+- disease-resistance genes;
+- pattern/colour genes.
+
+Derived traits are calculated from multiple genes.
+
+Examples:
+- speed emerges from limb length, stride efficiency, mass, muscle, stamina and terrain affinity;
+- combat power emerges from size, strength, weapons, aggression, skill-like instincts and target choice;
+- survivability emerges from armour, toughness, pain tolerance, speed, fear response and healing;
+- knight-killing ability may require strength, armour penetration, courage and survival under heavy damage;
+- villager interception may require speed, perception and target prioritisation.
+
+11. Inbreeding
+Inbreeding must create problems.
+
+The game should track relatedness/inbreeding sufficiently to create:
+- increased chance of harmful recessive traits;
+- fertility penalties;
+- disease susceptibility;
+- developmental weakness if desired;
+- shorter lifespan;
+- behavioural instability;
+- reduced clutch viability.
+
+Inbreeding can still be useful for fixing desirable traits, but should create long-term risk.
+
+Wild monsters provide new alleles and reduce inbreeding, but may introduce undesirable genes as well as useful ones.
+
+12. Aesthetic Genetics
+Some genes are purely or mainly aesthetic.
+
+Possible visual traits:
+- purple, green, blue, cyan, red, black, white, etc.;
+- stripes;
+- spots;
+- mottling;
+- gradients;
+- glowing markings;
+- horn colour;
+- eye colour;
+- scale/skin/fur texture.
+
+Alleles may interact. For example, if a purple allele and cyan allele have equal ranking, the monster may show patterned or mixed colouring rather than one fully dominating.
+
+Visual appearance should be procedurally generated and consistent with genotype.
+
+13. Procedural Monster Graphics
+Graphics should be generated as simplified but expressive procedural SVG or canvas-drawn component art.
+
+Monster appearance should reflect:
+- genome;
+- age;
+- injury;
+- disease/health;
+- ownership collar;
+- possibly fear/aggression state.
+
+Monster rendering should use phenotype data from authoritative simulation snapshots. Rendering code may cache derived visual data, but visual caches must not be authoritative gameplay state.
+
+Graphics should prioritise clarity and charm over realism. Monsters should look distinct enough that players can remember bloodlines.
+
+The early MVP visual direction is a readable dog/crocodile-like monster silhouette with snout, tail, legs, teeth, horns/spines and collar. This is a placeholder phenotype style, not a constraint on the eventual genetic renderer.
+
+14. Reproduction
+Monsters reproduce by laying eggs.
+
+Reasons:
+- visually clear;
+- cute;
+- easier to communicate;
+- supports clutch mechanics;
+- avoids mammalian pregnancy complexity.
+
+Possible model:
+- breeding takes the mother out of action for one turn;
+- eggs hatch after a short number of turns;
+- clutch size depends on genetics and age;
+- offspring inherit genes from both parents;
+- mutation may occur at low rates;
+- hatchlings may need time to mature before breeding or effective combat.
+
+Monsters can only breed below a certain age.
+
+15. Ageing, Injury and Disease
+Monsters can die from:
+- battle injury;
+- disease;
+- old age.
+
+Disease is simplified. There is no transmissible disease model.
+
+Disease risk is based on:
+- genes;
+- age;
+- random chance;
+- injury status.
+
+Injuries come mainly from battle. Injuries may:
+- heal;
+- leave permanent penalties;
+- increase disease risk;
+- reduce fertility;
+- reduce combat effectiveness;
+- cause death.
+
+16. Wild Monsters
+Wild monsters may appear randomly during raid phases.
+
+Wild monsters:
+- behave like any other monster according to genes and circumstances;
+- are not harder to command because there is no command/domestication system;
+- can be captured by clicking during the battle phase;
+- continue acting normally for the current round;
+- return to base at the end of the round if captured and alive.
+
+Purpose:
+- broaden the gene pool;
+- reduce inbreeding;
+- introduce rare traits;
+- introduce both desirable and undesirable genes.
+
+17. Combat
+Combat is real-time and autonomous.
+
+When a monster and adventurer engage, possible outcomes include:
+- one wounds the other;
+- one flees;
+- one dies;
+- both disengage;
+- combat continues.
+
+Combat depends on adventurer factors:
+- class;
+- equipment;
+- armour;
+- weapon;
+- individual bravery;
+- individual skill;
+- current treasure load;
+- terrain;
+- mounted/dismounted status for knights.
+
+Combat depends on monster factors:
+- size;
+- speed;
+- attack anatomy;
+- armour/toughness;
+- aggression;
+- fearfulness;
+- intelligence;
+- injury;
+- terrain affinity;
+- pack/cooperation traits if implemented.
+
+Monsters should not always fight to the death. Retreat/flee behaviour should be genetically influenced.
+
+Adventurers may keep running, fight, or flee depending on class and individual traits.
+
+18. Terrain, Environment and Navigation
+Each round has a procedurally generated landscape. The landscape is stable for that round.
+
+Terrain affects:
+- movement speed;
+- hiding/ambush;
+- adventurer pathfinding;
+- mounted knight effectiveness;
+- availability of rocks/sticks;
+- monster terrain advantages;
+- line of sight.
+
+Current and intended terrain/feature categories include:
+- open grassland;
+- rocky ground;
+- forest;
+- marsh;
+- stream/lake water barriers;
+- tundra/ice/desert variants if useful;
+- ruins/caves/narrow passes/hills as later additions.
+
+Pathfinding and movement are part of agent behaviour, not a detached god service. Agents own movement, pathfinding and visibility decisions. Shared terrain rules interpret world facts for movement cost, traversability and visibility.
+
+Navigation has two layers:
+- coarse A* pathfinding through navigation cells;
+- continuous local steering around circular obstacle footprints.
+
+Static scenery may have separate visual radius and blocking radius. Trees, for example, may have large visual canopies but small trunk-sized blocking radii. This avoids making tree canopies artificially impassable.
+
+Agents must validate that the segment to their next waypoint is clear before following it. If a waypoint becomes locally unusable, the agent clears the path and repaths. Local steering should use a small fan of angular detours rather than only X/Y axis sliding so agents do not wedge against circular obstacle shoulders.
+
+Different rounds should reward different monster lines.
+
+19. Treasure Defence and Scoring
+Adventurers attempt to:
+- enter the map;
+- choose treasure;
+- run to it;
+- collect as much as they can carry;
+- escape.
+
+The player scores based on the value of remaining treasure at the end of the round.
+
+If no adventurer successfully escapes with treasure for four consecutive raid turns/waves, the adventurers abandon the attempt and the round ends.
+
+The campaign loss condition is: all treasure is depleted.
+
+20. Round Variation and Campaign Progression
+Rounds should generally escalate but remain unpredictable.
+
+Expected broad progression:
+- early rounds: low treasure, villagers, simple terrain;
+- mid rounds: silver/gold, explorers/warriors, stronger terrain variation;
+- later rounds: gems, knights, mixed raids, more difficult layouts.
+
+However, later rounds can still vary dramatically. Examples:
+- low-value treasure near a village, causing villager swarms;
+- gem-rich map far from settlement, causing fewer but elite adventurers;
+- open terrain favouring knights;
+- dense forest favouring ambush monsters;
+- rocky terrain arming villagers with improvised weapons;
+- scattered treasure requiring fast interceptors;
+- concentrated treasure requiring tough guardians.
+
+21. Import/Export
+Monsters can be exported and imported.
+
+Export should serialise core monster data:
+- genome;
+- age;
+- sex/reproductive role if applicable;
+- injury state;
+- disease state;
+- fertility state;
+- pedigree summary if desired;
+- visual cache if useful, but not authoritative.
+
+Imported monsters in campaign mode should preferably appear through an in-game opportunity, such as:
+- wandering monster dealer;
+- strange wild monster;
+- mysterious egg.
+
+Sandbox mode may allow direct insertion.
+
+Imported monsters must not require timeline contextualisation as in a historical game.
+
+22. Design Priorities
+Highest priorities:
+- Artificial selection as the main gameplay.
+- Autonomous monsters whose behaviour is genetically influenced.
+- Clear feedback from raids.
+- Procedural variation in landscapes and threats.
+- Inbreeding pressure requiring occasional wild genes.
+- SVG/canvas monsters that visibly reflect genetics.
+- Simple but meaningful combat.
+- Limited player control during raids.
+- Replayability through random treasure/terrain/adventurer contexts.
+- AI-debuggable architecture and deterministic headless tests.
+
+23. Deliberately Out of Scope
+To keep the project feasible, avoid:
+- detailed RTS controls;
+- training/domestication systems;
+- transmissible disease;
+- separate monster species;
+- human economy simulation;
+- base-building complexity unless added much later;
+- weather systems;
+- detailed equipment inventories;
+- complex nutrition;
+- 3D graphics;
+- multiplayer;
+- large numbers of adventurer classes;
+- too many treasure types.
+
+24. Technical Framing and Current Architecture
+The game should be architecture-first, modular and easy to debug with AI assistance.
+
+Current implementation framing:
+- The project remains a single HTML file for collaboration convenience, but internally separates worker simulation from main-thread rendering.
+- The authoritative simulation runs in a Web Worker.
+- The main browser thread owns UI, input, canvas rendering, interpolation and event log presentation only.
+- Worker snapshots are authoritative. Interpolated render snapshots are visual-only and must never be sent back into the simulation.
+- GameSession is a high-level coordinator, not a god object.
+- World owns persistent physical place data.
+- GameState owns persistent player-owned monsters/eggs and optional campaign statistics.
+- Raid owns temporary live raid state.
+- Agent owns pathfinding, movement and visibility.
+- TerrainRules interpret terrain facts for movement and sight; they do not own world state.
+
+Snapshot protocol:
+- Static scenery/world data should not be sent every tick.
+- The worker sends WORLD_SNAPSHOT after world creation.
+- Repeated RAID_SNAPSHOT messages contain dynamic raid state only: agents, raid status, treasure amounts and dropped treasure.
+- The main thread stores the latest static world snapshot and attaches it locally for rendering.
+
+Recommended future modules:
+- genetics
+- monsterLifecycle
+- monsterPhenotype
+- monsterBehaviour
+- eggAndBreeding
+- inbreeding
+- diseaseAndInjury
+- adventurers
+- treasure
+- terrain
+- terrainRules
+- agentNavigation
+- combat
+- roundGeneration
+- raidSimulation
+- snapshotProtocol
+- importExport
+- svgOrCanvasRendering
+- saveLoad
+
+The simulation core should remain separable from the UI to allow automated balance testing.
+
+25. Pathfinding and Performance Policy
+Pathfinding should remain single-threaded until profiling proves otherwise.
+
+Before considering a pathfinding worker pool, the game should first use:
+- disciplined repath throttling;
+- path intent keys that do not include the agent's current start cell;
+- emergency repathing only when the target/intent changes materially, the path is absent, the next waypoint is invalid or the agent is genuinely stuck;
+- local steering around obstacle shoulders;
+- deterministic stress tests checking both monsters and adventurers for stuck windows;
+- snapshot-size tests to ensure static world data is not resent every tick.
+
+Multithreaded pathfinding may later be worthwhile for large maps and large raids, but it requires plain-data path requests, stale-result handling, priorities and deterministic application on simulation ticks.
+
+26. Automated Balance and Regression Testing Goals
+The game should support headless simulation tests.
+
+Balance metrics to record:
+- treasure lost per round;
+- adventurer deaths by class;
+- monster deaths by cause;
+- monster injury rates;
+- breeding success;
+- inbreeding level;
+- wild monster capture frequency;
+- gene diversity;
+- average monster age;
+- frequency of campaign loss;
+- usefulness of different monster trait clusters;
+- balance between treasure values and adventurer pressure.
+
+Architecture/regression metrics to record:
+- pathfinding calls per active agent;
+- stuck-window detections for monsters and adventurers;
+- average and maximum simulation tick time;
+- dynamic snapshot size;
+- static snapshot size;
+- number of static world snapshots per new world;
+- number of recurring dynamic raid snapshots;
+- rendering interpolation correctness.
+
+The goal is not perfect balance, but avoiding dominant strategies and ensuring different monster builds are useful in different contexts.
+
+27. One-Sentence Pitch
+Breed a lineage of autonomous, genetically varied monsters to defend treasure from increasingly dangerous adventurers across procedurally generated raids, using wild monsters to refresh the bloodline before inbreeding, age, injury and greed destroy the hoard.
