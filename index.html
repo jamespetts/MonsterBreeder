@@ -6,7 +6,7 @@
 <title>Monster Breeder</title>
 <style>
 html, body { margin: 0; min-height: 100%; font-family: system-ui, sans-serif; color: #1f2730; background: #f0eee6; }
-body { overflow-y: auto; }
+body { overflow: hidden; }
 #topBar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.75rem 1rem; background: #2f3d2f; color: white; box-sizing: border-box; }
 #topBar h1 { margin: 0; font-size: 1.35rem; }
 #topBar p { margin: 0.25rem 0 0; opacity: 0.9; }
@@ -22,15 +22,15 @@ body { overflow-y: auto; }
 #controls { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 button { border: 0; border-radius: 0.4rem; padding: 0.55rem 0.75rem; cursor: pointer; background: #f2c14e; color: #1f2730; font-weight: 700; }
 button:hover { background: #ffd768; }
-#layout { display: block; padding: 0.75rem; box-sizing: border-box; }
+#layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 0.75rem; padding: 0.75rem; box-sizing: border-box; height: calc(100vh - 74px); min-height: 0; }
 #mapPanel, #sidePanel { background: white; border-radius: 0.6rem; box-shadow: 0 1px 5px rgba(0, 0, 0, 0.18); padding: 0.75rem; box-sizing: border-box; }
-#mapPanel { min-height: 320px; }
+#mapPanel { min-height: 320px; min-width: 0; }
 #raidCanvas { display: block; width: 100%; border: 2px solid #394732; background: #9fc4d9; box-sizing: border-box; cursor: grab; touch-action: none; }
 #raidCanvas.dragging { cursor: grabbing; }
 #mapPanel { position: relative; overflow: hidden; }
 #managementDrawer { position: absolute; left: 0.75rem; right: 0.75rem; top: 0.75rem; max-height: 52%; overflow: auto; background: rgba(255, 252, 240, 0.97); border: 2px solid #394732; border-radius: 0.6rem; box-shadow: 0 6px 22px rgba(0, 0, 0, 0.28); padding: 0.75rem; box-sizing: border-box; z-index: 5; transition: transform 0.18s ease, opacity 0.18s ease; }
 #managementDrawer.drawerHidden { transform: translateY(-110%); opacity: 0; pointer-events: none; }
-#monsterTooltip { position: absolute; z-index: 8; max-width: 270px; padding: 0.45rem 0.55rem; border-radius: 0.45rem; background: rgba(31,39,48,0.92); color: white; font-size: 0.86rem; white-space: pre-line; pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,0.28); }
+#monsterTooltip { display: none; }
 #monsterTooltip.tooltipHidden { display: none; }
 #managementDrawer.raidDrawer { max-height: 46%; }
 .deployNowButton { padding: 0.25rem 0.45rem; font-size: 0.82rem; }
@@ -66,13 +66,24 @@ button:hover { background: #ffd768; }
 #managementActions { margin-top: 0.65rem; }
 @media (max-width: 900px) { #managementBody { grid-template-columns: 1fr; } }
 .hint { margin: 0.5rem 0 0; color: #526052; }
-#sidePanel { margin-top: 0.75rem; display: grid; grid-template-columns: minmax(220px, 1fr) minmax(180px, 260px) minmax(280px, 2fr); gap: 0.75rem; align-items: start; }
-#sidePanel h2 { margin: 0 0 0.35rem; font-size: 1rem; }
-#statusBox { white-space: pre-line; line-height: 1.45; }
-#monsterPortrait svg { width: 140px; height: 100px; }
-#eventLog { max-height: 10rem; overflow: auto; padding-left: 1.4rem; margin-top: 0; }
+#sidePanel { margin-top: 0; display: grid; grid-template-rows: 1fr 1fr; gap: 0.75rem; min-height: 0; background: #020617; color: #e5e7eb; border: 1px solid #111827; box-shadow: 0 1px 8px rgba(0,0,0,0.45); }
+#sidePanel h2 { margin: 0 0 0.45rem; font-size: 1rem; color: #f2c14e; }
+#sidePanel h3 { margin: 0.65rem 0 0.25rem; font-size: 0.92rem; color: #bfdbfe; }
+#campaignStatsSection, #selectionSection { min-width: 0; min-height: 0; overflow: auto; border: 1px solid #1f2937; border-radius: 0.45rem; padding: 0.65rem; background: #030712; }
+#statusBox, #objectDetails { white-space: pre-line; line-height: 1.42; font-size: 0.9rem; }
+#monsterPortrait { display: none; }
+#eventLog { max-height: 8rem; overflow: auto; padding-left: 1.4rem; margin-top: 0.35rem; color: #d1d5db; }
 #eventLog li { margin-bottom: 0.35rem; }
-#statusSection, #monsterSection, #logSection { min-width: 0; }
+.detailMuted { color: #9ca3af; }
+#mainMenuOverlay { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: rgba(2,6,23,0.92); color: #f9fafb; }
+#mainMenuOverlay.menuHidden { display: none; }
+#mainMenuPanel { width: min(420px, calc(100vw - 2rem)); border: 1px solid #334155; border-radius: 0.85rem; padding: 1.2rem; background: #111827; box-shadow: 0 18px 60px rgba(0,0,0,0.55); }
+#mainMenuPanel h2 { margin: 0 0 0.4rem; font-size: 1.65rem; }
+#mainMenuPanel p { margin: 0 0 1rem; color: #cbd5e1; }
+.mainMenuButtons { display: grid; gap: 0.55rem; }
+.mainMenuButtons button { width: 100%; text-align: left; font-size: 1rem; }
+.mainMenuButtons button:disabled { cursor: not-allowed; background: #374151; color: #9ca3af; }
+@media (max-width: 980px) { #layout { grid-template-columns: 1fr; height: auto; overflow: auto; } #sidePanel { grid-template-rows: auto auto; } body { overflow-y: auto; } }
 @media (max-width: 900px) {
     #topBar { align-items: flex-start; flex-direction: column; }
     #sidePanel { grid-template-columns: 1fr; }
@@ -80,8 +91,9 @@ button:hover { background: #ffd768; }
 </style>
 </head>
 <body>
-<header id="topBar"><div><h1>Monster Breeder</h1><p>Breed and deploy a persistent brood of collared monsters across seasons.</p></div><div id="seasonDisplay" aria-live="polite">Season 1</div><div id="controls"><button id="newRaidButton" type="button">New Campaign</button><button id="pauseButton" type="button">Pause</button><button id="resumeButton" type="button">Resume</button><button id="harnessButton" type="button">Run Harness</button></div></header>
-<main id="layout"><section id="mapPanel"><div id="viewportTopControls"><button id="monsterManagementTab" type="button" aria-label="Show monster management">Monster Management</button><button id="startSeasonButton" type="button">Start Season</button></div><div id="managementDrawer"><button id="closeManagementButton" type="button" aria-label="Close monster management">×</button><h2>Monster Management</h2><p id="managementSummary">Choose which collared monsters to release for the next season.</p><div id="managementBody"><div id="cageViewport"><div id="rosterList" aria-label="Captive monster cage"></div></div><aside id="selectedMonsterPanel"><h3>Cage</h3><p>Select a monster to inspect it.</p></aside></div><div id="managementActions"><span id="managementHint" class="hint"></span></div></div><canvas id="raidCanvas" width="960" height="540" aria-label="Raid map"></canvas><div id="monsterTooltip" class="tooltipHidden"></div><p class="hint">Use WASD/arrow keys or drag the map to pan. Mouse wheel zooms the map around the pointer; pinch zoom works on touch screens.</p></section><aside id="sidePanel"><section id="statusSection"><h2>Status</h2><div id="statusBox">Starting main thread...</div></section><section id="monsterSection"><h2>Monster</h2><div id="monsterPortrait"></div></section><section id="logSection"><h2>Event Log</h2><ol id="eventLog"></ol></section></aside></main>
+<header id="topBar"><div><h1>Monster Breeder</h1><p>Breed and deploy a persistent brood of collared monsters across seasons.</p></div><div id="seasonDisplay" aria-live="polite">Main Menu</div><div id="controls"><button id="newRaidButton" type="button">Main Menu</button><button id="pauseButton" type="button">Pause</button><button id="resumeButton" type="button">Resume</button><button id="harnessButton" type="button">Run Harness</button></div></header>
+<main id="layout"><section id="mapPanel"><div id="viewportTopControls"><button id="monsterManagementTab" type="button" aria-label="Show monster management">Monster Management</button><button id="startSeasonButton" type="button">Start Season</button></div><div id="managementDrawer"><button id="closeManagementButton" type="button" aria-label="Close monster management">×</button><h2>Monster Management</h2><p id="managementSummary">Choose which collared monsters to release for the next season.</p><div id="managementBody"><div id="cageViewport"><div id="rosterList" aria-label="Captive monster cage"></div></div><aside id="selectedMonsterPanel"><h3>Cage</h3><p>Select a monster to inspect it.</p></aside></div><div id="managementActions"><span id="managementHint" class="hint"></span></div></div><canvas id="raidCanvas" width="960" height="540" aria-label="Raid map"></canvas><div id="monsterTooltip" class="tooltipHidden"></div><p class="hint">Use WASD/arrow keys or drag the map to pan. Mouse wheel zooms the map around the pointer; pinch zoom works on touch screens.</p></section><aside id="sidePanel"><section id="campaignStatsSection"><h2>Campaign Stats</h2><div id="statusBox">Open the main menu to start a campaign or single game.</div></section><section id="selectionSection"><h2>Selected Object</h2><div id="objectDetails">Click any monster, adventurer, treasure, scenery object or terrain tile to inspect it.</div><div id="monsterPortrait"></div><h3>Event Log</h3><ol id="eventLog"></ol></section></aside></main>
+<div id="mainMenuOverlay"><div id="mainMenuPanel"><h2>Monster Breeder</h2><p>Choose how to begin. Press ESC during play to return to this menu.</p><div class="mainMenuButtons"><button id="tutorialMenuButton" type="button" disabled>Tutorial - coming soon</button><button id="campaignMenuButton" type="button">Campaign</button><button id="quickGameMenuButton" type="button">Quick Game</button><button id="customGameMenuButton" type="button" disabled>Custom Game - coming soon</button><button id="optionsMenuButton" type="button" disabled>Options - coming soon</button><button id="saveGameMenuButton" type="button" disabled>Save - coming soon</button><button id="loadGameMenuButton" type="button" disabled>Load - coming soon</button></div></div></div>
 <script id="simulationWorkerSource" type="text/plain">
 
 // SPDX-License-Identifier: GPL-3.0-only
@@ -168,12 +180,13 @@ button:hover { background: #ffd768; }
     ];
 
     var TREASURE_TYPES = {
-        bronze: { id: 'bronze', displayName: 'bronze coins', unitValue: 1, colour: '#b7791f' },
-        silver: { id: 'silver', displayName: 'silver coins', unitValue: 3, colour: '#c0c7d1' },
-        gold: { id: 'gold', displayName: 'gold coins', unitValue: 7, colour: '#f2c14e' },
-        rubies: { id: 'rubies', displayName: 'rubies', unitValue: 20, colour: '#b91c1c' },
-        emeralds: { id: 'emeralds', displayName: 'emeralds', unitValue: 30, colour: '#047857' }
+        bronze: { id: 'bronze', displayName: 'bronze coins', unitValue: 10, colour: '#b7791f' },
+        silver: { id: 'silver', displayName: 'silver coins', unitValue: 30, colour: '#c0c7d1' },
+        gold: { id: 'gold', displayName: 'gold coins', unitValue: 100, colour: '#f2c14e' },
+        rubies: { id: 'rubies', displayName: 'rubies', unitValue: 200, colour: '#b91c1c' },
+        emeralds: { id: 'emeralds', displayName: 'emeralds', unitValue: 350, colour: '#047857' }
     };
+    var TREASURE_TYPE_ORDER = ['bronze', 'silver', 'gold', 'rubies', 'emeralds'];
 
     var ADVENTURER_PROFILE = {
         villager: {
@@ -1074,6 +1087,53 @@ button:hover { background: #ffd768; }
             return total;
         }
 
+        getStartingTreasureValue() {
+            var total = 0;
+
+            for (var i = 0; i < this.treasureDeposits.length; i += 1) {
+                var deposit = this.treasureDeposits[i];
+                total += deposit.startingAmount * TREASURE_TYPES[deposit.treasureType].unitValue;
+            }
+
+            return total;
+        }
+
+        getTreasureBreakdown() {
+            var breakdown = {
+                starting: { byType: {}, totalUnits: 0, totalValue: 0 },
+                stolen: { byType: {}, totalUnits: 0, totalValue: 0 },
+                remaining: { byType: {}, totalUnits: 0, totalValue: 0 }
+            };
+            TREASURE_TYPE_ORDER.forEach(function (treasureType) {
+                var profile = TREASURE_TYPES[treasureType];
+                ['starting', 'stolen', 'remaining'].forEach(function (section) {
+                    breakdown[section].byType[treasureType] = {
+                        id: treasureType,
+                        displayName: profile.displayName,
+                        unitValue: profile.unitValue,
+                        amount: 0,
+                        value: 0
+                    };
+                });
+            });
+            this.treasureDeposits.forEach(function (deposit) {
+                var profile = TREASURE_TYPES[deposit.treasureType];
+                var startingAmount = deposit.startingAmount || 0;
+                var remainingAmount = deposit.amountRemaining || 0;
+                var stolenAmount = Math.max(0, startingAmount - remainingAmount);
+                var data = { starting: startingAmount, stolen: stolenAmount, remaining: remainingAmount };
+                Object.keys(data).forEach(function (section) {
+                    var amount = data[section];
+                    var row = breakdown[section].byType[deposit.treasureType];
+                    row.amount += amount;
+                    row.value += amount * profile.unitValue;
+                    breakdown[section].totalUnits += amount;
+                    breakdown[section].totalValue += amount * profile.unitValue;
+                });
+            });
+            return breakdown;
+        }
+
         hasTreasureRemaining() {
             return this.treasureDeposits.some(function (deposit) {
                 return !deposit.isEmpty();
@@ -1096,6 +1156,7 @@ button:hover { background: #ffd768; }
             var snapshot = this.getStaticSnapshot();
             snapshot.treasureDeposits = this.getTreasureSnapshots();
             snapshot.remainingTreasureValue = this.getRemainingTreasureValue();
+            snapshot.treasureBreakdown = this.getTreasureBreakdown();
             return snapshot;
         }
     }
@@ -1582,10 +1643,6 @@ button:hover { background: #ffd768; }
             s.escaped = this.escaped;
             s.behaviourState = this.behaviourState;
             s.attackCooldownTicks = this.attackCooldownTicks;
-            s.pathFindCount = this.pathFindCount;
-            s.pathRepathCooldownTicks = this.pathRepathCooldownTicks;
-            s.pathLength = this.path ? this.path.length : 0;
-            s.stuckTicks = this.stuckTicks;
             return s;
         }
     }
@@ -1935,16 +1992,42 @@ button:hover { background: #ffd768; }
     class CampaignStats {
         constructor() {
             this.worldsCompleted = 0;
+            this.worldsWon = 0;
             this.worldsLost = 0;
-            this.cumulativeScore = 0;
-            this.worldHistory = [];
+            this.roundHistory = [];
+        }
+        recordRound(summary, resultText) {
+            var treasureBreakdown = summary.treasureBreakdown || {
+                starting: { totalValue: summary.treasureStartingValue || 0 },
+                remaining: { totalValue: summary.treasureRemainingValue || 0 }
+            };
+            this.worldsCompleted += 1;
+            if (summary.treasureDepleted) {
+                this.worldsLost += 1;
+            } else {
+                this.worldsWon += 1;
+            }
+            this.roundHistory.push({
+                roundNumber: summary.roundNumber,
+                worldSeed: summary.worldSeed,
+                result: resultText,
+                startingTreasureValue: treasureBreakdown.starting.totalValue || 0,
+                endingTreasureValue: treasureBreakdown.remaining.totalValue || 0
+            });
+        }
+        getSnapshot() {
+            return {
+                worldsCompleted: this.worldsCompleted,
+                worldsWon: this.worldsWon,
+                worldsLost: this.worldsLost,
+                roundHistory: this.roundHistory.slice(0)
+            };
         }
     }
-
     class GameState {
         constructor(rng, mode) {
             this.mode = mode || 'campaign';
-            this.campaignStats = this.mode === 'campaign' ? new CampaignStats() : null;
+            this.campaignStats = new CampaignStats();
             this.nextMonsterId = 2;
             this.ownedMonsters = [new Monster('monster_1', RIGHT_EDGE_X, rng.range(120, MAP_HEIGHT - 120), rng, { owned: true, name: 'Gribble', selectedForDeployment: true })];
             this.eggs = [];
@@ -2224,21 +2307,31 @@ button:hover { background: #ffd768; }
             var adventurersKilled = this.adventurers.filter(function (adventurer) {
                 return !adventurer.alive;
             }).length;
+            var adventurerDeathsByClass = {};
+            this.adventurers.forEach(function (adventurer) {
+                if (!adventurer.alive) {
+                    adventurerDeathsByClass[adventurer.className] = (adventurerDeathsByClass[adventurer.className] || 0) + 1;
+                }
+            });
+            var treasureBreakdown = this.world.getTreasureBreakdown();
             return {
                 seed: this.seed,
                 worldSeed: this.world.seed,
                 seasonNumber: this.seasonNumber,
+                roundNumber: this.gameState && this.gameState.roundNumber ? this.gameState.roundNumber : undefined,
                 tickNumber: this.tickNumber,
                 raidEnded: this.raidEnded,
                 raidResult: this.raidResult,
                 adventurersReturnedAlive: adventurersReturnedAlive,
                 adventurersEscapedWithTreasure: adventurersEscapedWithTreasure,
                 adventurersKilled: adventurersKilled,
+                adventurerDeathsByClass: adventurerDeathsByClass,
                 noAdventurersReturnedAlive: adventurersReturnedAlive === 0,
-                treasureRemainingValue: this.world.getRemainingTreasureValue(),
-                treasureRemaining: this.world.treasureDeposits.reduce(function (sum, treasure) {
-                    return sum + treasure.amountRemaining;
-                }, 0),
+                treasureBreakdown: treasureBreakdown,
+                treasureStartingValue: treasureBreakdown.starting.totalValue,
+                treasureRemainingValue: treasureBreakdown.remaining.totalValue,
+                treasureLostValue: treasureBreakdown.stolen.totalValue,
+                treasureRemaining: treasureBreakdown.remaining.totalUnits,
                 treasureDepleted: !this.world.hasTreasureRemaining(),
                 pathfindingTotalCalls: this.getPathfindingTotalCalls(),
                 maxStuckTicks: this.getMaxStuckTicks(),
@@ -2246,21 +2339,18 @@ button:hover { background: #ffd768; }
                 obstacleSpatialBins: Object.keys(this.world.obstacleSpatialBins).length
             };
         }
-
         getPathfindingTotalCalls() {
             var agents = this.adventurers.concat(this.monsters);
             return agents.reduce(function (sum, agent) {
                 return sum + agent.pathFindCount;
             }, 0);
         }
-
         getMaxStuckTicks() {
             var agents = this.adventurers.concat(this.monsters);
             return agents.reduce(function (max, agent) {
                 return Math.max(max, agent.stuckTicks);
             }, 0);
         }
-
         getNavBlockedCacheEntryCount() {
             var total = 0;
             var keys = Object.keys(this.world.navBlockedCache);
@@ -2269,7 +2359,6 @@ button:hover { background: #ffd768; }
             }
             return total;
         }
-
         getStaticSnapshot() {
             return {
                 worldSeed: this.world.seed,
@@ -2296,6 +2385,7 @@ button:hover { background: #ffd768; }
                 raidResult: this.raidResult,
                 treasures: treasureSnapshots,
                 treasureDeposits: treasureSnapshots,
+                treasureBreakdown: this.world.getTreasureBreakdown(),
                 droppedTreasure: this.droppedTreasure.map(function (drop) { return drop.getSnapshot(); }),
                 monsters: this.monsters.map(function (monster) { return monster.getSnapshot(); }),
                 adventurers: this.adventurers.map(function (adventurer) { return adventurer.getSnapshot(); })
@@ -2317,9 +2407,10 @@ button:hover { background: #ffd768; }
             this.roundResult = 'Round in progress';
             this.lastRaidSummary = null;
             this.gameState = new GameState(this.rng, this.mode);
+            this.gameState.roundNumber = this.roundNumber;
             this.world = WorldGenerator.createWorld(this.seed, options && options.worldOptions ? options.worldOptions : {});
             this.currentRaid = null;
-            this.pendingEvents = [{ tickNumber: 0, text: 'Campaign created. Choose monsters for round 1 season 1.' }];
+            this.pendingEvents = [{ tickNumber: 0, text: (this.mode === 'campaign' ? 'Campaign' : 'Single game') + ' created. Choose monsters for round 1 season 1.' }];
         }
 
         tick() {
@@ -2344,8 +2435,14 @@ button:hover { background: #ffd768; }
             this.currentRaid = null;
 
             if (this.roundEnded) {
-                this.phase = 'roundEnded';
-                this.pendingEvents.push({ tickNumber: finishedTickNumber, text: this.roundResult + ' Start the next season to generate a new round.' });
+                this.recordCompletedRound(summary);
+                if (this.mode === 'campaign') {
+                    this.phase = 'roundEnded';
+                    this.pendingEvents.push({ tickNumber: finishedTickNumber, text: this.roundResult + ' Start the next season to generate a new campaign world.' });
+                } else {
+                    this.phase = 'gameOver';
+                    this.pendingEvents.push({ tickNumber: finishedTickNumber, text: this.roundResult + ' Single game complete; return to the main menu.' });
+                }
             } else {
                 this.phase = 'management';
                 this.seasonNumber += 1;
@@ -2353,6 +2450,12 @@ button:hover { background: #ffd768; }
             }
         }
 
+        recordCompletedRound(summary) {
+            summary.roundNumber = this.roundNumber;
+            if (this.gameState && this.gameState.campaignStats) {
+                this.gameState.campaignStats.recordRound(summary, this.roundResult);
+            }
+        }
         applyRoundProgression(summary) {
             if (summary.noAdventurersReturnedAlive) {
                 this.consecutiveSeasonsWithNoReturningAdventurers += 1;
@@ -2374,6 +2477,7 @@ button:hover { background: #ffd768; }
 
         startNewRound() {
             this.roundNumber += 1;
+            this.gameState.roundNumber = this.roundNumber;
             this.seasonNumber = 1;
             this.consecutiveSeasonsWithNoReturningAdventurers = 0;
             this.roundEnded = false;
@@ -2388,7 +2492,10 @@ button:hover { background: #ffd768; }
                 return { ok: false, reason: 'A raid is already in progress.' };
             }
 
-            if (this.roundEnded || this.phase === 'roundEnded') {
+            if (this.roundEnded || this.phase === 'roundEnded' || this.phase === 'gameOver') {
+                if (this.mode !== 'campaign') {
+                    return { ok: false, reason: 'This single game has ended. Return to the main menu to start another game.' };
+                }
                 this.startNewRound();
             }
 
@@ -2471,6 +2578,8 @@ button:hover { background: #ffd768; }
             if (this.currentRaid) {
                 var raidSnapshot = this.currentRaid.getSnapshot(this.paused);
                 raidSnapshot.phase = this.phase;
+                raidSnapshot.gameMode = this.mode;
+                raidSnapshot.campaignStats = this.gameState.campaignStats ? this.gameState.campaignStats.getSnapshot() : null;
                 raidSnapshot.roundNumber = this.roundNumber;
                 raidSnapshot.roundEnded = this.roundEnded;
                 raidSnapshot.roundResult = this.roundResult;
@@ -2487,6 +2596,8 @@ button:hover { background: #ffd768; }
                 seasonNumber: this.seasonNumber,
                 roundNumber: this.roundNumber,
                 phase: this.phase,
+                gameMode: this.mode,
+                campaignStats: this.gameState.campaignStats ? this.gameState.campaignStats.getSnapshot() : null,
                 mapWidth: this.world.width,
                 mapHeight: this.world.height,
                 paused: this.paused,
@@ -2497,6 +2608,7 @@ button:hover { background: #ffd768; }
                 consecutiveSeasonsWithNoReturningAdventurers: this.consecutiveSeasonsWithNoReturningAdventurers,
                 treasures: treasureSnapshots,
                 treasureDeposits: treasureSnapshots,
+                treasureBreakdown: this.world.getTreasureBreakdown(),
                 droppedTreasure: [],
                 monsters: this.gameState.ownedMonsters.map(function (monster) { return monster.getSnapshot(); }),
                 adventurers: [],
@@ -2515,7 +2627,6 @@ button:hover { background: #ffd768; }
         var tickTimeTotalMs = 0;
         var maxTickTimeMs = 0;
         var finalSummary = null;
-
         while (session.currentRaid && !session.currentRaid.raidEnded && ticksRun < maxTicks) {
             var startMs = Date.now();
             session.tick();
@@ -2524,12 +2635,12 @@ button:hover { background: #ffd768; }
             maxTickTimeMs = Math.max(maxTickTimeMs, elapsedMs);
             ticksRun += 1;
         }
-
         if (session.lastRaidSummary) {
             finalSummary = session.lastRaidSummary;
         } else if (session.currentRaid) {
             finalSummary = session.currentRaid.getConclusionSummary();
         } else {
+            var treasureBreakdown = session.world.getTreasureBreakdown();
             finalSummary = {
                 seed: seed,
                 worldSeed: session.world.seed,
@@ -2541,31 +2652,34 @@ button:hover { background: #ffd768; }
                 adventurersEscapedWithTreasure: 0,
                 adventurersKilled: 0,
                 noAdventurersReturnedAlive: false,
-                treasureRemainingValue: session.world.getRemainingTreasureValue(),
-                treasureRemaining: session.world.treasureDeposits.reduce(function (sum, treasure) {
-                    return sum + treasure.amountRemaining;
-                }, 0),
+                treasureBreakdown: treasureBreakdown,
+                treasureRemainingValue: treasureBreakdown.remaining.totalValue,
+                treasureRemaining: treasureBreakdown.remaining.totalUnits,
+                treasureLostValue: treasureBreakdown.stolen.totalValue,
                 treasureDepleted: !session.world.hasTreasureRemaining(),
                 pathfindingTotalCalls: 0,
-                maxStuckTicks: 0
+                maxStuckTicks: 0,
+                navBlockedCacheEntries: 0,
+                obstacleSpatialBins: 0
             };
         }
-
         return {
             seed: seed,
             startedSeason: releaseResult.ok,
             ticksRun: ticksRun,
             raidEnded: finalSummary.raidEnded,
             raidResult: finalSummary.raidResult,
+            treasureBreakdown: finalSummary.treasureBreakdown,
             treasureRemaining: finalSummary.treasureRemaining,
             treasureRemainingValue: finalSummary.treasureRemainingValue,
+            treasureLostValue: finalSummary.treasureLostValue || 0,
             adventurersKilled: finalSummary.adventurersKilled,
             adventurersReturnedAlive: finalSummary.adventurersReturnedAlive,
             adventurersEscapedWithTreasure: finalSummary.adventurersEscapedWithTreasure,
             noAdventurersReturnedAlive: finalSummary.noAdventurersReturnedAlive,
-            pathfindingTotalCalls: finalSummary.pathfindingTotalCalls,
-            pathfindingCallsPerTick: ticksRun > 0 ? finalSummary.pathfindingTotalCalls / ticksRun : 0,
-            maxStuckTicks: finalSummary.maxStuckTicks,
+            pathfindingTotalCalls: finalSummary.pathfindingTotalCalls || 0,
+            pathfindingCallsPerTick: ticksRun > 0 ? (finalSummary.pathfindingTotalCalls || 0) / ticksRun : 0,
+            maxStuckTicks: finalSummary.maxStuckTicks || 0,
             navBlockedCacheEntries: finalSummary.navBlockedCacheEntries || 0,
             obstacleSpatialBins: finalSummary.obstacleSpatialBins || 0,
             averageTickTimeMs: ticksRun > 0 ? tickTimeTotalMs / ticksRun : 0,
@@ -2575,7 +2689,6 @@ button:hover { background: #ffd768; }
             consecutiveSeasonsWithNoReturningAdventurers: session.consecutiveSeasonsWithNoReturningAdventurers
         };
     }
-
     function RunHeadlessTests(payload) {
         var options = payload || {};
         var count = Number.isFinite(options.count) ? Math.max(1, Math.floor(options.count)) : 20;
@@ -2584,22 +2697,21 @@ button:hover { background: #ffd768; }
         var results = [];
         var endedCount = 0;
         var treasureRemainingTotal = 0;
+        var treasureLostTotal = 0;
         var adventurersKilledTotal = 0;
         var escapedTotal = 0;
         var pathfindingCallsTotal = 0;
         var maxStuckTicks = 0;
         var averageTickTimeTotalMs = 0;
         var maxTickTimeMs = 0;
-
         for (var i = 0; i < count; i += 1) {
             var result = RunSingleHeadlessRaid(firstSeed + i, maxTicks);
             results.push(result);
-
             if (result.raidEnded) {
                 endedCount += 1;
             }
-
             treasureRemainingTotal += result.treasureRemaining;
+            treasureLostTotal += result.treasureLostValue || 0;
             adventurersKilledTotal += result.adventurersKilled;
             escapedTotal += result.adventurersEscapedWithTreasure;
             pathfindingCallsTotal += result.pathfindingTotalCalls;
@@ -2607,7 +2719,6 @@ button:hover { background: #ffd768; }
             averageTickTimeTotalMs += result.averageTickTimeMs;
             maxTickTimeMs = Math.max(maxTickTimeMs, result.maxTickTimeMs);
         }
-
         return {
             count: count,
             firstSeed: firstSeed,
@@ -2615,6 +2726,7 @@ button:hover { background: #ffd768; }
             endedCount: endedCount,
             timedOutCount: count - endedCount,
             averageTreasureRemaining: treasureRemainingTotal / count,
+            averageTreasureLostValue: treasureLostTotal / count,
             averageAdventurersKilled: adventurersKilledTotal / count,
             averageEscapedWithTreasure: escapedTotal / count,
             averagePathfindingCalls: pathfindingCallsTotal / count,
@@ -2625,7 +2737,6 @@ button:hover { background: #ffd768; }
             results: results
         };
     }
-
     var gameSession = null;
     var intervalId = 0;
 
@@ -2694,7 +2805,6 @@ button:hover { background: #ffd768; }
             if (events.length > 0) {
                 Post({ type: 'RAID_EVENTS', payload: { events: events } });
             }
-
             Post({ type: 'RAID_SNAPSHOT', payload: { snapshot: gameSession.getSnapshot() } });
         }, TICK_MS);
     }
@@ -2815,7 +2925,9 @@ button:hover { background: #ffd768; }
     // ============================================================================
     // Browser-only state for canvas, controls, rendering snapshots and input.
     var PROTOCOL_VERSION=1, TILE_SIZE=100, ISO_W=92, ISO_H=46, WORLD_WIDTH=1800, WORLD_HEIGHT=1200, MAP_VIEW_MARGIN=120;
-    var canvas=document.getElementById('raidCanvas'), ctx=canvas.getContext('2d'), statusBox=document.getElementById('statusBox'), eventLog=document.getElementById('eventLog'), monsterPortrait=document.getElementById('monsterPortrait'), managementDrawer=document.getElementById('managementDrawer'), managementSummary=document.getElementById('managementSummary'), rosterList=document.getElementById('rosterList'), selectedMonsterPanel=document.getElementById('selectedMonsterPanel'), startSeasonButton=document.getElementById('startSeasonButton'), managementHint=document.getElementById('managementHint'), monsterTooltip=document.getElementById('monsterTooltip'), monsterManagementTab=document.getElementById('monsterManagementTab'), closeManagementButton=document.getElementById('closeManagementButton'), seasonDisplay=document.getElementById('seasonDisplay');
+    var TREASURE_TYPES={bronze:{displayName:'bronze coins',unitValue:10},silver:{displayName:'silver coins',unitValue:30},gold:{displayName:'gold coins',unitValue:100},rubies:{displayName:'rubies',unitValue:200},emeralds:{displayName:'emeralds',unitValue:350}};
+    var TREASURE_TYPE_ORDER=['bronze','silver','gold','rubies','emeralds'];
+    var canvas=document.getElementById('raidCanvas'), ctx=canvas.getContext('2d'), statusBox=document.getElementById('statusBox'), objectDetails=document.getElementById('objectDetails'), eventLog=document.getElementById('eventLog'), monsterPortrait=document.getElementById('monsterPortrait'), managementDrawer=document.getElementById('managementDrawer'), managementSummary=document.getElementById('managementSummary'), rosterList=document.getElementById('rosterList'), selectedMonsterPanel=document.getElementById('selectedMonsterPanel'), startSeasonButton=document.getElementById('startSeasonButton'), managementHint=document.getElementById('managementHint'), monsterTooltip=document.getElementById('monsterTooltip'), monsterManagementTab=document.getElementById('monsterManagementTab'), closeManagementButton=document.getElementById('closeManagementButton'), seasonDisplay=document.getElementById('seasonDisplay'), mainMenuOverlay=document.getElementById('mainMenuOverlay');
     var latestWorldSnapshot=null,latestStaticObstacles=[];
     var latestSnapshot=null,previousSnapshot=null,currentSnapshot=null,previousSnapshotTime=0,currentSnapshotTime=0,nextMessageId=1,keys=new Set();
     var RENDER_INTERPOLATION_DELAY_MS=50;
@@ -2828,7 +2940,7 @@ button:hover { background: #ffd768; }
     var visualFacingById={
     }
     ;
-    var selectedRosterMonsterId=null, lastManagementRenderKey='', managementDrawerVisible=true, hoveredMonsterId=null, hoveredMonster=null, lastSnapshotPhase=null;
+    var selectedRosterMonsterId=null, lastManagementRenderKey='', managementDrawerVisible=true, hoveredMonsterId=null, hoveredMonster=null, selectedObject=null, lastSnapshotPhase=null, gameStarted=false;
     monsterPortrait.innerHTML='<svg viewBox="0 0 180 120" role="img" aria-label="Purple starter monster"><ellipse cx="90" cy="70" rx="55" ry="30" fill="#6b2d83"/><circle cx="62" cy="57" r="8" fill="white"/><circle cx="118" cy="57" r="8" fill="white"/><circle cx="64" cy="58" r="4" fill="#1f2730"/><circle cx="116" cy="58" r="4" fill="#1f2730"/><rect x="52" y="68" width="76" height="8" rx="4" fill="#f2c14e"/></svg>';
     // ============================================================================
     // MODULE: VIEW TRANSFORMS AND WORKER COMMANDS
@@ -2901,7 +3013,8 @@ button:hover { background: #ffd768; }
         var topBar=document.getElementById('topBar');
         var mapPanel=document.getElementById('mapPanel');
         var hint=mapPanel.querySelector('.hint');
-        var availableWidth=Math.max(360, window.innerWidth - 24);
+        var sideAllowance=window.innerWidth>980?365:24;
+        var availableWidth=Math.max(360, window.innerWidth - sideAllowance);
         var usedHeight=topBar.getBoundingClientRect().height + (hint ? hint.getBoundingClientRect().height : 0) + 62;
         var availableHeight=Math.max(300, window.innerHeight - usedHeight);
         var cssWidth=Math.floor(Math.max(360, availableWidth - 24));
@@ -2922,29 +3035,81 @@ button:hover { background: #ffd768; }
         type:'text/javascript'
     }
     ), workerUrl=URL.createObjectURL(workerBlob), worker=new Worker(workerUrl);
+    function FormatNumber(value){
+        if(value===null||value===undefined||!Number.isFinite(value)){ return 'n/a'; }
+        return Math.round(value).toString();
+    }
+    function FormatFixed(value, digits){
+        if(value===null||value===undefined||!Number.isFinite(value)){ return 'n/a'; }
+        return value.toFixed(digits);
+    }
+    function FormatTreasureRow(label, row){
+        return label+': '+FormatNumber(row ? row.amount : 0)+' units | value '+FormatNumber(row ? row.value : 0);
+    }
+    function FormatTreasureSection(title, section){
+        var lines=[title];
+        TREASURE_TYPE_ORDER.forEach(function(treasureType){
+            var row=section&&section.byType?section.byType[treasureType]:null;
+            var displayName=row&&row.displayName?row.displayName:TREASURE_TYPES[treasureType].displayName;
+            lines.push('  '+FormatTreasureRow(displayName,row));
+        });
+        lines.push('  Total: '+FormatNumber(section ? section.totalUnits : 0)+' units | value '+FormatNumber(section ? section.totalValue : 0));
+        return lines.join('\n');
+    }
+    function FormatCampaignRoundHistory(stats, mode){
+        if(mode!=='Campaign'){
+            return 'Previous campaign rounds: n/a in single round game';
+        }
+        var history=stats&&stats.roundHistory?stats.roundHistory:[];
+        if(history.length===0){
+            return 'Previous campaign rounds: none yet';
+        }
+        var lines=['Previous campaign rounds'];
+        history.forEach(function(round){
+            lines.push('  Round '+round.roundNumber+': start '+FormatNumber(round.startingTreasureValue)+' | end '+FormatNumber(round.endingTreasureValue)+' | '+round.result);
+        });
+        return lines.join('\n');
+    }
     function UpdateStatus(s){
         var tr=s.treasures.filter(function(t){
             return !t.stolen;
-        }
-        ).length;
+        }).length;
         var adv=s.adventurers.filter(function(a){
             return a.alive&&!a.escaped;
-        }
-        ).length;
+        }).length;
         var owned=s.monsters.filter(function(m){
             return m.owned;
-        }
-        );
+        });
         var deployed=owned.filter(function(m){
             return m.deployed&&m.alive;
-        }
-        ).length;
+        }).length;
         var wild=s.monsters.filter(function(m){
             return !m.owned&&m.alive;
-        }
-        ).length;
-        seasonDisplay.textContent='Round '+(s.roundNumber||1)+' Season '+s.seasonNumber;
-        statusBox.textContent=['Round: '+(s.roundNumber||1),'Season: '+s.seasonNumber,'Phase: '+(s.phase||'raid'),'Result: '+s.raidResult,'Paused: '+s.paused,'Treasure deposits remaining: '+tr+' / '+s.treasures.length,'Active adventurers: '+adv,'Captive monsters: '+owned.length+'  Deployed: '+deployed+'  Wild: '+wild,'Tick: '+s.tickNumber].join('\\n');
+        }).length;
+        var stats=s.campaignStats||{};
+        var treasureBreakdown=s.treasureBreakdown||{ starting:{ byType:{}, totalUnits:0, totalValue:0 }, stolen:{ byType:{}, totalUnits:0, totalValue:0 }, remaining:{ byType:{}, totalUnits:0, totalValue:0 } };
+        var mode=s.gameMode==='campaign'?'Campaign':'Single round game';
+        seasonDisplay.textContent=mode+' - Round '+(s.roundNumber||1)+' Season '+s.seasonNumber;
+        statusBox.textContent=[
+            'Mode: '+mode,
+            'Round: '+(s.roundNumber||1)+'  Season: '+s.seasonNumber,
+            'Phase: '+(s.phase||'raid')+'  Paused: '+s.paused,
+            'Result: '+s.raidResult,
+            'Treasure deposits remaining: '+tr+' / '+s.treasures.length,
+            'Active adventurers: '+adv,
+            'Captive monsters: '+owned.length+'  Deployed: '+deployed+'  Wild: '+wild,
+            '',
+            'Campaign worlds completed: '+FormatNumber(stats.worldsCompleted||0),
+            'Worlds won/lost: '+FormatNumber(stats.worldsWon||0)+' / '+FormatNumber(stats.worldsLost||0),
+            '',
+            FormatTreasureSection('Treasure at round start',treasureBreakdown.starting),
+            '',
+            FormatTreasureSection('Treasure stolen this round',treasureBreakdown.stolen),
+            '',
+            FormatTreasureSection('Treasure remaining',treasureBreakdown.remaining),
+            '',
+            FormatCampaignRoundHistory(stats,mode)
+        ].join('\n');
     }
     function BuildManagementRenderKey(s, monsters){
         return [s.phase||'raid',s.seasonNumber,managementDrawerVisible?1:0].concat(monsters.map(function(monster){
@@ -3788,60 +3953,134 @@ else DrawMonster(r.obj,now);
         );
         EndWorldRenderTransform();
     }
-    function FindMonsterAt(clientX,clientY){
-        var renderSnapshot=MakeRenderSnapshot(performance.now());
-        if(!renderSnapshot||!renderSnapshot.monsters){ return null; }
+    function ClientToWorldPoint(clientX,clientY){
         var rect=canvas.getBoundingClientRect();
         var sx=(clientX-rect.left)*(canvas.width/Math.max(1,rect.width));
         var sy=(clientY-rect.top)*(canvas.height/Math.max(1,rect.height));
-        var worldPoint=ScreenToIso(sx,sy);
+        return ScreenToIso(sx,sy);
+    }
+    function FindObjectAt(clientX,clientY){
+        var renderSnapshot=MakeRenderSnapshot(performance.now());
+        if(!renderSnapshot){ return null; }
+        var worldPoint=ClientToWorldPoint(clientX,clientY);
         var best=null;
-        var bestDistance=32/Math.max(0.1,camera.zoom);
-        renderSnapshot.monsters.forEach(function(monster){
-            if(!monster.alive||!monster.deployed){ return; }
-            var p=ToScreen(monster.x,monster.y);
+        var bestDistance=34/Math.max(0.1,camera.zoom);
+        function consider(kind,obj,radius,onlyActive){
+            if(onlyActive && (!obj.alive || obj.escaped || obj.deployed===false)){ return; }
+            var p=ToScreen(obj.x,obj.y);
             var d=Math.hypot(p.x-worldPoint.x,p.y-worldPoint.y);
-            if(d<bestDistance){ bestDistance=d; best=monster; }
-        });
-        return best;
+            if(d<bestDistance){
+                bestDistance=d;
+                best={ kind:kind, obj:obj };
+            }
+        }
+        (renderSnapshot.monsters||[]).forEach(function(monster){ consider('monster',monster,32,true); });
+        (renderSnapshot.adventurers||[]).forEach(function(adventurer){ consider('adventurer',adventurer,26,false); });
+        (renderSnapshot.treasures||[]).forEach(function(treasure){ consider('treasure',treasure,26,false); });
+        (renderSnapshot.droppedTreasure||[]).forEach(function(treasure){ consider('droppedTreasure',treasure,20,false); });
+        (renderSnapshot.obstacles||[]).forEach(function(obstacle){ consider('worldObject',obstacle,Math.max(18,obstacle.radius||18),false); });
+        if(best){ return best; }
+        var tileX=Math.floor(worldPoint.x/TILE_SIZE);
+        var tileY=Math.floor(worldPoint.y/TILE_SIZE);
+        if(tileX>=0&&tileY>=0&&tileX<Math.ceil((renderSnapshot.mapWidth||WORLD_WIDTH)/TILE_SIZE)&&tileY<Math.ceil((renderSnapshot.mapHeight||WORLD_HEIGHT)/TILE_SIZE)){
+            var terrainType=TerrainTypeAtRenderTile(renderSnapshot,tileX,tileY);
+            return { kind:'terrain', obj:{ id:'tile_'+tileX+'_'+tileY, tileX:tileX, tileY:tileY, terrainType:terrainType, x:worldPoint.x, y:worldPoint.y } };
+        }
+        return null;
+    }
+    function FindMonsterAt(clientX,clientY){
+        var picked=FindObjectAt(clientX,clientY);
+        return picked&&picked.kind==='monster'?picked.obj:null;
+    }
+    function TerrainName(type){
+        return ['grass','rocky ground','forest','marsh','stream','lake','tundra','ice','desert'][type]||'unknown terrain';
     }
     function MonsterDisplayName(monster){
         return monster.name || (monster.collared ? 'Collared monster' : 'Uncollared wild monster');
     }
-    function BuildMonsterTooltip(monster){
-        var lines=[];
-        lines.push(MonsterDisplayName(monster));
-        lines.push('Health: '+Math.round(monster.health)+' / '+Math.round(monster.maxHealth));
-        lines.push(monster.collared?'Collared':'Uncollared');
-        lines.push(monster.deployed?'Currently on the map':'In cage');
-        if(!monster.owned){
-            lines.push('Click to collar');
+    function DescribeSelectedObject(selection){
+        if(!selection){
+            return 'Click any monster, adventurer, treasure, scenery object or terrain tile to inspect it.';
         }
-        return lines.join('\n');
+        var o=selection.obj;
+        if(selection.kind==='monster'){
+            return [
+                'Monster: '+MonsterDisplayName(o),
+                'Health: '+Math.round(o.health)+' / '+Math.round(o.maxHealth),
+                'Ownership: '+(o.owned?'Captive/owned':'Wild'),
+                'Collar: '+(o.collared?'Collared':'Uncollared'),
+                'Map state: '+(o.deployed?'On map':'In cage/reserve'),
+                'Behaviour: '+(o.behaviourState||'unknown'),
+                'Deployment order: '+(o.selectedForDeployment?'Deploy at season start':'Reserve'),
+                o.owned?'':'Click again to collar this wild monster.'
+            ].join('\n');
+        }
+        if(selection.kind==='adventurer'){
+            return [
+                'Adventurer: '+(o.className||'unknown'),
+                'Health: '+Math.round(o.health)+' / '+Math.round(o.maxHealth),
+                'State: '+(o.behaviourState||'unknown'),
+                'Carrying treasure: '+(o.carryingTreasure?(o.carryingAmount+' '+o.carryingTreasureType):'none'),
+                'Fleeing: '+(o.fleeing?'yes':'no'),
+                'Speed: '+FormatNumber(o.speed)
+            ].join('\n');
+        }
+        if(selection.kind==='treasure' || selection.kind==='droppedTreasure'){
+            return [
+                (selection.kind==='treasure'?'Treasure deposit':'Dropped treasure'),
+                'Type: '+(o.treasureDisplayName||o.treasureType),
+                'Amount remaining: '+FormatNumber(o.amountRemaining),
+                'Value remaining: '+FormatNumber(o.value),
+                o.startingAmount!==undefined?'Starting amount: '+FormatNumber(o.startingAmount):'',
+                'Position: '+Math.round(o.x)+', '+Math.round(o.y)
+            ].filter(Boolean).join('\n');
+        }
+        if(selection.kind==='worldObject'){
+            return [
+                'World object: '+(o.type||'object'),
+                'Blocks movement: '+(o.blocksMovement?'yes':'no'),
+                'Carryable: '+(o.carryable?'yes':'no'),
+                'Throwable: '+(o.throwable?'yes':'no'),
+                o.damage!==undefined?'Damage: '+FormatNumber(o.damage):'',
+                'Position: '+Math.round(o.x)+', '+Math.round(o.y)
+            ].filter(Boolean).join('\n');
+        }
+        if(selection.kind==='terrain'){
+            return [
+                'Terrain tile',
+                'Type: '+TerrainName(o.terrainType),
+                'Tile: '+o.tileX+', '+o.tileY,
+                'World position: '+Math.round(o.x)+', '+Math.round(o.y)
+            ].join('\n');
+        }
+        return 'Selected object details unavailable.';
+    }
+    function UpdateSelectedObjectPanel(){
+        objectDetails.textContent=DescribeSelectedObject(selectedObject);
     }
     function UpdateMonsterHover(clientX,clientY){
-        var monster=FindMonsterAt(clientX,clientY);
-        hoveredMonster=monster;
-        hoveredMonsterId=monster?monster.id:null;
-        if(!monster){
-            monsterTooltip.classList.add('tooltipHidden');
+        var picked=FindObjectAt(clientX,clientY);
+        hoveredMonster=(picked&&picked.kind==='monster')?picked.obj:null;
+        hoveredMonsterId=hoveredMonster?hoveredMonster.id:null;
+        if(hoveredMonster&&!hoveredMonster.owned){
+            canvas.style.cursor='pointer';
+        } else if(picked) {
+            canvas.style.cursor='crosshair';
+        } else {
             canvas.style.cursor=isDragging?'grabbing':'grab';
-            return;
         }
-        canvas.style.cursor=monster.owned?'grab':'pointer';
-        monsterTooltip.textContent=BuildMonsterTooltip(monster);
-        var panelRect=document.getElementById('mapPanel').getBoundingClientRect();
-        monsterTooltip.style.left=(clientX-panelRect.left+12)+'px';
-        monsterTooltip.style.top=(clientY-panelRect.top+12)+'px';
-        monsterTooltip.classList.remove('tooltipHidden');
     }
-    function TryCaptureWildMonsterAt(clientX,clientY){
-        var best=FindMonsterAt(clientX,clientY);
-        if(best&&!best.owned){
-            SendCommand('CAPTURE_WILD_MONSTER',{ monsterId:best.id });
+    function SelectObjectAt(clientX,clientY){
+        selectedObject=FindObjectAt(clientX,clientY);
+        UpdateSelectedObjectPanel();
+        if(selectedObject&&selectedObject.kind==='monster'&&!selectedObject.obj.owned){
+            SendCommand('CAPTURE_WILD_MONSTER',{ monsterId:selectedObject.obj.id });
             return true;
         }
-        return false;
+        return !!selectedObject;
+    }
+    function TryCaptureWildMonsterAt(clientX,clientY){
+        return SelectObjectAt(clientX,clientY);
     }
     // ============================================================================
     // MODULE: WORKER MESSAGE HANDLING
@@ -3861,11 +4100,8 @@ else DrawMonster(r.obj,now);
             return;
         }
         switch(message.type){
-            case'READY':AppendLog('Simulation worker ready.');
-            SendCommand('NEW_WORLD',{
-                seed:Date.now()
-            }
-            );
+            case'READY':AppendLog('Simulation worker ready. Open the main menu to start.');
+            RenderPlaceholder('Main menu');
             break;
             case'COMMAND_REJECTED':AppendLog('Command rejected: '+message.payload.reason);
             break;
@@ -3886,6 +4122,10 @@ else DrawMonster(r.obj,now);
             }
             lastSnapshotPhase=latestSnapshot.phase||'raid';
             UpdateManagementDrawer(latestSnapshot);
+            UpdateSelectedObjectPanel();
+            if(latestSnapshot.phase==='gameOver'){
+                ShowMainMenu();
+            }
             break;
             case'RAID_EVENTS':message.payload.events.forEach(function(e){
                 AppendLog('['+e.tickNumber+'] '+e.text);
@@ -3894,7 +4134,7 @@ else DrawMonster(r.obj,now);
             break;
             case'WORKER_ERROR':AppendLog('Worker error: '+message.payload.message);
             break;
-            case'HEADLESS_TEST_RESULTS':AppendLog('Harness: '+message.payload.endedCount+'/'+message.payload.count+' raids ended; avg treasure remaining '+message.payload.averageTreasureRemaining.toFixed(2)+'.');
+            case'HEADLESS_TEST_RESULTS':AppendLog('Harness: '+message.payload.endedCount+'/'+message.payload.count+' raids ended; avg treasure remaining '+message.payload.averageTreasureRemaining.toFixed(2)+', avg treasure lost value '+message.payload.averageTreasureLostValue.toFixed(2)+', avg pathfinding calls '+message.payload.averagePathfindingCalls.toFixed(2)+'.');
             break;
         }
     }
@@ -3903,11 +4143,33 @@ else DrawMonster(r.obj,now);
     // MODULE: INPUT HANDLERS
     // ============================================================================
     // Converts user input into worker commands or camera-only UI changes.
-    document.getElementById('newRaidButton').addEventListener('click',function(){
+    function ShowMainMenu(){
+        mainMenuOverlay.classList.remove('menuHidden');
+        seasonDisplay.textContent='Main Menu';
+    }
+    function HideMainMenu(){
+        mainMenuOverlay.classList.add('menuHidden');
+    }
+    function StartNewGame(mode){
+        gameStarted=true;
+        HideMainMenu();
+        selectedObject=null;
+        UpdateSelectedObjectPanel();
+        managementDrawerVisible=true;
+        lastManagementRenderKey='';
         SendCommand('NEW_WORLD',{
-            seed:Date.now()
-        }
-        );
+            seed:Date.now(),
+            mode:mode
+        });
+    }
+    document.getElementById('campaignMenuButton').addEventListener('click',function(){
+        StartNewGame('campaign');
+    });
+    document.getElementById('quickGameMenuButton').addEventListener('click',function(){
+        StartNewGame('single');
+    });
+    document.getElementById('newRaidButton').addEventListener('click',function(){
+        ShowMainMenu();
     }
     );
     monsterManagementTab.addEventListener('click',function(){
@@ -3951,6 +4213,11 @@ else DrawMonster(r.obj,now);
     }
     );
     window.addEventListener('keydown',function(e){
+        if(e.key==='Escape'){
+            ShowMainMenu();
+            e.preventDefault();
+            return;
+        }
         keys.add(e.key.toLowerCase());
     }
     );

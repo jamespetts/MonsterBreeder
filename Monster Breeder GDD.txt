@@ -49,11 +49,11 @@ Surviving owned monsters carry forward to later rounds.
 
 4. Treasure
 There are five treasure types:
-- Bronze coins
-- Silver coins
-- Gold coins
-- Rubies
-- Emeralds
+- Bronze coins: 10 credits each
+- Silver coins: 30 credits each
+- Gold coins: 100 credits each
+- Rubies: 200 credits each
+- Emeralds: 350 credits each
 
 Treasure types differ by value. Higher-value treasure attracts stronger adventurers.
 
@@ -550,7 +550,7 @@ Before considering a pathfinding worker pool, the game should first use:
 - emergency repathing only when the target/intent changes materially, the path is absent, the next waypoint is invalid or the agent is genuinely stuck;
 - local steering around obstacle shoulders;
 - deterministic stress tests checking both monsters and adventurers for stuck windows;
-- snapshot-size tests to ensure static world data is not resent every tick.
+- snapshot-size tests to ensure static world data is not resent every tick.  
 
 Multithreaded pathfinding may later be worthwhile for large maps and large raids, but it requires plain-data path requests, stale-result handling, priorities and deterministic application on simulation ticks.
 
@@ -583,6 +583,22 @@ Architecture/regression metrics to record:
 
 The goal is not perfect balance, but avoiding dominant strategies and ensuring different monster builds are useful in different contexts.
 
+
+26A. Campaign and Treasure Statistics
+The game should support clear player-facing campaign statistics.
+
+The statistics panel should always show whether the player is currently in a campaign or a single round game.
+
+Treasure statistics to record and show:
+- treasure at the start of the current round, listed separately for bronze coins, silver coins, gold coins, rubies and emeralds;
+- for each treasure type, both the number of units and the value;
+- total starting treasure units and total starting treasure value;
+- treasure stolen in the current round, again by type, units and value, with totals;
+- treasure remaining in the current round, again by type, units and value, with totals;
+- in campaign mode, starting treasure value and ending treasure value for each previous round played.
+
+The goal is to give the player clear feedback about what kinds of treasure are being lost or defended, without cluttering the campaign UI with internal technical metrics or averages that do not help decision-making.
+
 27. One-Sentence Pitch
 Breed a lineage of autonomous, genetically varied monsters to defend treasure from increasingly dangerous adventurers across procedurally generated raids, using wild monsters to refresh the bloodline before inbreeding, age, injury and greed destroy the hoard.
 
@@ -601,7 +617,7 @@ Design intent:
 - A monster that is held in reserve during a raid, or that does not meet its nutrition requirement during the raid, must be fed between seasons at the player's expense if enough treasure remains.
 - Feeding is automatic rather than a separate shop/micromanagement screen.
 - Food cost varies by biome/environment. The default cost is 1 credit per food.
-- Treasure values are measured in credits: bronze coin = 10 credits, silver coin = 30 credits, gold coin = 100 credits, with gems higher.
+- Treasure values are measured in credits: bronze coin = 10 credits, silver coin = 30 credits, gold coin = 100 credits, ruby = 200 credits, emerald = 350 credits.
 - The game keeps a running total of food expenditure and shows it in the UI.
 - Food expenditure is deducted from final remaining-treasure scoring.
 - Automatic feeding must not reduce treasure below zero.
