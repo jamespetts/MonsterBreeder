@@ -600,14 +600,35 @@ button:hover { background: #ffd768; }
     // and settlement distance. World is data/query state, not its own factory.
     class WorldGenerator {
         static createWorld(seed, options) {
-            var rng = new SeededRng(seed);
             var settings = options || {};
-            var environment = WorldGenerator.createEnvironment(rng, settings);
-            var grid = WorldGenerator.createTerrainGrid(rng, environment);
+            var maxAttempts = Number.isFinite(settings.maxMapGenerationAttempts) ? Math.max(1, Math.floor(settings.maxMapGenerationAttempts)) : 80;
+            var originalSeed = seed >>> 0;
+            var candidateSeed = originalSeed;
+            var grid = null;
+            var environment = null;
+            var rng = null;
+            var attempt;
+
+            for (attempt = 0; attempt < maxAttempts; attempt += 1) {
+                rng = new SeededRng(candidateSeed);
+                environment = WorldGenerator.createEnvironment(rng, settings);
+                grid = WorldGenerator.createTerrainGrid(rng, environment);
+
+                if (WorldGenerator.validateRequiredEntryEdges(grid)) {
+                    break;
+                }
+
+                candidateSeed = rng.integer(1, 0x7fffffff);
+            }
+
+            if (!WorldGenerator.validateRequiredEntryEdges(grid)) {
+                WorldGenerator.ensureRequiredEntryEdgeLand(grid);
+            }
+
             var objects = WorldGenerator.createTerrainObjects(rng, environment, grid);
             var deposits = WorldGenerator.createTreasureDeposits(rng, grid, objects);
             var distance = WorldGenerator.createSettlementDistanceMiles(rng, environment, settings);
-            return new World(seed, MAP_WIDTH, MAP_HEIGHT, grid, environment, distance, objects, deposits);
+            return new World(candidateSeed, MAP_WIDTH, MAP_HEIGHT, grid, environment, distance, objects, deposits);
         }
 
         static createEnvironment(rng, settings) {
@@ -676,6 +697,48 @@ button:hover { background: #ffd768; }
             }
 
             return new TerrainGrid(MAP_WIDTH, MAP_HEIGHT, TILE_SIZE, terrainTypes, heights);
+        }
+
+        static terrainTypeIsWater(terrainType) {
+            return terrainType === TERRAIN_TYPE.LAKE || terrainType === TERRAIN_TYPE.STREAM;
+        }
+
+        static edgeTileCoordinates(grid, edge, offset) {
+            if (edge === 'left') {
+                return { tx: 0, ty: offset };
+            }
+            if (edge === 'right') {
+                return { tx: grid.cols - 1, ty: offset };
+            }
+            if (edge === 'top') {
+                return { tx: offset, ty: 0 };
+            }
+            return { tx: offset, ty: grid.rows - 1 };
+        }
+
+        static edgeHasLand(grid, edge) {
+            var count = edge === 'left' || edge === 'right' ? grid.rows : grid.cols;
+
+            for (var i = 0; i < count; i += 1) {
+                var tile = WorldGenerator.edgeTileCoordinates(grid, edge, i);
+                if (!WorldGenerator.terrainTypeIsWater(grid.getTerrainTypeAtTile(tile.tx, tile.ty))) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        static validateRequiredEntryEdges(grid) {
+            return WorldGenerator.edgeHasLand(grid, 'left') && WorldGenerator.edgeHasLand(grid, 'right');
+        }
+
+        static ensureRequiredEntryEdgeLand(grid) {
+            var centreRow = Math.floor(grid.rows / 2);
+            var leftIndex = grid.index(0, centreRow);
+            var rightIndex = grid.index(grid.cols - 1, centreRow);
+            grid.terrainTypes[leftIndex] = TERRAIN_TYPE.GRASS;
+            grid.terrainTypes[rightIndex] = TERRAIN_TYPE.GRASS;
         }
 
         static createTerrainObjects(rng, environment, grid) {
@@ -930,6 +993,62 @@ button:hover { background: #ffd768; }
             }
             cache[index] = false;
             return false;
+        }
+
+        edgePointFor(edge, offset) {
+            if (edge === 'left') {
+                return { x: 0, y: Clamp(offset, 0, this.height) };
+            }
+            if (edge === 'right') {
+                return { x: this.width, y: Clamp(offset, 0, this.height) };
+            }
+            if (edge === 'top') {
+                return { x: Clamp(offset, 0, this.width), y: 0 };
+            }
+            return { x: Clamp(offset, 0, this.width), y: this.height };
+        }
+
+        edgeLength(edge) {
+            return edge === 'left' || edge === 'right' ? this.height : this.width;
+        }
+
+        edgePointIsOpen(agent, edge, offset) {
+            var point = this.edgePointFor(edge, offset);
+            var terrainType = this.terrainGrid.getTerrainTypeAtWorld(point.x, point.y);
+
+            if (WorldGenerator.terrainTypeIsWater(terrainType)) {
+                return false;
+            }
+
+            return !agent.isInsideObstacle(this, point.x, point.y);
+        }
+
+        findOpenEdgePoint(agent, edge, rng, margin) {
+            var edgeMargin = margin === undefined ? 120 : margin;
+            var length = this.edgeLength(edge);
+            var min = Math.min(edgeMargin, length / 2);
+            var max = Math.max(min, length - edgeMargin);
+
+            for (var attempt = 0; attempt < 80; attempt += 1) {
+                var randomOffset = rng.range(min, max);
+                if (this.edgePointIsOpen(agent, edge, randomOffset)) {
+                    return this.edgePointFor(edge, randomOffset);
+                }
+            }
+
+            var samples = Math.max(2, Math.ceil(length / TILE_SIZE));
+            for (var i = 0; i <= samples; i += 1) {
+                var offset = min + (max - min) * (i / samples);
+                if (this.edgePointIsOpen(agent, edge, offset)) {
+                    return this.edgePointFor(edge, offset);
+                }
+            }
+
+            return null;
+        }
+
+        edgeHasOpenPoint(agent, edge) {
+            return this.findOpenEdgePoint(agent, edge, new SeededRng((this.seed ^ 0x9e3779b9) >>> 0), 40) !== null;
         }
 
         getObstacleSnapshots() {
@@ -1487,6 +1606,11 @@ button:hover { background: #ffd768; }
             this.carryingTreasure = false;
             this.carryingTreasureType = null;
             this.targetTreasureId = null;
+            this.entryEdge = 'left';
+            this.entryX = x;
+            this.entryY = y;
+            this.exitX = x;
+            this.exitY = y;
             this.fleeing = false;
             this.courage = rng.range(profile.courageMin, profile.courageMax);
             this.intelligence = rng.range(profile.intelligenceMin, profile.intelligenceMax);
@@ -1503,9 +1627,9 @@ button:hover { background: #ffd768; }
 
             if (this.fleeing || this.carryingTreasure) {
                 this.behaviourState = this.fleeing ? 'fleeing' : 'escapingWithTreasure';
-                this.moveWithPath(raid.world, LEFT_EDGE_X, this.y, this.speed * this.bodyHealth.movementMultiplier() * TICK_DT, this.id + '_exit');
+                this.moveWithPath(raid.world, this.exitX, this.exitY, this.speed * this.bodyHealth.movementMultiplier() * TICK_DT, this.id + '_exit');
 
-                if (this.x <= 12) {
+                if (this.x <= 12 && Distance(this.x, this.y, this.exitX, this.exitY) <= 34) {
                     this.escaped = true;
                     raid.addEvent(this.carryingTreasure ? 'An adventurer escaped with treasure.' : 'A wounded adventurer fled off the map.');
                 }
@@ -1606,6 +1730,11 @@ button:hover { background: #ffd768; }
             s.carryingTreasure = this.carryingTreasure;
             s.carryingTreasureType = this.carryingTreasureType;
             s.targetTreasureId = this.targetTreasureId;
+            s.entryEdge = this.entryEdge;
+            s.entryX = this.entryX;
+            s.entryY = this.entryY;
+            s.exitX = this.exitX;
+            s.exitY = this.exitY;
             s.fleeing = this.fleeing;
             return s;
         }
@@ -1650,27 +1779,48 @@ button:hover { background: #ffd768; }
         }
 
         enterFromRight(world, rng) {
+            var point = world.findOpenEdgePoint(this, 'right', rng, 120);
+            if (!point) {
+                return false;
+            }
+
             this.deployed = true;
             this.escaped = false;
-            this.x = RIGHT_EDGE_X;
-            this.y = rng.range(120, world.height - 120);
+            this.x = point.x;
+            this.y = point.y;
+            this.entryEdge = 'right';
             this.behaviourState = 'roaming';
+            return true;
         }
         enterWild(world, rng) {
             this.enterWildFromEdge(world, rng);
         }
         enterWildFromEdge(world, rng) {
+            var possibleEdges = [];
+
+            if (world.edgeHasOpenPoint(this, 'top')) {
+                possibleEdges.push('top');
+            }
+            if (world.edgeHasOpenPoint(this, 'bottom')) {
+                possibleEdges.push('bottom');
+            }
+            if (possibleEdges.length === 0) {
+                return false;
+            }
+
+            var chosenEdge = rng.pick(possibleEdges);
+            var point = world.findOpenEdgePoint(this, chosenEdge, rng, 120);
+            if (!point) {
+                return false;
+            }
+
             this.deployed = true;
             this.escaped = false;
-            this.x = rng.range(120, world.width - 120);
-            if (rng.nextFloat() < 0.5) {
-                this.y = 0;
-                this.entryEdge = 'top';
-            } else {
-                this.y = world.height;
-                this.entryEdge = 'bottom';
-            }
+            this.x = point.x;
+            this.y = point.y;
+            this.entryEdge = chosenEdge;
             this.behaviourState = 'wildRoaming';
+            return true;
         }
         capture(rng) {
             if (this.owned || !this.alive) {
@@ -1874,7 +2024,20 @@ button:hover { background: #ffd768; }
             var adventurers = [];
 
             for (var i = 0; i < count; i += 1) {
-                adventurers.push(new Villager('adventurer_' + (i + 1), LEFT_EDGE_X, this.rng.range(120, this.world.height - 120), this.rng));
+                var adventurer = new Villager('adventurer_' + (i + 1), LEFT_EDGE_X, 0, this.rng);
+                var point = this.world.findOpenEdgePoint(adventurer, 'left', this.rng, 120);
+
+                if (!point) {
+                    continue;
+                }
+
+                adventurer.x = point.x;
+                adventurer.y = point.y;
+                adventurer.entryX = point.x;
+                adventurer.entryY = point.y;
+                adventurer.exitX = point.x;
+                adventurer.exitY = point.y;
+                adventurers.push(adventurer);
             }
 
             return adventurers;
@@ -1907,7 +2070,11 @@ button:hover { background: #ffd768; }
                     continue;
                 }
                 this.pendingWildMonsters.splice(i, 1);
-                monster.enterWildFromEdge(this.world, this.rng);
+                if (!monster.enterWildFromEdge(this.world, this.rng)) {
+                    this.addEvent('A wild uncollared monster found no dry edge to enter from and stayed away.');
+                    continue;
+                }
+
                 this.wildMonsters.push(monster);
                 this.monsters.push(monster);
                 this.addEvent('A wild uncollared monster wandered onto the map.');
@@ -1918,8 +2085,11 @@ button:hover { background: #ffd768; }
             this.gameState.ownedMonsters.forEach(function (monster) {
                 monster.resetForManagement();
                 if (monster.alive && monster.selectedForDeployment) {
-                    monster.enterFromRight(this.world, this.rng);
-                    this.addEvent(monster.name + ' was released for this season.');
+                    if (monster.enterFromRight(this.world, this.rng)) {
+                        this.addEvent(monster.name + ' was released for this season.');
+                    } else {
+                        this.addEvent(monster.name + ' could not find a dry monster-entry edge and remained in reserve.');
+                    }
                 }
             }, this);
         }
@@ -1946,7 +2116,10 @@ button:hover { background: #ffd768; }
                 return { ok: false, reason: 'No living reserve monster is available.' };
             }
 
-            monster.enterFromRight(this.world, this.rng);
+            if (!monster.enterFromRight(this.world, this.rng)) {
+                return { ok: false, reason: 'No dry monster-entry point is available on the far right edge.' };
+            }
+
             this.addEvent(monster.name + ' entered from the far right edge.');
             return { ok: true };
         }
