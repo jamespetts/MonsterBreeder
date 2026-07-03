@@ -587,7 +587,7 @@ The goal is not perfect balance, but avoiding dominant strategies and ensuring d
 Breed a lineage of autonomous, genetically varied monsters to defend treasure from increasingly dangerous adventurers across procedurally generated raids, using wild monsters to refresh the bloodline before inbreeding, age, injury and greed destroy the hoard.
 
 - Nutrition and Feeding
-Nutrition is an intended campaign and raid system, but it should be implemented after the basic season loop, captive-monster roster, deployment selection, wild-monster capture, and between-season UI are stable.
+Nutrition is the next intended campaign and raid system after the basic season/round loop, captive-monster roster, deployment selection, wild-monster capture, between-season UI, and headless architecture tests are stable. The complex breeding/genetics system should be implemented later, after nutrition can be balanced.
 
 Design intent:
 - Each monster has a per-season nutrition requirement.

@@ -141,6 +141,7 @@ button:hover { background: #ffd768; }
     var WILD_MONSTER_FIRST_SPAWN_TICK_MAX = 180;
     var WILD_MONSTER_SPAWN_GAP_MIN = 150;
     var WILD_MONSTER_SPAWN_GAP_MAX = 360;
+    var SEASONS_WITH_NO_RETURNING_ADVENTURERS_TO_WIN_ROUND = 4;
 
     var TERRAIN_TYPE = {
         GRASS: 0,
@@ -231,6 +232,74 @@ button:hover { background: #ffd768; }
 
     function Clamp(value, min, max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    class BinaryHeap {
+        constructor(compare) {
+            this.items = [];
+            this.compare = compare;
+        }
+
+        get length() {
+            return this.items.length;
+        }
+
+        push(item) {
+            this.items.push(item);
+            this.bubbleUp(this.items.length - 1);
+        }
+
+        pop() {
+            if (this.items.length === 0) {
+                return null;
+            }
+            var result = this.items[0];
+            var last = this.items.pop();
+            if (this.items.length > 0) {
+                this.items[0] = last;
+                this.sinkDown(0);
+            }
+            return result;
+        }
+
+        bubbleUp(index) {
+            var item = this.items[index];
+            while (index > 0) {
+                var parentIndex = Math.floor((index - 1) / 2);
+                var parent = this.items[parentIndex];
+                if (this.compare(item, parent) >= 0) {
+                    break;
+                }
+                this.items[parentIndex] = item;
+                this.items[index] = parent;
+                index = parentIndex;
+            }
+        }
+
+        sinkDown(index) {
+            var length = this.items.length;
+            var item = this.items[index];
+            while (true) {
+                var leftIndex = index * 2 + 1;
+                var rightIndex = leftIndex + 1;
+                var swapIndex = -1;
+                if (leftIndex < length && this.compare(this.items[leftIndex], item) < 0) {
+                    swapIndex = leftIndex;
+                }
+                if (rightIndex < length) {
+                    var compareAgainst = swapIndex === -1 ? item : this.items[leftIndex];
+                    if (this.compare(this.items[rightIndex], compareAgainst) < 0) {
+                        swapIndex = rightIndex;
+                    }
+                }
+                if (swapIndex === -1) {
+                    break;
+                }
+                this.items[index] = this.items[swapIndex];
+                this.items[swapIndex] = item;
+                index = swapIndex;
+            }
+        }
     }
 
     // ============================================================================
@@ -335,6 +404,18 @@ button:hover { background: #ffd768; }
         getSlopeAtWorld(x, y) {
             var tile = this.worldToTile(x, y);
             return this.getSlopeAtTile(tile.tx, tile.ty);
+        }
+
+        getSnapshot() {
+            return {
+                width: this.width,
+                height: this.height,
+                tileSize: this.tileSize,
+                cols: this.cols,
+                rows: this.rows,
+                terrainTypes: this.terrainTypes.slice(0),
+                heights: this.heights.slice(0)
+            };
         }
     }
 
@@ -757,6 +838,7 @@ button:hover { background: #ffd768; }
                 height: this.height,
                 environment: Object.assign({}, this.environment),
                 distanceToSettlementMiles: this.distanceToSettlementMiles,
+                terrainGrid: this.terrainGrid.getSnapshot(),
                 terrainObjects: this.getObstacleSnapshots()
             };
         }
@@ -993,26 +1075,34 @@ button:hover { background: #ffd768; }
             this.pathFindCount += 1;
             var start = this.nearestOpenCell(world, this.worldToCell(world, this.x, this.y));
             var goal = this.nearestOpenCell(world, this.worldToCell(world, gx, gy));
-            var open = [{ cx: start.cx, cy: start.cy, g: 0, f: 0 }];
+            var open = new BinaryHeap(function (a, b) {
+                return a.f - b.f;
+            });
             var came = {};
             var gScore = {};
+            var closed = {};
             var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
-            gScore[this.cellKey(start.cx, start.cy)] = 0;
+            var startKey = this.cellKey(start.cx, start.cy);
+            gScore[startKey] = 0;
+            open.push({ cx: start.cx, cy: start.cy, g: 0, f: Math.hypot(goal.cx - start.cx, goal.cy - start.cy) });
 
             while (open.length > 0) {
-                open.sort(function (a, b) { return a.f - b.f; });
-                var current = open.shift();
+                var current = open.pop();
+                if (!current) {
+                    break;
+                }
                 var ck = this.cellKey(current.cx, current.cy);
-
+                if (closed[ck]) {
+                    continue;
+                }
+                closed[ck] = true;
                 if (current.cx === goal.cx && current.cy === goal.cy) {
                     var cells = [];
-
                     while (came[ck]) {
                         var parts = ck.split(',');
                         cells.push({ cx: Number(parts[0]), cy: Number(parts[1]) });
                         ck = came[ck];
                     }
-
                     cells.reverse();
                     return cells.map(function (cell) {
                         return this.cellCentre(world, cell.cx, cell.cy);
@@ -1022,28 +1112,26 @@ button:hover { background: #ffd768; }
                 for (var i = 0; i < dirs.length; i += 1) {
                     var nx = current.cx + dirs[i][0];
                     var ny = current.cy + dirs[i][1];
-
                     if (nx < 0 || ny < 0 || nx >= this.navCols(world) || ny >= this.navRows(world)) {
                         continue;
                     }
-
                     if (this.cellIsBlocked(world, nx, ny)) {
                         continue;
                     }
-
                     if (dirs[i][0] !== 0 && dirs[i][1] !== 0) {
                         if (this.cellIsBlocked(world, current.cx + dirs[i][0], current.cy) || this.cellIsBlocked(world, current.cx, current.cy + dirs[i][1])) {
                             continue;
                         }
                     }
-
                     var nk = this.cellKey(nx, ny);
+                    if (closed[nk]) {
+                        continue;
+                    }
                     var step = (dirs[i][0] === 0 || dirs[i][1] === 0) ? 1 : 1.414;
                     var centre = this.cellCentre(world, nx, ny);
                     var terrainType = world.terrainGrid.getTerrainTypeAtWorld(centre.x, centre.y);
                     var slope = world.terrainGrid.getSlopeAtWorld(centre.x, centre.y);
                     var tentative = current.g + step * TerrainRules.movementCostFor(this, terrainType, slope);
-
                     if (gScore[nk] === undefined || tentative < gScore[nk]) {
                         came[nk] = this.cellKey(current.cx, current.cy);
                         gScore[nk] = tentative;
@@ -1051,7 +1139,6 @@ button:hover { background: #ffd768; }
                     }
                 }
             }
-
             return [];
         }
 
@@ -1828,8 +1915,53 @@ button:hover { background: #ffd768; }
             var escapedWithTreasure = this.adventurers.some(function (adventurer) {
                 return adventurer.escaped && adventurer.carryingTreasure;
             });
-            this.raidResult = escapedWithTreasure ? 'Raid ended: treasure was lost.' : 'Raid ended: treasure defended.';
+            this.raidResult = escapedWithTreasure ? 'Season ended: treasure was lost.' : 'Season ended: treasure defended.';
             this.addEvent(this.raidResult);
+        }
+
+        getConclusionSummary() {
+            var adventurersReturnedAlive = this.adventurers.filter(function (adventurer) {
+                return adventurer.alive && adventurer.escaped;
+            }).length;
+            var adventurersEscapedWithTreasure = this.adventurers.filter(function (adventurer) {
+                return adventurer.alive && adventurer.escaped && adventurer.carryingTreasure;
+            }).length;
+            var adventurersKilled = this.adventurers.filter(function (adventurer) {
+                return !adventurer.alive;
+            }).length;
+            return {
+                seed: this.seed,
+                worldSeed: this.world.seed,
+                seasonNumber: this.seasonNumber,
+                tickNumber: this.tickNumber,
+                raidEnded: this.raidEnded,
+                raidResult: this.raidResult,
+                adventurersReturnedAlive: adventurersReturnedAlive,
+                adventurersEscapedWithTreasure: adventurersEscapedWithTreasure,
+                adventurersKilled: adventurersKilled,
+                noAdventurersReturnedAlive: adventurersReturnedAlive === 0,
+                treasureRemainingValue: this.world.getRemainingTreasureValue(),
+                treasureRemaining: this.world.treasureDeposits.reduce(function (sum, treasure) {
+                    return sum + treasure.amountRemaining;
+                }, 0),
+                treasureDepleted: !this.world.hasTreasureRemaining(),
+                pathfindingTotalCalls: this.getPathfindingTotalCalls(),
+                maxStuckTicks: this.getMaxStuckTicks()
+            };
+        }
+
+        getPathfindingTotalCalls() {
+            var agents = this.adventurers.concat(this.monsters);
+            return agents.reduce(function (sum, agent) {
+                return sum + agent.pathFindCount;
+            }, 0);
+        }
+
+        getMaxStuckTicks() {
+            var agents = this.adventurers.concat(this.monsters);
+            return agents.reduce(function (max, agent) {
+                return Math.max(max, agent.stuckTicks);
+            }, 0);
         }
 
         getStaticSnapshot() {
@@ -1850,6 +1982,7 @@ button:hover { background: #ffd768; }
                 worldSeed: this.world.seed,
                 tickNumber: this.tickNumber,
                 seasonNumber: this.seasonNumber,
+                roundNumber: this.gameState && this.gameState.roundNumber ? this.gameState.roundNumber : undefined,
                 mapWidth: this.world.width,
                 mapHeight: this.world.height,
                 paused: paused,
@@ -1870,12 +2003,17 @@ button:hover { background: #ffd768; }
             this.rng = new SeededRng(this.seed);
             this.paused = false;
             this.mode = options && options.mode ? options.mode : 'campaign';
+            this.roundNumber = 1;
             this.seasonNumber = 1;
             this.phase = 'management';
+            this.consecutiveSeasonsWithNoReturningAdventurers = 0;
+            this.roundEnded = false;
+            this.roundResult = 'Round in progress';
+            this.lastRaidSummary = null;
             this.gameState = new GameState(this.rng, this.mode);
             this.world = WorldGenerator.createWorld(this.seed, options && options.worldOptions ? options.worldOptions : {});
             this.currentRaid = null;
-            this.pendingEvents = [{ tickNumber: 0, text: 'Campaign created. Choose monsters for season 1.' }];
+            this.pendingEvents = [{ tickNumber: 0, text: 'Campaign created. Choose monsters for round 1 season 1.' }];
         }
 
         tick() {
@@ -1892,20 +2030,60 @@ button:hover { background: #ffd768; }
                 return;
             }
 
+            var summary = this.currentRaid.getConclusionSummary();
+            this.lastRaidSummary = summary;
+            this.applyRoundProgression(summary);
             var finishedTickNumber = this.currentRaid.tickNumber;
-            this.phase = 'management';
             this.gameState.resetAllOwnedForManagement();
             this.currentRaid = null;
-            this.seasonNumber += 1;
-            this.pendingEvents.push({ tickNumber: finishedTickNumber, text: 'Season ended. Choose monsters for the next season.' });
+
+            if (this.roundEnded) {
+                this.phase = 'roundEnded';
+                this.pendingEvents.push({ tickNumber: finishedTickNumber, text: this.roundResult + ' Start the next season to generate a new round.' });
+            } else {
+                this.phase = 'management';
+                this.seasonNumber += 1;
+                this.pendingEvents.push({ tickNumber: finishedTickNumber, text: 'Season ended. Choose monsters for the next season in this round.' });
+            }
+        }
+
+        applyRoundProgression(summary) {
+            if (summary.noAdventurersReturnedAlive) {
+                this.consecutiveSeasonsWithNoReturningAdventurers += 1;
+            } else {
+                this.consecutiveSeasonsWithNoReturningAdventurers = 0;
+            }
+
+            if (summary.treasureDepleted) {
+                this.roundEnded = true;
+                this.roundResult = 'Round lost: all treasure was stolen.';
+            } else if (this.consecutiveSeasonsWithNoReturningAdventurers >= SEASONS_WITH_NO_RETURNING_ADVENTURERS_TO_WIN_ROUND) {
+                this.roundEnded = true;
+                this.roundResult = 'Round won: no adventurers returned alive for ' + SEASONS_WITH_NO_RETURNING_ADVENTURERS_TO_WIN_ROUND + ' consecutive seasons.';
+            } else {
+                this.roundEnded = false;
+                this.roundResult = 'Round in progress';
+            }
+        }
+
+        startNewRound() {
+            this.roundNumber += 1;
+            this.seasonNumber = 1;
+            this.consecutiveSeasonsWithNoReturningAdventurers = 0;
+            this.roundEnded = false;
+            this.roundResult = 'Round in progress';
+            this.lastRaidSummary = null;
+            this.world = WorldGenerator.createWorld(this.rng.integer(1, 0x7fffffff), {});
+            this.pendingEvents.push({ tickNumber: 0, text: 'Round ' + this.roundNumber + ' created. Choose monsters for season 1.' });
         }
 
         startSeason() {
             if (this.phase === 'raid') {
                 return { ok: false, reason: 'A raid is already in progress.' };
             }
-if (this.currentRaid) {
-                this.world = WorldGenerator.createWorld(this.rng.integer(1, 0x7fffffff), {});
+
+            if (this.roundEnded || this.phase === 'roundEnded') {
+                this.startNewRound();
             }
 
             this.currentRaid = new Raid(this.world, this.gameState, this.rng.integer(1, 0x7fffffff), this.seasonNumber);
@@ -1987,6 +2165,10 @@ if (this.currentRaid) {
             if (this.currentRaid) {
                 var raidSnapshot = this.currentRaid.getSnapshot(this.paused);
                 raidSnapshot.phase = this.phase;
+                raidSnapshot.roundNumber = this.roundNumber;
+                raidSnapshot.roundEnded = this.roundEnded;
+                raidSnapshot.roundResult = this.roundResult;
+                raidSnapshot.consecutiveSeasonsWithNoReturningAdventurers = this.consecutiveSeasonsWithNoReturningAdventurers;
                 raidSnapshot.management = this.gameState.getManagementSnapshot();
                 return raidSnapshot;
             }
@@ -1997,12 +2179,16 @@ if (this.currentRaid) {
                 worldSeed: this.world.seed,
                 tickNumber: 0,
                 seasonNumber: this.seasonNumber,
+                roundNumber: this.roundNumber,
                 phase: this.phase,
                 mapWidth: this.world.width,
                 mapHeight: this.world.height,
                 paused: this.paused,
                 raidEnded: false,
-                raidResult: 'Choose monsters for the next season.',
+                raidResult: this.roundEnded ? this.roundResult : 'Choose monsters for the next season.',
+                roundEnded: this.roundEnded,
+                roundResult: this.roundResult,
+                consecutiveSeasonsWithNoReturningAdventurers: this.consecutiveSeasonsWithNoReturningAdventurers,
                 treasures: treasureSnapshots,
                 treasureDeposits: treasureSnapshots,
                 droppedTreasure: [],
@@ -2020,32 +2206,65 @@ if (this.currentRaid) {
         var session = new GameSession(seed, { mode: 'quick' });
         var releaseResult = session.startSeason();
         var ticksRun = 0;
+        var tickTimeTotalMs = 0;
+        var maxTickTimeMs = 0;
+        var finalSummary = null;
 
         while (session.currentRaid && !session.currentRaid.raidEnded && ticksRun < maxTicks) {
+            var startMs = Date.now();
             session.tick();
+            var elapsedMs = Date.now() - startMs;
+            tickTimeTotalMs += elapsedMs;
+            maxTickTimeMs = Math.max(maxTickTimeMs, elapsedMs);
             ticksRun += 1;
         }
 
-        var snapshot = session.getSnapshot();
-        var treasureRemaining = snapshot.treasures.reduce(function (sum, treasure) {
-            return sum + treasure.amountRemaining;
-        }, 0);
-        var adventurersKilled = snapshot.adventurers.filter(function (a) { return !a.alive; }).length;
-        var escapedWithTreasure = snapshot.adventurers.filter(function (a) { return a.escaped && a.carryingTreasure; }).length;
-        var monstersAlive = snapshot.monsters.filter(function (m) { return m.alive; }).length;
+        if (session.lastRaidSummary) {
+            finalSummary = session.lastRaidSummary;
+        } else if (session.currentRaid) {
+            finalSummary = session.currentRaid.getConclusionSummary();
+        } else {
+            finalSummary = {
+                seed: seed,
+                worldSeed: session.world.seed,
+                seasonNumber: session.seasonNumber,
+                tickNumber: ticksRun,
+                raidEnded: false,
+                raidResult: 'Raid did not start.',
+                adventurersReturnedAlive: 0,
+                adventurersEscapedWithTreasure: 0,
+                adventurersKilled: 0,
+                noAdventurersReturnedAlive: false,
+                treasureRemainingValue: session.world.getRemainingTreasureValue(),
+                treasureRemaining: session.world.treasureDeposits.reduce(function (sum, treasure) {
+                    return sum + treasure.amountRemaining;
+                }, 0),
+                treasureDepleted: !session.world.hasTreasureRemaining(),
+                pathfindingTotalCalls: 0,
+                maxStuckTicks: 0
+            };
+        }
 
         return {
             seed: seed,
             startedSeason: releaseResult.ok,
             ticksRun: ticksRun,
-            raidEnded: snapshot.raidEnded,
-            raidResult: snapshot.raidResult,
-            treasureRemaining: treasureRemaining,
-            treasurePileCount: snapshot.treasures.length,
-            adventurersKilled: adventurersKilled,
-            adventurersEscapedWithTreasure: escapedWithTreasure,
-            monstersAlive: monstersAlive,
-            monsterTotal: snapshot.monsters.length
+            raidEnded: finalSummary.raidEnded,
+            raidResult: finalSummary.raidResult,
+            treasureRemaining: finalSummary.treasureRemaining,
+            treasureRemainingValue: finalSummary.treasureRemainingValue,
+            adventurersKilled: finalSummary.adventurersKilled,
+            adventurersReturnedAlive: finalSummary.adventurersReturnedAlive,
+            adventurersEscapedWithTreasure: finalSummary.adventurersEscapedWithTreasure,
+            noAdventurersReturnedAlive: finalSummary.noAdventurersReturnedAlive,
+            pathfindingTotalCalls: finalSummary.pathfindingTotalCalls,
+            pathfindingCallsPerTick: ticksRun > 0 ? finalSummary.pathfindingTotalCalls / ticksRun : 0,
+            maxStuckTicks: finalSummary.maxStuckTicks,
+            averageTickTimeMs: ticksRun > 0 ? tickTimeTotalMs / ticksRun : 0,
+            maxTickTimeMs: maxTickTimeMs,
+            roundEnded: session.roundEnded,
+            roundResult: session.roundResult,
+            consecutiveSeasonsWithNoReturningAdventurers: session.consecutiveSeasonsWithNoReturningAdventurers
         };
     }
 
@@ -2059,7 +2278,10 @@ if (this.currentRaid) {
         var treasureRemainingTotal = 0;
         var adventurersKilledTotal = 0;
         var escapedTotal = 0;
-        var monstersAliveTotal = 0;
+        var pathfindingCallsTotal = 0;
+        var maxStuckTicks = 0;
+        var averageTickTimeTotalMs = 0;
+        var maxTickTimeMs = 0;
 
         for (var i = 0; i < count; i += 1) {
             var result = RunSingleHeadlessRaid(firstSeed + i, maxTicks);
@@ -2072,7 +2294,10 @@ if (this.currentRaid) {
             treasureRemainingTotal += result.treasureRemaining;
             adventurersKilledTotal += result.adventurersKilled;
             escapedTotal += result.adventurersEscapedWithTreasure;
-            monstersAliveTotal += result.monstersAlive;
+            pathfindingCallsTotal += result.pathfindingTotalCalls;
+            maxStuckTicks = Math.max(maxStuckTicks, result.maxStuckTicks);
+            averageTickTimeTotalMs += result.averageTickTimeMs;
+            maxTickTimeMs = Math.max(maxTickTimeMs, result.maxTickTimeMs);
         }
 
         return {
@@ -2084,7 +2309,11 @@ if (this.currentRaid) {
             averageTreasureRemaining: treasureRemainingTotal / count,
             averageAdventurersKilled: adventurersKilledTotal / count,
             averageEscapedWithTreasure: escapedTotal / count,
-            averageMonstersAlive: monstersAliveTotal / count,
+            averagePathfindingCalls: pathfindingCallsTotal / count,
+            averagePathfindingCallsPerTick: results.reduce(function (sum, result) { return sum + result.pathfindingCallsPerTick; }, 0) / count,
+            maxStuckTicks: maxStuckTicks,
+            averageTickTimeMs: averageTickTimeTotalMs / count,
+            maxTickTimeMs: maxTickTimeMs,
             results: results
         };
     }
@@ -2406,8 +2635,8 @@ if (this.currentRaid) {
             return !m.owned&&m.alive;
         }
         ).length;
-        seasonDisplay.textContent='Season '+s.seasonNumber;
-        statusBox.textContent=['Season: '+s.seasonNumber,'Phase: '+(s.phase||'raid'),'Result: '+s.raidResult,'Paused: '+s.paused,'Treasure deposits remaining: '+tr+' / '+s.treasures.length,'Active adventurers: '+adv,'Captive monsters: '+owned.length+'  Deployed: '+deployed+'  Wild: '+wild,'Tick: '+s.tickNumber].join('\\n');
+        seasonDisplay.textContent='Round '+(s.roundNumber||1)+' Season '+s.seasonNumber;
+        statusBox.textContent=['Round: '+(s.roundNumber||1),'Season: '+s.seasonNumber,'Phase: '+(s.phase||'raid'),'Result: '+s.raidResult,'Paused: '+s.paused,'Treasure deposits remaining: '+tr+' / '+s.treasures.length,'Active adventurers: '+adv,'Captive monsters: '+owned.length+'  Deployed: '+deployed+'  Wild: '+wild,'Tick: '+s.tickNumber].join('\\n');
     }
     function BuildManagementRenderKey(s, monsters){
         return [s.phase||'raid',s.seasonNumber,managementDrawerVisible?1:0].concat(monsters.map(function(monster){
@@ -2581,6 +2810,33 @@ if (this.currentRaid) {
             ctx.stroke();
         }
     }
+    function TerrainColour(terrainType, x, y){
+        if(terrainType===1) return (x+y)%2===0?'#8c8a7c':'#969486';
+        if(terrainType===2) return (x+y)%2===0?'#4f8a4d':'#5b9654';
+        if(terrainType===3) return (x+y)%2===0?'#6f8f67':'#789a70';
+        if(terrainType===4) return '#5fa8c8';
+        if(terrainType===5) return '#4d92bd';
+        if(terrainType===6) return (x+y)%2===0?'#a7b29a':'#b1bba5';
+        if(terrainType===7) return '#c8d8df';
+        if(terrainType===8) return (x+y)%2===0?'#d4b56f':'#dec17c';
+        return (x+y)%2===0?'#7fa85b':'#88b463';
+    }
+
+    function TerrainStroke(terrainType){
+        if(terrainType===4 || terrainType===5) return '#407895';
+        if(terrainType===8) return '#b9944f';
+        if(terrainType===7) return '#9eb5bf';
+        if(terrainType===2) return '#3f743e';
+        return '#648a45';
+    }
+
+    function TerrainTypeAtRenderTile(s, x, y){
+        var grid=s.world&&s.world.terrainGrid;
+        if(!grid||!grid.terrainTypes){ return 0; }
+        var index=Math.max(0,Math.min(grid.rows-1,y))*grid.cols+Math.max(0,Math.min(grid.cols-1,x));
+        return grid.terrainTypes[index]||0;
+    }
+
     function DrawTree(o){
         var p=ToScreen(o.x,o.y);
         ctx.fillStyle='#6b4423';
@@ -3175,7 +3431,8 @@ else {
             x+=1){
                 p=ToScreen(x*TILE_SIZE+TILE_SIZE/2,y*TILE_SIZE+TILE_SIZE/2);
                 if(p.x<camera.x-canvas.width/camera.zoom-160||p.x>camera.x+canvas.width/camera.zoom+160||p.y<camera.y-canvas.height/camera.zoom-160||p.y>camera.y+canvas.height/camera.zoom+160)continue;
-                DrawDiamond(p.x,p.y,ISO_W,ISO_H,(x+y)%2===0?'#7fa85b':'#88b463','#648a45');
+                var terrainType=TerrainTypeAtRenderTile(s,x,y);
+                DrawDiamond(p.x,p.y,ISO_W,ISO_H,TerrainColour(terrainType,x,y),TerrainStroke(terrainType));
             }
         }
         var renderables=[];
