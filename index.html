@@ -57,6 +57,8 @@ button:hover { background: #ffd768; }
 .monsterHpBar { height: 0.42rem; border-radius: 999px; background: #5a1f1f; overflow: hidden; border: 1px solid rgba(31,39,48,0.5); }
 .monsterHpFill { height: 100%; background: #2f855a; }
 .monsterHpFill.low { background: #c05621; }
+.nutritionShortfall { color: #b91c1c; font-weight: 800; }
+#sidePanel .nutritionShortfall { color: #f87171; }
 #selectedMonsterPanel { border: 1px solid #d8d0b8; border-radius: 0.55rem; background: #fffaf0; padding: 0.65rem; min-height: 190px; box-sizing: border-box; }
 #selectedMonsterPanel h3 { margin: 0 0 0.35rem; }
 #selectedMonsterPanel svg { width: 100%; max-height: 105px; display: block; margin-bottom: 0.4rem; }
@@ -154,6 +156,18 @@ button:hover { background: #ffd768; }
     var WILD_MONSTER_SPAWN_GAP_MIN = 150;
     var WILD_MONSTER_SPAWN_GAP_MAX = 360;
     var SEASONS_WITH_NO_RETURNING_ADVENTURERS_TO_WIN_ROUND = 4;
+    var DEFAULT_MONSTER_NUTRITION_REQUIREMENT = 10;
+    var DEFAULT_FOOD_COST_CREDITS = 1;
+    var HUMAN_FOOD_VALUE = 1;
+    var LARGE_MACROFAUNA_FOOD_VALUE = 10;
+    var FOOD_EATING_TICKS_PER_FOOD = 45;
+    var MONSTER_FOOD_SENSE_RANGE = 260;
+    var NUTRITION_STATE = {
+        NOURISHED: 'Nourished',
+        MALNOURISHED: 'Malnourished',
+        SEVERELY_MALNOURISHED: 'Severely malnourished',
+        STARVED: 'Starved'
+    };
 
     var TERRAIN_TYPE = {
         GRASS: 0,
@@ -870,6 +884,7 @@ button:hover { background: #ffd768; }
             this.distanceToSettlementMiles = distanceToSettlementMiles;
             this.terrainObjects = terrainObjects;
             this.treasureDeposits = treasureDeposits;
+            this.foodExpenditureCredits = 0;
             this.blockingTerrainObjects = this.terrainObjects.filter(function (object) {
                 return object.blocksMovement;
             });
@@ -1131,6 +1146,8 @@ button:hover { background: #ffd768; }
                     breakdown[section].totalValue += amount * profile.unitValue;
                 });
             });
+            breakdown.foodExpenditureCredits = this.foodExpenditureCredits || 0;
+            breakdown.remainingAfterFoodValue = Math.max(0, breakdown.remaining.totalValue - breakdown.foodExpenditureCredits);
             return breakdown;
         }
 
@@ -1157,6 +1174,7 @@ button:hover { background: #ffd768; }
             snapshot.treasureDeposits = this.getTreasureSnapshots();
             snapshot.remainingTreasureValue = this.getRemainingTreasureValue();
             snapshot.treasureBreakdown = this.getTreasureBreakdown();
+            snapshot.foodExpenditureCredits = this.foodExpenditureCredits || 0;
             return snapshot;
         }
     }
@@ -1675,6 +1693,8 @@ button:hover { background: #ffd768; }
             this.strength = rng.range(profile.strengthMin, profile.strengthMax);
             this.sightRange = 280 + this.perception * 180;
             this.eyeHeight = 5;
+            this.foodValue = HUMAN_FOOD_VALUE;
+            this.edibleFoodRemaining = 0;
         }
 
         update(raid) {
@@ -1754,6 +1774,7 @@ button:hover { background: #ffd768; }
 
             if (this.bodyHealth.isDead()) {
                 this.alive = false;
+                this.edibleFoodRemaining = Math.max(this.edibleFoodRemaining || 0, this.foodValue || HUMAN_FOOD_VALUE);
                 this.dropTreasure(raid, 'death');
             } else if (!this.fleeing && this.health < this.maxHealth * 0.35) {
                 this.fleeing = true;
@@ -1793,6 +1814,8 @@ button:hover { background: #ffd768; }
             s.exitX = this.exitX;
             s.exitY = this.exitY;
             s.fleeing = this.fleeing;
+            s.foodValue = this.foodValue;
+            s.edibleFoodRemaining = this.edibleFoodRemaining;
             return s;
         }
     }
@@ -1802,6 +1825,174 @@ button:hover { background: #ffd768; }
             super(id, x, y, rng, ADVENTURER_PROFILE.villager);
         }
     }
+
+    // ============================================================================
+    // MODULE: NUTRITION AND FEEDING
+    // ============================================================================
+    // Nutrition is persistent monster state owned by GameState/Monster data, while
+    // raid-time eating is ordinary Monster behaviour. The UI displays snapshots
+    // only; it must not calculate authoritative food, cost or starvation results.
+    var NutritionSystem = {
+        getFoodCostCredits: function (world) {
+            // Environment-specific price variation belongs here so balancing can
+            // later use biome data without leaking economy logic into rendering.
+            return DEFAULT_FOOD_COST_CREDITS;
+        },
+
+        getMonsterRequirement: function (monster) {
+            return Number.isFinite(monster.nutritionRequirement) ? Math.max(0, monster.nutritionRequirement) : DEFAULT_MONSTER_NUTRITION_REQUIREMENT;
+        },
+
+        resetSeasonNutrition: function (monster) {
+            monster.foodEatenThisSeason = 0;
+            monster.foodBoughtThisSeason = 0;
+            monster.foodBoughtCostCreditsThisSeason = 0;
+            monster.nutritionShortfallThisSeason = 0;
+            monster.eatingTargetId = null;
+            monster.eatingTicksRemaining = 0;
+        },
+
+        getTotalFoodThisSeason: function (monster) {
+            return (monster.foodEatenThisSeason || 0) + (monster.foodBoughtThisSeason || 0);
+        },
+
+        getFoodNeeded: function (monster) {
+            return Math.max(0, this.getMonsterRequirement(monster) - this.getTotalFoodThisSeason(monster));
+        },
+
+        isFullyNourishedThisSeason: function (monster) {
+            return this.getFoodNeeded(monster) <= 0;
+        },
+
+        canFeedOnCarcass: function (carcass) {
+            return !!carcass && !carcass.alive && !carcass.escaped && (carcass.edibleFoodRemaining || 0) > 0;
+        },
+
+        consumeOneFoodFromCarcass: function (monster, carcass) {
+            if (!this.canFeedOnCarcass(carcass) || this.isFullyNourishedThisSeason(monster)) {
+                return 0;
+            }
+            carcass.edibleFoodRemaining = Math.max(0, (carcass.edibleFoodRemaining || 0) - 1);
+            monster.foodEatenThisSeason = (monster.foodEatenThisSeason || 0) + 1;
+            return 1;
+        },
+
+        getNutritionSpeedMultiplier: function (monster) {
+            if (monster.nutritionState === NUTRITION_STATE.MALNOURISHED) {
+                return 0.88;
+            }
+            if (monster.nutritionState === NUTRITION_STATE.SEVERELY_MALNOURISHED) {
+                return 0.68;
+            }
+            if (monster.nutritionState === NUTRITION_STATE.STARVED) {
+                return 0;
+            }
+            return 1;
+        },
+
+        applyNutritionStateFromSeason: function (monster, rng) {
+            var requirement = this.getMonsterRequirement(monster);
+            var totalFood = this.getTotalFoodThisSeason(monster);
+            var ratio = requirement > 0 ? totalFood / requirement : 1;
+            monster.nutritionShortfallThisSeason = Math.max(0, requirement - totalFood);
+
+            if (ratio >= 1) {
+                monster.nutritionState = NUTRITION_STATE.NOURISHED;
+                return { state: monster.nutritionState, died: false };
+            }
+            if (ratio >= 0.5) {
+                monster.nutritionState = NUTRITION_STATE.MALNOURISHED;
+                monster.health = Math.max(1, monster.health - Math.round(monster.maxHealth * 0.06));
+                return { state: monster.nutritionState, died: false };
+            }
+            if (ratio >= 0.25) {
+                monster.nutritionState = NUTRITION_STATE.SEVERELY_MALNOURISHED;
+                monster.health = Math.max(1, monster.health - Math.round(monster.maxHealth * 0.18));
+                if (rng.nextFloat() < 0.18) {
+                    monster.alive = false;
+                    monster.behaviourState = 'dead';
+                    return { state: monster.nutritionState, died: true };
+                }
+                return { state: monster.nutritionState, died: false };
+            }
+
+            monster.nutritionState = NUTRITION_STATE.STARVED;
+            monster.alive = false;
+            monster.health = 0;
+            monster.behaviourState = 'dead';
+            return { state: monster.nutritionState, died: true };
+        },
+
+        availableTreasureCreditsForFood: function (world) {
+            return Math.max(0, world.getRemainingTreasureValue() - (world.foodExpenditureCredits || 0));
+        },
+
+        buyFoodForMonster: function (gameState, world, monster, neededFood) {
+            var foodCostCredits = this.getFoodCostCredits(world);
+            var availableCredits = this.availableTreasureCreditsForFood(world);
+            var affordableFood = foodCostCredits > 0 ? Math.floor(availableCredits / foodCostCredits) : neededFood;
+            var boughtFood = Math.max(0, Math.min(neededFood, affordableFood));
+            var expenditure = boughtFood * foodCostCredits;
+
+            monster.foodBoughtThisSeason = (monster.foodBoughtThisSeason || 0) + boughtFood;
+            monster.foodBoughtCostCreditsThisSeason = (monster.foodBoughtCostCreditsThisSeason || 0) + expenditure;
+            world.foodExpenditureCredits = (world.foodExpenditureCredits || 0) + expenditure;
+            gameState.foodExpenditureCredits = (gameState.foodExpenditureCredits || 0) + expenditure;
+            gameState.roundFoodExpenditureCredits = (gameState.roundFoodExpenditureCredits || 0) + expenditure;
+            return { boughtFood: boughtFood, expenditure: expenditure };
+        },
+
+        applyBetweenSeasonFeeding: function (gameState, world, raidMonsters, rng) {
+            var monsters = gameState.getLivingOwnedMonsters();
+            var result = {
+                foodCostCredits: this.getFoodCostCredits(world),
+                foodEatenInRaid: 0,
+                foodBought: 0,
+                expenditureCredits: 0,
+                monstersFed: 0,
+                monstersMalnourished: 0,
+                monstersSeverelyMalnourished: 0,
+                monstersStarved: 0,
+                events: []
+            };
+
+            monsters.forEach(function (monster) {
+                result.foodEatenInRaid += monster.foodEatenThisSeason || 0;
+                var neededFood = NutritionSystem.getFoodNeeded(monster);
+                if (neededFood > 0) {
+                    var purchase = NutritionSystem.buyFoodForMonster(gameState, world, monster, neededFood);
+                    result.foodBought += purchase.boughtFood;
+                    result.expenditureCredits += purchase.expenditure;
+                    if (purchase.boughtFood > 0) {
+                        result.monstersFed += 1;
+                    }
+                }
+
+                var stateResult = NutritionSystem.applyNutritionStateFromSeason(monster, rng);
+                if (monster.nutritionState === NUTRITION_STATE.MALNOURISHED) {
+                    result.monstersMalnourished += 1;
+                } else if (monster.nutritionState === NUTRITION_STATE.SEVERELY_MALNOURISHED) {
+                    result.monstersSeverelyMalnourished += 1;
+                } else if (monster.nutritionState === NUTRITION_STATE.STARVED || stateResult.died) {
+                    result.monstersStarved += 1;
+                }
+            });
+
+            if (result.foodEatenInRaid > 0) {
+                result.events.push('Monsters ate ' + result.foodEatenInRaid + ' food during the raid.');
+            }
+            if (result.foodBought > 0) {
+                result.events.push('Automatic feeding bought ' + result.foodBought + ' food for ' + result.expenditureCredits + ' credits.');
+            }
+            if (result.monstersMalnourished > 0 || result.monstersSeverelyMalnourished > 0) {
+                result.events.push('Nutrition shortage left ' + (result.monstersMalnourished + result.monstersSeverelyMalnourished) + ' monster(s) underfed.');
+            }
+            if (result.monstersStarved > 0) {
+                result.events.push(result.monstersStarved + ' monster(s) starved.');
+            }
+            return result;
+        }
+    };
 
     // ============================================================================
     // MODULE: MONSTERS
@@ -1825,6 +2016,14 @@ button:hover { background: #ffd768; }
             this.bodyHealth = new BodyHealth(20);
             this.maxHealth = this.bodyHealth.maxTotal();
             this.health = this.bodyHealth.total();
+            this.nutritionRequirement = options && Number.isFinite(options.nutritionRequirement) ? Math.max(0, options.nutritionRequirement) : DEFAULT_MONSTER_NUTRITION_REQUIREMENT;
+            this.nutritionState = options && options.nutritionState ? options.nutritionState : NUTRITION_STATE.NOURISHED;
+            this.foodEatenThisSeason = 0;
+            this.foodBoughtThisSeason = 0;
+            this.foodBoughtCostCreditsThisSeason = 0;
+            this.nutritionShortfallThisSeason = 0;
+            this.eatingTargetId = null;
+            this.eatingTicksRemaining = 0;
         }
 
         static randomName(rng) {
@@ -1899,6 +2098,8 @@ button:hover { background: #ffd768; }
             this.path = [];
             this.pathKey = '';
             this.pathIntentKey = '';
+            this.eatingTargetId = null;
+            this.eatingTicksRemaining = 0;
             this.behaviourState = this.alive ? 'captive' : 'dead';
         }
 
@@ -1907,18 +2108,80 @@ button:hover { background: #ffd768; }
                 return;
             }
 
-            var target = this.chooseTarget(raid);
+            if (this.continueEating(raid)) {
+                return;
+            }
 
+            var foodTarget = this.chooseFoodTarget(raid);
+            if (foodTarget) {
+                if (this.distanceTo(foodTarget) > MONSTER_ATTACK_RANGE) {
+                    this.behaviourState = 'seekingFood';
+                    this.moveWithPath(raid.world, foodTarget.x, foodTarget.y, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT, this.id + '_food_' + foodTarget.id);
+                } else {
+                    this.eatingTargetId = foodTarget.id;
+                    this.eatingTicksRemaining = FOOD_EATING_TICKS_PER_FOOD;
+                    this.behaviourState = 'eating';
+                }
+                return;
+            }
+
+            var target = this.chooseTarget(raid);
             if (!target) {
                 return;
             }
 
             if (this.distanceTo(target) > MONSTER_ATTACK_RANGE) {
                 this.behaviourState = 'stalking';
-                this.moveWithPath(raid.world, target.x, target.y, this.speed * TICK_DT, this.id + '_' + target.id);
+                this.moveWithPath(raid.world, target.x, target.y, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT, this.id + '_' + target.id);
             } else {
                 this.behaviourState = 'attacking';
             }
+        }
+
+        continueEating(raid) {
+            if (!this.eatingTargetId) {
+                return false;
+            }
+            var carcass = raid.findEdibleCarcassById(this.eatingTargetId);
+            if (!NutritionSystem.canFeedOnCarcass(carcass) || NutritionSystem.isFullyNourishedThisSeason(this)) {
+                this.eatingTargetId = null;
+                this.eatingTicksRemaining = 0;
+                return false;
+            }
+            if (this.distanceTo(carcass) > MONSTER_ATTACK_RANGE * 1.4) {
+                this.eatingTargetId = null;
+                this.eatingTicksRemaining = 0;
+                return false;
+            }
+
+            this.behaviourState = 'eating';
+            this.eatingTicksRemaining -= 1;
+            if (this.eatingTicksRemaining <= 0) {
+                if (NutritionSystem.consumeOneFoodFromCarcass(this, carcass) > 0) {
+                    raid.addEvent(this.name + ' ate from a carcass.');
+                }
+                this.eatingTicksRemaining = NutritionSystem.isFullyNourishedThisSeason(this) || !NutritionSystem.canFeedOnCarcass(carcass) ? 0 : FOOD_EATING_TICKS_PER_FOOD;
+                if (this.eatingTicksRemaining <= 0) {
+                    this.eatingTargetId = null;
+                }
+            }
+            return true;
+        }
+
+        chooseFoodTarget(raid) {
+            if (NutritionSystem.isFullyNourishedThisSeason(this)) {
+                return null;
+            }
+            var candidates = raid.getEdibleCarcasses().filter(function (carcass) {
+                return NutritionSystem.canFeedOnCarcass(carcass) && this.distanceTo(carcass) <= MONSTER_FOOD_SENSE_RANGE;
+            }, this);
+            if (candidates.length === 0) {
+                return null;
+            }
+            candidates.sort(function (a, b) {
+                return this.distanceTo(a) - this.distanceTo(b);
+            }.bind(this));
+            return candidates[0];
         }
 
         chooseTarget(raid) {
@@ -1961,6 +2224,15 @@ button:hover { background: #ffd768; }
             s.health = this.health;
             s.maxHealth = this.maxHealth;
             s.bodyHealth = this.bodyHealth.getSnapshot();
+            s.nutritionRequirement = this.nutritionRequirement;
+            s.nutritionState = this.nutritionState;
+            s.foodEatenThisSeason = this.foodEatenThisSeason;
+            s.foodBoughtThisSeason = this.foodBoughtThisSeason;
+            s.foodBoughtCostCreditsThisSeason = this.foodBoughtCostCreditsThisSeason || 0;
+            s.nutritionShortfallThisSeason = this.nutritionShortfallThisSeason;
+            s.foodNeededThisSeason = NutritionSystem.getFoodNeeded(this);
+            s.eatingTargetId = this.eatingTargetId;
+            s.eatingTicksRemaining = this.eatingTicksRemaining;
             return s;
         }
     }
@@ -1982,7 +2254,18 @@ button:hover { background: #ffd768; }
             super(id, x, y, 10, speed);
             this.agentKind = 'macrofauna';
             this.species = species;
+            this.foodValue = LARGE_MACROFAUNA_FOOD_VALUE;
+            this.edibleFoodRemaining = 0;
             this.behaviourState = 'grazing';
+        }
+
+        getSnapshot() {
+            var s = super.getSnapshot();
+            s.agentKind = this.agentKind;
+            s.species = this.species;
+            s.foodValue = this.foodValue;
+            s.edibleFoodRemaining = this.edibleFoodRemaining;
+            return s;
         }
     }
 
@@ -2012,7 +2295,8 @@ button:hover { background: #ffd768; }
                 worldSeed: summary.worldSeed,
                 result: resultText,
                 startingTreasureValue: treasureBreakdown.starting.totalValue || 0,
-                endingTreasureValue: treasureBreakdown.remaining.totalValue || 0
+                endingTreasureValue: treasureBreakdown.remainingAfterFoodValue !== undefined ? treasureBreakdown.remainingAfterFoodValue : (treasureBreakdown.remaining.totalValue || 0),
+                foodExpenditureCredits: treasureBreakdown.foodExpenditureCredits || 0
             });
         }
         getSnapshot() {
@@ -2031,6 +2315,8 @@ button:hover { background: #ffd768; }
             this.nextMonsterId = 2;
             this.ownedMonsters = [new Monster('monster_1', RIGHT_EDGE_X, rng.range(120, MAP_HEIGHT - 120), rng, { owned: true, name: 'Gribble', selectedForDeployment: true })];
             this.eggs = [];
+            this.foodExpenditureCredits = 0;
+            this.roundFoodExpenditureCredits = 0;
         }
         createMonsterId(prefix) {
             var id = (prefix || 'monster') + '_' + this.nextMonsterId;
@@ -2075,7 +2361,9 @@ button:hover { background: #ffd768; }
                 ownedMonsters: this.ownedMonsters.map(function (monster) {
                     return monster.getSnapshot();
                 }),
-                eggs: this.eggs.slice(0)
+                eggs: this.eggs.slice(0),
+                foodExpenditureCredits: this.foodExpenditureCredits || 0,
+                roundFoodExpenditureCredits: this.roundFoodExpenditureCredits || 0
             };
         }
     }
@@ -2091,7 +2379,11 @@ button:hover { background: #ffd768; }
             this.raidEnded = false;
             this.raidResult = 'Raid in progress';
             this.events = [];
+            this.gameState.getLivingOwnedMonsters().forEach(function (monster) {
+                NutritionSystem.resetSeasonNutrition(monster);
+            });
             this.adventurers = this.createAdventurers();
+            this.macrofauna = [];
             this.wildMonsters = [];
             this.pendingWildMonsters = this.createWildMonsters();
             this.monsters = gameState.ownedMonsters.concat(this.wildMonsters);
@@ -2146,6 +2438,22 @@ button:hover { background: #ffd768; }
             }
             return wildMonsters;
         }
+        getEdibleCarcasses() {
+            return this.adventurers.concat(this.macrofauna).filter(function (agent) {
+                return NutritionSystem.canFeedOnCarcass(agent);
+            });
+        }
+
+        findEdibleCarcassById(id) {
+            var carcasses = this.getEdibleCarcasses();
+            for (var i = 0; i < carcasses.length; i += 1) {
+                if (carcasses[i].id === id) {
+                    return carcasses[i];
+                }
+            }
+            return null;
+        }
+
         spawnDueWildMonsters() {
             for (var i = this.pendingWildMonsters.length - 1; i >= 0; i -= 1) {
                 var monster = this.pendingWildMonsters[i];
@@ -2280,12 +2588,29 @@ button:hover { background: #ffd768; }
             }
         }
 
+        feedingShouldContinueAfterAdventurersGone() {
+            return this.monsters.some(function (monster) {
+                if (!monster.isActive() || !monster.deployed || NutritionSystem.isFullyNourishedThisSeason(monster)) {
+                    return false;
+                }
+                if (monster.eatingTargetId) {
+                    return true;
+                }
+                return monster.chooseFoodTarget(this) !== null;
+            }, this);
+        }
+
         checkRaidEnd() {
             var active = this.adventurers.some(function (adventurer) {
                 return adventurer.isActive();
             });
 
             if (active) {
+                return;
+            }
+
+            if (this.feedingShouldContinueAfterAdventurersGone()) {
+                this.raidResult = 'Raid won: monsters are feeding before returning to base.';
                 return;
             }
 
@@ -2314,6 +2639,18 @@ button:hover { background: #ffd768; }
                 }
             });
             var treasureBreakdown = this.world.getTreasureBreakdown();
+            var ownedNutrition = this.gameState.ownedMonsters.map(function (monster) {
+                return {
+                    id: monster.id,
+                    name: monster.name,
+                    requirement: monster.nutritionRequirement || DEFAULT_MONSTER_NUTRITION_REQUIREMENT,
+                    eatenInRaid: monster.foodEatenThisSeason || 0,
+                    fedAtBase: monster.foodBoughtThisSeason || 0,
+                    baseFoodCostCredits: monster.foodBoughtCostCreditsThisSeason || 0,
+                    foodNeeded: NutritionSystem.getFoodNeeded(monster),
+                    nutritionState: monster.nutritionState
+                };
+            });
             return {
                 seed: this.seed,
                 worldSeed: this.world.seed,
@@ -2331,6 +2668,11 @@ button:hover { background: #ffd768; }
                 treasureStartingValue: treasureBreakdown.starting.totalValue,
                 treasureRemainingValue: treasureBreakdown.remaining.totalValue,
                 treasureLostValue: treasureBreakdown.stolen.totalValue,
+                treasureRemainingAfterFoodValue: treasureBreakdown.remainingAfterFoodValue,
+                foodExpenditureCredits: treasureBreakdown.foodExpenditureCredits || 0,
+                ownedNutrition: ownedNutrition,
+                foodEatenInRaidTotal: ownedNutrition.reduce(function (sum, row) { return sum + row.eatenInRaid; }, 0),
+                foodFedAtBaseTotal: ownedNutrition.reduce(function (sum, row) { return sum + row.fedAtBase; }, 0),
                 treasureRemaining: treasureBreakdown.remaining.totalUnits,
                 treasureDepleted: !this.world.hasTreasureRemaining(),
                 pathfindingTotalCalls: this.getPathfindingTotalCalls(),
@@ -2387,6 +2729,8 @@ button:hover { background: #ffd768; }
                 treasureDeposits: treasureSnapshots,
                 treasureBreakdown: this.world.getTreasureBreakdown(),
                 droppedTreasure: this.droppedTreasure.map(function (drop) { return drop.getSnapshot(); }),
+                macrofauna: this.macrofauna.map(function (animal) { return animal.getSnapshot(); }),
+                foodExpenditureCredits: this.world.foodExpenditureCredits || 0,
                 monsters: this.monsters.map(function (monster) { return monster.getSnapshot(); }),
                 adventurers: this.adventurers.map(function (adventurer) { return adventurer.getSnapshot(); })
             };
@@ -2427,10 +2771,15 @@ button:hover { background: #ffd768; }
                 return;
             }
 
+            var nutritionResult = NutritionSystem.applyBetweenSeasonFeeding(this.gameState, this.world, this.currentRaid.monsters, this.currentRaid.rng);
             var summary = this.currentRaid.getConclusionSummary();
+            summary.nutritionResult = nutritionResult;
             this.lastRaidSummary = summary;
             this.applyRoundProgression(summary);
             var finishedTickNumber = this.currentRaid.tickNumber;
+            nutritionResult.events.forEach(function (eventText) {
+                this.pendingEvents.push({ tickNumber: finishedTickNumber, text: eventText });
+            }, this);
             this.gameState.resetAllOwnedForManagement();
             this.currentRaid = null;
 
@@ -2483,6 +2832,7 @@ button:hover { background: #ffd768; }
             this.roundEnded = false;
             this.roundResult = 'Round in progress';
             this.lastRaidSummary = null;
+            this.gameState.roundFoodExpenditureCredits = 0;
             this.world = WorldGenerator.createWorld(this.rng.integer(1, 0x7fffffff), {});
             this.pendingEvents.push({ tickNumber: 0, text: 'Round ' + this.roundNumber + ' created. Choose monsters for season 1.' });
         }
@@ -2609,7 +2959,9 @@ button:hover { background: #ffd768; }
                 treasures: treasureSnapshots,
                 treasureDeposits: treasureSnapshots,
                 treasureBreakdown: this.world.getTreasureBreakdown(),
+                foodExpenditureCredits: this.world.foodExpenditureCredits || 0,
                 droppedTreasure: [],
+                macrofauna: [],
                 monsters: this.gameState.ownedMonsters.map(function (monster) { return monster.getSnapshot(); }),
                 adventurers: [],
                 management: this.gameState.getManagementSnapshot()
@@ -2672,6 +3024,12 @@ button:hover { background: #ffd768; }
             treasureBreakdown: finalSummary.treasureBreakdown,
             treasureRemaining: finalSummary.treasureRemaining,
             treasureRemainingValue: finalSummary.treasureRemainingValue,
+            treasureRemainingAfterFoodValue: finalSummary.treasureRemainingAfterFoodValue !== undefined ? finalSummary.treasureRemainingAfterFoodValue : finalSummary.treasureRemainingValue,
+            foodExpenditureCredits: finalSummary.foodExpenditureCredits || 0,
+            foodEatenInRaidTotal: finalSummary.foodEatenInRaidTotal || 0,
+            foodFedAtBaseTotal: finalSummary.foodFedAtBaseTotal || 0,
+            ownedNutrition: finalSummary.ownedNutrition || [],
+            nutritionResult: finalSummary.nutritionResult || null,
             treasureLostValue: finalSummary.treasureLostValue || 0,
             adventurersKilled: finalSummary.adventurersKilled,
             adventurersReturnedAlive: finalSummary.adventurersReturnedAlive,
@@ -2698,6 +3056,10 @@ button:hover { background: #ffd768; }
         var endedCount = 0;
         var treasureRemainingTotal = 0;
         var treasureLostTotal = 0;
+        var foodExpenditureTotal = 0;
+        var foodEatenInRaidTotal = 0;
+        var foodFedAtBaseTotal = 0;
+        var treasureAfterFoodTotal = 0;
         var adventurersKilledTotal = 0;
         var escapedTotal = 0;
         var pathfindingCallsTotal = 0;
@@ -2712,6 +3074,10 @@ button:hover { background: #ffd768; }
             }
             treasureRemainingTotal += result.treasureRemaining;
             treasureLostTotal += result.treasureLostValue || 0;
+            foodExpenditureTotal += result.foodExpenditureCredits || 0;
+            foodEatenInRaidTotal += result.foodEatenInRaidTotal || 0;
+            foodFedAtBaseTotal += result.foodFedAtBaseTotal || 0;
+            treasureAfterFoodTotal += result.treasureRemainingAfterFoodValue || 0;
             adventurersKilledTotal += result.adventurersKilled;
             escapedTotal += result.adventurersEscapedWithTreasure;
             pathfindingCallsTotal += result.pathfindingTotalCalls;
@@ -2727,6 +3093,10 @@ button:hover { background: #ffd768; }
             timedOutCount: count - endedCount,
             averageTreasureRemaining: treasureRemainingTotal / count,
             averageTreasureLostValue: treasureLostTotal / count,
+            averageFoodExpenditureCredits: foodExpenditureTotal / count,
+            averageFoodEatenInRaid: foodEatenInRaidTotal / count,
+            averageFoodFedAtBase: foodFedAtBaseTotal / count,
+            averageTreasureRemainingAfterFoodValue: treasureAfterFoodTotal / count,
             averageAdventurersKilled: adventurersKilledTotal / count,
             averageEscapedWithTreasure: escapedTotal / count,
             averagePathfindingCalls: pathfindingCallsTotal / count,
@@ -3056,6 +3426,34 @@ button:hover { background: #ffd768; }
         lines.push('  Total: '+FormatNumber(section ? section.totalUnits : 0)+' units | value '+FormatNumber(section ? section.totalValue : 0));
         return lines.join('\n');
     }
+    function FormatNutritionLine(monster){
+        if(!monster){ return 'Nutrition: n/a'; }
+        var eaten=monster.foodEatenThisSeason||0;
+        var bought=monster.foodBoughtThisSeason||0;
+        var baseCost=monster.foodBoughtCostCreditsThisSeason||0;
+        var requirement=monster.nutritionRequirement||10;
+        return (monster.nutritionState||'Nourished')+' | food '+FormatNumber(eaten+bought)+'/'+FormatNumber(requirement)+' (raid '+FormatNumber(eaten)+', base '+FormatNumber(bought)+', cost '+FormatNumber(baseCost)+')';
+    }
+    function GetFoodShortfall(monster){
+        return monster&&monster.nutritionShortfallThisSeason ? monster.nutritionShortfallThisSeason : 0;
+    }
+    function GetFoodRequirement(monster){
+        return monster&&monster.nutritionRequirement ? monster.nutritionRequirement : 10;
+    }
+    function FormatMonsterNutritionStats(monsters){
+        var owned=monsters.filter(function(monster){ return monster.owned; });
+        if(owned.length===0){ return 'Monster nutrition: no captive monsters'; }
+        var lines=['Monster nutrition'];
+        owned.forEach(function(monster){
+            var shortfall=GetFoodShortfall(monster);
+            var line='  '+MonsterDisplayName(monster)+': requirement '+FormatNumber(GetFoodRequirement(monster))+' | '+FormatNutritionLine(monster);
+            if(shortfall>0){
+                line+=' | FOOD SHORTFALL '+FormatNumber(shortfall);
+            }
+            lines.push(line);
+        });
+        return lines.join('\n');
+    }
     function FormatCampaignRoundHistory(stats, mode){
         if(mode!=='Campaign'){
             return 'Previous campaign rounds: n/a in single round game';
@@ -3066,7 +3464,7 @@ button:hover { background: #ffd768; }
         }
         var lines=['Previous campaign rounds'];
         history.forEach(function(round){
-            lines.push('  Round '+round.roundNumber+': start '+FormatNumber(round.startingTreasureValue)+' | end '+FormatNumber(round.endingTreasureValue)+' | '+round.result);
+            lines.push('  Round '+round.roundNumber+': start '+FormatNumber(round.startingTreasureValue)+' | end after food '+FormatNumber(round.endingTreasureValue)+' | food '+FormatNumber(round.foodExpenditureCredits||0)+' | '+round.result);
         });
         return lines.join('\n');
     }
@@ -3099,6 +3497,8 @@ button:hover { background: #ffd768; }
             'Active adventurers: '+adv,
             'Captive monsters: '+owned.length+'  Deployed: '+deployed+'  Wild: '+wild,
             '',
+            FormatMonsterNutritionStats(owned),
+            '',
             'Campaign worlds completed: '+FormatNumber(stats.worldsCompleted||0),
             'Worlds won/lost: '+FormatNumber(stats.worldsWon||0)+' / '+FormatNumber(stats.worldsLost||0),
             '',
@@ -3107,13 +3507,15 @@ button:hover { background: #ffd768; }
             FormatTreasureSection('Treasure stolen this round',treasureBreakdown.stolen),
             '',
             FormatTreasureSection('Treasure remaining',treasureBreakdown.remaining),
+            'Food expenditure this round: '+FormatNumber(treasureBreakdown.foodExpenditureCredits||s.foodExpenditureCredits||0)+' credits',
+            'Treasure after food costs: '+FormatNumber(treasureBreakdown.remainingAfterFoodValue!==undefined?treasureBreakdown.remainingAfterFoodValue:treasureBreakdown.remaining.totalValue),
             '',
             FormatCampaignRoundHistory(stats,mode)
         ].join('\n');
     }
     function BuildManagementRenderKey(s, monsters){
         return [s.phase||'raid',s.seasonNumber,managementDrawerVisible?1:0].concat(monsters.map(function(monster){
-            return [monster.id,monster.name,monster.alive?1:0,monster.selectedForDeployment?1:0,monster.deployed?1:0,monster.capturedThisRaid?1:0,Math.round(monster.health),Math.round(monster.maxHealth)].join(':');
+            return [monster.id,monster.name,monster.alive?1:0,monster.selectedForDeployment?1:0,monster.deployed?1:0,monster.capturedThisRaid?1:0,Math.round(monster.health),Math.round(monster.maxHealth),monster.nutritionState,monster.foodEatenThisSeason||0,monster.foodBoughtThisSeason||0,monster.foodBoughtCostCreditsThisSeason||0,monster.foodNeededThisSeason||0].join(':');
         })).join('|');
     }
     function MonsterIconSvg(monster){
@@ -3149,11 +3551,21 @@ button:hover { background: #ffd768; }
         icon.innerHTML=MonsterIconSvg(monster);
         var details=document.createElement('dl');
         details.className='monsterDetailGrid';
-        [['Status',monster.alive?'Alive':'Dead'],['Health',Math.round(monster.health)+' / '+Math.round(monster.maxHealth)],['Collar',monster.collared?'Collared':'Uncollared'],['Raid state',monster.deployed?'Deployed':'In cage'],['Season order',monster.selectedForDeployment?'Deploy at start':'Reserve'],['Origin',monster.capturedThisRaid?'Captured wild monster':'Captive monsters']].forEach(function(row){
+        var detailRows=[['Status',monster.alive?'Alive':'Dead'],['Health',Math.round(monster.health)+' / '+Math.round(monster.maxHealth)],['Nutrition',FormatNutritionLine(monster)],['Season food requirement',FormatNumber(GetFoodRequirement(monster))],['In-raid food',FormatNumber(monster.foodEatenThisSeason||0)],['Base-fed food',FormatNumber(monster.foodBoughtThisSeason||0)],['Base food cost',FormatNumber(monster.foodBoughtCostCreditsThisSeason||0)+' credits']];
+        var shortfall=GetFoodShortfall(monster);
+        if(shortfall>0){
+            detailRows.push(['Food shortfall',FormatNumber(shortfall),'nutritionShortfall']);
+        }
+        detailRows=detailRows.concat([['Collar',monster.collared?'Collared':'Uncollared'],['Raid state',monster.deployed?'Deployed':'In cage'],['Season order',monster.selectedForDeployment?'Deploy at start':'Reserve'],['Origin',monster.capturedThisRaid?'Captured wild monster':'Captive monsters']]);
+        detailRows.forEach(function(row){
             var dt=document.createElement('dt');
             var dd=document.createElement('dd');
             dt.textContent=row[0];
             dd.textContent=row[1];
+            if(row[2]){
+                dt.className=row[2];
+                dd.className=row[2];
+            }
             details.appendChild(dt);
             details.appendChild(dd);
         });
@@ -3177,7 +3589,7 @@ button:hover { background: #ffd768; }
         var renderKey=BuildManagementRenderKey(s,monsters)+'|selected:'+selectedRosterMonsterId;
         if(renderKey===lastManagementRenderKey){ return; }
         lastManagementRenderKey=renderKey;
-        managementSummary.textContent=phase==='raid'?'Raid in progress: inspect the captive monsters and deploy living reserve monsters when needed.':'Choose which collared captive monsters to release for season '+s.seasonNumber+'. Captured wild monsters appear here after they are collared.';
+        managementSummary.textContent=phase==='raid'?'Raid in progress: hungry deployed monsters may pause to eat carcasses. Reserve monsters are fed automatically after the season if treasure remains.':'Choose which collared captive monsters to release for season '+s.seasonNumber+'. Each living monster needs 10 food per season; unfed monsters are fed automatically from treasure if possible.';
         rosterList.innerHTML='';
         if(monsters.length===0){
             var empty=document.createElement('div');
@@ -3244,7 +3656,12 @@ button:hover { background: #ffd768; }
             var status=document.createElement('span');
             status.textContent=monster.alive?'HP '+Math.round(monster.health)+'/'+Math.round(monster.maxHealth):'dead';
             var state=document.createElement('span');
-            state.textContent=phase==='raid'?(monster.deployed?'deployed':'in cage'):(monster.capturedThisRaid?'new capture':(monster.selectedForDeployment?'deploy':'reserve'));
+            state.textContent=(monster.nutritionState||'Nourished')+' | '+(phase==='raid'?(monster.deployed?'deployed':'in cage'):(monster.capturedThisRaid?'new capture':(monster.selectedForDeployment?'deploy':'reserve')));
+            var shortfall=GetFoodShortfall(monster);
+            if(shortfall>0){
+                state.textContent+=' | shortfall '+FormatNumber(shortfall);
+                state.className='nutritionShortfall';
+            }
             meta.appendChild(status);
             meta.appendChild(state);
             card.appendChild(header);
@@ -3262,7 +3679,7 @@ button:hover { background: #ffd768; }
             var reserves=monsters.filter(function(monster){ return monster.alive&&!monster.deployed; }).length;
             managementHint.textContent=reserves+' reserve monster'+(reserves===1?'':'s')+' available.';
         } else {
-            managementHint.textContent=selected+' monster'+(selected===1?'':'s')+' selected for deployment.';
+            managementHint.textContent=selected+' monster'+(selected===1?'':'s')+' selected for deployment. Food expense this round: '+FormatNumber((s.treasureBreakdown&&s.treasureBreakdown.foodExpenditureCredits)||s.foodExpenditureCredits||0)+' credits.';
         }
     }
     // ============================================================================
@@ -4007,6 +4424,12 @@ else DrawMonster(r.obj,now);
             return [
                 'Monster: '+MonsterDisplayName(o),
                 'Health: '+Math.round(o.health)+' / '+Math.round(o.maxHealth),
+                'Nutrition: '+FormatNutritionLine(o),
+                'Season food requirement: '+FormatNumber(GetFoodRequirement(o)),
+                'Food eaten in raid: '+FormatNumber(o.foodEatenThisSeason||0),
+                'Food fed at base: '+FormatNumber(o.foodBoughtThisSeason||0),
+                'Base feeding cost: '+FormatNumber(o.foodBoughtCostCreditsThisSeason||0)+' credits',
+                'Eating: '+(o.eatingTargetId?('yes, '+FormatNumber(o.eatingTicksRemaining)+' ticks remaining'):'no'),
                 'Ownership: '+(o.owned?'Captive/owned':'Wild'),
                 'Collar: '+(o.collared?'Collared':'Uncollared'),
                 'Map state: '+(o.deployed?'On map':'In cage/reserve'),
@@ -4019,6 +4442,7 @@ else DrawMonster(r.obj,now);
             return [
                 'Adventurer: '+(o.className||'unknown'),
                 'Health: '+Math.round(o.health)+' / '+Math.round(o.maxHealth),
+                'Edible food remaining: '+FormatNumber(o.edibleFoodRemaining||0),
                 'State: '+(o.behaviourState||'unknown'),
                 'Carrying treasure: '+(o.carryingTreasure?(o.carryingAmount+' '+o.carryingTreasureType):'none'),
                 'Fleeing: '+(o.fleeing?'yes':'no'),
@@ -4055,7 +4479,24 @@ else DrawMonster(r.obj,now);
         }
         return 'Selected object details unavailable.';
     }
+    function EscapeHtml(value){
+        return String(value).replace(/[&<>"']/g,function(ch){
+            return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];
+        });
+    }
     function UpdateSelectedObjectPanel(){
+        if(selectedObject&&selectedObject.kind==='monster'){
+            var lines=DescribeSelectedObject(selectedObject).split('\n').map(function(line){
+                return '<div>'+EscapeHtml(line)+'</div>';
+            });
+            var monster=selectedObject.obj;
+            var shortfall=GetFoodShortfall(monster);
+            if(shortfall>0){
+                lines.splice(4,0,'<div><span class="nutritionShortfall">Food shortfall: '+EscapeHtml(FormatNumber(shortfall))+'</span></div>');
+            }
+            objectDetails.innerHTML=lines.join('');
+            return;
+        }
         objectDetails.textContent=DescribeSelectedObject(selectedObject);
     }
     function UpdateMonsterHover(clientX,clientY){
