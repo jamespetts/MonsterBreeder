@@ -794,12 +794,142 @@ button:hover { background: #ffd768; }
             this.distanceToSettlementMiles = distanceToSettlementMiles;
             this.terrainObjects = terrainObjects;
             this.treasureDeposits = treasureDeposits;
+            this.blockingTerrainObjects = this.terrainObjects.filter(function (object) {
+                return object.blocksMovement;
+            });
+            this.obstacleSpatialCellSize = 120;
+            this.obstacleSpatialBins = {};
+            this.maxBlockingObstacleRadius = 0;
+            this.navColsValue = Math.floor(this.width / NAV_CELL_SIZE) + 1;
+            this.navRowsValue = Math.floor(this.height / NAV_CELL_SIZE) + 1;
+            this.navTerrainTypes = [];
+            this.navSlopes = [];
+            this.navMovementCostCache = {};
+            this.navBlockedCache = {};
+            this.buildObstacleSpatialIndex();
+            this.buildNavCellData();
         }
 
         getBlockingTerrainObjects() {
-            return this.terrainObjects.filter(function (object) {
-                return object.blocksMovement;
-            });
+            return this.blockingTerrainObjects;
+        }
+
+        obstacleCellKey(cx, cy) {
+            return cx + ',' + cy;
+        }
+
+        buildObstacleSpatialIndex() {
+            for (var i = 0; i < this.blockingTerrainObjects.length; i += 1) {
+                var obstacle = this.blockingTerrainObjects[i];
+                var blockingRadius = obstacle.blockingRadius !== undefined ? obstacle.blockingRadius : obstacle.radius;
+                this.maxBlockingObstacleRadius = Math.max(this.maxBlockingObstacleRadius, blockingRadius);
+                var cx = Math.floor(obstacle.x / this.obstacleSpatialCellSize);
+                var cy = Math.floor(obstacle.y / this.obstacleSpatialCellSize);
+                var key = this.obstacleCellKey(cx, cy);
+                if (!this.obstacleSpatialBins[key]) {
+                    this.obstacleSpatialBins[key] = [];
+                }
+                this.obstacleSpatialBins[key].push(obstacle);
+            }
+        }
+
+        getNearbyBlockingTerrainObjects(x, y, agentRadius) {
+            var queryRadius = this.maxBlockingObstacleRadius + agentRadius + MOVEMENT_CLEARANCE_MARGIN;
+            var minCx = Math.floor((x - queryRadius) / this.obstacleSpatialCellSize);
+            var maxCx = Math.floor((x + queryRadius) / this.obstacleSpatialCellSize);
+            var minCy = Math.floor((y - queryRadius) / this.obstacleSpatialCellSize);
+            var maxCy = Math.floor((y + queryRadius) / this.obstacleSpatialCellSize);
+            var result = [];
+            var seen = {};
+            for (var cx = minCx; cx <= maxCx; cx += 1) {
+                for (var cy = minCy; cy <= maxCy; cy += 1) {
+                    var bin = this.obstacleSpatialBins[this.obstacleCellKey(cx, cy)];
+                    if (!bin) {
+                        continue;
+                    }
+                    for (var i = 0; i < bin.length; i += 1) {
+                        var obstacle = bin[i];
+                        if (seen[obstacle.id]) {
+                            continue;
+                        }
+                        seen[obstacle.id] = true;
+                        result.push(obstacle);
+                    }
+                }
+            }
+            return result;
+        }
+
+        getNavCols() {
+            return this.navColsValue;
+        }
+
+        getNavRows() {
+            return this.navRowsValue;
+        }
+
+        getNavCellIndex(cx, cy) {
+            return Clamp(cy, 0, this.navRowsValue - 1) * this.navColsValue + Clamp(cx, 0, this.navColsValue - 1);
+        }
+
+        getNavCellCentre(cx, cy) {
+            return {
+                x: Clamp(cx * NAV_CELL_SIZE + NAV_CELL_SIZE / 2, 0, this.width),
+                y: Clamp(cy * NAV_CELL_SIZE + NAV_CELL_SIZE / 2, 0, this.height)
+            };
+        }
+
+        buildNavCellData() {
+            for (var cy = 0; cy < this.navRowsValue; cy += 1) {
+                for (var cx = 0; cx < this.navColsValue; cx += 1) {
+                    var centre = this.getNavCellCentre(cx, cy);
+                    var index = this.getNavCellIndex(cx, cy);
+                    this.navTerrainTypes[index] = this.terrainGrid.getTerrainTypeAtWorld(centre.x, centre.y);
+                    this.navSlopes[index] = this.terrainGrid.getSlopeAtWorld(centre.x, centre.y);
+                }
+            }
+        }
+
+        getNavCellMovementCost(agent, cx, cy) {
+            var cacheKey = agent.isMounted ? 'mounted' : 'unmounted';
+            if (!this.navMovementCostCache[cacheKey]) {
+                this.navMovementCostCache[cacheKey] = [];
+            }
+            var cache = this.navMovementCostCache[cacheKey];
+            var index = this.getNavCellIndex(cx, cy);
+            if (cache[index] === undefined) {
+                cache[index] = TerrainRules.movementCostFor(agent, this.navTerrainTypes[index], this.navSlopes[index]);
+            }
+            return cache[index];
+        }
+
+        navCellIsBlocked(agent, cx, cy) {
+            var radiusKey = Math.round(agent.radius * 10) / 10;
+            var cacheKey = (agent.isMounted ? 'mounted' : 'unmounted') + ':' + radiusKey;
+            if (!this.navBlockedCache[cacheKey]) {
+                this.navBlockedCache[cacheKey] = [];
+            }
+            var cache = this.navBlockedCache[cacheKey];
+            var index = this.getNavCellIndex(cx, cy);
+            if (cache[index] !== undefined) {
+                return cache[index];
+            }
+            if (this.getNavCellMovementCost(agent, cx, cy) >= 9999) {
+                cache[index] = true;
+                return true;
+            }
+            var centre = this.getNavCellCentre(cx, cy);
+            var obstacles = this.getNearbyBlockingTerrainObjects(centre.x, centre.y, agent.radius);
+            for (var i = 0; i < obstacles.length; i += 1) {
+                var blockingRadius = obstacles[i].blockingRadius !== undefined ? obstacles[i].blockingRadius : obstacles[i].radius;
+                var clearance = blockingRadius + agent.radius + MOVEMENT_CLEARANCE_MARGIN;
+                if (Distance(centre.x, centre.y, obstacles[i].x, obstacles[i].y) < clearance) {
+                    cache[index] = true;
+                    return true;
+                }
+            }
+            cache[index] = false;
+            return false;
         }
 
         getObstacleSnapshots() {
@@ -971,11 +1101,11 @@ button:hover { background: #ffd768; }
         }
 
         navCols(world) {
-            return Math.floor(world.width / NAV_CELL_SIZE) + 1;
+            return world.getNavCols();
         }
 
         navRows(world) {
-            return Math.floor(world.height / NAV_CELL_SIZE) + 1;
+            return world.getNavRows();
         }
 
         worldToCell(world, x, y) {
@@ -986,10 +1116,7 @@ button:hover { background: #ffd768; }
         }
 
         cellCentre(world, cx, cy) {
-            return {
-                x: Clamp(cx * NAV_CELL_SIZE + NAV_CELL_SIZE / 2, 0, world.width),
-                y: Clamp(cy * NAV_CELL_SIZE + NAV_CELL_SIZE / 2, 0, world.height)
-            };
+            return world.getNavCellCentre(cx, cy);
         }
 
         cellKey(cx, cy) {
@@ -1004,8 +1131,7 @@ button:hover { background: #ffd768; }
                 return true;
             }
 
-            var obstacles = world.getBlockingTerrainObjects();
-
+            var obstacles = world.getNearbyBlockingTerrainObjects(x, y, this.radius);
             for (var i = 0; i < obstacles.length; i += 1) {
                 var blockingRadius = obstacles[i].blockingRadius !== undefined ? obstacles[i].blockingRadius : obstacles[i].radius;
 
@@ -1020,8 +1146,7 @@ button:hover { background: #ffd768; }
         }
 
         cellIsBlocked(world, cx, cy) {
-            var centre = this.cellCentre(world, cx, cy);
-            return this.isInsideObstacle(world, centre.x, centre.y);
+            return world.navCellIsBlocked(this, cx, cy);
         }
 
         nearestOpenCell(world, cell) {
@@ -1128,10 +1253,7 @@ button:hover { background: #ffd768; }
                         continue;
                     }
                     var step = (dirs[i][0] === 0 || dirs[i][1] === 0) ? 1 : 1.414;
-                    var centre = this.cellCentre(world, nx, ny);
-                    var terrainType = world.terrainGrid.getTerrainTypeAtWorld(centre.x, centre.y);
-                    var slope = world.terrainGrid.getSlopeAtWorld(centre.x, centre.y);
-                    var tentative = current.g + step * TerrainRules.movementCostFor(this, terrainType, slope);
+                    var tentative = current.g + step * world.getNavCellMovementCost(this, nx, ny);
                     if (gScore[nk] === undefined || tentative < gScore[nk]) {
                         came[nk] = this.cellKey(current.cx, current.cy);
                         gScore[nk] = tentative;
@@ -1946,7 +2068,9 @@ button:hover { background: #ffd768; }
                 }, 0),
                 treasureDepleted: !this.world.hasTreasureRemaining(),
                 pathfindingTotalCalls: this.getPathfindingTotalCalls(),
-                maxStuckTicks: this.getMaxStuckTicks()
+                maxStuckTicks: this.getMaxStuckTicks(),
+                navBlockedCacheEntries: this.getNavBlockedCacheEntryCount(),
+                obstacleSpatialBins: Object.keys(this.world.obstacleSpatialBins).length
             };
         }
 
@@ -1962,6 +2086,15 @@ button:hover { background: #ffd768; }
             return agents.reduce(function (max, agent) {
                 return Math.max(max, agent.stuckTicks);
             }, 0);
+        }
+
+        getNavBlockedCacheEntryCount() {
+            var total = 0;
+            var keys = Object.keys(this.world.navBlockedCache);
+            for (var i = 0; i < keys.length; i += 1) {
+                total += this.world.navBlockedCache[keys[i]].length;
+            }
+            return total;
         }
 
         getStaticSnapshot() {
@@ -2260,6 +2393,8 @@ button:hover { background: #ffd768; }
             pathfindingTotalCalls: finalSummary.pathfindingTotalCalls,
             pathfindingCallsPerTick: ticksRun > 0 ? finalSummary.pathfindingTotalCalls / ticksRun : 0,
             maxStuckTicks: finalSummary.maxStuckTicks,
+            navBlockedCacheEntries: finalSummary.navBlockedCacheEntries || 0,
+            obstacleSpatialBins: finalSummary.obstacleSpatialBins || 0,
             averageTickTimeMs: ticksRun > 0 ? tickTimeTotalMs / ticksRun : 0,
             maxTickTimeMs: maxTickTimeMs,
             roundEnded: session.roundEnded,
