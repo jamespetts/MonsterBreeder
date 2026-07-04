@@ -11,6 +11,7 @@ def FindHtmlPath():
     if len(sys.argv) > 1:
         return Path(sys.argv[1])
     candidates = [
+        Path('monster_breeder_round_end_stats_20260704.html'),
         Path('monster_breeder_fixes_20260703_2315.html'),
         Path('monster_breeder_round_season_pathfinding_20260703.html'),
         Path('index.html'),
@@ -84,6 +85,9 @@ def StaticDomChecks(html):
         'function RunRegressionTests()',
         'class MicrofaunaEmitter',
         'getTreasureBreakdown(extraLooseTreasure)',
+        'function FormatEndOfRoundStats',
+        'Food expenditure does not remove physical treasure units',
+        'Knights are not deterred by lower-class adventurers failing to return alive',
     ]
     missing = [text for text in required if text not in html]
     if missing:

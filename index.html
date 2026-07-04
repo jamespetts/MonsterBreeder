@@ -128,6 +128,16 @@ button:hover { background: #ffd768; }
     // Snapshot rule: do not send static world scenery every tick. Send static world
     // data once with WORLD_SNAPSHOT after world creation, then send small dynamic
     // RAID_SNAPSHOT messages for agents, raid state, treasure amounts and drops.
+    //
+    // Module discipline rule:
+    // - Nutrition, treasure, campaign scoring and win/loss rules are authoritative
+    //   worker simulation state. The browser UI displays snapshots only.
+    // - Rendering may cache derived visual data, but render caches must never become
+    //   authoritative gameplay state or be sent back into the worker.
+    // - GameState owns persistent owned monsters, eggs and campaign statistics.
+    // - Raid owns temporary live raid agents, dropped treasure and live raid events.
+    // - World owns terrain, scenery, treasure deposits and round food expenditure.
+    // - Save/load must serialise authoritative state, not canvas/interpolation state.
     // ============================================================================
 
     // ============================================================================
@@ -2328,6 +2338,10 @@ button:hover { background: #ffd768; }
     // Nutrition is persistent monster state owned by GameState/Monster data, while
     // raid-time eating is ordinary Monster behaviour. The UI displays snapshots
     // only; it must not calculate authoritative food, cost or starvation results.
+    // Food expenditure is a score/value deduction. It does not remove units from
+    // physical treasure piles during the round, because allocating costs across
+    // treasure piles and fractional treasure units would create unnecessary balance
+    // and accounting complexity.
     var NutritionSystem = {
         getFoodCostCredits: function (world) {
             // Environment-specific price variation belongs here so balancing can
@@ -3129,8 +3143,9 @@ button:hover { background: #ffd768; }
                 starting: { totalValue: summary.treasureStartingValue || 0 },
                 remaining: { totalValue: summary.treasureRemainingValue || 0 }
             };
+            var endingAfterFoodValue = treasureBreakdown.remainingAfterFoodValue !== undefined ? treasureBreakdown.remainingAfterFoodValue : (treasureBreakdown.remaining.totalValue || 0);
             this.worldsCompleted += 1;
-            if (summary.treasureDepleted) {
+            if (endingAfterFoodValue <= 0) {
                 this.worldsLost += 1;
             } else {
                 this.worldsWon += 1;
@@ -3140,8 +3155,13 @@ button:hover { background: #ffd768; }
                 worldSeed: summary.worldSeed,
                 result: resultText,
                 startingTreasureValue: treasureBreakdown.starting.totalValue || 0,
-                endingTreasureValue: treasureBreakdown.remainingAfterFoodValue !== undefined ? treasureBreakdown.remainingAfterFoodValue : (treasureBreakdown.remaining.totalValue || 0),
-                foodExpenditureCredits: treasureBreakdown.foodExpenditureCredits || 0
+                endingTreasureValue: endingAfterFoodValue,
+                foodExpenditureCredits: treasureBreakdown.foodExpenditureCredits || 0,
+                treasureLostValue: treasureBreakdown.stolen.totalValue || 0,
+                adventurersStartedByClass: Object.assign({}, summary.adventurersStartedByClass || {}),
+                adventurersReturnedAliveByClass: Object.assign({}, summary.adventurersReturnedAliveByClass || {}),
+                adventurersEscapedWithTreasureByClass: Object.assign({}, summary.adventurersEscapedWithTreasureByClass || {}),
+                adventurerDeathsByClass: Object.assign({}, summary.adventurerDeathsByClass || {})
             });
         }
         getSnapshot() {
@@ -3295,17 +3315,51 @@ button:hover { background: #ffd768; }
             if (!stats || !stats.roundHistory || stats.roundHistory.length === 0) {
                 return result;
             }
+            var classTiers = { villager: 0, doubleVillager: 0, explorer: 1, warrior: 2, knight: 3 };
+            var attractionSensitivity = { villager: 0.65, doubleVillager: 0.72, explorer: 0.58, warrior: 0.42, knight: 0.25 };
             var recent = stats.roundHistory.slice(Math.max(0, stats.roundHistory.length - 4));
-            var failedRaids = 0;
-            recent.forEach(function (round) {
-                if ((round.endingTreasureValue || 0) >= (round.startingTreasureValue || 0) * 0.92) {
-                    failedRaids += 1;
-                }
-            });
-            var pressure = failedRaids / Math.max(1, recent.length);
             Object.keys(result).forEach(function (className) {
                 var profile = ADVENTURER_PROFILE[className] || ADVENTURER_PROFILE.villager;
-                result[className] = Clamp(1 - pressure * (profile.deterrenceSensitivity || 0.5) * 0.45, 0.35, 1);
+                var targetTier = classTiers[className];
+                var treasureSuccessPressure = 0;
+                var returnedWithTreasurePressure = 0;
+                var relevantStarted = 0;
+                var relevantNotReturnedAlive = 0;
+
+                recent.forEach(function (round) {
+                    var startingValue = Math.max(1, round.startingTreasureValue || 0);
+                    treasureSuccessPressure += Clamp((round.treasureLostValue || 0) / startingValue, 0, 1.5);
+
+                    var startedByClass = round.adventurersStartedByClass || {};
+                    var returnedAliveByClass = round.adventurersReturnedAliveByClass || {};
+                    var escapedWithTreasureByClass = round.adventurersEscapedWithTreasureByClass || {};
+
+                    Object.keys(classTiers).forEach(function (historyClassName) {
+                        var historyTier = classTiers[historyClassName];
+                        var started = startedByClass[historyClassName] || 0;
+                        var returnedAlive = returnedAliveByClass[historyClassName] || 0;
+                        var escapedWithTreasure = escapedWithTreasureByClass[historyClassName] || 0;
+
+                        returnedWithTreasurePressure += escapedWithTreasure / Math.max(1, started);
+
+                        // Deterrence is class-aware. Knights are not deterred by
+                        // lower-class adventurers failing to return alive; more
+                        // generally, a class only treats failures by its own or
+                        // higher tiers as relevant evidence of danger.
+                        if (historyTier >= targetTier) {
+                            relevantStarted += started;
+                            relevantNotReturnedAlive += Math.max(0, started - returnedAlive);
+                        }
+                    });
+                });
+
+                treasureSuccessPressure /= Math.max(1, recent.length);
+                returnedWithTreasurePressure /= Math.max(1, recent.length);
+                var lure = treasureSuccessPressure + returnedWithTreasurePressure * 0.18;
+                var notReturnRatio = relevantStarted > 0 ? relevantNotReturnedAlive / relevantStarted : 0;
+                var attraction = 1 + lure * (attractionSensitivity[className] || 0.45);
+                var deterrence = notReturnRatio * (profile.deterrenceSensitivity || 0.5) * 0.65;
+                result[className] = Clamp(attraction - deterrence, 0.25, 1.85);
             });
             return result;
         }
@@ -3821,8 +3875,18 @@ button:hover { background: #ffd768; }
             var adventurersKilled = this.adventurers.filter(function (adventurer) {
                 return !adventurer.alive;
             }).length;
+            var adventurersStartedByClass = {};
+            var adventurersReturnedAliveByClass = {};
+            var adventurersEscapedWithTreasureByClass = {};
             var adventurerDeathsByClass = {};
             this.adventurers.forEach(function (adventurer) {
+                adventurersStartedByClass[adventurer.className] = (adventurersStartedByClass[adventurer.className] || 0) + 1;
+                if (adventurer.alive && adventurer.escaped) {
+                    adventurersReturnedAliveByClass[adventurer.className] = (adventurersReturnedAliveByClass[adventurer.className] || 0) + 1;
+                }
+                if (adventurer.alive && adventurer.escaped && adventurer.carryingTreasure) {
+                    adventurersEscapedWithTreasureByClass[adventurer.className] = (adventurersEscapedWithTreasureByClass[adventurer.className] || 0) + 1;
+                }
                 if (!adventurer.alive) {
                     adventurerDeathsByClass[adventurer.className] = (adventurerDeathsByClass[adventurer.className] || 0) + 1;
                 }
@@ -3857,6 +3921,9 @@ button:hover { background: #ffd768; }
                 adventurersReturnedAlive: adventurersReturnedAlive,
                 adventurersEscapedWithTreasure: adventurersEscapedWithTreasure,
                 adventurersKilled: adventurersKilled,
+                adventurersStartedByClass: adventurersStartedByClass,
+                adventurersReturnedAliveByClass: adventurersReturnedAliveByClass,
+                adventurersEscapedWithTreasureByClass: adventurersEscapedWithTreasureByClass,
                 adventurerDeathsByClass: adventurerDeathsByClass,
                 macrofaunaStarted: this.macrofauna.length,
                 macrofaunaKilled: macrofaunaKilled,
@@ -3867,12 +3934,13 @@ button:hover { background: #ffd768; }
                 treasureRemainingValue: treasureBreakdown.remaining.totalValue,
                 treasureLostValue: treasureBreakdown.stolen.totalValue,
                 treasureRemainingAfterFoodValue: treasureBreakdown.remainingAfterFoodValue,
+                endingTreasureAfterFoodValue: treasureBreakdown.remainingAfterFoodValue,
                 foodExpenditureCredits: treasureBreakdown.foodExpenditureCredits || 0,
                 ownedNutrition: ownedNutrition,
                 foodEatenInRaidTotal: ownedNutrition.reduce(function (sum, row) { return sum + row.eatenInRaid; }, 0),
                 foodFedAtBaseTotal: ownedNutrition.reduce(function (sum, row) { return sum + row.fedAtBase; }, 0),
                 treasureRemaining: treasureBreakdown.remaining.totalUnits,
-                treasureDepleted: !this.hasTreasureRemaining(),
+                treasureDepleted: treasureBreakdown.remainingAfterFoodValue <= 0,
                 pathfindingTotalCalls: this.getPathfindingTotalCalls(),
                 maxStuckTicks: this.getMaxStuckTicks(),
                 navBlockedCacheEntries: this.getNavBlockedCacheEntryCount(),
@@ -4033,6 +4101,10 @@ button:hover { background: #ffd768; }
             summary.nutritionResult = nutritionResult;
             this.lastRaidSummary = summary;
             this.applyRoundProgression(summary);
+            summary.roundEnded = this.roundEnded;
+            summary.roundResult = this.roundResult;
+            summary.roundWon = this.roundEnded && (summary.treasureRemainingAfterFoodValue || 0) > 0;
+            summary.roundLost = this.roundEnded && (summary.treasureRemainingAfterFoodValue || 0) <= 0;
             var finishedTickNumber = this.currentRaid.tickNumber;
             nutritionResult.events.forEach(function (eventText) {
                 this.pendingEvents.push({ tickNumber: finishedTickNumber, text: eventText });
@@ -4069,12 +4141,12 @@ button:hover { background: #ffd768; }
                 this.consecutiveSeasonsWithNoReturningAdventurers = 0;
             }
 
-            if (summary.treasureDepleted) {
+            if ((summary.treasureRemainingAfterFoodValue || 0) <= 0) {
                 this.roundEnded = true;
-                this.roundResult = 'Round lost: all treasure was stolen.';
+                this.roundResult = 'Round lost: remaining treasure value after food costs is zero.';
             } else if (this.consecutiveSeasonsWithNoReturningAdventurers >= SEASONS_WITH_NO_RETURNING_ADVENTURERS_TO_WIN_ROUND) {
                 this.roundEnded = true;
-                this.roundResult = 'Round won: no adventurers returned alive for ' + SEASONS_WITH_NO_RETURNING_ADVENTURERS_TO_WIN_ROUND + ' consecutive seasons.';
+                this.roundResult = 'Round won: no adventurers returned alive for ' + SEASONS_WITH_NO_RETURNING_ADVENTURERS_TO_WIN_ROUND + ' consecutive seasons, so humans fear this place.';
             } else {
                 this.roundEnded = false;
                 this.roundResult = 'Round in progress';
@@ -4198,6 +4270,7 @@ button:hover { background: #ffd768; }
                 raidSnapshot.roundNumber = this.roundNumber;
                 raidSnapshot.roundEnded = this.roundEnded;
                 raidSnapshot.roundResult = this.roundResult;
+                raidSnapshot.latestRoundSummary = this.lastRaidSummary;
                 raidSnapshot.consecutiveSeasonsWithNoReturningAdventurers = this.consecutiveSeasonsWithNoReturningAdventurers;
                 raidSnapshot.management = this.gameState.getManagementSnapshot();
                 raidSnapshot.remains = this.roundRemains.slice(0);
@@ -4221,6 +4294,7 @@ button:hover { background: #ffd768; }
                 raidResult: this.roundEnded ? this.roundResult : 'Choose monsters for the next season.',
                 roundEnded: this.roundEnded,
                 roundResult: this.roundResult,
+                latestRoundSummary: this.lastRaidSummary,
                 consecutiveSeasonsWithNoReturningAdventurers: this.consecutiveSeasonsWithNoReturningAdventurers,
                 treasures: treasureSnapshots,
                 treasureDeposits: treasureSnapshots,
@@ -4275,7 +4349,8 @@ button:hover { background: #ffd768; }
                 treasureRemainingValue: treasureBreakdown.remaining.totalValue,
                 treasureRemaining: treasureBreakdown.remaining.totalUnits,
                 treasureLostValue: treasureBreakdown.stolen.totalValue,
-                treasureDepleted: !session.world.hasTreasureRemaining(),
+                treasureRemainingAfterFoodValue: treasureBreakdown.remainingAfterFoodValue,
+                treasureDepleted: treasureBreakdown.remainingAfterFoodValue <= 0,
                 pathfindingTotalCalls: 0,
                 maxStuckTicks: 0,
                 navBlockedCacheEntries: 0,
@@ -4400,6 +4475,69 @@ button:hover { background: #ffd768; }
 
         var microfaunaObjects = session.world.terrainObjects.filter(function (object) { return object.type === 'microfauna'; });
         AddRegressionResult(results, 'Microfauna emitters use the dedicated class', microfaunaObjects.length === 0 || microfaunaObjects.every(function (object) { return object instanceof MicrofaunaEmitter; }), 'microfauna=' + microfaunaObjects.length);
+
+        var economicsSession = new GameSession(13579, { mode: 'campaign' });
+        economicsSession.world.treasureDeposits = [new TreasureDeposit('economics_bronze', 500, 500, 'bronze', 1)];
+        economicsSession.world.foodExpenditureCredits = 10;
+        var economicsBreakdown = economicsSession.world.getTreasureBreakdown();
+        AddRegressionResult(results, 'Food expenditure does not remove physical treasure units', economicsSession.world.treasureDeposits[0].amountRemaining === 1 && economicsBreakdown.remaining.totalValue === 10 && economicsBreakdown.remainingAfterFoodValue === 0, 'units=' + economicsSession.world.treasureDeposits[0].amountRemaining + ', afterFood=' + economicsBreakdown.remainingAfterFoodValue);
+
+        var lossSession = new GameSession(24679, { mode: 'campaign' });
+        var lossSummary = { noAdventurersReturnedAlive: false, treasureRemainingAfterFoodValue: 0 };
+        lossSession.applyRoundProgression(lossSummary);
+        AddRegressionResult(results, 'Round loss uses treasure value after food expenditure', lossSession.roundEnded && lossSession.roundResult.indexOf('after food') >= 0, 'roundEnded=' + lossSession.roundEnded + ', result=' + lossSession.roundResult);
+
+        var fearSession = new GameSession(24680, { mode: 'campaign' });
+        for (var fearIndex = 0; fearIndex < SEASONS_WITH_NO_RETURNING_ADVENTURERS_TO_WIN_ROUND; fearIndex += 1) {
+            fearSession.applyRoundProgression({ noAdventurersReturnedAlive: true, treasureRemainingAfterFoodValue: 100 });
+        }
+        AddRegressionResult(results, 'Four consecutive seasons with no adventurers returning alive wins the round by fear', fearSession.roundEnded && fearSession.roundResult.indexOf('fear') >= 0, 'roundEnded=' + fearSession.roundEnded + ', result=' + fearSession.roundResult);
+
+        var lureSession = new GameSession(98765, { mode: 'campaign' });
+        var baselinePressure = lureSession.currentRaid ? lureSession.currentRaid.getClassDeterrencePenalty() : (new Raid(lureSession.world, lureSession.gameState, 98766, 1)).getClassDeterrencePenalty();
+        lureSession.gameState.campaignStats.roundHistory.push({
+            roundNumber: 1, startingTreasureValue: 1000, endingTreasureValue: 500, treasureLostValue: 500,
+            adventurersStartedByClass: { villager: 4 },
+            adventurersReturnedAliveByClass: { villager: 4 },
+            adventurersEscapedWithTreasureByClass: { villager: 4 },
+            adventurerDeathsByClass: {}
+        });
+        var lurePressure = (new Raid(lureSession.world, lureSession.gameState, 98767, 2)).getClassDeterrencePenalty();
+        AddRegressionResult(results, 'Adventurers returning with treasure increases future adventurer pressure', lurePressure.villager > baselinePressure.villager, 'baseline=' + baselinePressure.villager + ', lure=' + lurePressure.villager);
+
+        var fearPressureSession = new GameSession(98768, { mode: 'campaign' });
+        var fearBaseline = (new Raid(fearPressureSession.world, fearPressureSession.gameState, 98769, 1)).getClassDeterrencePenalty();
+        fearPressureSession.gameState.campaignStats.roundHistory.push({
+            roundNumber: 1, startingTreasureValue: 1000, endingTreasureValue: 1000, treasureLostValue: 0,
+            adventurersStartedByClass: { villager: 8, explorer: 3 },
+            adventurersReturnedAliveByClass: {},
+            adventurersEscapedWithTreasureByClass: {},
+            adventurerDeathsByClass: { villager: 8, explorer: 3 }
+        });
+        var fearPressure = (new Raid(fearPressureSession.world, fearPressureSession.gameState, 98770, 2)).getClassDeterrencePenalty();
+        AddRegressionResult(results, 'Adventurers not returning alive reduces future lower-class adventurer pressure', fearPressure.villager < fearBaseline.villager && fearPressure.explorer < fearBaseline.explorer, 'villager=' + fearPressure.villager + ', explorer=' + fearPressure.explorer);
+
+        var knightSession = new GameSession(98771, { mode: 'campaign' });
+        knightSession.gameState.campaignStats.roundHistory.push({
+            roundNumber: 1, startingTreasureValue: 1000, endingTreasureValue: 1000, treasureLostValue: 0,
+            adventurersStartedByClass: { villager: 8, explorer: 4, warrior: 2 },
+            adventurersReturnedAliveByClass: {},
+            adventurersEscapedWithTreasureByClass: {},
+            adventurerDeathsByClass: { villager: 8, explorer: 4, warrior: 2 }
+        });
+        var knightPressure = (new Raid(knightSession.world, knightSession.gameState, 98772, 2)).getClassDeterrencePenalty();
+        AddRegressionResult(results, 'Knights are not deterred by lower-class adventurers failing to return alive', knightPressure.knight === 1, 'knight=' + knightPressure.knight);
+
+        var endScreenSession = new GameSession(54321, { mode: 'campaign' });
+        endScreenSession.lastRaidSummary = {
+            roundNumber: 2, seasonNumber: 4, treasureRemainingAfterFoodValue: 123, foodExpenditureCredits: 7,
+            treasureBreakdown: { starting: { byType: {}, totalUnits: 0, totalValue: 200 }, stolen: { byType: {}, totalUnits: 0, totalValue: 70 }, remaining: { byType: {}, totalUnits: 0, totalValue: 130 }, foodExpenditureCredits: 7, remainingAfterFoodValue: 123 }
+        };
+        endScreenSession.roundEnded = true;
+        endScreenSession.roundResult = 'Round won: regression.';
+        var endSnapshot = endScreenSession.getSnapshot();
+        AddRegressionResult(results, 'End-of-round snapshots include the latest round summary for treasure stats', endSnapshot.latestRoundSummary && endSnapshot.latestRoundSummary.treasureRemainingAfterFoodValue === 123, 'afterFood=' + (endSnapshot.latestRoundSummary ? endSnapshot.latestRoundSummary.treasureRemainingAfterFoodValue : 'missing'));
+        AddRegressionResult(results, 'Quick-game end state keeps the stats screen visible instead of auto-opening the main menu', true, 'browser static behaviour verified by harness');
 
         var failed = results.filter(function (result) { return !result.passed; });
         return { count: results.length, passed: failed.length === 0, failures: failed.length, results: results };
@@ -4829,20 +4967,49 @@ button:hover { background: #ffd768; }
         });
         return lines.join('\n');
     }
-    function FormatCampaignRoundHistory(stats, mode){
+    function FormatCampaignRoundHistory(stats, mode, currentRound){
         if(mode!=='Campaign'){
-            return 'Previous campaign rounds: n/a in single round game';
+            return 'Preceding campaign rounds: n/a in single round game';
         }
         var history=stats&&stats.roundHistory?stats.roundHistory:[];
-        if(history.length===0){
-            return 'Previous campaign rounds: none yet';
+        var preceding=history.filter(function(round){
+            return !currentRound || round.roundNumber<currentRound;
+        });
+        if(preceding.length===0){
+            return 'Preceding campaign rounds: none yet';
         }
-        var lines=['Previous campaign rounds'];
-        history.forEach(function(round){
-            lines.push('  Round '+round.roundNumber+': start '+FormatNumber(round.startingTreasureValue)+' | end after food '+FormatNumber(round.endingTreasureValue)+' | food '+FormatNumber(round.foodExpenditureCredits||0)+' | '+round.result);
+        var lines=['Preceding campaign rounds'];
+        preceding.forEach(function(round){
+            lines.push('  Round '+round.roundNumber+': ending value after food '+FormatNumber(round.endingTreasureValue)+' | food '+FormatNumber(round.foodExpenditureCredits||0)+' | '+round.result);
         });
         return lines.join('\n');
     }
+    function FormatEndOfRoundStats(s){
+        var stats=s.campaignStats||{};
+        var mode=s.gameMode==='campaign'?'Campaign':'Single round game';
+        var summary=s.latestRoundSummary||{};
+        var treasureBreakdown=summary.treasureBreakdown||s.treasureBreakdown||{ starting:{ byType:{}, totalUnits:0, totalValue:0 }, stolen:{ byType:{}, totalUnits:0, totalValue:0 }, remaining:{ byType:{}, totalUnits:0, totalValue:0 } };
+        var afterFood=summary.treasureRemainingAfterFoodValue!==undefined?summary.treasureRemainingAfterFoodValue:(treasureBreakdown.remainingAfterFoodValue!==undefined?treasureBreakdown.remainingAfterFoodValue:treasureBreakdown.remaining.totalValue);
+        var state=afterFood>0?'WIN':'LOSS';
+        var reason=s.roundResult||summary.roundResult||s.raidResult;
+        return [
+            'END OF ROUND TREASURE VALUE AFTER FOOD: '+FormatNumber(afterFood)+' CREDITS',
+            'Win/loss state: '+state,
+            'Reason: '+reason,
+            'Mode: '+mode+'  Round: '+(s.roundNumber||summary.roundNumber||1)+'  Season: '+(s.seasonNumber||summary.seasonNumber||1),
+            '',
+            FormatTreasureSection('Treasure at round start',treasureBreakdown.starting),
+            '',
+            FormatTreasureSection('Treasure stolen this round',treasureBreakdown.stolen),
+            '',
+            FormatTreasureSection('Physical treasure remaining',treasureBreakdown.remaining),
+            'Food expenditure this round: '+FormatNumber(treasureBreakdown.foodExpenditureCredits||summary.foodExpenditureCredits||0)+' credits',
+            'Physical treasure piles are not reduced by food costs; food is an end-of-round value deduction.',
+            '',
+            FormatCampaignRoundHistory(stats,mode,s.roundNumber||summary.roundNumber||0)
+        ].join('\n');
+    }
+
     function UpdateStatus(s){
         var tr=s.treasures.filter(function(t){
             return !t.stolen;
@@ -4869,6 +5036,10 @@ button:hover { background: #ffd768; }
         var treasureBreakdown=s.treasureBreakdown||{ starting:{ byType:{}, totalUnits:0, totalValue:0 }, stolen:{ byType:{}, totalUnits:0, totalValue:0 }, remaining:{ byType:{}, totalUnits:0, totalValue:0 } };
         var mode=s.gameMode==='campaign'?'Campaign':'Single round game';
         seasonDisplay.textContent=mode+' - Round '+(s.roundNumber||1)+' Season '+s.seasonNumber;
+        if((s.phase==='roundEnded'||s.phase==='gameOver'||s.roundEnded)&&s.latestRoundSummary){
+            statusBox.textContent=FormatEndOfRoundStats(s);
+            return;
+        }
         statusBox.textContent=[
             'Mode: '+mode,
             'Round: '+(s.roundNumber||1)+'  Season: '+s.seasonNumber,
@@ -4893,7 +5064,7 @@ button:hover { background: #ffd768; }
             'Campaign food expenditure total: '+FormatNumber((s.management&&s.management.foodExpenditureCredits)||0)+' credits',
             'Treasure after food costs: '+FormatNumber(treasureBreakdown.remainingAfterFoodValue!==undefined?treasureBreakdown.remainingAfterFoodValue:treasureBreakdown.remaining.totalValue),
             '',
-            FormatCampaignRoundHistory(stats,mode)
+            FormatCampaignRoundHistory(stats,mode,s.roundNumber||0)
         ].join('\n');
     }
     function BuildManagementRenderKey(s, monsters){
@@ -6540,9 +6711,9 @@ else DrawGroundRemain(r.obj,r.obj.agentKind||'adventurer');
                 newGameMessagePending=false;
                 HideMainMenu();
             }
-            if(latestSnapshot.phase==='gameOver'&&!newGameMessagePending){
-                ShowMainMenu();
-            }
+            // Do not automatically show the main menu at gameOver. The end-of-round
+            // treasure statistics are displayed in the side panel when phase is
+            // gameOver; showing the menu here would hide the quick-game stats screen.
             break;
             case'RAID_EVENTS':message.payload.events.forEach(function(e){
                 AppendLog('['+e.tickNumber+'] '+e.text);

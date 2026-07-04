@@ -1,12 +1,13 @@
 Monster Breeder - Concise Game Design Document
-Updated for the object-oriented worker architecture and snapshot-split rendering pipeline, 2026-07-02
+
+Document rule: this GDD describes the finished project design, not the implementation status, work history, or development sequence. Future updates must not add notes about what has already been implemented, what is intended next, what should be implemented before or after another feature, or any other project-log or roadmap material.
 
 1. High Concept
 Monster Breeder is a semi-turn-based monster-breeding defence game. The player breeds a genetically evolving population of autonomous monsters and deploys them to defend procedurally generated treasure sites from human adventurers.
 
 The player's main control is artificial selection: choosing which monsters to breed, which to deploy, which to hold in reserve, and which wild monsters to capture to broaden the gene pool. During raids, monsters act autonomously according to inherited traits and immediate circumstances.
 
-The player loses the campaign if all treasure is depleted.
+The player loses the campaign if the remaining treasure value after food expenditure is zero.
 
 2. Core Fantasy
 The player is the keeper of a monster brood defending treasure from greedy humans. Over many rounds, the player develops bloodlines of monsters suited to different terrains, treasure layouts and adventurer threats.
@@ -41,9 +42,9 @@ There is no detailed RTS-style command structure.
 3.3 Aftermath
 The game calculates stolen and remaining treasure. Injuries, deaths, ageing, disease checks and egg progression occur.
 
-If adventurers fail to escape with treasure for 4 consecutive raid turns/waves, the round ends successfully and the player scores the remaining treasure value.
+If no adventurers return alive for 4 consecutive seasons, the round ends successfully: the map has become feared by humans and the treasure there is regarded as safe.
 
-If all treasure is depleted, the campaign is lost.
+If the remaining treasure value after food expenditure is zero, the campaign is lost.
 
 Surviving owned monsters carry forward to later rounds.
 
@@ -60,7 +61,7 @@ Treasure types differ by value. Higher-value treasure attracts stronger adventur
 Each adventurer has a fixed carrying capacity for each treasure class. All adventurers prefer higher-value treasure over lower-value treasure, subject to what they can reach and carry.
 
 5. Adventurer Classes
-There are four intended adventurer classes. The current MVP may implement only villagers at first, but the architecture should allow the other classes to be added without redesigning the simulation.
+There are five adventurer classes.
 
 5.1 Villagers
 - Always possible.
@@ -101,6 +102,7 @@ There are four intended adventurer classes. The current MVP may implement only v
 - Can dismount in unsuitable terrain.
 - Dismounted knights should still be at least as effective as warriors.
 - Much less deterred by previous casualties or failures.
+- Not deterred by lower-class adventurers failing to return alive.
 
 6. Adventurer Generation
 Each round has a procedurally generated context including:
@@ -115,9 +117,10 @@ Adventurer numbers depend on:
 - highest treasure tier present;
 - total treasure value;
 - distance to settlement;
-- casualties in recent rounds;
+- casualties and non-returning adventurers in recent rounds;
 - amount of treasure successfully stolen in recent rounds;
-- class-specific deterrence.
+- adventurers returning alive with treasure in recent rounds;
+- class-specific attraction and deterrence.
 
 The game remembers up to the last 4 rounds for deterrence purposes.
 
@@ -128,6 +131,9 @@ General rules:
 - Warriors are less affected.
 - Knights are least affected.
 - Higher treasure tiers increase the chance and number of stronger adventurers.
+- Adventurers who return alive with treasure increase future adventurer pressure by proving that the site can be robbed.
+- Adventurers who fail to return alive reduce future adventurer pressure by making the site feared.
+- Deterrence is class-aware: each class is principally deterred by failures of its own or higher classes. Knights are not deterred by lower-class adventurers failing to return alive.
 
 Example progression:
 - Bronze only: mostly villagers.
@@ -199,7 +205,7 @@ Released monsters choose targets and behaviours based on:
 - own injuries/fear;
 - terrain;
 - threat level;
-- hunger/territorial aggression if implemented;
+- hunger and territorial aggression;
 - immediate combat circumstances.
 
 The game should reward breeding appropriate behaviour rather than micromanagement.
@@ -285,7 +291,7 @@ Monster rendering should use phenotype data from authoritative simulation snapsh
 
 Graphics should prioritise clarity and charm over realism. Monsters should look distinct enough that players can remember bloodlines.
 
-The early MVP visual direction is a readable dog/crocodile-like monster silhouette with snout, tail, legs, teeth, horns/spines and collar. This is a placeholder phenotype style, not a constraint on the eventual genetic renderer.
+The visual direction is a readable dog/crocodile-like monster silhouette with snout, tail, legs, teeth, horns/spines and collar. This phenotype style supports clarity while allowing genetic visual variety.
 
 14. Reproduction
 Monsters reproduce by laying eggs.
@@ -376,7 +382,7 @@ Combat depends on monster factors:
 - intelligence;
 - injury;
 - terrain affinity;
-- pack/cooperation traits if implemented.
+- pack/cooperation traits.
 
 Monsters should not always fight to the death. Retreat/flee behaviour should be genetically influenced.
 
@@ -394,14 +400,14 @@ Terrain affects:
 - monster terrain advantages;
 - line of sight.
 
-Current and intended terrain/feature categories include:
+Terrain/feature categories include:
 - open grassland;
 - rocky ground;
 - forest;
 - marsh;
 - stream/lake water barriers;
 - tundra/ice/desert variants if useful;
-- ruins/caves/narrow passes/hills as later additions.
+- ruins/caves/narrow passes/hills.
 
 Pathfinding and movement are part of agent behaviour, not a detached god service. Agents own movement, pathfinding and visibility decisions. Shared terrain rules interpret world facts for movement cost, traversability and visibility.
 
@@ -425,9 +431,11 @@ Adventurers attempt to:
 
 The player scores based on the value of remaining treasure at the end of the round.
 
-If no adventurer successfully escapes with treasure for four consecutive raid turns/waves, the adventurers abandon the attempt and the round ends.
+If no adventurers return alive for four consecutive seasons, humans abandon the attempt because the site has become feared, and the round ends successfully.
 
-The campaign loss condition is: all treasure is depleted.
+Food expenditure is deducted from the end-of-round treasure value used for scoring and win/loss. Food expenditure does not remove units from physical treasure piles during the round, because allocating cost across specific piles and fractional treasure units would create unnecessary accounting and balance complexity.
+
+The campaign loss condition is: remaining treasure value after food expenditure is zero.
 
 20. Round Variation and Campaign Progression
 Rounds should generally escalate but remain unpredictable.
@@ -488,7 +496,7 @@ To keep the project feasible, avoid:
 - transmissible disease;
 - separate monster species;
 - human economy simulation;
-- base-building complexity unless added much later;
+- base-building complexity;
 - weather systems;
 - detailed equipment inventories;
 - complex nutrition;
@@ -497,10 +505,10 @@ To keep the project feasible, avoid:
 - large numbers of adventurer classes;
 - too many treasure types.
 
-24. Technical Framing and Current Architecture
+24. Technical Framing and Architecture
 The game should be architecture-first, modular and easy to debug with AI assistance.
 
-Current implementation framing:
+Architecture framing:
 - The project remains a single HTML file for collaboration convenience, but internally separates worker simulation from main-thread rendering.
 - The authoritative simulation runs in a Web Worker.
 - The main browser thread owns UI, input, canvas rendering, interpolation and event log presentation only.
@@ -518,7 +526,7 @@ Snapshot protocol:
 - Repeated RAID_SNAPSHOT messages contain dynamic raid state only: agents, raid status, treasure amounts and dropped treasure.
 - The main thread stores the latest static world snapshot and attaches it locally for rendering.
 
-Recommended future modules:
+Logical module boundaries:
 - genetics
 - monsterLifecycle
 - monsterPhenotype
@@ -541,10 +549,18 @@ Recommended future modules:
 
 The simulation core should remain separable from the UI to allow automated balance testing.
 
+Module discipline:
+- Nutrition, treasure, campaign scoring and win/loss rules are authoritative simulation state. The browser UI displays snapshots only.
+- Rendering may cache derived visual data, but render caches must never become authoritative gameplay state.
+- GameState owns persistent owned monsters, eggs and campaign statistics.
+- Raid owns temporary live raid agents, dropped treasure and live raid events.
+- World owns terrain, scenery, treasure deposits and round food expenditure.
+- Save/load must serialise authoritative state, not canvas/interpolation state.
+
 25. Pathfinding and Performance Policy
 Pathfinding should remain single-threaded until profiling proves otherwise.
 
-Before considering a pathfinding worker pool, the game should first use:
+The pathfinding system uses:
 - disciplined repath throttling;
 - path intent keys that do not include the agent's current start cell;
 - emergency repathing only when the target/intent changes materially, the path is absent, the next waypoint is invalid or the agent is genuinely stuck;
@@ -552,7 +568,7 @@ Before considering a pathfinding worker pool, the game should first use:
 - deterministic stress tests checking both monsters and adventurers for stuck windows;
 - snapshot-size tests to ensure static world data is not resent every tick.  
 
-Multithreaded pathfinding may later be worthwhile for large maps and large raids, but it requires plain-data path requests, stale-result handling, priorities and deterministic application on simulation ticks.
+Any multithreaded pathfinding design requires plain-data path requests, stale-result handling, priorities and deterministic application on simulation ticks.
 
 26. Automated Balance and Regression Testing Goals
 The game should support headless simulation tests.
@@ -595,35 +611,36 @@ Treasure statistics to record and show:
 - total starting treasure units and total starting treasure value;
 - treasure stolen in the current round, again by type, units and value, with totals;
 - treasure remaining in the current round, again by type, units and value, with totals;
-- in campaign mode, starting treasure value and ending treasure value for each previous round played.
+- in campaign mode, the ending treasure value after food expenditure for each preceding round played;
+- at the end of each round or single-round game, an end-of-round treasure statistics screen showing win/loss state;
+- the most prominent value on the end-of-round statistics screen: remaining treasure value after food expenditure.
 
 The goal is to give the player clear feedback about what kinds of treasure are being lost or defended, without cluttering the campaign UI with internal technical metrics or averages that do not help decision-making.
 
 27. One-Sentence Pitch
 Breed a lineage of autonomous, genetically varied monsters to defend treasure from increasingly dangerous adventurers across procedurally generated raids, using wild monsters to refresh the bloodline before inbreeding, age, injury and greed destroy the hoard.
 
-- Nutrition and Feeding
-Nutrition is the next intended campaign and raid system after the basic season/round loop, captive-monster roster, deployment selection, wild-monster capture, between-season UI, and headless architecture tests are stable. The complex breeding/genetics system should be implemented later, after nutrition can be balanced.
-
+28. Nutrition and Feeding
 Design intent:
 - Each monster has a per-season nutrition requirement.
 - The default nutrition requirement is 10 food per monster per season.
-- Later genetics, age, size, injury, activity level, metabolism and possibly pregnancy/egg-laying may modify this requirement.
+- Genetics, age, size, injury, activity level, metabolism and pregnancy/egg-laying may modify this requirement.
 - Monsters can satisfy nutrition during raids by eating killed adventurers or macrofauna.
 - A human normally provides 1 food.
 - Macrofauna provide food according to species and size; larger macrofauna such as deer or seals should provide about 10 food.
-- Eating during a raid takes time. The base eating duration should initially be simple, then later modified by genetics, mouth anatomy, size, hunger and temperament.
-- A fully nourished monster normally does not stop to eat a kill, but this should later be genetically modifiable so that greedy, compulsive or low-self-control monsters may still feed.
+- Eating during a raid takes time. Eating duration is modified by genetics, mouth anatomy, size, hunger and temperament.
+- A fully nourished monster normally does not stop to eat a kill, but this is genetically modifiable so that greedy, compulsive or low-self-control monsters may still feed.
 - A monster that is held in reserve during a raid, or that does not meet its nutrition requirement during the raid, must be fed between seasons at the player's expense if enough treasure remains.
 - Feeding is automatic rather than a separate shop/micromanagement screen.
 - Food cost varies by biome/environment. The default cost is 1 credit per food.
 - Treasure values are measured in credits: bronze coin = 10 credits, silver coin = 30 credits, gold coin = 100 credits, ruby = 200 credits, emerald = 350 credits.
 - The game keeps a running total of food expenditure and shows it in the UI.
-- Food expenditure is deducted from final remaining-treasure scoring.
-- Automatic feeding must not reduce treasure below zero.
+- Food expenditure is deducted from final remaining-treasure scoring and from the win/loss value.
+- Food expenditure does not remove units from physical treasure piles during the round.
+- Automatic feeding must not reduce the remaining treasure value after food expenditure below zero.
 - If the player cannot or does not fully feed a monster, nutrition debt creates health states.
 
-Suggested early health states:
+Health states:
 - Nourished: full requirement met.
 - Malnourished: some food shortage; mild health, speed, fertility and disease-risk penalties.
 - Severely malnourished: major penalties and high disease/death risk.
