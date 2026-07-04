@@ -220,18 +220,151 @@ button:hover { background: #ffd768; }
     var ADVENTURER_PROFILE = {
         villager: {
             className: 'villager',
-            speedMin: 86,
-            speedMax: 112,
+            displayName: 'villager',
+            speedMin: 82,
+            speedMax: 108,
             bodyPartHealth: 12,
             carryCapacity: 15,
             courageMin: 0.18,
             courageMax: 0.55,
+            greedMin: 0.15,
+            greedMax: 0.55,
             intelligenceMin: 0.12,
             intelligenceMax: 0.42,
             perceptionMin: 0.12,
             perceptionMax: 0.48,
             strengthMin: 0.25,
-            strengthMax: 0.6
+            strengthMax: 0.6,
+            cautionMin: 0.1,
+            cautionMax: 0.4,
+            armour: 0,
+            meleeDamageMin: 4,
+            meleeDamageMax: 9,
+            meleeHitChance: 0.42,
+            canUseImprovisedWeapons: true,
+            treasurePower: 3.9,
+            treasureTierMin: 0,
+            deterrenceSensitivity: 1.0
+        },
+        doubleVillager: {
+            className: 'doubleVillager',
+            displayName: 'double villagers',
+            speedMin: 58,
+            speedMax: 74,
+            bodyPartHealth: 13,
+            carryCapacity: 45,
+            courageMin: 0.12,
+            courageMax: 0.42,
+            greedMin: 0.45,
+            greedMax: 0.8,
+            intelligenceMin: 0.1,
+            intelligenceMax: 0.34,
+            perceptionMin: 0.1,
+            perceptionMax: 0.36,
+            strengthMin: 0.32,
+            strengthMax: 0.68,
+            cautionMin: 0.22,
+            cautionMax: 0.55,
+            armour: 0,
+            meleeDamageMin: 3,
+            meleeDamageMax: 7,
+            meleeHitChance: 0.34,
+            canUseImprovisedWeapons: false,
+            treasurePower: 3.2,
+            treasureTierMin: 0,
+            deterrenceSensitivity: 1.18,
+            pairCarrySack: true
+        },
+        explorer: {
+            className: 'explorer',
+            displayName: 'explorer',
+            speedMin: 96,
+            speedMax: 126,
+            bodyPartHealth: 15,
+            carryCapacity: 20,
+            courageMin: 0.38,
+            courageMax: 0.72,
+            greedMin: 0.42,
+            greedMax: 0.82,
+            intelligenceMin: 0.48,
+            intelligenceMax: 0.82,
+            perceptionMin: 0.45,
+            perceptionMax: 0.84,
+            strengthMin: 0.38,
+            strengthMax: 0.74,
+            cautionMin: 0.42,
+            cautionMax: 0.86,
+            armour: 3,
+            meleeDamageMin: 8,
+            meleeDamageMax: 15,
+            meleeHitChance: 0.58,
+            canUseImprovisedWeapons: false,
+            treasurePower: 1.45,
+            treasureTierMin: 1,
+            deterrenceSensitivity: 0.72,
+            weaponName: 'dagger'
+        },
+        warrior: {
+            className: 'warrior',
+            displayName: 'warrior',
+            speedMin: 82,
+            speedMax: 112,
+            bodyPartHealth: 21,
+            carryCapacity: 24,
+            courageMin: 0.62,
+            courageMax: 0.92,
+            greedMin: 0.48,
+            greedMax: 0.9,
+            intelligenceMin: 0.42,
+            intelligenceMax: 0.76,
+            perceptionMin: 0.36,
+            perceptionMax: 0.72,
+            strengthMin: 0.62,
+            strengthMax: 0.94,
+            cautionMin: 0.22,
+            cautionMax: 0.58,
+            armour: 8,
+            meleeDamageMin: 14,
+            meleeDamageMax: 27,
+            meleeHitChance: 0.68,
+            canUseImprovisedWeapons: false,
+            treasurePower: 1.18,
+            treasureTierMin: 2,
+            deterrenceSensitivity: 0.45,
+            weaponName: 'broad sword'
+        },
+        knight: {
+            className: 'knight',
+            displayName: 'knight',
+            speedMin: 76,
+            speedMax: 102,
+            mountedSpeedMin: 132,
+            mountedSpeedMax: 168,
+            bodyPartHealth: 27,
+            carryCapacity: 30,
+            courageMin: 0.72,
+            courageMax: 0.98,
+            greedMin: 0.55,
+            greedMax: 0.95,
+            intelligenceMin: 0.48,
+            intelligenceMax: 0.82,
+            perceptionMin: 0.38,
+            perceptionMax: 0.74,
+            strengthMin: 0.72,
+            strengthMax: 1.0,
+            cautionMin: 0.18,
+            cautionMax: 0.5,
+            armour: 14,
+            meleeDamageMin: 18,
+            meleeDamageMax: 34,
+            mountedDamageBonus: 9,
+            meleeHitChance: 0.74,
+            canUseImprovisedWeapons: false,
+            treasurePower: 1.04,
+            treasureTierMin: 3,
+            deterrenceSensitivity: 0.2,
+            weaponName: 'long sword and lance',
+            canMount: true
         }
     };
 
@@ -696,7 +829,7 @@ button:hover { background: #ffd768; }
             }
 
             var objects = WorldGenerator.createTerrainObjects(rng, environment, grid);
-            var deposits = WorldGenerator.createTreasureDeposits(rng, grid, objects);
+            var deposits = WorldGenerator.createTreasureDeposits(rng, grid, objects, settings);
             var distance = WorldGenerator.createSettlementDistanceMiles(rng, environment, settings);
             return new World(candidateSeed, MAP_WIDTH, MAP_HEIGHT, grid, environment, distance, objects, deposits);
         }
@@ -868,50 +1001,58 @@ button:hover { background: #ffd768; }
             return objects;
         }
 
-        static createTreasureDeposits(rng, grid, objects) {
+        static createTreasureDeposits(rng, grid, objects, settings) {
             var deposits = [];
             var types = ['bronze', 'silver', 'gold', 'rubies', 'emeralds'];
-            var tierRoll = rng.nextFloat();
+            var campaignRound = settings && Number.isFinite(settings.campaignRound) ? Math.max(1, Math.floor(settings.campaignRound)) : null;
             var highestTierIndex;
-            if (tierRoll < 0.25) {
-                highestTierIndex = 0;
-            } else if (tierRoll < 0.48) {
-                highestTierIndex = 1;
-            } else if (tierRoll < 0.72) {
-                highestTierIndex = 2;
-            } else if (tierRoll < 0.90) {
-                highestTierIndex = 3;
-            } else {
-                highestTierIndex = 4;
-            }
-            var count = highestTierIndex + 1;
+            var amountMin;
+            var amountMax;
 
+            if (campaignRound) {
+                if (campaignRound <= 2) {
+                    highestTierIndex = 0;
+                } else if (campaignRound <= 4) {
+                    highestTierIndex = 1;
+                } else if (campaignRound <= 6) {
+                    highestTierIndex = 2;
+                } else if (campaignRound <= 8) {
+                    highestTierIndex = 3;
+                } else {
+                    highestTierIndex = 4;
+                }
+                var pressure = campaignRound - 1;
+                amountMin = 10 + pressure * 6;
+                amountMax = 22 + pressure * 10;
+            } else {
+                var tierRoll = rng.nextFloat();
+                if (tierRoll < 0.25) {
+                    highestTierIndex = 0;
+                } else if (tierRoll < 0.48) {
+                    highestTierIndex = 1;
+                } else if (tierRoll < 0.72) {
+                    highestTierIndex = 2;
+                } else if (tierRoll < 0.90) {
+                    highestTierIndex = 3;
+                } else {
+                    highestTierIndex = 4;
+                }
+                amountMin = 35;
+                amountMax = 90;
+            }
+
+            var count = highestTierIndex + 1;
             for (var i = 0; i < count; i += 1) {
                 var occupied = objects.concat(deposits);
                 var p = WorldGenerator.findOpenPoint(rng, grid, occupied, 210, false);
-
+                if (!p) { p = WorldGenerator.findOpenPoint(rng, grid, occupied, 150, false); }
+                if (!p) { p = WorldGenerator.findOpenPoint(rng, grid, occupied, 100, true); }
+                if (!p) { p = WorldGenerator.findOpenPoint(rng, grid, occupied, 70, true); }
                 if (!p) {
-                    p = WorldGenerator.findOpenPoint(rng, grid, occupied, 150, false);
+                    p = { x: MAP_WIDTH * (0.35 + 0.1 * i), y: MAP_HEIGHT * (0.35 + 0.07 * i) };
                 }
-
-                if (!p) {
-                    p = WorldGenerator.findOpenPoint(rng, grid, occupied, 100, true);
-                }
-
-                if (!p) {
-                    p = WorldGenerator.findOpenPoint(rng, grid, occupied, 70, true);
-                }
-
-                if (!p) {
-                    p = {
-                        x: MAP_WIDTH * (0.35 + 0.1 * i),
-                        y: MAP_HEIGHT * (0.35 + 0.07 * i)
-                    };
-                }
-
-                deposits.push(new TreasureDeposit('treasure_' + (i + 1), p.x, p.y, types[i], rng.integer(35, 90)));
+                deposits.push(new TreasureDeposit('treasure_' + (i + 1), p.x, p.y, types[i], rng.integer(amountMin, amountMax)));
             }
-
             return deposits;
         }
 
@@ -1795,7 +1936,11 @@ button:hover { background: #ffd768; }
         constructor(id, x, y, rng, profile) {
             super(id, x, y, 12, rng.range(profile.speedMin, profile.speedMax));
             this.agentKind = 'adventurer';
+            this.profile = profile;
             this.className = profile.className;
+            this.displayName = profile.displayName || profile.className;
+            this.armour = profile.armour || 0;
+            this.weaponName = profile.weaponName || '';
             this.bodyHealth = new BodyHealth(profile.bodyPartHealth);
             this.maxHealth = this.bodyHealth.maxTotal();
             this.health = this.bodyHealth.total();
@@ -1811,9 +1956,11 @@ button:hover { background: #ffd768; }
             this.exitY = y;
             this.fleeing = false;
             this.courage = rng.range(profile.courageMin, profile.courageMax);
+            this.greed = rng.range(profile.greedMin, profile.greedMax);
             this.intelligence = rng.range(profile.intelligenceMin, profile.intelligenceMax);
             this.perception = rng.range(profile.perceptionMin, profile.perceptionMax);
             this.strength = rng.range(profile.strengthMin, profile.strengthMax);
+            this.caution = rng.range(profile.cautionMin, profile.cautionMax);
             this.sightRange = 280 + this.perception * 180;
             this.eyeHeight = 5;
             this.foodValue = HUMAN_FOOD_VALUE;
@@ -1822,11 +1969,19 @@ button:hover { background: #ffd768; }
             this.carriedWorldObjectType = null;
             this.carriedWorldObjectDamage = 0;
             this.carriedWorldObjectWeight = 0;
+            this.lastDamageTick = -9999;
+            this.lastDamagePart = null;
         }
 
         update(raid) {
             if (!this.isActive()) {
                 return;
+            }
+
+            if (!this.fleeing && !this.carryingTreasure && this.stuckTicks >= 180) {
+                this.fleeing = true;
+                this.behaviourState = 'fleeing';
+                raid.addEvent('A ' + this.displayName + ' gave up after failing to find a usable route.');
             }
 
             if (this.fleeing || this.carryingTreasure) {
@@ -1847,6 +2002,7 @@ button:hover { background: #ffd768; }
                 return;
             }
 
+            this.updateMountedState(raid);
             this.tryPickupImprovisedWeapon(raid);
             var target = this.chooseTreasure(raid);
             this.targetTreasureId = target ? target.id : null;
@@ -1910,16 +2066,53 @@ button:hover { background: #ffd768; }
             var profile = TREASURE_TYPES[treasure.treasureType];
             var unitValue = profile ? profile.unitValue : 1;
             var distance = Math.max(1, Distance(this.x, this.y, treasure.x, treasure.y));
-
-            // Villagers have low risk tolerance and weak planning: nearby treasure
-            // dominates. Higher-value treasure wins only when it is not much farther.
-            if (this.className === 'villager') {
-                return unitValue / Math.pow(distance, 4);
+            var tierIndex = TREASURE_TYPE_ORDER.indexOf(treasure.treasureType);
+            var classProfile = this.profile || ADVENTURER_PROFILE[this.className] || ADVENTURER_PROFILE.villager;
+            if (tierIndex >= 0 && tierIndex < (classProfile.treasureTierMin || 0)) {
+                return -Infinity;
             }
+            var greedWeight = 0.8 + (this.greed || 0.5) * 0.7;
+            var intelligenceWeight = 0.78 + (this.intelligence || 0.5) * 0.5;
+            var power = classProfile.treasurePower || 1.25;
+            if (this.className === 'villager' || this.className === 'doubleVillager') {
+                return (unitValue * greedWeight) / Math.pow(distance, power);
+            }
+            return (unitValue * greedWeight * intelligenceWeight) / Math.pow(distance, power);
+        }
 
-            var greedWeight = 0.85 + (this.greed || 0.5) * 0.6;
-            var intelligenceWeight = 0.85 + (this.intelligence || 0.5) * 0.45;
-            return (unitValue * greedWeight * intelligenceWeight) / Math.pow(distance, 1.05);
+        updateMountedState(raid) {
+            if (!this.profile || !this.profile.canMount) {
+                return;
+            }
+            var terrainType = raid.world.terrainGrid.getTerrainTypeAtWorld(this.x, this.y);
+            var unsuitable = terrainType === TERRAIN_TYPE.FOREST || terrainType === TERRAIN_TYPE.MARSH || terrainType === TERRAIN_TYPE.STREAM || terrainType === TERRAIN_TYPE.LAKE;
+            if (this.isMounted && unsuitable) {
+                this.isMounted = false;
+                this.speed = this.dismountedSpeed || this.speed;
+                this.behaviourState = 'dismounting';
+                raid.addEvent('A knight dismounted in unsuitable terrain.');
+            } else if (!this.isMounted && !unsuitable && this.canRemount) {
+                this.isMounted = true;
+                this.speed = this.mountedSpeed || this.speed;
+                this.behaviourState = 'mounting';
+                raid.addEvent('A knight mounted up on open ground.');
+            }
+        }
+
+        getMeleeDamage(rng) {
+            var profile = this.profile || ADVENTURER_PROFILE.villager;
+            var bonus = this.isMounted ? (profile.mountedDamageBonus || 0) : 0;
+            return rng.integer(profile.meleeDamageMin + bonus, profile.meleeDamageMax + bonus);
+        }
+
+        getMeleeHitChance() {
+            var profile = this.profile || ADVENTURER_PROFILE.villager;
+            return Clamp((profile.meleeHitChance || 0.5) + (this.strength - 0.5) * 0.08 - (this.carryingTreasure ? 0.08 : 0), 0.18, 0.92);
+        }
+
+        receiveArmouredDamage(amount) {
+            var reduced = Math.max(1, Math.round(amount - (this.armour || 0) * 0.55));
+            return reduced;
         }
 
         chooseTreasure(raid) {
@@ -1951,12 +2144,13 @@ button:hover { background: #ffd768; }
                 this.carryingAmount = amount;
                 this.carryingTreasure = true;
                 this.carryingTreasureType = treasure.treasureType;
-                raid.addEvent('An adventurer took ' + amount + ' units of ' + TREASURE_TYPES[treasure.treasureType].displayName + '.');
+                this.behaviourState = 'pickingUpTreasure';
+                raid.addEvent('A ' + this.displayName + ' took ' + amount + ' units of ' + TREASURE_TYPES[treasure.treasureType].displayName + '.');
             }
         }
 
         tryPickupImprovisedWeapon(raid) {
-            if (this.carriedWorldObjectId || this.carryingTreasure || this.className !== 'villager') {
+            if (this.carriedWorldObjectId || this.carryingTreasure || !(this.profile && this.profile.canUseImprovisedWeapons)) {
                 return false;
             }
             var best = null;
@@ -2018,8 +2212,10 @@ button:hover { background: #ffd768; }
         }
 
         applyDamage(amount, rng, raid) {
-            var part = this.bodyHealth.applyGeneralDamage(amount, rng);
+            var part = this.bodyHealth.applyGeneralDamage(this.receiveArmouredDamage(amount), rng);
             this.health = this.bodyHealth.total();
+            this.lastDamagePart = part;
+            this.lastDamageTick = raid ? raid.tickNumber : -1;
 
             if (this.carryingTreasure && !this.bodyHealth.armsCanCarry()) {
                 this.dropTreasure(raid, 'arm injury');
@@ -2044,7 +2240,8 @@ button:hover { background: #ffd768; }
 
             raid.droppedTreasure.push(new DroppedTreasure('dropped_' + raid.nextDroppedTreasureId, this.x, this.y, this.carryingTreasureType, this.carryingAmount, this.id));
             raid.nextDroppedTreasureId += 1;
-            raid.addEvent('An adventurer dropped treasure due to ' + reason + '.');
+            this.behaviourState = 'droppingTreasure';
+            raid.addEvent('A ' + this.displayName + ' dropped treasure due to ' + reason + '.');
             this.carryingAmount = 0;
             this.carryingTreasure = false;
             this.carryingTreasureType = null;
@@ -2054,6 +2251,13 @@ button:hover { background: #ffd768; }
             var s = super.getSnapshot();
             s.agentKind = this.agentKind;
             s.className = this.className;
+            s.displayName = this.displayName;
+            s.armour = this.armour;
+            s.weaponName = this.weaponName;
+            s.isMounted = this.isMounted;
+            s.canRemount = this.canRemount;
+            s.lastDamageTick = this.lastDamageTick;
+            s.lastDamagePart = this.lastDamagePart;
             s.health = this.health;
             s.maxHealth = this.maxHealth;
             s.bodyHealth = this.bodyHealth.getSnapshot();
@@ -2084,6 +2288,37 @@ button:hover { background: #ffd768; }
     class Villager extends Adventurer {
         constructor(id, x, y, rng) {
             super(id, x, y, rng, ADVENTURER_PROFILE.villager);
+        }
+    }
+
+    class DoubleVillager extends Adventurer {
+        constructor(id, x, y, rng) {
+            super(id, x, y, rng, ADVENTURER_PROFILE.doubleVillager);
+            this.radius = 18;
+        }
+    }
+
+    class Explorer extends Adventurer {
+        constructor(id, x, y, rng) {
+            super(id, x, y, rng, ADVENTURER_PROFILE.explorer);
+        }
+    }
+
+    class Warrior extends Adventurer {
+        constructor(id, x, y, rng) {
+            super(id, x, y, rng, ADVENTURER_PROFILE.warrior);
+        }
+    }
+
+    class Knight extends Adventurer {
+        constructor(id, x, y, rng) {
+            super(id, x, y, rng, ADVENTURER_PROFILE.knight);
+            this.dismountedSpeed = this.speed;
+            this.mountedSpeed = rng.range(ADVENTURER_PROFILE.knight.mountedSpeedMin, ADVENTURER_PROFILE.knight.mountedSpeedMax);
+            this.speed = this.mountedSpeed;
+            this.isMounted = true;
+            this.canRemount = true;
+            this.radius = 16;
         }
     }
 
@@ -2295,6 +2530,9 @@ button:hover { background: #ffd768; }
             this.lastMacrofaunaTargetX = null;
             this.lastMacrofaunaTargetY = null;
             this.lastMacrofaunaTargetTick = -1;
+            this.recallRequested = false;
+            this.recallTargetX = null;
+            this.recallTargetY = null;
         }
 
         static randomName(rng) {
@@ -2305,6 +2543,18 @@ button:hover { background: #ffd768; }
             return PATH_MONSTER_REPATH_COOLDOWN_TICKS;
         }
 
+        getMovementBounds(world) {
+            if (this.recallRequested) {
+                return {
+                    minX: 0,
+                    minY: 0,
+                    maxX: world.width + OFF_MAP_ESCAPE_MARGIN,
+                    maxY: world.height
+                };
+            }
+            return super.getMovementBounds(world);
+        }
+
         canLeavePlayableArea() {
             return !this.collared && !this.owned;
         }
@@ -2313,6 +2563,37 @@ button:hover { background: #ffd768; }
             var exitPoint = RandomOffMapPoint(world, rng, OFF_MAP_ESCAPE_MARGIN);
             this.wildExitTargetX = exitPoint.x;
             this.wildExitTargetY = exitPoint.y;
+        }
+
+        continueRecallToBase(raid) {
+            if (!this.recallRequested) {
+                return false;
+            }
+            if (this.recallTargetX === null || this.recallTargetY === null) {
+                this.recallTargetX = raid.world.width + OFF_MAP_ESCAPE_MARGIN;
+                this.recallTargetY = Clamp(this.y, 0, raid.world.height);
+            }
+            this.eatingTargetId = null;
+            this.eatingTicksRemaining = 0;
+            this.behaviourState = 'recalling';
+            this.moveWithPath(raid.world, this.recallTargetX, this.recallTargetY, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT, this.id + '_recall_exit');
+            if (this.x >= raid.world.width + Math.max(4, this.radius)) {
+                this.deployed = false;
+                this.escaped = false;
+                this.recallRequested = false;
+                this.path = [];
+                this.pathKey = '';
+                this.pathIntentKey = '';
+                this.pathTargetX = null;
+                this.pathTargetY = null;
+                this.recallTargetX = null;
+                this.recallTargetY = null;
+                this.x = RIGHT_EDGE_X;
+                this.y = Clamp(this.y, 0, raid.world.height);
+                this.behaviourState = 'recalled';
+                raid.addEvent(this.name + ' reached base.');
+            }
+            return true;
         }
 
         moveWildOffMap(raid) {
@@ -2421,6 +2702,10 @@ button:hover { background: #ffd768; }
 
         update(raid) {
             if (!this.isActive() || !this.deployed) {
+                return;
+            }
+
+            if (this.continueRecallToBase(raid)) {
                 return;
             }
 
@@ -2594,6 +2879,9 @@ button:hover { background: #ffd768; }
             s.foodNeededThisSeason = NutritionSystem.getFoodNeeded(this);
             s.eatingTargetId = this.eatingTargetId;
             s.eatingTicksRemaining = this.eatingTicksRemaining;
+            s.recallRequested = this.recallRequested;
+            s.recallTargetX = this.recallTargetX;
+            s.recallTargetY = this.recallTargetY;
             return s;
         }
     }
@@ -2950,35 +3238,101 @@ button:hover { background: #ffd768; }
             this.nextDroppedTreasureId = 1;
             this.thrownProjectiles = [];
             this.nextThrownProjectileId = 1;
+            this.noActiveAdventurerSinceTick = null;
             this.addEvent('Season ' + this.seasonNumber + ' raid started in world seed ' + this.world.seed + '.');
         }
 
         createAdventurers() {
-            var settlementFactor = Clamp((35 - this.world.distanceToSettlementMiles) / 35, 0.15, 1);
             var treasureValue = this.world.getRemainingTreasureValue();
-            var treasurePressure = Math.sqrt(treasureValue / 2000);
-            var count = Clamp(1 + Math.round(settlementFactor * 1.5 + treasurePressure), 1, 5);
+            var highestTier = this.getHighestTreasureTier();
+            var settlementFactor = Clamp((35 - this.world.distanceToSettlementMiles) / 35, 0.08, 1);
+            var recentFailurePenalty = this.getClassDeterrencePenalty();
             var adventurers = [];
-
-            for (var i = 0; i < count; i += 1) {
-                var adventurer = new Villager('adventurer_' + (i + 1), LEFT_EDGE_X, 0, this.rng);
-                var point = this.world.findOpenEdgePoint(adventurer, 'left', this.rng, 120);
-
-                if (!point) {
-                    continue;
+            var classCounts = this.getAdventurerClassCounts(highestTier, treasureValue, settlementFactor, recentFailurePenalty);
+            var classOrder = ['villager', 'doubleVillager', 'explorer', 'warrior', 'knight'];
+            var index = 1;
+            for (var c = 0; c < classOrder.length; c += 1) {
+                var className = classOrder[c];
+                for (var i = 0; i < (classCounts[className] || 0); i += 1) {
+                    var adventurer = this.createAdventurerByClass(className, 'adventurer_' + index);
+                    index += 1;
+                    var point = this.world.findOpenEdgePoint(adventurer, 'left', this.rng, 120);
+                    if (!point) { continue; }
+                    adventurer.x = point.x;
+                    adventurer.y = point.y;
+                    adventurer.entryX = point.x;
+                    adventurer.entryY = point.y;
+                    adventurer.exitX = point.x;
+                    adventurer.exitY = point.y;
+                    adventurer.exitEdge = adventurer.entryEdge;
+                    adventurers.push(adventurer);
                 }
-
-                adventurer.x = point.x;
-                adventurer.y = point.y;
-                adventurer.entryX = point.x;
-                adventurer.entryY = point.y;
-                adventurer.exitX = point.x;
-                adventurer.exitY = point.y;
-                adventurer.exitEdge = adventurer.entryEdge;
-                adventurers.push(adventurer);
             }
-
             return adventurers;
+        }
+
+        createAdventurerByClass(className, id) {
+            if (className === 'doubleVillager') { return new DoubleVillager(id, LEFT_EDGE_X, 0, this.rng); }
+            if (className === 'explorer') { return new Explorer(id, LEFT_EDGE_X, 0, this.rng); }
+            if (className === 'warrior') { return new Warrior(id, LEFT_EDGE_X, 0, this.rng); }
+            if (className === 'knight') { return new Knight(id, LEFT_EDGE_X, 0, this.rng); }
+            return new Villager(id, LEFT_EDGE_X, 0, this.rng);
+        }
+
+        getHighestTreasureTier() {
+            var highest = 0;
+            this.world.treasureDeposits.forEach(function (deposit) {
+                if (!deposit.isEmpty()) {
+                    highest = Math.max(highest, TREASURE_TYPE_ORDER.indexOf(deposit.treasureType));
+                }
+            });
+            return highest;
+        }
+
+        getClassDeterrencePenalty() {
+            var result = { villager: 1, doubleVillager: 1, explorer: 1, warrior: 1, knight: 1 };
+            var stats = this.gameState && this.gameState.campaignStats;
+            if (!stats || !stats.roundHistory || stats.roundHistory.length === 0) {
+                return result;
+            }
+            var recent = stats.roundHistory.slice(Math.max(0, stats.roundHistory.length - 4));
+            var failedRaids = 0;
+            recent.forEach(function (round) {
+                if ((round.endingTreasureValue || 0) >= (round.startingTreasureValue || 0) * 0.92) {
+                    failedRaids += 1;
+                }
+            });
+            var pressure = failedRaids / Math.max(1, recent.length);
+            Object.keys(result).forEach(function (className) {
+                var profile = ADVENTURER_PROFILE[className] || ADVENTURER_PROFILE.villager;
+                result[className] = Clamp(1 - pressure * (profile.deterrenceSensitivity || 0.5) * 0.45, 0.35, 1);
+            });
+            return result;
+        }
+
+        getAdventurerClassCounts(highestTier, treasureValue, settlementFactor, deterrence) {
+            var pressure = Math.sqrt(Math.max(1, treasureValue) / 1200);
+            var counts = { villager: 0, doubleVillager: 0, explorer: 0, warrior: 0, knight: 0 };
+            counts.villager = Clamp(Math.round(1 + settlementFactor * 2.2 + pressure * 0.55), 1, 8);
+            if (this.world.distanceToSettlementMiles <= 18 && treasureValue >= 420) {
+                counts.doubleVillager = Clamp(Math.round((18 - this.world.distanceToSettlementMiles) / 8 + pressure * 0.18), 0, 3);
+            }
+            if (highestTier >= 1) {
+                counts.explorer = Clamp(Math.round((highestTier * 0.7 + pressure * 0.4) * settlementFactor), 1, 6);
+            }
+            if (highestTier >= 2) {
+                counts.warrior = Clamp(Math.round(((highestTier - 1) * 0.55 + pressure * 0.28) * (0.65 + settlementFactor * 0.35)), 1, 5);
+            }
+            if (highestTier >= 3) {
+                counts.knight = Clamp(Math.round(((highestTier - 2) * 0.45 + pressure * 0.16) * (0.45 + settlementFactor * 0.25)), highestTier >= 4 ? 1 : 0, highestTier >= 4 ? 4 : 2);
+            }
+            Object.keys(counts).forEach(function (className) {
+                counts[className] = Math.max(0, Math.round(counts[className] * (deterrence[className] || 1)));
+            });
+            if (counts.villager <= 0 && counts.explorer <= 0 && counts.warrior <= 0 && counts.knight <= 0) {
+                counts.villager = 1;
+            }
+            return counts;
         }
 
         chooseMacrofaunaSpecies() {
@@ -3190,17 +3544,20 @@ button:hover { background: #ffd768; }
                 return m.id === monsterId && m.alive && m.deployed;
             });
             if (!monster) { return { ok: false, reason: 'No deployed living captive monster has that id.' }; }
-            monster.deployed = false;
+            if (monster.recallRequested) { return { ok: true }; }
             monster.escaped = false;
+            monster.recallRequested = true;
+            monster.recallTargetX = this.world.width + OFF_MAP_ESCAPE_MARGIN;
+            monster.recallTargetY = Clamp(monster.y, 0, this.world.height);
             monster.path = [];
             monster.pathKey = '';
             monster.pathIntentKey = '';
+            monster.pathTargetX = null;
+            monster.pathTargetY = null;
             monster.eatingTargetId = null;
             monster.eatingTicksRemaining = 0;
-            monster.behaviourState = 'recalled';
-            monster.x = RIGHT_EDGE_X;
-            monster.y = Clamp(monster.y, 0, this.world.height);
-            this.addEvent(monster.name + ' was recalled to base.');
+            monster.behaviourState = 'recalling';
+            this.addEvent(monster.name + ' was recalled and is returning to base.');
             return { ok: true };
         }
 
@@ -3338,16 +3695,18 @@ button:hover { background: #ffd768; }
 
                         if (this.rng.nextFloat() <= 0.82) {
                             var part = adventurer.applyDamage(this.rng.integer(18, 34), this.rng, this);
-                            this.addEvent(monster.name + ' hit a ' + adventurer.className + ' in the ' + part + '.');
+                            adventurer.behaviourState = 'takingDamage';
+                            this.addEvent(monster.name + ' hit a ' + adventurer.displayName + ' in the ' + part + '.');
                         }
                     }
 
                     if (adventurer.isActive() && adventurer.attackCooldownTicks <= 0) {
                         adventurer.attackCooldownTicks = COMBAT_COOLDOWN_TICKS;
 
-                        if (this.rng.nextFloat() <= 0.62) {
-                            monster.applyDamage(this.rng.integer(7, 17), this.rng);
-                            this.addEvent('An adventurer wounded ' + monster.name + '.');
+                        adventurer.behaviourState = 'meleeAttacking';
+                        if (this.rng.nextFloat() <= adventurer.getMeleeHitChance()) {
+                            monster.applyDamage(adventurer.getMeleeDamage(this.rng), this.rng);
+                            this.addEvent('A ' + adventurer.displayName + ' wounded ' + monster.name + '.');
                         }
                     }
                 }
@@ -3425,15 +3784,21 @@ button:hover { background: #ffd768; }
             });
 
             if (active) {
+                this.noActiveAdventurerSinceTick = null;
                 return;
             }
 
-            if (this.feedingShouldContinueAfterAdventurersGone()) {
+            if (this.noActiveAdventurerSinceTick === null) {
+                this.noActiveAdventurerSinceTick = this.tickNumber;
+            }
+            var afterActionGraceExpired = this.tickNumber - this.noActiveAdventurerSinceTick > 180;
+
+            if (!afterActionGraceExpired && this.feedingShouldContinueAfterAdventurersGone()) {
                 this.raidResult = 'Raid won: monsters are feeding before returning to base.';
                 return;
             }
 
-            if (this.departedMacrofaunaChaseShouldContinue()) {
+            if (!afterActionGraceExpired && this.departedMacrofaunaChaseShouldContinue()) {
                 this.raidResult = 'Raid won: uncollared monsters are chasing escaped macrofauna.';
                 return;
             }
@@ -3587,10 +3952,18 @@ button:hover { background: #ffd768; }
             this.lastRaidSummary = null;
             this.gameState = new GameState(this.rng, this.mode);
             this.gameState.roundNumber = this.roundNumber;
-            this.world = WorldGenerator.createWorld(this.seed, options && options.worldOptions ? options.worldOptions : {});
+            this.world = WorldGenerator.createWorld(this.seed, this.getWorldOptions(options && options.worldOptions ? options.worldOptions : {}));
             this.currentRaid = null;
             this.roundRemains = [];
             this.pendingEvents = [{ tickNumber: 0, text: (this.mode === 'campaign' ? 'Campaign' : 'Single game') + ' created. Choose monsters for round 1 season 1.' }];
+        }
+
+        getWorldOptions(baseOptions) {
+            var result = Object.assign({}, baseOptions || {});
+            if (this.mode === 'campaign') {
+                result.campaignRound = this.roundNumber;
+            }
+            return result;
         }
 
         tick() {
@@ -3718,7 +4091,7 @@ button:hover { background: #ffd768; }
             this.lastRaidSummary = null;
             this.roundRemains = [];
             this.gameState.roundFoodExpenditureCredits = 0;
-            this.world = WorldGenerator.createWorld(this.rng.integer(1, 0x7fffffff), {});
+            this.world = WorldGenerator.createWorld(this.rng.integer(1, 0x7fffffff), this.getWorldOptions({}));
             this.pendingEvents.push({ tickNumber: 0, text: 'Round ' + this.roundNumber + ' created. Choose monsters for season 1.' });
         }
 
@@ -4003,6 +4376,24 @@ button:hover { background: #ffd768; }
         nearLeftEdgeCarryingAdventurer.update(raid);
         AddRegressionResult(results, 'Treasure-carrying adventurer already at exit tolerance is marked escaped before another movement step', nearLeftEdgeCarryingAdventurer.escaped, 'escaped=' + nearLeftEdgeCarryingAdventurer.escaped);
         AddRegressionResult(results, 'Adventurer exit check is edge-flexible for future entry sides', rightExitAdventurer.hasReachedExit(session.world), 'right exit');
+
+        var activeCarrierRaid = new Raid(session.world, session.gameState, 998877, 1);
+        activeCarrierRaid.adventurers = [new Villager('active_carrier', 600, 600, session.rng)];
+        activeCarrierRaid.adventurers[0].carryingTreasure = true;
+        activeCarrierRaid.adventurers[0].carryingAmount = 1;
+        activeCarrierRaid.adventurers[0].carryingTreasureType = 'bronze';
+        activeCarrierRaid.world.treasureDeposits.forEach(function (deposit) { deposit.amountRemaining = 0; });
+        activeCarrierRaid.checkRaidEnd();
+        AddRegressionResult(results, 'Active adventurer carrying all remaining treasure does not immediately end the season', !activeCarrierRaid.raidEnded, 'raidEnded=' + activeCarrierRaid.raidEnded + ', active=' + activeCarrierRaid.adventurers[0].isActive());
+
+        var quickTreasureHighestTypes = {};
+        for (var quickSeed = 100000; quickSeed < 100020; quickSeed += 1) {
+            var quickSession = new GameSession(quickSeed, { mode: 'quick' });
+            var quickTreasures = quickSession.world.getTreasureSnapshots();
+            var highestTreasureType = quickTreasures.length > 0 ? quickTreasures[quickTreasures.length - 1].treasureType : 'none';
+            quickTreasureHighestTypes[highestTreasureType] = true;
+        }
+        AddRegressionResult(results, 'Quick games can generate treasure tiers above bronze', Object.keys(quickTreasureHighestTypes).some(function (treasureType) { return treasureType !== 'bronze'; }), 'highestTypes=' + Object.keys(quickTreasureHighestTypes).join(','));
 
         var staticOnlySnapshot = session.getSnapshot();
         AddRegressionResult(results, 'Dynamic raid snapshot does not resend static world data', !staticOnlySnapshot.world && !staticOnlySnapshot.obstacles && !staticOnlySnapshot.terrainObjects, 'phase=' + staticOnlySnapshot.phase);
@@ -4289,7 +4680,7 @@ button:hover { background: #ffd768; }
     var visualFacingCandidateById={
     }
     ;
-    var selectedRosterMonsterId=null, lastManagementRenderKey='', managementDrawerVisible=true, hoveredMonsterId=null, hoveredMonster=null, selectedObject=null, selectionCycleKey='', selectionCycleIndex=0, lastSnapshotPhase=null, gameStarted=false;
+    var selectedRosterMonsterId=null, lastManagementRenderKey='', managementDrawerVisible=true, hoveredMonsterId=null, hoveredMonster=null, selectedObject=null, selectionCycleKey='', selectionCycleIndex=0, lastSnapshotPhase=null, gameStarted=false, newGameMessagePending=false;
     monsterPortrait.innerHTML='<svg viewBox="0 0 180 120" role="img" aria-label="Purple starter monster"><ellipse cx="90" cy="70" rx="55" ry="30" fill="#6b2d83"/><circle cx="62" cy="57" r="8" fill="white"/><circle cx="118" cy="57" r="8" fill="white"/><circle cx="64" cy="58" r="4" fill="#1f2730"/><circle cx="116" cy="58" r="4" fill="#1f2730"/><rect x="52" y="68" width="76" height="8" rx="4" fill="#f2c14e"/></svg>';
     // ============================================================================
     // MODULE: VIEW TRANSFORMS AND WORKER COMMANDS
@@ -4952,7 +5343,48 @@ button:hover { background: #ffd768; }
         }
         return FacingFromOctant(visualFacingById[entity.id]);
     }
-    function DrawSegmentedLimb(ax,ay,bx,by,cx,cy,outerWidth,innerWidth,innerColour,outline){
+    function PointAlongSegmentedLimb(ax,ay,bx,by,cx,cy,fraction){
+        var firstLength=Math.hypot(bx-ax,by-ay);
+        var secondLength=Math.hypot(cx-bx,cy-by);
+        var totalLength=Math.max(0.0001,firstLength+secondLength);
+        var target=Clamp01(fraction||0.54)*totalLength;
+        if(target<=firstLength){
+            var firstFraction=firstLength>0?target/firstLength:0;
+            return {
+                x:ax+(bx-ax)*firstFraction,
+                y:ay+(by-ay)*firstFraction,
+                angle:Math.atan2(by-ay,bx-ax)
+            };
+        }
+        var secondFraction=secondLength>0?(target-firstLength)/secondLength:0;
+        return {
+            x:bx+(cx-bx)*secondFraction,
+            y:by+(cy-by)*secondFraction,
+            angle:Math.atan2(cy-by,cx-bx)
+        };
+    }
+    function DrawLimbSurfaceInjury(ax,ay,bx,by,cx,cy,innerWidth,severity){
+        if(!severity||severity<=0){return;}
+        var anchor=PointAlongSegmentedLimb(ax,ay,bx,by,cx,cy,0.58);
+        var markLength=Math.max(3,Math.min(7,innerWidth*1.65));
+        var strokeCount=severity>0.66?3:(severity>0.33?2:1);
+        ctx.save();
+        ctx.translate(anchor.x,anchor.y);
+        ctx.rotate(anchor.angle);
+        ctx.globalAlpha=0.34+Math.min(0.46,severity*0.42);
+        ctx.strokeStyle=severity>0.65?'#7f1d1d':'#b91c1c';
+        ctx.lineWidth=Math.max(0.9,Math.min(innerWidth*0.58,0.9+severity*1.25));
+        ctx.lineCap='round';
+        for(var i=0;i<strokeCount;i+=1){
+            var offset=(i-(strokeCount-1)/2)*Math.max(1,innerWidth*0.32);
+            ctx.beginPath();
+            ctx.moveTo(-markLength*0.5,offset-innerWidth*0.18);
+            ctx.quadraticCurveTo(0,offset+innerWidth*0.16,markLength*0.5,offset);
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+    function DrawSegmentedLimb(ax,ay,bx,by,cx,cy,outerWidth,innerWidth,innerColour,outline,injurySeverity){
         ctx.lineCap='round';
         ctx.lineJoin='round';
         ctx.strokeStyle=outline;
@@ -4969,6 +5401,7 @@ button:hover { background: #ffd768; }
         ctx.lineTo(bx,by);
         ctx.lineTo(cx,cy);
         ctx.stroke();
+        DrawLimbSurfaceInjury(ax,ay,bx,by,cx,cy,innerWidth,injurySeverity);
         ctx.fillStyle=outline;
         ctx.beginPath();
         ctx.arc(bx,by,Math.max(2,innerWidth*0.62),0,Math.PI*2);
@@ -4978,7 +5411,7 @@ button:hover { background: #ffd768; }
         ctx.arc(bx,by,Math.max(1.2,innerWidth*0.36),0,Math.PI*2);
         ctx.fill();
     }
-    function DrawHumanLeg(hipX,hipY,side,phase,front,trouser,outline,facing){
+    function DrawHumanLeg(hipX,hipY,side,phase,front,trouser,outline,facing,injurySeverity){
         // Humanoid walk commitment:
         // - Legs must have a visible thigh, knee and shin.
         // - Feet remain on their own side of the pelvis in all 8 directions.
@@ -4995,13 +5428,13 @@ button:hover { background: #ffd768; }
         var kneeY=hipScreenY+12-lift+forwardY*stride*0.35;
         var footX=hipX+lateralX*side*8+forwardX*stride;
         var footY=hipY+27-lift*0.25+forwardY*stride*0.45+lateralY*side*2;
-        DrawSegmentedLimb(hipScreenX,hipScreenY,kneeX,kneeY,footX,footY,front?7:6,front?4:3,trouser,outline);
+        DrawSegmentedLimb(hipScreenX,hipScreenY,kneeX,kneeY,footX,footY,front?7:6,front?4:3,trouser,outline,injurySeverity);
         ctx.fillStyle=outline;
         ctx.beginPath();
         ctx.ellipse(footX+forwardX*2,footY+1,5,2.4,Math.atan2(forwardY,forwardX),0,Math.PI*2);
         ctx.fill();
     }
-    function DrawArm(x,y,length,phase,colour,outline,holdingWeapon,facing,side){
+    function DrawArm(x,y,length,phase,colour,outline,holdingWeapon,facing,side,injurySeverity){
         var lateralX=facing.lateralX;
         var lateralY=facing.lateralY*0.35;
         var forwardX=facing.facingX;
@@ -5011,7 +5444,7 @@ button:hover { background: #ffd768; }
         var elbowY=y+length*0.47+lateralY*side*2+forwardY*swing;
         var handX=elbowX+lateralX*side*5+forwardX*swing*0.6;
         var handY=elbowY+length*0.48+forwardY*swing*0.5;
-        DrawSegmentedLimb(x,y,elbowX,elbowY,handX,handY,6,3,colour,outline);
+        DrawSegmentedLimb(x,y,elbowX,elbowY,handX,handY,6,3,colour,outline,injurySeverity);
         if(holdingWeapon){
             ctx.strokeStyle='#6f4e2a';
             ctx.lineWidth=4;
@@ -5093,6 +5526,57 @@ button:hover { background: #ffd768; }
     // ============================================================================
     // Draws humanoid adventurers based on authoritative snapshot state plus visual
     // interpolation/facing.
+    function DrawInjuryMarker(x,y,severity,rx,ry,angle){
+        if(severity<=0){return;}
+        var markRx=rx||Math.max(3,3+severity*3);
+        var markRy=ry||Math.max(2,2+severity*2);
+        var markAngle=angle||0;
+        ctx.save();
+        ctx.translate(x,y);
+        ctx.rotate(markAngle);
+        ctx.beginPath();
+        ctx.ellipse(0,0,markRx,markRy,0,0,Math.PI*2);
+        ctx.clip();
+        ctx.globalAlpha=0.35+Math.min(0.48,severity*0.42);
+        ctx.strokeStyle=severity>0.65?'#7f1d1d':'#b91c1c';
+        ctx.lineWidth=Math.max(1,Math.min(2.6,1+severity*1.8));
+        ctx.lineCap='round';
+        var strokeCount=severity>0.66?3:(severity>0.33?2:1);
+        for(var i=0;i<strokeCount;i+=1){
+            var offsetY=(i-(strokeCount-1)/2)*markRy*0.45;
+            var startX=-markRx*0.62+i*markRx*0.14;
+            var endX=markRx*0.48-i*markRx*0.08;
+            ctx.beginPath();
+            ctx.moveTo(startX,offsetY-markRy*0.18);
+            ctx.quadraticCurveTo(0,offsetY+markRy*0.18,endX,offsetY);
+            ctx.stroke();
+        }
+        if(severity>0.5){
+            ctx.globalAlpha=0.18+Math.min(0.22,severity*0.18);
+            ctx.fillStyle='#7f1d1d';
+            ctx.beginPath();
+            ctx.ellipse(markRx*0.18,-markRy*0.08,markRx*0.32,markRy*0.24,0,0,Math.PI*2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+    function BodyPartSeverity(a,part){
+        if(!a.bodyHealth||!a.bodyHealth.maxEach){return 0;}
+        return Clamp01(1-(a.bodyHealth[part]/a.bodyHealth.maxEach));
+    }
+    function DrawWeaponShape(kind,profile,facing,side){
+        var dark='#1f2730';
+        ctx.strokeStyle=dark;
+        ctx.lineCap='round';
+        if(kind==='dagger'){
+            ctx.strokeStyle='#d1d5db'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(facing.facingX*14+side*facing.lateralX*3,facing.facingY*8+side*facing.lateralY*2); ctx.stroke();
+        } else if(kind==='broad sword'){
+            ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(facing.facingX*22+side*facing.lateralX*4,facing.facingY*12+side*facing.lateralY*3); ctx.stroke();
+        } else if(kind==='long sword and lance'){
+            ctx.strokeStyle='#9ca3af'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(-facing.facingX*12,-facing.facingY*8); ctx.lineTo(facing.facingX*34+side*facing.lateralX*4,facing.facingY*18+side*facing.lateralY*4); ctx.stroke();
+            ctx.strokeStyle='#e5e7eb'; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(facing.facingX*18+side*facing.lateralX*4,facing.facingY*10+side*facing.lateralY*3); ctx.stroke();
+        }
+    }
     function DrawAdventurer(a,now){
         if(!a.alive){
             DrawGroundRemain(a,'adventurer');
@@ -5103,120 +5587,114 @@ button:hover { background: #ffd768; }
         var moving=!!a.renderMoving&&a.alive&&!a.escaped;
         var phaseBase=now*0.014+StablePhase(a.id);
         var walk=moving?phaseBase:StablePhase(a.id)*0.35;
+        var action=a.behaviourState||'';
+        var actionPulse=Math.sin(now*0.03+StablePhase(a.id));
         var bob=moving?Math.sin(walk*2)*1.8:Math.sin(now*0.002+StablePhase(a.id))*0.45;
+        if(action==='pickingUpTreasure'||action==='droppingTreasure'||action==='armingSelf'){bob+=4;}
+        if(action==='takingDamage'){bob+=actionPulse*2.5;}
         var hurtRatio=a.maxHealth>0?a.health/a.maxHealth:1;
-        var bodyColour=a.carryingTreasure?'#b7791f':(a.fleeing?'#6b7280':'#2b6cb0');
+        var cls=a.className||'villager';
         var dark='#1f2730';
-        ctx.globalAlpha=!a.alive?0.25:a.escaped?0.12:1;
+        var scale=0.74;
+        var tunic='#64748b';
+        var trouser='#5b3a24';
+        var skin='#f1c27d';
+        var hair='#5b3317';
+        var armourColour=null;
+        var helmet=false;
+        var weapon=a.weaponName||'';
+        if(cls==='villager'){tunic='#8b7355'; trouser='#6f472b'; weapon=a.carriedWorldObjectId?weapon:'';}
+        else if(cls==='doubleVillager'){tunic='#a16207'; trouser='#5b3a24'; scale=0.62;}
+        else if(cls==='explorer'){tunic='#166534'; trouser='#4b3528'; armourColour='#8b5a2b'; weapon='dagger';}
+        else if(cls==='warrior'){tunic='#475569'; trouser='#334155'; armourColour='#94a3b8'; helmet=true; weapon='broad sword';}
+        else if(cls==='knight'){tunic='#cbd5e1'; trouser='#64748b'; armourColour='#e5e7eb'; helmet=true; weapon='long sword and lance'; scale=a.isMounted?0.82:0.76;}
+        if(a.fleeing){tunic='#6b7280';}
+        ctx.globalAlpha=a.escaped?0.12:1;
         ctx.save();
         ctx.translate(p.x,p.y+bob);
-        ctx.scale(0.74,0.74);
-        // 8-direction adventurer commitment:
-        // - Body parts shift according to the renderer-only facing octant.
-        // - Rear/side/front presentation changes for all 8 facings so the figure does not walk backwards.
-        // - The humanoid walk has explicit knees and boots, not a cross-legged stick motion.
+        ctx.scale(scale,scale);
         ctx.fillStyle='rgba(0,0,0,0.18)';
         ctx.beginPath();
-        ctx.ellipse(0,3,16,6,0,0,Math.PI*2);
+        ctx.ellipse(0,3,cls==='doubleVillager'?28:18,cls==='knight'&&a.isMounted?9:6,0,0,Math.PI*2);
         ctx.fill();
-        DrawHumanLeg(-5,-23,-1,walk+Math.PI,false,'#5b3a24',dark,facing);
-        DrawHumanLeg(6,-23,1,walk,true,'#6f472b',dark,facing);
+        if(cls==='doubleVillager'){
+            ctx.save();
+            ctx.translate(0,0);
+            DrawDoubleVillagerPair(a,now,facing,walk,tunic,trouser,skin,hair,dark);
+            ctx.restore();
+            ctx.restore();
+            ctx.globalAlpha=1;
+            return;
+        }
+        if(cls==='knight'&&a.isMounted){
+            ctx.fillStyle='#6b4f3a'; ctx.strokeStyle=dark; ctx.lineWidth=2;
+            ctx.beginPath(); ctx.ellipse(0,-18,31,13,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.ellipse(facing.facingX*25,-25+facing.facingY*4,12,8,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.strokeStyle='#3b2f2a'; ctx.lineWidth=5;
+            for(var hl=-1;hl<=1;hl+=2){ctx.beginPath(); ctx.moveTo(hl*13,-11); ctx.lineTo(hl*18,-1+Math.sin(walk+hl)*3); ctx.stroke();}
+            ctx.translate(0,-18);
+        }
+        DrawHumanLeg(-5,-23,-1,walk+Math.PI,false,trouser,dark,facing,BodyPartSeverity(a,'leftLeg'));
+        DrawHumanLeg(6,-23,1,walk,true,trouser,dark,facing,BodyPartSeverity(a,'rightLeg'));
         var torsoLeanX=facing.facingX*3;
         var headX=facing.facingX*4;
         var headY=-61+facing.facingY*2;
         if(a.carryingTreasure){
             var sackX=-facing.facingX*12+facing.lateralX*8;
             var sackY=-31-facing.facingY*2;
-            ctx.fillStyle='#8b5a2b';
-            ctx.strokeStyle=dark;
-            ctx.lineWidth=2;
-            ctx.beginPath();
-            ctx.ellipse(sackX,sackY,9,12,-0.3,0,Math.PI*2);
-            ctx.fill();
-            ctx.stroke();
-            ctx.fillStyle='#f2c14e';
-            ctx.fillRect(sackX-3,sackY-10,6,5);
+            ctx.fillStyle=cls==='knight'?'#703f12':'#8b5a2b'; ctx.strokeStyle=dark; ctx.lineWidth=2;
+            ctx.beginPath(); ctx.ellipse(sackX,sackY,10,13,-0.3,0,Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle='#f2c14e'; ctx.fillRect(sackX-3,sackY-10,6,5);
         }
-        ctx.fillStyle=bodyColour;
-        ctx.strokeStyle=dark;
-        ctx.lineWidth=2;
+        ctx.fillStyle=armourColour||tunic; ctx.strokeStyle=dark; ctx.lineWidth=2;
         ctx.beginPath();
-        ctx.moveTo(-12+torsoLeanX*0.25,-48);
-        ctx.lineTo(12+torsoLeanX*0.25,-48);
-        ctx.lineTo(15+torsoLeanX,-25);
-        ctx.lineTo(7+torsoLeanX*0.35,-18);
-        ctx.lineTo(-8+torsoLeanX*0.35,-18);
-        ctx.lineTo(-15+torsoLeanX,-25);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle='#3f2a1d';
-        ctx.fillRect(-12+torsoLeanX*0.35,-31,24,4);
+        ctx.moveTo(-12+torsoLeanX*0.25,-48); ctx.lineTo(12+torsoLeanX*0.25,-48); ctx.lineTo(15+torsoLeanX,-25); ctx.lineTo(7+torsoLeanX*0.35,-18); ctx.lineTo(-8+torsoLeanX*0.35,-18); ctx.lineTo(-15+torsoLeanX,-25); ctx.closePath(); ctx.fill(); DrawInjuryMarker(torsoLeanX*0.5,-34,BodyPartSeverity(a,'torso'),9,10,0.08); ctx.stroke();
+        if(armourColour){ctx.strokeStyle='#f8fafc'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(-8,-44); ctx.lineTo(8,-21); ctx.moveTo(8,-44); ctx.lineTo(-8,-21); ctx.stroke();}
+        ctx.fillStyle='#3f2a1d'; ctx.fillRect(-12+torsoLeanX*0.35,-31,24,4);
         var weaponSide=facing.side;
-        var shieldSide=-weaponSide;
-        var throwing=a.behaviourState==='throwing';
-        DrawArm(weaponSide*11+torsoLeanX*0.35,-43,24,throwing?walk+1.6:walk,'#f1c27d',dark,true,facing,weaponSide);
-        DrawArm(shieldSide*11+torsoLeanX*0.35,-43,24,walk+Math.PI,'#f1c27d',dark,false,facing,shieldSide);
+        var offSide=-weaponSide;
+        var throwing=action==='throwing';
+        var melee=action==='meleeAttacking';
+        var armPhase=throwing||melee?walk+1.8:walk;
+        DrawArm(weaponSide*11+torsoLeanX*0.35,-43,24,armPhase,skin,dark,false,facing,weaponSide,BodyPartSeverity(a,weaponSide<0?'leftArm':'rightArm'));
+        DrawArm(offSide*11+torsoLeanX*0.35,-43,24,walk+Math.PI,skin,dark,false,facing,offSide,BodyPartSeverity(a,offSide<0?'leftArm':'rightArm'));
+        ctx.save(); ctx.translate(weaponSide*24+facing.facingX*6,-43+facing.facingY*4); ctx.rotate(throwing?-0.8:(melee?0.95:0.25));
         if(a.carriedWorldObjectId){
-            ctx.save();
-            ctx.translate(weaponSide*24+facing.facingX*6,-43+facing.facingY*4);
-            ctx.rotate(throwing?-0.8:0.35);
-            if(a.carriedWorldObjectType==='stick'){
-                ctx.strokeStyle='#6b3f1d'; ctx.lineWidth=4; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(-10,0); ctx.lineTo(12,0); ctx.stroke();
-            } else {
-                ctx.fillStyle='#8d8d84'; ctx.strokeStyle=dark; ctx.beginPath(); ctx.ellipse(0,0,6,4,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
-            }
-            ctx.restore();
+            if(a.carriedWorldObjectType==='stick'){ctx.strokeStyle='#6b3f1d'; ctx.lineWidth=4; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(-10,0); ctx.lineTo(12,0); ctx.stroke();}
+            else {ctx.fillStyle='#8d8d84'; ctx.strokeStyle=dark; ctx.beginPath(); ctx.ellipse(0,0,6,4,0,0,Math.PI*2); ctx.fill(); ctx.stroke();}
+        } else if(weapon){
+            DrawWeaponShape(weapon,null,facing,weaponSide);
         }
-        ctx.fillStyle='#6b7280';
-        ctx.strokeStyle=dark;
-        ctx.lineWidth=2;
-        ctx.beginPath();
-        ctx.ellipse(shieldSide*18+facing.facingX*2,-31+facing.facingY*2,7,10,-0.25,0,Math.PI*2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle='#f1c27d';
-        ctx.strokeStyle=dark;
-        ctx.lineWidth=2;
-        ctx.fillRect(-4+headX*0.35,-52,8,8);
-        ctx.strokeRect(-4+headX*0.35,-52,8,8);
-        ctx.beginPath();
-        ctx.arc(headX,headY,10,0,Math.PI*2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle='#5b3317';
-        if(facing.away){
-            ctx.beginPath();
-            ctx.arc(headX,headY-2,10,0,Math.PI*2);
-            ctx.fill();
+        ctx.restore();
+        ctx.fillStyle=skin; ctx.strokeStyle=dark; ctx.lineWidth=2;
+        ctx.fillRect(-4+headX*0.35,-52,8,8); ctx.strokeRect(-4+headX*0.35,-52,8,8);
+        ctx.beginPath(); ctx.arc(headX,headY,10,0,Math.PI*2); ctx.fill(); DrawInjuryMarker(headX,headY+1,BodyPartSeverity(a,'head'),6,4,0.1); ctx.stroke();
+        if(helmet){ctx.fillStyle=armourColour||'#cbd5e1'; ctx.beginPath(); ctx.arc(headX,headY-3,11,Math.PI,Math.PI*2); ctx.fill(); ctx.stroke();}
+        else {ctx.fillStyle=hair; ctx.beginPath(); ctx.arc(headX,headY-5,10,Math.PI,Math.PI*2); ctx.fill();}
+        if(!facing.away){
+            ctx.fillStyle=dark; ctx.beginPath(); ctx.arc(headX-3+facing.facingX*2,headY,1.5,0,Math.PI*2); ctx.arc(headX+4+facing.facingX*2,headY,1.5,0,Math.PI*2); ctx.fill();
+            ctx.strokeStyle=(a.fleeing||hurtRatio<0.35)?'#7f1d1d':dark; ctx.lineWidth=1.6; ctx.beginPath();
+            if(a.fleeing||hurtRatio<0.35){ctx.moveTo(headX-4,headY+6); ctx.lineTo(headX+4,headY+7);} else {ctx.arc(headX+facing.facingX,headY+5,4,0.1,Math.PI-0.1);} ctx.stroke();
         }
-else {
-            ctx.beginPath();
-            ctx.arc(headX,headY-5,10,Math.PI,Math.PI*2);
-            ctx.fill();
-            ctx.fillStyle=dark;
-            ctx.beginPath();
-            ctx.arc(headX-3+facing.facingX*2,headY,1.5,0,Math.PI*2);
-            ctx.arc(headX+4+facing.facingX*2,headY,1.5,0,Math.PI*2);
-            ctx.fill();
-            ctx.strokeStyle=(a.fleeing||hurtRatio<0.35)?'#7f1d1d':dark;
-            ctx.lineWidth=1.6;
-            ctx.beginPath();
-            if(a.fleeing||hurtRatio<0.35){
-                ctx.moveTo(headX-4,headY+6);
-                ctx.lineTo(headX+4,headY+7);
-            }
-else {
-                ctx.arc(headX+facing.facingX,headY+5,4,0.1,Math.PI-0.1);
-            }
-            ctx.stroke();
-        }
-        DrawHealthBar({
-            x:0,y:-76
-        }
-        ,32,5,a.health,a.maxHealth);
+        DrawHealthBar({x:0,y:-76},32,5,a.health,a.maxHealth);
         ctx.restore();
         ctx.globalAlpha=1;
+    }
+    function DrawDoubleVillagerPair(a,now,facing,walk,tunic,trouser,skin,hair,dark){
+        var offsets=[-15,15];
+        var sackDropped=a.fleeing||a.behaviourState==='droppingTreasure'||!a.carryingTreasure;
+        if(!sackDropped){ctx.fillStyle='#7c4a1c'; ctx.strokeStyle=dark; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(0,-34,17,14,-0.15,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.fillStyle='#f2c14e'; ctx.fillRect(-5,-46,10,6);} 
+        else {ctx.fillStyle='#7c4a1c'; ctx.strokeStyle=dark; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(0,-6,18,8,0.05,0,Math.PI*2); ctx.fill(); ctx.stroke();}
+        for(var n=0;n<2;n+=1){
+            ctx.save(); ctx.translate(offsets[n],0);
+            DrawHumanLeg(-4,-20,-1,walk+Math.PI+n,false,trouser,dark,facing,BodyPartSeverity(a,'leftLeg')); DrawHumanLeg(5,-20,1,walk+n,true,trouser,dark,facing,BodyPartSeverity(a,'rightLeg'));
+            ctx.fillStyle=tunic; ctx.strokeStyle=dark; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(0,-34,12,13,0,0,Math.PI*2); ctx.fill(); DrawInjuryMarker(0,-34,BodyPartSeverity(a,'torso'),8,8,0.05); ctx.stroke();
+            DrawArm(-8,-39,22,walk,skin,dark,false,facing,-1,BodyPartSeverity(a,'leftArm')); DrawArm(8,-39,22,walk+Math.PI,skin,dark,false,facing,1,BodyPartSeverity(a,'rightArm'));
+            ctx.fillStyle=skin; ctx.beginPath(); ctx.arc(facing.facingX*3,-55,9,0,Math.PI*2); ctx.fill(); DrawInjuryMarker(facing.facingX*3,-55,BodyPartSeverity(a,'head'),5,4,0.1); ctx.stroke();
+            ctx.fillStyle=hair; ctx.beginPath(); ctx.arc(facing.facingX*3,-59,9,Math.PI,Math.PI*2); ctx.fill();
+            ctx.restore();
+        }
+        DrawHealthBar({x:0,y:-72},38,5,a.health,a.maxHealth);
     }
     // ============================================================================
     // MODULE: MONSTER RENDERING
@@ -5405,13 +5883,6 @@ else {
             ctx.stroke();
             ctx.fillStyle='#f2c14e';
             ctx.fillRect(headX-fx*3-2,headY+10,5,6);
-        }
-        if(m.id===hoveredMonsterId){
-            ctx.strokeStyle=m.collared?'rgba(242,193,78,0.9)':'rgba(255,255,255,0.95)';
-            ctx.lineWidth=4;
-            ctx.beginPath();
-            ctx.ellipse(0,-34,43,29,rot,0,Math.PI*2);
-            ctx.stroke();
         }
         if(hurtRatio<0.35){
             ctx.fillStyle='rgba(190,39,39,0.18)';
@@ -5619,18 +6090,8 @@ else {
     function IsSelectedRenderObject(kind,obj){
         return selectedObject && selectedObject.kind===kind && selectedObject.obj && selectedObject.obj.id===obj.id;
     }
-    function DrawSelectionGleam(obj,kind){
-        if(!obj){ return; }
-        var p=ToScreen(obj.x,obj.y);
-        var r=kind==='monster'?34:(kind==='adventurer'?28:(kind==='macrofauna'?26:Math.max(20,obj.radius||20)));
-        ctx.save();
-        ctx.globalCompositeOperation='screen';
-        ctx.fillStyle='rgba(255,255,210,0.42)';
-        ctx.beginPath(); ctx.ellipse(p.x,p.y-r*0.35,r*0.9,r*0.55,0,0,Math.PI*2); ctx.fill();
-        ctx.globalCompositeOperation='source-over';
-        ctx.strokeStyle='rgba(255,247,153,0.95)'; ctx.lineWidth=3; ctx.setLineDash([7,5]);
-        ctx.beginPath(); ctx.ellipse(p.x,p.y-r*0.35,r,r*0.62,0,0,Math.PI*2); ctx.stroke();
-        ctx.restore();
+    function SelectionKindForRenderable(kind){
+        return kind==='obstacle'?'worldObject':kind;
     }
     // ============================================================================
     // MODULE: RAID SCENE COMPOSITION
@@ -5711,6 +6172,11 @@ else {
         }
         );
         renderables.forEach(function(r){
+            var selectedForBrightness=IsSelectedRenderObject(SelectionKindForRenderable(r.kind),r.obj);
+            if(selectedForBrightness){
+                ctx.save();
+                ctx.filter='brightness(1.5)';
+            }
             if(r.kind==='obstacle'){
                 if(r.obj.type==='tree')DrawTree(r.obj);
 else if(r.obj.type==='microfauna')DrawMicrofaunaEmitter(r.obj,now);
@@ -5723,7 +6189,9 @@ else if(r.kind==='macrofauna')DrawMacrofauna(r.obj,now);
 else if(r.kind==='monster')DrawMonster(r.obj,now);
 else if(r.kind==='adventurer')DrawAdventurer(r.obj,now);
 else DrawGroundRemain(r.obj,r.obj.agentKind||'adventurer');
-            if(IsSelectedRenderObject(r.kind==='obstacle'?'worldObject':r.kind,r.obj)){ DrawSelectionGleam(r.obj,r.kind); }
+            if(selectedForBrightness){
+                ctx.restore();
+            }
         }
         );
         (s.thrownProjectiles||[]).forEach(function(projectile){ DrawThrownProjectile(projectile,s.tickNumber||0); });
@@ -5935,18 +6403,50 @@ else DrawGroundRemain(r.obj,r.obj.agentKind||'adventurer');
                 var collarButton=document.createElement('button');
                 collarButton.type='button';
                 collarButton.textContent='Collar wild monster';
-                collarButton.addEventListener('click',function(event){
-                    event.stopPropagation();
+                var collarCommandSent=false;
+                function activateCollarButton(event){
+                    if(event){
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
+                    if(collarCommandSent){
+                        return;
+                    }
+                    collarCommandSent=true;
                     collarButton.disabled=true;
                     collarButton.textContent='Collaring...';
                     SendCommand('CAPTURE_WILD_MONSTER',{ monsterId:monster.id });
-                });
+                }
+                collarButton.addEventListener('pointerdown',activateCollarButton);
+                collarButton.addEventListener('mousedown',activateCollarButton);
+                collarButton.addEventListener('click',activateCollarButton);
                 actions.appendChild(collarButton);
+            } else if(monster.collared&&monster.deployed&&monster.recallRequested){
+                var recallStatus=document.createElement('div');
+                recallStatus.className='detailMuted';
+                recallStatus.textContent='Recalling to base...';
+                actions.appendChild(recallStatus);
             } else if(monster.collared&&monster.deployed){
                 var recallButton=document.createElement('button');
                 recallButton.type='button';
                 recallButton.textContent='Recall to base';
-                recallButton.addEventListener('click',function(){ SendCommand('RECALL_MONSTER',{ monsterId:monster.id }); });
+                var recallCommandSent=false;
+                function activateRecallButton(event){
+                    if(event){
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
+                    if(recallCommandSent){
+                        return;
+                    }
+                    recallCommandSent=true;
+                    recallButton.disabled=true;
+                    recallButton.textContent='Recalling...';
+                    SendCommand('RECALL_MONSTER',{ monsterId:monster.id });
+                }
+                recallButton.addEventListener('pointerdown',activateRecallButton);
+                recallButton.addEventListener('mousedown',activateRecallButton);
+                recallButton.addEventListener('click',activateRecallButton);
                 actions.appendChild(recallButton);
             }
             if(actions.children.length>0){ objectDetails.appendChild(actions); }
@@ -6017,6 +6517,9 @@ else DrawGroundRemain(r.obj,r.obj.agentKind||'adventurer');
             currentSnapshotTime=0;
             selectedObject=null;
             objectDetails.textContent='Click any monster, adventurer, treasure, scenery object or terrain tile to inspect it.';
+            if(newGameMessagePending){
+                mainMenuOverlay.classList.add('menuHidden');
+            }
             AppendLog('World snapshot received: '+latestStaticObstacles.length+' static scenery objects.');
             break;
             case'RAID_SNAPSHOT':previousSnapshot=currentSnapshot;
@@ -6033,7 +6536,11 @@ else DrawGroundRemain(r.obj,r.obj.agentKind||'adventurer');
             UpdateManagementDrawer(latestSnapshot);
             RefreshSelectedObjectFromSnapshot(latestSnapshot);
             UpdateSelectedObjectPanel();
-            if(latestSnapshot.phase==='gameOver'){
+            if(newGameMessagePending&&latestSnapshot.phase!=='gameOver'){
+                newGameMessagePending=false;
+                HideMainMenu();
+            }
+            if(latestSnapshot.phase==='gameOver'&&!newGameMessagePending){
                 ShowMainMenu();
             }
             break;
@@ -6072,6 +6579,11 @@ else DrawGroundRemain(r.obj,r.obj.agentKind||'adventurer');
     }
     function StartNewGame(mode){
         gameStarted=true;
+        newGameMessagePending=true;
+        latestSnapshot=null;
+        previousSnapshot=null;
+        currentSnapshot=null;
+        lastSnapshotPhase=null;
         HideMainMenu();
         selectedObject=null;
         UpdateSelectedObjectPanel();
@@ -6092,7 +6604,7 @@ else DrawGroundRemain(r.obj,r.obj.agentKind||'adventurer');
         StartNewGame('campaign');
     });
     document.getElementById('quickGameMenuButton').addEventListener('click',function(){
-        StartNewGame('single');
+        StartNewGame('quick');
     });
     document.getElementById('newRaidButton').addEventListener('click',function(){
         ShowMainMenu();
