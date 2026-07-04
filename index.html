@@ -161,6 +161,10 @@ button:hover { background: #ffd768; }
     var TERRAIN_STEEP_SLOPE = 5;
     var LEFT_EDGE_X = 0;
     var RIGHT_EDGE_X = MAP_WIDTH;
+    var TREASURE_MINIMUM_DISTANCE_FROM_ADVENTURER_ENTRY_FRACTION = 1 / 3;
+    var TREASURE_DEEP_PLACEMENT_FRACTION = 1 / 2;
+    var TREASURE_NEAR_HALF_PLACEMENT_CHANCE = 0.15;
+    var ADVENTURER_ENTRY_EDGES = ['left', 'right', 'top', 'bottom'];
     var TICK_DT = 1 / 30;
     var TICK_MS = 33;
     var NAV_CELL_SIZE = 60;
@@ -1012,10 +1016,14 @@ button:hover { background: #ffd768; }
                 WorldGenerator.ensureRequiredEntryEdgeLand(grid);
             }
 
+            var adventurerEntryEdge = WorldGenerator.chooseAdventurerEntryEdge(rng, grid, settings);
+            if (!WorldGenerator.edgeHasLand(grid, adventurerEntryEdge)) {
+                WorldGenerator.ensureEntryEdgeLand(grid, adventurerEntryEdge);
+            }
             var objects = WorldGenerator.createTerrainObjects(rng, environment, grid);
-            var deposits = WorldGenerator.createTreasureDeposits(rng, grid, objects, settings);
+            var deposits = WorldGenerator.createTreasureDeposits(rng, grid, objects, settings, adventurerEntryEdge);
             var distance = WorldGenerator.createSettlementDistanceMiles(rng, environment, settings);
-            return new World(candidateSeed, MAP_WIDTH, MAP_HEIGHT, grid, environment, distance, objects, deposits);
+            return new World(candidateSeed, MAP_WIDTH, MAP_HEIGHT, grid, environment, distance, objects, deposits, adventurerEntryEdge);
         }
 
         static createEnvironment(rng, settings) {
@@ -1386,15 +1394,42 @@ button:hover { background: #ffd768; }
         }
 
         static validateRequiredEntryEdges(grid) {
-            return WorldGenerator.edgeHasLand(grid, 'left') && WorldGenerator.edgeHasLand(grid, 'right');
+            return ADVENTURER_ENTRY_EDGES.some(function (edge) {
+                return WorldGenerator.edgeHasLand(grid, edge);
+            }) && WorldGenerator.edgeHasLand(grid, 'right');
+        }
+
+        static chooseAdventurerEntryEdge(rng, grid, settings) {
+            if (settings && ADVENTURER_ENTRY_EDGES.indexOf(settings.adventurerEntryEdge) >= 0) {
+                return settings.adventurerEntryEdge;
+            }
+            var candidates = ADVENTURER_ENTRY_EDGES.filter(function (edge) {
+                return WorldGenerator.edgeHasLand(grid, edge);
+            });
+            if (candidates.length === 0) {
+                return 'left';
+            }
+            return rng.pick(candidates);
+        }
+
+        static ensureEntryEdgeLand(grid, edge) {
+            var centreRow = Math.floor(grid.rows / 2);
+            var centreCol = Math.floor(grid.cols / 2);
+            var tile = WorldGenerator.edgeTileCoordinates(grid, edge, edge === 'left' || edge === 'right' ? centreRow : centreCol);
+            grid.terrainTypes[grid.index(tile.tx, tile.ty)] = TERRAIN_TYPE.GRASS;
         }
 
         static ensureRequiredEntryEdgeLand(grid) {
             var centreRow = Math.floor(grid.rows / 2);
+            var centreCol = Math.floor(grid.cols / 2);
             var leftIndex = grid.index(0, centreRow);
             var rightIndex = grid.index(grid.cols - 1, centreRow);
+            var topIndex = grid.index(centreCol, 0);
+            var bottomIndex = grid.index(centreCol, grid.rows - 1);
             grid.terrainTypes[leftIndex] = TERRAIN_TYPE.GRASS;
             grid.terrainTypes[rightIndex] = TERRAIN_TYPE.GRASS;
+            grid.terrainTypes[topIndex] = TERRAIN_TYPE.GRASS;
+            grid.terrainTypes[bottomIndex] = TERRAIN_TYPE.GRASS;
         }
 
         static createTerrainObjects(rng, environment, grid) {
@@ -1454,7 +1489,7 @@ button:hover { background: #ffd768; }
             return objects;
         }
 
-        static createTreasureDeposits(rng, grid, objects, settings) {
+        static createTreasureDeposits(rng, grid, objects, settings, adventurerEntryEdge) {
             var deposits = [];
             var types = ['bronze', 'silver', 'gold', 'rubies', 'emeralds'];
             var customAmounts = settings && settings.customTreasureAmounts ? settings.customTreasureAmounts : null;
@@ -1465,12 +1500,12 @@ button:hover { background: #ffd768; }
                 for (var customIndex = 0; customIndex < customTypes.length; customIndex += 1) {
                     var customType = customTypes[customIndex];
                     var occupiedCustom = objects.concat(deposits);
-                    var customPoint = WorldGenerator.findOpenPoint(rng, grid, occupiedCustom, 210, false);
-                    if (!customPoint) { customPoint = WorldGenerator.findOpenPoint(rng, grid, occupiedCustom, 150, false); }
-                    if (!customPoint) { customPoint = WorldGenerator.findOpenPoint(rng, grid, occupiedCustom, 100, true); }
-                    if (!customPoint) { customPoint = WorldGenerator.findOpenPoint(rng, grid, occupiedCustom, 70, true); }
+                    var customPoint = WorldGenerator.findTreasurePoint(rng, grid, occupiedCustom, 210, false, adventurerEntryEdge);
+                    if (!customPoint) { customPoint = WorldGenerator.findTreasurePoint(rng, grid, occupiedCustom, 150, false, adventurerEntryEdge); }
+                    if (!customPoint) { customPoint = WorldGenerator.findTreasurePoint(rng, grid, occupiedCustom, 100, true, adventurerEntryEdge); }
+                    if (!customPoint) { customPoint = WorldGenerator.findTreasurePoint(rng, grid, occupiedCustom, 70, true, adventurerEntryEdge); }
                     if (!customPoint) {
-                        customPoint = { x: MAP_WIDTH * (0.35 + 0.1 * customIndex), y: MAP_HEIGHT * (0.35 + 0.07 * customIndex) };
+                        customPoint = WorldGenerator.fallbackTreasurePoint(customIndex, adventurerEntryEdge);
                     }
                     deposits.push(new TreasureDeposit('treasure_' + (customIndex + 1), customPoint.x, customPoint.y, customType, Math.max(0, Math.floor(customAmounts[customType]))));
                 }
@@ -1516,16 +1551,244 @@ button:hover { background: #ffd768; }
             var count = highestTierIndex + 1;
             for (var i = 0; i < count; i += 1) {
                 var occupied = objects.concat(deposits);
-                var p = WorldGenerator.findOpenPoint(rng, grid, occupied, 210, false);
-                if (!p) { p = WorldGenerator.findOpenPoint(rng, grid, occupied, 150, false); }
-                if (!p) { p = WorldGenerator.findOpenPoint(rng, grid, occupied, 100, true); }
-                if (!p) { p = WorldGenerator.findOpenPoint(rng, grid, occupied, 70, true); }
+                var p = WorldGenerator.findTreasurePoint(rng, grid, occupied, 210, false, adventurerEntryEdge);
+                if (!p) { p = WorldGenerator.findTreasurePoint(rng, grid, occupied, 150, false, adventurerEntryEdge); }
+                if (!p) { p = WorldGenerator.findTreasurePoint(rng, grid, occupied, 100, true, adventurerEntryEdge); }
+                if (!p) { p = WorldGenerator.findTreasurePoint(rng, grid, occupied, 70, true, adventurerEntryEdge); }
                 if (!p) {
-                    p = { x: MAP_WIDTH * (0.35 + 0.1 * i), y: MAP_HEIGHT * (0.35 + 0.07 * i) };
+                    p = WorldGenerator.fallbackTreasurePoint(i, adventurerEntryEdge);
                 }
                 deposits.push(new TreasureDeposit('treasure_' + (i + 1), p.x, p.y, types[i], rng.integer(amountMin, amountMax)));
             }
             return deposits;
+        }
+
+        static treasureMinimumDistanceFromAdventurerEntry() {
+            return Math.min(MAP_WIDTH, MAP_HEIGHT) * TREASURE_MINIMUM_DISTANCE_FROM_ADVENTURER_ENTRY_FRACTION;
+        }
+
+        static treasureDeepPlacementBoundary() {
+            return Math.min(MAP_WIDTH, MAP_HEIGHT) * TREASURE_DEEP_PLACEMENT_FRACTION;
+        }
+
+        static sampleTreasureDepthFromAdventurerEntry(rng, allowEdge) {
+            var edgeMargin = allowEdge ? 80 : 150;
+            var mapDepth = Math.min(MAP_WIDTH, MAP_HEIGHT);
+            var nearLimit = Math.max(edgeMargin, WorldGenerator.treasureMinimumDistanceFromAdventurerEntry());
+            var farLimit = Math.max(nearLimit, mapDepth - edgeMargin);
+            var deepBoundary = Clamp(WorldGenerator.treasureDeepPlacementBoundary(), nearLimit, farLimit);
+            if (deepBoundary > nearLimit && rng.nextFloat() < TREASURE_NEAR_HALF_PLACEMENT_CHANCE) {
+                return rng.range(nearLimit, deepBoundary);
+            }
+            return rng.range(deepBoundary, farLimit);
+        }
+
+        static sampleTreasurePointFromAdventurerEntry(rng, allowEdge, adventurerEntryEdge) {
+            var margin = allowEdge ? 80 : 150;
+            var entryEdge = adventurerEntryEdge || 'left';
+            var depth = WorldGenerator.sampleTreasureDepthFromAdventurerEntry(rng, allowEdge);
+            if (entryEdge === 'right') {
+                return { x: MAP_WIDTH - depth, y: rng.range(margin, MAP_HEIGHT - margin) };
+            }
+            if (entryEdge === 'top') {
+                return { x: rng.range(margin, MAP_WIDTH - margin), y: depth };
+            }
+            if (entryEdge === 'bottom') {
+                return { x: rng.range(margin, MAP_WIDTH - margin), y: MAP_HEIGHT - depth };
+            }
+            return { x: depth, y: rng.range(margin, MAP_HEIGHT - margin) };
+        }
+
+        static sampleTreasureXFromAdventurerEntry(rng, allowEdge) {
+            return WorldGenerator.sampleTreasurePointFromAdventurerEntry(rng, allowEdge, 'left').x;
+        }
+
+        static distanceFromAdventurerEntryEdge(x, y, adventurerEntryEdge) {
+            if (adventurerEntryEdge === 'right') { return MAP_WIDTH - x; }
+            if (adventurerEntryEdge === 'top') { return y; }
+            if (adventurerEntryEdge === 'bottom') { return MAP_HEIGHT - y; }
+            return x;
+        }
+
+        static fallbackTreasurePoint(index, adventurerEntryEdge) {
+            var entryEdge = adventurerEntryEdge || 'left';
+            var depth = WorldGenerator.treasureDeepPlacementBoundary() + 60 + index * 35;
+            var lateralFraction = 0.35 + 0.07 * index;
+            var lateralX = Clamp(MAP_WIDTH * lateralFraction, 150, MAP_WIDTH - 150);
+            var lateralY = Clamp(MAP_HEIGHT * lateralFraction, 150, MAP_HEIGHT - 150);
+            if (entryEdge === 'right') {
+                return { x: Clamp(MAP_WIDTH - depth, 150, MAP_WIDTH - 150), y: lateralY };
+            }
+            if (entryEdge === 'top') {
+                return { x: lateralX, y: Clamp(depth, 150, MAP_HEIGHT - 150) };
+            }
+            if (entryEdge === 'bottom') {
+                return { x: lateralX, y: Clamp(MAP_HEIGHT - depth, 150, MAP_HEIGHT - 150) };
+            }
+            return { x: Clamp(depth, 150, MAP_WIDTH - 150), y: lateralY };
+        }
+
+        static treasureProbeAgent() {
+            return { radius: 12, isMounted: false, canEnterDeepWater: false };
+        }
+
+        static navCellCentreFor(cx, cy) {
+            return {
+                x: Clamp(cx * NAV_CELL_SIZE + NAV_CELL_SIZE / 2, 0, MAP_WIDTH),
+                y: Clamp(cy * NAV_CELL_SIZE + NAV_CELL_SIZE / 2, 0, MAP_HEIGHT)
+            };
+        }
+
+        static pointIsOpenForTreasureProbe(grid, objects, x, y) {
+            var agent = WorldGenerator.treasureProbeAgent();
+            var terrainType = grid.getTerrainTypeAtWorld(x, y);
+            var slope = grid.getSlopeAtWorld(x, y);
+            if (!TerrainRules.canTraverse(agent, terrainType, slope)) {
+                return false;
+            }
+            for (var i = 0; i < objects.length; i += 1) {
+                var object = objects[i];
+                if (!object.blocksMovement) { continue; }
+                var blockingRadius = object.blockingRadius !== undefined ? object.blockingRadius : object.radius;
+                var clearance = blockingRadius + agent.radius + MOVEMENT_CLEARANCE_MARGIN;
+                if (Distance(x, y, object.x, object.y) < clearance) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        static navCellIsOpenForTreasureProbe(grid, objects, cx, cy) {
+            var centre = WorldGenerator.navCellCentreFor(cx, cy);
+            return WorldGenerator.pointIsOpenForTreasureProbe(grid, objects, centre.x, centre.y);
+        }
+
+        static nearestOpenTreasureProbeCell(grid, objects, point) {
+            var cols = Math.floor(MAP_WIDTH / NAV_CELL_SIZE) + 1;
+            var rows = Math.floor(MAP_HEIGHT / NAV_CELL_SIZE) + 1;
+            var start = {
+                cx: Clamp(Math.floor(point.x / NAV_CELL_SIZE), 0, cols - 1),
+                cy: Clamp(Math.floor(point.y / NAV_CELL_SIZE), 0, rows - 1)
+            };
+            if (WorldGenerator.navCellIsOpenForTreasureProbe(grid, objects, start.cx, start.cy)) {
+                return start;
+            }
+            var maxRadius = Math.max(cols, rows);
+            for (var r = 1; r < maxRadius; r += 1) {
+                for (var dx = -r; dx <= r; dx += 1) {
+                    for (var dy = -r; dy <= r; dy += 1) {
+                        if (Math.abs(dx) !== r && Math.abs(dy) !== r) { continue; }
+                        var cx = start.cx + dx;
+                        var cy = start.cy + dy;
+                        if (cx < 0 || cy < 0 || cx >= cols || cy >= rows) { continue; }
+                        if (WorldGenerator.navCellIsOpenForTreasureProbe(grid, objects, cx, cy)) {
+                            return { cx: cx, cy: cy };
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        static treasureProbeMovementCostBetween(grid, fromCell, toCell) {
+            var agent = WorldGenerator.treasureProbeAgent();
+            var fromCentre = WorldGenerator.navCellCentreFor(fromCell.cx, fromCell.cy);
+            var toCentre = WorldGenerator.navCellCentreFor(toCell.cx, toCell.cy);
+            if (grid.isCliffBetween && grid.isCliffBetween(fromCentre.x, fromCentre.y, toCentre.x, toCentre.y)) {
+                return 9999;
+            }
+            return TerrainRules.movementCostBetween(
+                agent,
+                grid.getTerrainTypeAtWorld(fromCentre.x, fromCentre.y),
+                grid.getTerrainTypeAtWorld(toCentre.x, toCentre.y),
+                grid.getHeightAtWorld(fromCentre.x, fromCentre.y),
+                grid.getHeightAtWorld(toCentre.x, toCentre.y),
+                grid.getSlopeAtWorld(toCentre.x, toCentre.y)
+            );
+        }
+
+        static treasureProbePathExists(grid, objects, startPoint, targetPoint) {
+            var cols = Math.floor(MAP_WIDTH / NAV_CELL_SIZE) + 1;
+            var rows = Math.floor(MAP_HEIGHT / NAV_CELL_SIZE) + 1;
+            var start = WorldGenerator.nearestOpenTreasureProbeCell(grid, objects, startPoint);
+            var goal = WorldGenerator.nearestOpenTreasureProbeCell(grid, objects, targetPoint);
+            if (!start || !goal) { return false; }
+            var open = new BinaryHeap(function (a, b) { return a.f - b.f; });
+            var gScore = {};
+            var closed = {};
+            var directions = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+            gScore[start.cx + ',' + start.cy] = 0;
+            open.push({ cx: start.cx, cy: start.cy, g: 0, f: Math.hypot(goal.cx - start.cx, goal.cy - start.cy) });
+            while (open.length > 0) {
+                var current = open.pop();
+                if (!current) { break; }
+                var currentKey = current.cx + ',' + current.cy;
+                if (closed[currentKey]) { continue; }
+                closed[currentKey] = true;
+                if (current.cx === goal.cx && current.cy === goal.cy) { return true; }
+                for (var i = 0; i < directions.length; i += 1) {
+                    var nx = current.cx + directions[i][0];
+                    var ny = current.cy + directions[i][1];
+                    if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) { continue; }
+                    if (!WorldGenerator.navCellIsOpenForTreasureProbe(grid, objects, nx, ny)) { continue; }
+                    if (directions[i][0] !== 0 && directions[i][1] !== 0) {
+                        if (!WorldGenerator.navCellIsOpenForTreasureProbe(grid, objects, current.cx + directions[i][0], current.cy) ||
+                                !WorldGenerator.navCellIsOpenForTreasureProbe(grid, objects, current.cx, current.cy + directions[i][1])) {
+                            continue;
+                        }
+                    }
+                    var movementCost = WorldGenerator.treasureProbeMovementCostBetween(grid, { cx: current.cx, cy: current.cy }, { cx: nx, cy: ny });
+                    if (movementCost >= 9999) { continue; }
+                    var step = (directions[i][0] === 0 || directions[i][1] === 0) ? 1 : 1.414;
+                    var tentative = current.g + step * movementCost;
+                    var neighbourKey = nx + ',' + ny;
+                    if (gScore[neighbourKey] === undefined || tentative < gScore[neighbourKey]) {
+                        gScore[neighbourKey] = tentative;
+                        open.push({ cx: nx, cy: ny, g: tentative, f: tentative + Math.hypot(goal.cx - nx, goal.cy - ny) });
+                    }
+                }
+            }
+            return false;
+        }
+
+        static treasurePointIsReachableFromEntryEdge(grid, objects, point, adventurerEntryEdge) {
+            var entryEdge = adventurerEntryEdge || 'left';
+            var length = entryEdge === 'left' || entryEdge === 'right' ? MAP_HEIGHT : MAP_WIDTH;
+            var samples = Math.max(8, Math.ceil(length / TILE_SIZE));
+            for (var i = 0; i <= samples; i += 1) {
+                var offset = length * (i / samples);
+                var startPoint;
+                if (entryEdge === 'right') { startPoint = { x: MAP_WIDTH, y: offset }; }
+                else if (entryEdge === 'top') { startPoint = { x: offset, y: 0 }; }
+                else if (entryEdge === 'bottom') { startPoint = { x: offset, y: MAP_HEIGHT }; }
+                else { startPoint = { x: 0, y: offset }; }
+                if (!WorldGenerator.pointIsOpenForTreasureProbe(grid, objects, startPoint.x, startPoint.y)) { continue; }
+                if (WorldGenerator.treasureProbePathExists(grid, objects, startPoint, point)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        static findTreasurePoint(rng, grid, things, minDistance, allowEdge, adventurerEntryEdge) {
+            for (var attempt = 0; attempt < 400; attempt += 1) {
+                var point = WorldGenerator.sampleTreasurePointFromAdventurerEntry(rng, allowEdge, adventurerEntryEdge);
+                var terrainType = grid.getTerrainTypeAtWorld(point.x, point.y);
+                if (terrainType === TERRAIN_TYPE.LAKE || terrainType === TERRAIN_TYPE.STREAM) {
+                    continue;
+                }
+                var clear = true;
+                for (var i = 0; i < things.length; i += 1) {
+                    if (Distance(point.x, point.y, things[i].x, things[i].y) < minDistance) {
+                        clear = false;
+                        break;
+                    }
+                }
+                if (clear && WorldGenerator.treasurePointIsReachableFromEntryEdge(grid, things, point, adventurerEntryEdge)) {
+                    return point;
+                }
+            }
+            return null;
         }
 
         static findOpenPoint(rng, grid, things, minDistance, allowEdge) {
@@ -1562,7 +1825,7 @@ button:hover { background: #ffd768; }
     }
 
     class World {
-        constructor(seed, width, height, terrainGrid, environment, distanceToSettlementMiles, terrainObjects, treasureDeposits) {
+        constructor(seed, width, height, terrainGrid, environment, distanceToSettlementMiles, terrainObjects, treasureDeposits, adventurerEntryEdge) {
             this.seed = seed >>> 0;
             this.width = width;
             this.height = height;
@@ -1571,6 +1834,7 @@ button:hover { background: #ffd768; }
             this.distanceToSettlementMiles = distanceToSettlementMiles;
             this.terrainObjects = terrainObjects;
             this.treasureDeposits = treasureDeposits;
+            this.adventurerEntryEdge = adventurerEntryEdge || 'left';
             this.foodExpenditureCredits = 0;
             this.blockingTerrainObjects = this.terrainObjects.filter(function (object) {
                 return object.blocksMovement;
@@ -1909,6 +2173,7 @@ button:hover { background: #ffd768; }
                 height: this.height,
                 environment: Object.assign({}, this.environment),
                 distanceToSettlementMiles: this.distanceToSettlementMiles,
+                adventurerEntryEdge: this.adventurerEntryEdge,
                 terrainGrid: this.terrainGrid.getSnapshot(),
                 terrainObjects: this.getObstacleSnapshots()
             };
@@ -3897,15 +4162,17 @@ button:hover { background: #ffd768; }
                 for (var i = 0; i < (classCounts[className] || 0); i += 1) {
                     var adventurer = this.createAdventurerByClass(className, 'adventurer_' + index);
                     index += 1;
-                    var point = this.world.findOpenEdgePoint(adventurer, 'left', this.rng, 120);
+                    var entryEdge = this.world.adventurerEntryEdge || 'left';
+                    var point = this.world.findOpenEdgePoint(adventurer, entryEdge, this.rng, 120);
                     if (!point) { continue; }
                     adventurer.x = point.x;
                     adventurer.y = point.y;
+                    adventurer.entryEdge = entryEdge;
                     adventurer.entryX = point.x;
                     adventurer.entryY = point.y;
                     adventurer.exitX = point.x;
                     adventurer.exitY = point.y;
-                    adventurer.exitEdge = adventurer.entryEdge;
+                    adventurer.exitEdge = entryEdge;
                     adventurers.push(adventurer);
                 }
             }
@@ -4719,6 +4986,7 @@ button:hover { background: #ffd768; }
             this.rng = new SeededRng(this.seed);
             this.paused = false;
             this.mode = options && options.mode ? options.mode : 'campaign';
+            this.adventurerEntryEdge = options && ADVENTURER_ENTRY_EDGES.indexOf(options.adventurerEntryEdge) >= 0 ? options.adventurerEntryEdge : null;
             this.roundNumber = 1;
             this.seasonNumber = 1;
             this.phase = 'management';
@@ -4736,6 +5004,9 @@ button:hover { background: #ffd768; }
 
         getWorldOptions(baseOptions) {
             var result = Object.assign({}, baseOptions || {});
+            if (this.adventurerEntryEdge) {
+                result.adventurerEntryEdge = this.adventurerEntryEdge;
+            }
             if (this.mode === 'campaign') {
                 result.campaignRound = this.roundNumber;
             }
@@ -5177,6 +5448,52 @@ button:hover { background: #ffd768; }
             quickTreasureHighestTypes[highestTreasureType] = true;
         }
         AddRegressionResult(results, 'Quick games can generate treasure tiers above bronze', Object.keys(quickTreasureHighestTypes).some(function (treasureType) { return treasureType !== 'bronze'; }), 'highestTypes=' + Object.keys(quickTreasureHighestTypes).join(','));
+
+        var treasurePlacementRng = new SeededRng(444);
+        var treasurePlacementNearHalfCount = 0;
+        var treasurePlacementDeepHalfCount = 0;
+        var treasurePlacementAllDistantEnough = true;
+        for (var treasurePlacementSample = 0; treasurePlacementSample < 1000; treasurePlacementSample += 1) {
+            var treasurePlacementX = WorldGenerator.sampleTreasureXFromAdventurerEntry(treasurePlacementRng, false);
+            if (treasurePlacementX < WorldGenerator.treasureMinimumDistanceFromAdventurerEntry()) {
+                treasurePlacementAllDistantEnough = false;
+            }
+            if (treasurePlacementX < WorldGenerator.treasureDeepPlacementBoundary()) {
+                treasurePlacementNearHalfCount += 1;
+            } else {
+                treasurePlacementDeepHalfCount += 1;
+            }
+        }
+        AddRegressionResult(results, 'Treasure placement sampler never places treasure in the first third from adventurer entry', treasurePlacementAllDistantEnough, 'nearHalf=' + treasurePlacementNearHalfCount + ', deepHalf=' + treasurePlacementDeepHalfCount);
+        AddRegressionResult(results, 'Treasure placement sampler strongly favours the far half of the map', treasurePlacementDeepHalfCount > treasurePlacementNearHalfCount * 4, 'nearHalf=' + treasurePlacementNearHalfCount + ', deepHalf=' + treasurePlacementDeepHalfCount);
+
+        var generatedTreasureDistantEnough = true;
+        for (var placementSeed = 150000; placementSeed < 150025; placementSeed += 1) {
+            var placementSession = new GameSession(placementSeed, { mode: 'quick' });
+            generatedTreasureDistantEnough = generatedTreasureDistantEnough && placementSession.world.treasureDeposits.every(function (placementDeposit) {
+                return WorldGenerator.distanceFromAdventurerEntryEdge(placementDeposit.x, placementDeposit.y, placementSession.world.adventurerEntryEdge) >= WorldGenerator.treasureMinimumDistanceFromAdventurerEntry();
+            });
+        }
+        AddRegressionResult(results, 'Generated treasure is never placed in the first third from adventurer entry', generatedTreasureDistantEnough, 'seeds=150000-150024');
+
+        var flexibleEntrySession = new GameSession(160001, { mode: 'quick', adventurerEntryEdge: 'top' });
+        AddRegressionResult(results, 'World generation stores a non-left adventurer entry edge when requested', flexibleEntrySession.world.adventurerEntryEdge === 'top', 'entryEdge=' + flexibleEntrySession.world.adventurerEntryEdge);
+        flexibleEntrySession.startSeason();
+        AddRegressionResult(results, 'Adventurer spawning uses the world adventurer entry edge', flexibleEntrySession.currentRaid.adventurers.length === 0 || flexibleEntrySession.currentRaid.adventurers.every(function (adventurer) { return adventurer.entryEdge === 'top' && adventurer.exitEdge === 'top'; }), 'entryEdge=' + flexibleEntrySession.world.adventurerEntryEdge);
+
+        var generatedTreasureReachable = true;
+        for (var reachabilitySeed = 170000; reachabilitySeed < 170012; reachabilitySeed += 1) {
+            var reachabilitySession = new GameSession(reachabilitySeed, { mode: 'quick' });
+            generatedTreasureReachable = generatedTreasureReachable && reachabilitySession.world.treasureDeposits.every(function (reachabilityDeposit) {
+                return WorldGenerator.treasurePointIsReachableFromEntryEdge(
+                    reachabilitySession.world.terrainGrid,
+                    reachabilitySession.world.terrainObjects,
+                    reachabilityDeposit,
+                    reachabilitySession.world.adventurerEntryEdge
+                );
+            });
+        }
+        AddRegressionResult(results, 'Generated treasure deposits are nav-reachable from the adventurer entry edge', generatedTreasureReachable, 'seeds=170000-170011');
 
         var staticOnlySnapshot = session.getSnapshot();
         AddRegressionResult(results, 'Dynamic raid snapshot does not resend static world data', !staticOnlySnapshot.world && !staticOnlySnapshot.obstacles && !staticOnlySnapshot.terrainObjects, 'phase=' + staticOnlySnapshot.phase);
