@@ -164,6 +164,7 @@ button:hover { background: #ffd768; }
     var TREASURE_MINIMUM_DISTANCE_FROM_ADVENTURER_ENTRY_FRACTION = 1 / 3;
     var TREASURE_DEEP_PLACEMENT_FRACTION = 1 / 2;
     var TREASURE_NEAR_HALF_PLACEMENT_CHANCE = 0.15;
+    var DEFAULT_ADVENTURER_ENTRY_EDGE = 'left';
     var ADVENTURER_ENTRY_EDGES = ['left', 'right', 'top', 'bottom'];
     var TICK_DT = 1 / 30;
     var TICK_MS = 33;
@@ -179,6 +180,10 @@ button:hover { background: #ffd768; }
     var COMBAT_COOLDOWN_TICKS = 8;
     var ADVENTURER_THROW_RANGE = 190;
     var ADVENTURER_PICKUP_RANGE = 34;
+    var VISIBILITY_SAMPLE_DISTANCE = 45;
+    var VISIBILITY_TERRAIN_BLOCK_THRESHOLD = 1.2;
+    var VISIBILITY_OBJECT_BLOCK_THRESHOLD = 1.0;
+    var VISIBILITY_CLOSE_RANGE = 34;
     var THROWN_PROJECTILE_ANIMATION_TICKS = 18;
     var WILD_MONSTER_COUNT_MIN = 1;
     var WILD_MONSTER_COUNT_MAX = 3;
@@ -434,6 +439,18 @@ button:hover { background: #ffd768; }
     function Clamp(value, min, max) {
         return Math.max(min, Math.min(max, value));
     }
+    function DistancePointToSegment(px, py, ax, ay, bx, by) {
+        var dx = bx - ax;
+        var dy = by - ay;
+        var lenSq = dx * dx + dy * dy;
+        if (lenSq <= 0.0001) {
+            return { distance: Distance(px, py, ax, ay), t: 0 };
+        }
+        var t = Clamp(((px - ax) * dx + (py - ay) * dy) / lenSq, 0, 1);
+        var x = ax + dx * t;
+        var y = ay + dy * t;
+        return { distance: Distance(px, py, x, y), t: t };
+    }
 
     function RandomOffMapPoint(world, rng, margin) {
         var offMapMargin = Number.isFinite(margin) ? Math.max(0, margin) : 0;
@@ -578,7 +595,31 @@ button:hover { background: #ffd768; }
                 return 0.12 + slope * 0.02;
             }
 
+            if (terrainType === TERRAIN_TYPE.STREAM || terrainType === TERRAIN_TYPE.LAKE) {
+                return 0.04 + slope * 0.015;
+            }
+
+            if (terrainType === TERRAIN_TYPE.ROCKY) {
+                return 0.05 + slope * 0.035;
+            }
+
             return Math.max(0, slope * 0.03);
+        },
+
+        visibilityRangeMultiplierFor: function (terrainType, slope) {
+            if (terrainType === TERRAIN_TYPE.FOREST) {
+                return Clamp(0.82 - slope * 0.014, 0.58, 0.92);
+            }
+
+            if (terrainType === TERRAIN_TYPE.MARSH) {
+                return Clamp(0.88 - slope * 0.012, 0.62, 0.96);
+            }
+
+            if (terrainType === TERRAIN_TYPE.ROCKY) {
+                return Clamp(0.95 - slope * 0.012, 0.72, 1);
+            }
+
+            return Clamp(1 - slope * 0.006, 0.82, 1);
         }
     };
 
@@ -1005,15 +1046,15 @@ button:hover { background: #ffd768; }
                 environment = WorldGenerator.createEnvironment(rng, settings);
                 grid = WorldGenerator.createTerrainGrid(rng, environment);
 
-                if (WorldGenerator.validateRequiredEntryEdges(grid)) {
+                if (WorldGenerator.validateRequiredEntryEdges(grid, settings)) {
                     break;
                 }
 
                 candidateSeed = rng.integer(1, 0x7fffffff);
             }
 
-            if (!WorldGenerator.validateRequiredEntryEdges(grid)) {
-                WorldGenerator.ensureRequiredEntryEdgeLand(grid);
+            if (!WorldGenerator.validateRequiredEntryEdges(grid, settings)) {
+                WorldGenerator.ensureRequiredEntryEdgeLand(grid, settings);
             }
 
             var adventurerEntryEdge = WorldGenerator.chooseAdventurerEntryEdge(rng, grid, settings);
@@ -1393,23 +1434,20 @@ button:hover { background: #ffd768; }
             return false;
         }
 
-        static validateRequiredEntryEdges(grid) {
-            return ADVENTURER_ENTRY_EDGES.some(function (edge) {
-                return WorldGenerator.edgeHasLand(grid, edge);
-            }) && WorldGenerator.edgeHasLand(grid, 'right');
-        }
-
-        static chooseAdventurerEntryEdge(rng, grid, settings) {
+        static getConfiguredAdventurerEntryEdge(settings) {
             if (settings && ADVENTURER_ENTRY_EDGES.indexOf(settings.adventurerEntryEdge) >= 0) {
                 return settings.adventurerEntryEdge;
             }
-            var candidates = ADVENTURER_ENTRY_EDGES.filter(function (edge) {
-                return WorldGenerator.edgeHasLand(grid, edge);
-            });
-            if (candidates.length === 0) {
-                return 'left';
-            }
-            return rng.pick(candidates);
+            return DEFAULT_ADVENTURER_ENTRY_EDGE;
+        }
+
+        static validateRequiredEntryEdges(grid, settings) {
+            var adventurerEntryEdge = WorldGenerator.getConfiguredAdventurerEntryEdge(settings);
+            return WorldGenerator.edgeHasLand(grid, adventurerEntryEdge) && WorldGenerator.edgeHasLand(grid, 'right');
+        }
+
+        static chooseAdventurerEntryEdge(rng, grid, settings) {
+            return WorldGenerator.getConfiguredAdventurerEntryEdge(settings);
         }
 
         static ensureEntryEdgeLand(grid, edge) {
@@ -1419,17 +1457,10 @@ button:hover { background: #ffd768; }
             grid.terrainTypes[grid.index(tile.tx, tile.ty)] = TERRAIN_TYPE.GRASS;
         }
 
-        static ensureRequiredEntryEdgeLand(grid) {
-            var centreRow = Math.floor(grid.rows / 2);
-            var centreCol = Math.floor(grid.cols / 2);
-            var leftIndex = grid.index(0, centreRow);
-            var rightIndex = grid.index(grid.cols - 1, centreRow);
-            var topIndex = grid.index(centreCol, 0);
-            var bottomIndex = grid.index(centreCol, grid.rows - 1);
-            grid.terrainTypes[leftIndex] = TERRAIN_TYPE.GRASS;
-            grid.terrainTypes[rightIndex] = TERRAIN_TYPE.GRASS;
-            grid.terrainTypes[topIndex] = TERRAIN_TYPE.GRASS;
-            grid.terrainTypes[bottomIndex] = TERRAIN_TYPE.GRASS;
+        static ensureRequiredEntryEdgeLand(grid, settings) {
+            var adventurerEntryEdge = WorldGenerator.getConfiguredAdventurerEntryEdge(settings);
+            WorldGenerator.ensureEntryEdgeLand(grid, adventurerEntryEdge);
+            WorldGenerator.ensureEntryEdgeLand(grid, 'right');
         }
 
         static createTerrainObjects(rng, environment, grid) {
@@ -1585,7 +1616,7 @@ button:hover { background: #ffd768; }
 
         static sampleTreasurePointFromAdventurerEntry(rng, allowEdge, adventurerEntryEdge) {
             var margin = allowEdge ? 80 : 150;
-            var entryEdge = adventurerEntryEdge || 'left';
+            var entryEdge = adventurerEntryEdge || DEFAULT_ADVENTURER_ENTRY_EDGE;
             var depth = WorldGenerator.sampleTreasureDepthFromAdventurerEntry(rng, allowEdge);
             if (entryEdge === 'right') {
                 return { x: MAP_WIDTH - depth, y: rng.range(margin, MAP_HEIGHT - margin) };
@@ -1600,7 +1631,7 @@ button:hover { background: #ffd768; }
         }
 
         static sampleTreasureXFromAdventurerEntry(rng, allowEdge) {
-            return WorldGenerator.sampleTreasurePointFromAdventurerEntry(rng, allowEdge, 'left').x;
+            return WorldGenerator.sampleTreasurePointFromAdventurerEntry(rng, allowEdge, DEFAULT_ADVENTURER_ENTRY_EDGE).x;
         }
 
         static distanceFromAdventurerEntryEdge(x, y, adventurerEntryEdge) {
@@ -1611,7 +1642,7 @@ button:hover { background: #ffd768; }
         }
 
         static fallbackTreasurePoint(index, adventurerEntryEdge) {
-            var entryEdge = adventurerEntryEdge || 'left';
+            var entryEdge = adventurerEntryEdge || DEFAULT_ADVENTURER_ENTRY_EDGE;
             var depth = WorldGenerator.treasureDeepPlacementBoundary() + 60 + index * 35;
             var lateralFraction = 0.35 + 0.07 * index;
             var lateralX = Clamp(MAP_WIDTH * lateralFraction, 150, MAP_WIDTH - 150);
@@ -1752,7 +1783,7 @@ button:hover { background: #ffd768; }
         }
 
         static treasurePointIsReachableFromEntryEdge(grid, objects, point, adventurerEntryEdge) {
-            var entryEdge = adventurerEntryEdge || 'left';
+            var entryEdge = adventurerEntryEdge || DEFAULT_ADVENTURER_ENTRY_EDGE;
             var length = entryEdge === 'left' || entryEdge === 'right' ? MAP_HEIGHT : MAP_WIDTH;
             var samples = Math.max(8, Math.ceil(length / TILE_SIZE));
             for (var i = 0; i <= samples; i += 1) {
@@ -1834,10 +1865,13 @@ button:hover { background: #ffd768; }
             this.distanceToSettlementMiles = distanceToSettlementMiles;
             this.terrainObjects = terrainObjects;
             this.treasureDeposits = treasureDeposits;
-            this.adventurerEntryEdge = adventurerEntryEdge || 'left';
+            this.adventurerEntryEdge = adventurerEntryEdge || DEFAULT_ADVENTURER_ENTRY_EDGE;
             this.foodExpenditureCredits = 0;
             this.blockingTerrainObjects = this.terrainObjects.filter(function (object) {
                 return object.blocksMovement;
+            });
+            this.visionBlockingTerrainObjects = this.terrainObjects.filter(function (object) {
+                return (object.blocksVisionAmount || 0) > 0;
             });
             this.obstacleSpatialCellSize = 120;
             this.obstacleSpatialBins = {};
@@ -1914,6 +1948,23 @@ button:hover { background: #ffd768; }
                     }
                 }
             }
+            return result;
+        }
+        getVisionBlockingTerrainObjectsAlongSegment(ax, ay, bx, by) {
+            var result = [];
+            var objects = this.visionBlockingTerrainObjects || [];
+            for (var i = 0; i < objects.length; i += 1) {
+                var object = objects[i];
+                var radius = object.radius || 0;
+                var projected = DistancePointToSegment(object.x, object.y, ax, ay, bx, by);
+                if (projected.t <= 0.02 || projected.t >= 0.98) {
+                    continue;
+                }
+                if (projected.distance <= radius) {
+                    result.push({ object: object, distanceThroughObject: Math.max(0, radius - projected.distance), closestDistanceToSegment: projected.distance, t: projected.t });
+                }
+            }
+            result.sort(function (a, b) { return a.t - b.t; });
             return result;
         }
 
@@ -2287,7 +2338,8 @@ button:hover { background: #ffd768; }
             this.behaviourState = 'idle';
             this.attackCooldownTicks = 0;
             this.isMounted = false;
-            this.sightRange = 360;
+            this.perception = 0.5;
+            this.sightRange = 720;
             this.eyeHeight = 4;
             this.terrainHeight = 0;
         }
@@ -2586,17 +2638,11 @@ button:hover { background: #ffd768; }
             var dx = tx - this.x;
             var dy = ty - this.y;
             var len = Math.hypot(dx, dy);
-
             if (len <= 0.0001) {
                 return;
             }
 
             var oldDistance = Distance(this.x, this.y, tx, ty);
-            distance = this.getTerrainAdjustedMoveDistance(world, tx, ty, distance);
-            if (distance <= 0.0001) {
-                this.stuckTicks += 1;
-                return;
-            }
             var baseAngle = Math.atan2(dy, dx);
             var angleOffsets = [0, Math.PI / 10, -Math.PI / 10, Math.PI / 5, -Math.PI / 5, Math.PI / 3, -Math.PI / 3, Math.PI / 2, -Math.PI / 2, Math.PI * 0.75, -Math.PI * 0.75, Math.PI];
             var distanceMultipliers = [1, 0.7, 0.4];
@@ -2604,17 +2650,25 @@ button:hover { background: #ffd768; }
             var bestScore = Infinity;
 
             for (var d = 0; d < distanceMultipliers.length; d += 1) {
-                var stepDistance = distance * distanceMultipliers[d];
-
+                var requestedStepDistance = distance * distanceMultipliers[d];
                 for (var i = 0; i < angleOffsets.length; i += 1) {
                     var angle = baseAngle + angleOffsets[i];
                     var bounds = this.getMovementBounds(world);
-                    var nx = Clamp(this.x + Math.cos(angle) * stepDistance, bounds.minX, bounds.maxX);
-                    var ny = Clamp(this.y + Math.sin(angle) * stepDistance, bounds.minY, bounds.maxY);
+                    var probeX = Clamp(this.x + Math.cos(angle) * requestedStepDistance, bounds.minX, bounds.maxX);
+                    var probeY = Clamp(this.y + Math.sin(angle) * requestedStepDistance, bounds.minY, bounds.maxY);
+                    var adjustedStepDistance = this.getTerrainAdjustedMoveDistance(world, probeX, probeY, requestedStepDistance);
+
+                    if (adjustedStepDistance <= 0.0001) {
+                        continue;
+                    }
+
+                    var nx = Clamp(this.x + Math.cos(angle) * adjustedStepDistance, bounds.minX, bounds.maxX);
+                    var ny = Clamp(this.y + Math.sin(angle) * adjustedStepDistance, bounds.minY, bounds.maxY);
 
                     if (this.isInsideObstacle(world, nx, ny)) {
                         continue;
                     }
+
                     if (world.terrainGrid && world.terrainGrid.isCliffBetween && world.terrainGrid.isCliffBetween(this.x, this.y, nx, ny)) {
                         continue;
                     }
@@ -2709,17 +2763,41 @@ button:hover { background: #ffd768; }
                 this.moveToward(world, waypoint.x, waypoint.y, distance);
             }
         }
-        canSee(world, target) {
-            var distance = this.distanceTo(target);
-
-            if (distance > this.sightRange) {
-                return false;
+        getTargetVisibilityScale(target) {
+            var radius = target && Number.isFinite(target.radius) ? target.radius : 8;
+            var scale = Clamp(0.74 + radius / 34, 0.55, 1.55);
+            if (target && target.behaviourState === 'eating') {
+                scale *= 0.92;
             }
-
-            var steps = Math.max(2, Math.ceil(distance / 60));
+            if (target && (target.behaviourState === 'stalking' || target.behaviourState === 'grazing')) {
+                scale *= 0.88;
+            }
+            if (target && (target.corpseState === 'corpse' || target.corpseState === 'skeleton')) {
+                scale *= 0.72;
+            }
+            return Clamp(scale, 0.45, 1.7);
+        }
+        getEffectiveSightRange(world, target) {
+            var range = this.sightRange || 300;
+            var perception = Clamp(this.perception !== undefined ? this.perception : 0.5, 0, 1);
+            var ownTerrain = world.terrainGrid.getTerrainTypeAtWorld(this.x, this.y);
+            var targetTerrain = world.terrainGrid.getTerrainTypeAtWorld(target.x, target.y);
+            var ownSlope = world.terrainGrid.getSlopeAtWorld(this.x, this.y);
+            var targetSlope = world.terrainGrid.getSlopeAtWorld(target.x, target.y);
+            range *= 0.95 + perception * 0.45;
+            range *= this.getTargetVisibilityScale(target);
+            var ownMultiplier = TerrainRules.visibilityRangeMultiplierFor(ownTerrain, ownSlope);
+            var targetMultiplier = TerrainRules.visibilityRangeMultiplierFor(targetTerrain, targetSlope);
+            range *= 0.72 + Math.min(ownMultiplier, targetMultiplier) * 0.28;
+            return Math.max(VISIBILITY_CLOSE_RANGE, range);
+        }
+        terrainAndElevationAllowSight(world, target, distance) {
+            var steps = Math.max(2, Math.ceil(distance / VISIBILITY_SAMPLE_DISTANCE));
             var observerHeight = world.terrainGrid.getHeightAtWorld(this.x, this.y) + this.eyeHeight;
             var targetHeight = world.terrainGrid.getHeightAtWorld(target.x, target.y) + (target.eyeHeight || 2);
             var penalty = 0;
+            var perception = Clamp(this.perception !== undefined ? this.perception : 0.5, 0, 1);
+            var maximumPenalty = VISIBILITY_TERRAIN_BLOCK_THRESHOLD + perception * 0.32;
 
             for (var i = 1; i < steps; i += 1) {
                 var t = i / steps;
@@ -2735,9 +2813,67 @@ button:hover { background: #ffd768; }
                 }
 
                 penalty += TerrainRules.visibilityPenaltyFor(terrainType, slope);
+                if (penalty >= maximumPenalty) {
+                    return false;
+                }
             }
 
-            return penalty < 1.2;
+            return true;
+        }
+        terrainObjectsAllowSight(world, target, distance) {
+            var blockers = world.getVisionBlockingTerrainObjectsAlongSegment ? world.getVisionBlockingTerrainObjectsAlongSegment(this.x, this.y, target.x, target.y) : [];
+            var perception = Clamp(this.perception !== undefined ? this.perception : 0.5, 0, 1);
+            var accumulatedBlock = 0;
+            var targetRadius = Math.max(1, (target && target.radius) || 8);
+
+            for (var i = 0; i < blockers.length; i += 1) {
+                var object = blockers[i].object;
+                var radius = Math.max(1, object.radius || 1);
+                var distanceToObject = Math.max(1, Distance(this.x, this.y, object.x, object.y));
+                var targetAngularRadius = Math.atan(targetRadius / Math.max(1, distance));
+                var objectAngularRadius = Math.atan(radius / distanceToObject);
+                var angularSeparation = Math.atan((blockers[i].closestDistanceToSegment || 0) / distanceToObject);
+                var angularCoverage = Clamp((objectAngularRadius + targetAngularRadius - angularSeparation) / Math.max(0.001, targetAngularRadius * 2), 0, 1);
+                var depthFraction = Clamp(blockers[i].distanceThroughObject / radius, 0, 1);
+                var amount = (object.blocksVisionAmount || 0) * (0.35 + depthFraction * 0.65) * Math.pow(angularCoverage, 0.85);
+                var observerHeight = world.terrainGrid.getHeightAtWorld(this.x, this.y) + this.eyeHeight;
+                var targetHeight = world.terrainGrid.getHeightAtWorld(target.x, target.y) + (target.eyeHeight || 2);
+                var objectGroundHeight = world.terrainGrid.getHeightAtWorld(object.x, object.y);
+                var sightHeightAtObject = observerHeight + (targetHeight - observerHeight) * blockers[i].t;
+                var objectVisionHeight = objectGroundHeight + Math.max(3, radius * 0.42);
+
+                if (objectVisionHeight + 1.0 < sightHeightAtObject) {
+                    amount *= 0.22;
+                }
+
+                accumulatedBlock += amount;
+                if (accumulatedBlock >= VISIBILITY_OBJECT_BLOCK_THRESHOLD + perception * 0.45) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        canSee(world, target) {
+            if (!world || !world.terrainGrid || !target || !Number.isFinite(target.x) || !Number.isFinite(target.y)) {
+                return false;
+            }
+
+            var distance = this.distanceTo(target);
+
+            if (distance <= VISIBILITY_CLOSE_RANGE) {
+                return true;
+            }
+
+            if (distance > this.getEffectiveSightRange(world, target)) {
+                return false;
+            }
+
+            if (!this.terrainAndElevationAllowSight(world, target, distance)) {
+                return false;
+            }
+
+            return this.terrainObjectsAllowSight(world, target, distance);
         }
 
         getSnapshot() {
@@ -2773,7 +2909,7 @@ button:hover { background: #ffd768; }
             this.carryingTreasure = false;
             this.carryingTreasureType = null;
             this.targetTreasureId = null;
-            this.entryEdge = 'left';
+            this.entryEdge = DEFAULT_ADVENTURER_ENTRY_EDGE;
             this.entryX = x;
             this.entryY = y;
             this.exitX = x;
@@ -2785,7 +2921,7 @@ button:hover { background: #ffd768; }
             this.perception = rng.range(profile.perceptionMin, profile.perceptionMax);
             this.strength = rng.range(profile.strengthMin, profile.strengthMax);
             this.caution = rng.range(profile.cautionMin, profile.cautionMax);
-            this.sightRange = 280 + this.perception * 180;
+            this.sightRange = 520 + this.perception * 420;
             this.eyeHeight = 5;
             this.foodValue = HUMAN_FOOD_VALUE;
             this.edibleFoodRemaining = 0;
@@ -3101,6 +3237,8 @@ button:hover { background: #ffd768; }
             s.exitY = this.exitY;
             s.fleeing = this.fleeing;
             s.foodValue = this.foodValue;
+            s.perception = this.perception;
+            s.sightRange = this.sightRange;
             s.edibleFoodRemaining = this.edibleFoodRemaining;
             s.carriedWorldObjectId = this.carriedWorldObjectId;
             s.carriedWorldObjectType = this.carriedWorldObjectType;
@@ -3346,6 +3484,10 @@ button:hover { background: #ffd768; }
             this.selectedForDeployment = options && options.selectedForDeployment !== undefined ? options.selectedForDeployment : this.owned;
             this.deployed = false;
             this.bodyHealth = new BodyHealth(20);
+            this.perception = options && Number.isFinite(options.perception) ? Clamp(options.perception, 0, 1) : rng.range(0.38, 0.88);
+            this.sightRange = options && Number.isFinite(options.sightRange) ? Math.max(120, options.sightRange) : 560 + this.perception * 520;
+            this.scentRange = options && Number.isFinite(options.scentRange) ? Math.max(60, options.scentRange) : 220 + this.perception * 120;
+            this.eyeHeight = 4.5;
             this.maxHealth = this.bodyHealth.maxTotal();
             this.health = this.bodyHealth.total();
             this.nutritionRequirement = options && Number.isFinite(options.nutritionRequirement) ? Math.max(0, options.nutritionRequirement) : DEFAULT_MONSTER_NUTRITION_REQUIREMENT;
@@ -3365,6 +3507,9 @@ button:hover { background: #ffd768; }
             this.recallRequested = false;
             this.recallTargetX = null;
             this.recallTargetY = null;
+            this.roamTargetX = null;
+            this.roamTargetY = null;
+            this.roamRetargetTick = -1;
         }
 
         static randomName(rng) {
@@ -3535,7 +3680,79 @@ button:hover { background: #ffd768; }
             this.pathIntentKey = '';
             this.eatingTargetId = null;
             this.eatingTicksRemaining = 0;
+            this.roamTargetX = null;
+            this.roamTargetY = null;
+            this.roamRetargetTick = -1;
             this.behaviourState = this.alive ? 'captive' : 'dead';
+        }
+
+        setNewRoamingTarget(raid) {
+            var margin = 95;
+            var world = raid.world;
+            var best = null;
+
+            for (var attempt = 0; attempt < 24; attempt += 1) {
+                var distance = raid.rng.range(180, 520);
+                var angle = raid.rng.range(-Math.PI, Math.PI);
+
+                if (this.x > world.width - 70) {
+                    angle = Math.PI + raid.rng.range(-0.8, 0.8);
+                }
+
+                var x = Clamp(this.x + Math.cos(angle) * distance, margin, world.width - margin);
+                var y = Clamp(this.y + Math.sin(angle) * distance, margin, world.height - margin);
+
+                if (!this.isInsideObstacle(world, x, y)) {
+                    best = { x: x, y: y };
+                    break;
+                }
+            }
+
+            if (!best) {
+                for (var fallback = 0; fallback < 24; fallback += 1) {
+                    var fx = raid.rng.range(margin, world.width - margin);
+                    var fy = raid.rng.range(margin, world.height - margin);
+                    if (!this.isInsideObstacle(world, fx, fy)) {
+                        best = { x: fx, y: fy };
+                        break;
+                    }
+                }
+            }
+
+            if (!best) {
+                best = { x: world.width * 0.5, y: world.height * 0.5 };
+            }
+
+            this.roamTargetX = best.x;
+            this.roamTargetY = best.y;
+            this.roamRetargetTick = raid.tickNumber + raid.rng.integer(105, 245);
+        }
+
+        chooseRoamingTarget(raid) {
+            if (this.roamTargetX === null || this.roamTargetY === null || this.stuckTicks > 35 || raid.tickNumber >= this.roamRetargetTick || Distance(this.x, this.y, this.roamTargetX, this.roamTargetY) < 70) {
+                this.setNewRoamingTarget(raid);
+            }
+
+            return {
+                x: this.roamTargetX,
+                y: this.roamTargetY,
+                key: Math.floor(this.roamTargetX / NAV_CELL_SIZE) + '_' + Math.floor(this.roamTargetY / NAV_CELL_SIZE)
+            };
+        }
+
+        continueRoamingWithoutVisibleTarget(raid) {
+            if (!this.owned || this.recallRequested || this.canLeavePlayableArea()) {
+                return false;
+            }
+
+            var target = this.chooseRoamingTarget(raid);
+            if (!target || !Number.isFinite(target.x) || !Number.isFinite(target.y)) {
+                return false;
+            }
+
+            this.behaviourState = 'foragingForFauna';
+            this.moveWithPath(raid.world, target.x, target.y, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT * 0.52, this.id + '_forage_' + target.key);
+            return true;
         }
 
         update(raid) {
@@ -3591,6 +3808,9 @@ button:hover { background: #ffd768; }
 
             var target = this.chooseTarget(raid);
             if (!target) {
+                if (this.continueRoamingWithoutVisibleTarget(raid)) {
+                    return;
+                }
                 if (this.canLeavePlayableArea()) {
                     this.moveWildOffMap(raid);
                 }
@@ -3640,7 +3860,7 @@ button:hover { background: #ffd768; }
                 return null;
             }
             var candidates = raid.getEdibleCarcasses().filter(function (carcass) {
-                return NutritionSystem.canFeedOnCarcass(carcass) && this.distanceTo(carcass) <= MONSTER_FOOD_SENSE_RANGE;
+                return NutritionSystem.canFeedOnCarcass(carcass) && this.distanceTo(carcass) <= Math.max(MONSTER_FOOD_SENSE_RANGE, this.scentRange || 0);
             }, this);
             if (candidates.length === 0) {
                 return null;
@@ -3656,7 +3876,7 @@ button:hover { background: #ffd768; }
                 return null;
             }
             var candidates = raid.macrofauna.filter(function (animal) {
-                return animal.isActive() && this.distanceTo(animal) <= MONSTER_FOOD_SENSE_RANGE * 1.35;
+                return animal.isActive() && this.distanceTo(animal) <= Math.max(MONSTER_FOOD_SENSE_RANGE * 1.35, (this.scentRange || 0) * 1.18) && this.canSee(raid.world, animal);
             }, this);
             if (candidates.length === 0) {
                 return null;
@@ -3669,8 +3889,8 @@ button:hover { background: #ffd768; }
 
         chooseTarget(raid) {
             var candidates = raid.adventurers.filter(function (adventurer) {
-                return adventurer.isActive();
-            });
+                return adventurer.isActive() && this.canSee(raid.world, adventurer);
+            }, this);
 
             if (candidates.length === 0) {
                 return null;
@@ -3703,6 +3923,9 @@ button:hover { background: #ffd768; }
             s.wild = this.wild;
             s.entryEdge = this.entryEdge;
             s.capturedThisRaid = this.capturedThisRaid;
+            s.perception = this.perception;
+            s.sightRange = this.sightRange;
+            s.scentRange = this.scentRange;
             s.selectedForDeployment = this.selectedForDeployment;
             s.deployed = this.deployed;
             s.health = this.health;
@@ -3798,8 +4021,9 @@ button:hover { background: #ffd768; }
             this.wanderTargetY = y;
             this.wanderHeading = rng.range(0, Math.PI * 2);
             this.wanderRetargetTicks = rng.integer(MACROFAUNA_WANDER_RETARGET_TICKS_MIN, MACROFAUNA_WANDER_RETARGET_TICKS_MAX);
-            this.eyeHeight = 3;
-            this.sightRange = 260;
+            this.perception = this.species === 'hare' ? 0.72 : (this.species === 'deer' ? 0.62 : 0.48);
+            this.eyeHeight = this.species === 'bear' || this.species === 'walrus' ? 4 : 3;
+            this.sightRange = 450 + this.perception * 350;
         }
 
         getMapBoundaryPolicy() {
@@ -3911,15 +4135,15 @@ button:hover { background: #ffd768; }
 
         findNearestMonsterThreat(raid) {
             var candidates = raid.monsters.filter(function (monster) {
-                return monster.isActive() && monster.deployed;
-            });
+                return monster.isActive() && monster.deployed && this.canSee(raid.world, monster);
+            }, this);
             return this.findNearestAgent(candidates);
         }
 
         findNearestHumanThreat(raid) {
             var candidates = raid.adventurers.filter(function (adventurer) {
-                return adventurer.isActive();
-            });
+                return adventurer.isActive() && this.canSee(raid.world, adventurer);
+            }, this);
             return this.findNearestAgent(candidates);
         }
 
@@ -4009,6 +4233,8 @@ button:hover { background: #ffd768; }
             s.health = this.health;
             s.maxHealth = this.maxHealth;
             s.foodValue = this.foodValue;
+            s.perception = this.perception;
+            s.sightRange = this.sightRange;
             s.edibleFoodRemaining = this.edibleFoodRemaining;
             return s;
         }
@@ -4162,7 +4388,7 @@ button:hover { background: #ffd768; }
                 for (var i = 0; i < (classCounts[className] || 0); i += 1) {
                     var adventurer = this.createAdventurerByClass(className, 'adventurer_' + index);
                     index += 1;
-                    var entryEdge = this.world.adventurerEntryEdge || 'left';
+                    var entryEdge = this.world.adventurerEntryEdge || DEFAULT_ADVENTURER_ENTRY_EDGE;
                     var point = this.world.findOpenEdgePoint(adventurer, entryEdge, this.rng, 120);
                     if (!point) { continue; }
                     adventurer.x = point.x;
@@ -4653,7 +4879,7 @@ button:hover { background: #ffd768; }
                 }
 
                 var threat = this.findNearestIntimidatingMacrofauna(adventurer);
-                if (!threat) {
+                if (!threat || !adventurer.canSee(this.world, threat)) {
                     continue;
                 }
 
@@ -4710,7 +4936,7 @@ button:hover { background: #ffd768; }
                     if (!adventurer.isActive() || distanceToMonster > ADVENTURER_THROW_RANGE) {
                         continue;
                     }
-                    if (distanceToMonster > MONSTER_ATTACK_RANGE && adventurer.carriedWorldObjectId && adventurer.attackCooldownTicks <= 0) {
+                    if (distanceToMonster > MONSTER_ATTACK_RANGE && adventurer.carriedWorldObjectId && adventurer.attackCooldownTicks <= 0 && adventurer.canSee(this.world, monster)) {
                         adventurer.attackCooldownTicks = COMBAT_COOLDOWN_TICKS * 2;
                         adventurer.throwImprovisedWeaponAt(monster, this);
                         continue;
@@ -5476,6 +5702,11 @@ button:hover { background: #ffd768; }
         }
         AddRegressionResult(results, 'Generated treasure is never placed in the first third from adventurer entry', generatedTreasureDistantEnough, 'seeds=150000-150024');
 
+        var defaultEntrySession = placementSession;
+        AddRegressionResult(results, 'Default adventurer entry edge is pinned by a single constant to the left edge', defaultEntrySession.world.adventurerEntryEdge === DEFAULT_ADVENTURER_ENTRY_EDGE && defaultEntrySession.world.adventurerEntryEdge === 'left', 'entryEdge=' + defaultEntrySession.world.adventurerEntryEdge);
+        defaultEntrySession.startSeason();
+        AddRegressionResult(results, 'Default adventurers enter from the configured left edge while owned monsters still deploy from the right', defaultEntrySession.currentRaid.adventurers.length === 0 || defaultEntrySession.currentRaid.adventurers.every(function (adventurer) { return adventurer.entryEdge === DEFAULT_ADVENTURER_ENTRY_EDGE && adventurer.exitEdge === DEFAULT_ADVENTURER_ENTRY_EDGE; }), 'entryEdge=' + defaultEntrySession.world.adventurerEntryEdge + ', monsters=' + defaultEntrySession.currentRaid.monsters.map(function (monster) { return monster.entryEdge || 'none'; }).join(','));
+
         var flexibleEntrySession = new GameSession(160001, { mode: 'quick', adventurerEntryEdge: 'top' });
         AddRegressionResult(results, 'World generation stores a non-left adventurer entry edge when requested', flexibleEntrySession.world.adventurerEntryEdge === 'top', 'entryEdge=' + flexibleEntrySession.world.adventurerEntryEdge);
         flexibleEntrySession.startSeason();
@@ -5563,6 +5794,74 @@ button:hover { background: #ffd768; }
         var endSnapshot = endScreenSession.getSnapshot();
         AddRegressionResult(results, 'End-of-round snapshots include the latest round summary for treasure stats', endSnapshot.latestRoundSummary && endSnapshot.latestRoundSummary.treasureRemainingAfterFoodValue === 123, 'afterFood=' + (endSnapshot.latestRoundSummary ? endSnapshot.latestRoundSummary.treasureRemainingAfterFoodValue : 'missing'));
         AddRegressionResult(results, 'Quick-game end state keeps the stats screen visible instead of auto-opening the main menu', true, 'browser static behaviour verified by harness');
+
+
+        var visionTypes = new Array(9 * 6).fill(TERRAIN_TYPE.GRASS);
+        var visionHeights = new Array(9 * 6).fill(8);
+        var visionGrid = new TerrainGrid(540, 360, 60, visionTypes, visionHeights, 0);
+        var visionBlocker = new TerrainObject('vision_blocker', 'bigRock', 270, 180, 42, true);
+        visionBlocker.blocksVisionAmount = 1.45;
+        var visionWorld = new World(333001, 540, 360, visionGrid, { vegetationDensity: 0.2 }, 12, [visionBlocker], [], 'left');
+        var visionObserver = new Monster('vision_observer', 110, 180, new SeededRng(333002), { perception: 0.5, sightRange: 430 });
+        var visionTarget = new Villager('vision_target', 430, 180, new SeededRng(333003));
+        AddRegressionResult(results, 'Opaque terrain objects block line of sight without using their movement radius as the visual rule', !visionObserver.canSee(visionWorld, visionTarget), 'blocked=' + !visionObserver.canSee(visionWorld, visionTarget));
+        visionBlocker.x = 270;
+        visionBlocker.y = 270;
+        AddRegressionResult(results, 'Agents can see targets when the segment is not occluded by terrain objects', visionObserver.canSee(visionWorld, visionTarget), 'clear=' + visionObserver.canSee(visionWorld, visionTarget));
+        visionBlocker.x = 270;
+        visionBlocker.y = 220;
+        AddRegressionResult(results, 'Partial foreground occlusion reduces visibility without always fully blocking sight', visionObserver.canSee(visionWorld, visionTarget), 'partialClear=' + visionObserver.canSee(visionWorld, visionTarget));
+
+        var longSightTarget = new Villager('long_sight_target', 525, 180, new SeededRng(333006));
+        AddRegressionResult(results, 'Clear unobstructed sight reaches substantially farther than short combat ranges', visionObserver.canSee(visionWorld, longSightTarget), 'distance=' + visionObserver.distanceTo(longSightTarget));
+
+        var forestTypes = new Array(9 * 6).fill(TERRAIN_TYPE.FOREST);
+        var forestGrid = new TerrainGrid(540, 360, 60, forestTypes, visionHeights.slice(0), 0);
+        var forestWorld = new World(333004, 540, 360, forestGrid, { vegetationDensity: 0.9 }, 12, [], [], 'left');
+        var distantForestTarget = new Villager('distant_forest_target', 525, 180, new SeededRng(333007));
+        AddRegressionResult(results, 'Accumulated forest visibility penalty hides distant targets', !visionObserver.canSee(forestWorld, distantForestTarget), 'forestHidden=' + !visionObserver.canSee(forestWorld, distantForestTarget));
+
+        var hiddenRaid = new Raid(visionWorld, session.gameState, 333005, 1);
+        hiddenRaid.adventurers = [visionTarget];
+        hiddenRaid.monsters = [visionObserver];
+        visionObserver.deployed = true;
+        visionObserver.x = 110;
+        visionObserver.y = 65;
+        visionTarget.x = 430;
+        visionTarget.y = 300;
+        visionBlocker.x = 270;
+        visionBlocker.y = 180;
+        AddRegressionResult(results, 'Monster target choice uses its own visibility check rather than omniscient nearest-target knowledge', visionObserver.chooseTarget(hiddenRaid) === null, 'chosen=' + (visionObserver.chooseTarget(hiddenRaid) ? visionObserver.chooseTarget(hiddenRaid).id : 'none'));
+
+
+        var edgeRoamSession = new GameSession(796156459, { mode: 'quick' });
+        edgeRoamSession.startSeason();
+        var edgeRoamRaid = edgeRoamSession.currentRaid;
+        var edgeRoamMonster = edgeRoamRaid.monsters.filter(function (monster) { return monster.owned && monster.deployed; })[0];
+        var edgeStartX = edgeRoamMonster.x;
+        for (var edgeRoamTick = 0; edgeRoamTick < 80; edgeRoamTick += 1) {
+            edgeRoamSession.tick();
+        }
+        AddRegressionResult(results, 'Deployed collared monsters without visible targets wander inward for fauna rather than guarding treasure', edgeRoamMonster.x < edgeStartX - 20 && edgeRoamMonster.pathIntentKey.indexOf('treasure') === -1, 'startX=' + edgeStartX + ', x=' + edgeRoamMonster.x + ', state=' + edgeRoamMonster.behaviourState + ', pathKey=' + edgeRoamMonster.pathIntentKey);
+
+        var slopeExitSession = new GameSession(796156459, { mode: 'quick' });
+        slopeExitSession.startSeason();
+        var slopeExitRaid = slopeExitSession.currentRaid;
+        var slopeExitAdventurer = slopeExitRaid.adventurers.filter(function (adventurer) { return adventurer.id === 'adventurer_4'; })[0];
+        slopeExitAdventurer.x = 750.6471909123846;
+        slopeExitAdventurer.y = 614.4330470488826;
+        slopeExitAdventurer.exitX = 0;
+        slopeExitAdventurer.exitY = 248.80560860037804;
+        slopeExitAdventurer.exitEdge = 'left';
+        slopeExitAdventurer.carryingTreasure = true;
+        slopeExitAdventurer.carryingAmount = 1;
+        slopeExitAdventurer.carryingTreasureType = 'bronze';
+        slopeExitAdventurer.behaviourState = 'escapingWithTreasure';
+        var slopeExitBeforeX = slopeExitAdventurer.x;
+        var slopeExitBeforeY = slopeExitAdventurer.y;
+        slopeExitAdventurer.moveWithPath(slopeExitRaid.world, slopeExitAdventurer.exitX, slopeExitAdventurer.exitY, slopeExitAdventurer.speed * slopeExitAdventurer.bodyHealth.movementMultiplier() * TICK_DT, slopeExitAdventurer.id + '_exit_regression');
+        var slopeExitMoved = Distance(slopeExitBeforeX, slopeExitBeforeY, slopeExitAdventurer.x, slopeExitAdventurer.y);
+        AddRegressionResult(results, 'Terrain movement cost uses the local step rather than the distant target elevation', slopeExitMoved > 0.01, 'moved=' + slopeExitMoved + ', stuck=' + slopeExitAdventurer.stuckTicks);
 
         var failed = results.filter(function (result) { return !result.passed; });
         return { count: results.length, passed: failed.length === 0, failures: failed.length, results: results };
