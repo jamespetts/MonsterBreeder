@@ -76,6 +76,8 @@ button:hover { background: #ffd768; }
 #monsterPortrait { display: none; }
 #eventLog { max-height: 8rem; overflow: auto; padding-left: 1.4rem; margin-top: 0.35rem; color: #d1d5db; }
 #eventLog li { margin-bottom: 0.35rem; }
+.selectionActions { margin-top: 0.6rem; display: flex; gap: 0.45rem; flex-wrap: wrap; }
+.selectionActions button { padding: 0.4rem 0.55rem; }
 .detailMuted { color: #9ca3af; }
 #mainMenuOverlay { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: rgba(2,6,23,0.92); color: #f9fafb; }
 #mainMenuOverlay.menuHidden { display: none; }
@@ -95,7 +97,7 @@ button:hover { background: #ffd768; }
 <body>
 <header id="topBar"><div><h1>Monster Breeder</h1><p>Breed and deploy a persistent brood of collared monsters across seasons.</p></div><div id="seasonDisplay" aria-live="polite">Main Menu</div><div id="controls"><button id="newRaidButton" type="button">Main Menu</button><button id="pauseButton" type="button">Pause</button><button id="resumeButton" type="button">Resume</button><button id="harnessButton" type="button">Run Harness</button></div></header>
 <main id="layout"><section id="mapPanel"><div id="viewportTopControls"><button id="monsterManagementTab" type="button" aria-label="Show monster management">Monster Management</button><button id="startSeasonButton" type="button">Start Season</button></div><div id="managementDrawer"><button id="closeManagementButton" type="button" aria-label="Close monster management">×</button><h2>Monster Management</h2><p id="managementSummary">Choose which collared monsters to release for the next season.</p><div id="managementBody"><div id="cageViewport"><div id="rosterList" aria-label="Captive monster cage"></div></div><aside id="selectedMonsterPanel"><h3>Cage</h3><p>Select a monster to inspect it.</p></aside></div><div id="managementActions"><span id="managementHint" class="hint"></span></div></div><canvas id="raidCanvas" width="960" height="540" aria-label="Raid map"></canvas><div id="monsterTooltip" class="tooltipHidden"></div><p class="hint">Use WASD/arrow keys or drag the map to pan. Mouse wheel zooms the map around the pointer; pinch zoom works on touch screens.</p></section><aside id="sidePanel"><section id="campaignStatsSection"><h2>Campaign Stats</h2><div id="statusBox">Open the main menu to start a campaign or single game.</div></section><section id="selectionSection"><h2>Selected Object</h2><div id="objectDetails">Click any monster, adventurer, treasure, scenery object or terrain tile to inspect it.</div><div id="monsterPortrait"></div><h3>Event Log</h3><ol id="eventLog"></ol></section></aside></main>
-<div id="mainMenuOverlay"><div id="mainMenuPanel"><h2>Monster Breeder</h2><p>Choose how to begin. Press ESC during play to return to this menu.</p><div class="mainMenuButtons"><button id="tutorialMenuButton" type="button" disabled>Tutorial - coming soon</button><button id="campaignMenuButton" type="button">Campaign</button><button id="quickGameMenuButton" type="button">Quick Game</button><button id="customGameMenuButton" type="button" disabled>Custom Game - coming soon</button><button id="optionsMenuButton" type="button" disabled>Options - coming soon</button><button id="saveGameMenuButton" type="button" disabled>Save - coming soon</button><button id="loadGameMenuButton" type="button" disabled>Load - coming soon</button></div></div></div>
+<div id="mainMenuOverlay"><div id="mainMenuPanel"><h2>Monster Breeder</h2><p>Choose how to begin. Press ESC during play to return to this menu.</p><div class="mainMenuButtons"><button id="resumeGameMenuButton" type="button" disabled>Resume game</button><button id="tutorialMenuButton" type="button" disabled>Tutorial - coming soon</button><button id="campaignMenuButton" type="button">Campaign</button><button id="quickGameMenuButton" type="button">Quick Game</button><button id="customGameMenuButton" type="button" disabled>Custom Game - coming soon</button><button id="optionsMenuButton" type="button" disabled>Options - coming soon</button><button id="saveGameMenuButton" type="button" disabled>Save - coming soon</button><button id="loadGameMenuButton" type="button" disabled>Load - coming soon</button></div></div></div>
 <script id="simulationWorkerSource" type="text/plain">
 
 // SPDX-License-Identifier: GPL-3.0-only
@@ -149,6 +151,9 @@ button:hover { background: #ffd768; }
     var PATH_MONSTER_REPATH_COOLDOWN_TICKS = 10;
     var MONSTER_ATTACK_RANGE = 26;
     var COMBAT_COOLDOWN_TICKS = 8;
+    var ADVENTURER_THROW_RANGE = 190;
+    var ADVENTURER_PICKUP_RANGE = 34;
+    var THROWN_PROJECTILE_ANIMATION_TICKS = 18;
     var WILD_MONSTER_COUNT_MIN = 1;
     var WILD_MONSTER_COUNT_MAX = 3;
     var WILD_MONSTER_FIRST_SPAWN_TICK_MIN = 45;
@@ -166,6 +171,8 @@ button:hover { background: #ffd768; }
     var MACROFAUNA_FLEE_RANGE = 210;
     var MACROFAUNA_WANDER_RETARGET_TICKS_MIN = 90;
     var MACROFAUNA_WANDER_RETARGET_TICKS_MAX = 240;
+    var MACROFAUNA_WANDER_TURN_LIMIT_RADIANS = Math.PI * 0.34;
+    var DEPARTED_MACROFAUNA_TRACK_TICKS = 180;
     var MICROFAUNA_EMITTER_COUNT_MIN = 8;
     var MICROFAUNA_EMITTER_COUNT_MAX = 18;
     var FOOD_EATING_TICKS_PER_FOOD = 45;
@@ -270,17 +277,18 @@ button:hover { background: #ffd768; }
     }
 
     function RandomOffMapPoint(world, rng, margin) {
+        var offMapMargin = Number.isFinite(margin) ? Math.max(0, margin) : 0;
         var edge = rng.integer(0, 3);
         if (edge === 0) {
-            return { x: rng.range(0, world.width), y: 0 };
+            return { x: rng.range(0, world.width), y: -offMapMargin };
         }
         if (edge === 1) {
-            return { x: rng.range(0, world.width), y: world.height };
+            return { x: rng.range(0, world.width), y: world.height + offMapMargin };
         }
         if (edge === 2) {
-            return { x: 0, y: rng.range(0, world.height) };
+            return { x: -offMapMargin, y: rng.range(0, world.height) };
         }
-        return { x: world.width, y: rng.range(0, world.height) };
+        return { x: world.width + offMapMargin, y: rng.range(0, world.height) };
     }
 
     class BinaryHeap {
@@ -516,6 +524,11 @@ button:hover { background: #ffd768; }
             s.blockingRadius = this.blockingRadius;
             s.blocksVisionAmount = this.blocksVisionAmount;
             s.variant = this.variant;
+            if (this.carryable !== undefined) { s.carryable = this.carryable; }
+            if (this.throwable !== undefined) { s.throwable = this.throwable; }
+            if (this.weight !== undefined) { s.weight = this.weight; }
+            if (this.damage !== undefined) { s.damage = this.damage; }
+            if (this.carriedById !== undefined) { s.carriedById = this.carriedById; }
             return s;
         }
     }
@@ -570,7 +583,7 @@ button:hover { background: #ffd768; }
         constructor(id, x, y, rng) {
             super(id, 'stick', x, y, 7, false);
             this.carryable = true;
-            this.throwable = false;
+            this.throwable = true;
             this.weight = rng.range(0.4, 1.2);
             this.damage = 5;
             this.variant = rng.integer(0, 2);
@@ -629,13 +642,21 @@ button:hover { background: #ffd768; }
             this.sourceAgentId = sourceAgentId;
         }
 
+        take(maxAmount) {
+            var amount = Math.min(maxAmount, this.amountRemaining);
+            this.amountRemaining -= amount;
+            return amount;
+        }
+
         getSnapshot() {
             var profile = TREASURE_TYPES[this.treasureType];
             var s = super.getSnapshot();
             s.type = this.type;
             s.kind = this.kind;
             s.treasureType = this.treasureType;
+            s.treasureDisplayName = profile.displayName;
             s.colour = profile.colour;
+            s.unitValue = profile.unitValue;
             s.amountRemaining = this.amountRemaining;
             s.value = this.amountRemaining * profile.unitValue;
             return s;
@@ -836,9 +857,9 @@ button:hover { background: #ffd768; }
                 p = WorldGenerator.findOpenPoint(rng, grid, objects, 55, true);
 
                 if (p) {
-                    var emitter = new TerrainObject('microfauna_' + i, 'microfauna', p.x, p.y, rng.range(14, 28), false);
                     var terrainType = grid.getTerrainTypeAtWorld(p.x, p.y);
-                    emitter.species = terrainType === TERRAIN_TYPE.MARSH ? 'marsh midges' : (terrainType === TERRAIN_TYPE.FOREST ? 'woodland insects' : 'field crickets');
+                    var species = terrainType === TERRAIN_TYPE.MARSH ? 'marsh midges' : (terrainType === TERRAIN_TYPE.FOREST ? 'woodland insects' : 'field crickets');
+                    var emitter = new MicrofaunaEmitter('microfauna_' + i, species, p.x, p.y, rng.range(14, 28));
                     emitter.variant = rng.integer(0, 2);
                     objects.push(emitter);
                 }
@@ -850,7 +871,20 @@ button:hover { background: #ffd768; }
         static createTreasureDeposits(rng, grid, objects) {
             var deposits = [];
             var types = ['bronze', 'silver', 'gold', 'rubies', 'emeralds'];
-            var count = rng.integer(3, 5);
+            var tierRoll = rng.nextFloat();
+            var highestTierIndex;
+            if (tierRoll < 0.25) {
+                highestTierIndex = 0;
+            } else if (tierRoll < 0.48) {
+                highestTierIndex = 1;
+            } else if (tierRoll < 0.72) {
+                highestTierIndex = 2;
+            } else if (tierRoll < 0.90) {
+                highestTierIndex = 3;
+            } else {
+                highestTierIndex = 4;
+            }
+            var count = highestTierIndex + 1;
 
             for (var i = 0; i < count; i += 1) {
                 var occupied = objects.concat(deposits);
@@ -1153,7 +1187,7 @@ button:hover { background: #ffd768; }
             return total;
         }
 
-        getTreasureBreakdown() {
+        getTreasureBreakdown(extraLooseTreasure) {
             var breakdown = {
                 starting: { byType: {}, totalUnits: 0, totalValue: 0 },
                 stolen: { byType: {}, totalUnits: 0, totalValue: 0 },
@@ -1171,28 +1205,53 @@ button:hover { background: #ffd768; }
                     };
                 });
             });
+
+            function addAmount(section, treasureType, amount) {
+                if (!amount || amount <= 0) {
+                    return;
+                }
+                var profile = TREASURE_TYPES[treasureType];
+                var row = breakdown[section].byType[treasureType];
+                row.amount += amount;
+                row.value += amount * profile.unitValue;
+                breakdown[section].totalUnits += amount;
+                breakdown[section].totalValue += amount * profile.unitValue;
+            }
+
             this.treasureDeposits.forEach(function (deposit) {
-                var profile = TREASURE_TYPES[deposit.treasureType];
-                var startingAmount = deposit.startingAmount || 0;
-                var remainingAmount = deposit.amountRemaining || 0;
-                var stolenAmount = Math.max(0, startingAmount - remainingAmount);
-                var data = { starting: startingAmount, stolen: stolenAmount, remaining: remainingAmount };
-                Object.keys(data).forEach(function (section) {
-                    var amount = data[section];
-                    var row = breakdown[section].byType[deposit.treasureType];
-                    row.amount += amount;
-                    row.value += amount * profile.unitValue;
-                    breakdown[section].totalUnits += amount;
-                    breakdown[section].totalValue += amount * profile.unitValue;
-                });
+                addAmount('starting', deposit.treasureType, deposit.startingAmount || 0);
+                addAmount('remaining', deposit.treasureType, deposit.amountRemaining || 0);
             });
+
+            (extraLooseTreasure || []).forEach(function (treasure) {
+                addAmount('remaining', treasure.treasureType, treasure.amountRemaining || 0);
+            });
+
+            TREASURE_TYPE_ORDER.forEach(function (treasureType) {
+                var startingAmount = breakdown.starting.byType[treasureType].amount;
+                var remainingAmount = breakdown.remaining.byType[treasureType].amount;
+                addAmount('stolen', treasureType, Math.max(0, startingAmount - remainingAmount));
+            });
+
             breakdown.foodExpenditureCredits = this.foodExpenditureCredits || 0;
             breakdown.remainingAfterFoodValue = Math.max(0, breakdown.remaining.totalValue - breakdown.foodExpenditureCredits);
             return breakdown;
         }
 
-        hasTreasureRemaining() {
-            return this.treasureDeposits.some(function (deposit) {
+        getTreasureStateSnapshot(extraLooseTreasure) {
+            return {
+                treasureDeposits: this.getTreasureSnapshots(),
+                remainingTreasureValue: this.getRemainingTreasureValue(),
+                treasureBreakdown: this.getTreasureBreakdown(extraLooseTreasure),
+                foodExpenditureCredits: this.foodExpenditureCredits || 0
+            };
+        }
+
+        hasTreasureRemaining(extraLooseTreasure) {
+            var looseTreasureRemaining = (extraLooseTreasure || []).some(function (treasure) {
+                return (treasure.amountRemaining || 0) > 0;
+            });
+            return looseTreasureRemaining || this.treasureDeposits.some(function (deposit) {
                 return !deposit.isEmpty();
             });
         }
@@ -1209,13 +1268,9 @@ button:hover { background: #ffd768; }
             };
         }
 
-        getSnapshot() {
+        getDebugSnapshot() {
             var snapshot = this.getStaticSnapshot();
-            snapshot.treasureDeposits = this.getTreasureSnapshots();
-            snapshot.remainingTreasureValue = this.getRemainingTreasureValue();
-            snapshot.treasureBreakdown = this.getTreasureBreakdown();
-            snapshot.foodExpenditureCredits = this.foodExpenditureCredits || 0;
-            return snapshot;
+            return Object.assign(snapshot, this.getTreasureStateSnapshot([]));
         }
     }
 
@@ -1317,6 +1372,7 @@ button:hover { background: #ffd768; }
             this.stuckTicks = 0;
             this.alive = true;
             this.escaped = false;
+            this.corpseState = 'alive';
             this.behaviourState = 'idle';
             this.attackCooldownTicks = 0;
             this.isMounted = false;
@@ -1725,6 +1781,7 @@ button:hover { background: #ffd768; }
             s.speed = this.speed;
             s.alive = this.alive;
             s.escaped = this.escaped;
+            s.corpseState = this.corpseState || (this.alive ? 'alive' : ((this.edibleFoodRemaining || 0) > 0 ? 'corpse' : 'skeleton'));
             s.behaviourState = this.behaviourState;
             s.attackCooldownTicks = this.attackCooldownTicks;
             return s;
@@ -1761,6 +1818,10 @@ button:hover { background: #ffd768; }
             this.eyeHeight = 5;
             this.foodValue = HUMAN_FOOD_VALUE;
             this.edibleFoodRemaining = 0;
+            this.carriedWorldObjectId = null;
+            this.carriedWorldObjectType = null;
+            this.carriedWorldObjectDamage = 0;
+            this.carriedWorldObjectWeight = 0;
         }
 
         update(raid) {
@@ -1770,9 +1831,15 @@ button:hover { background: #ffd768; }
 
             if (this.fleeing || this.carryingTreasure) {
                 this.behaviourState = this.fleeing ? 'fleeing' : 'escapingWithTreasure';
+                if (this.hasReachedExit(raid.world)) {
+                    this.escaped = true;
+                    raid.addEvent(this.carryingTreasure ? 'An adventurer escaped with treasure.' : 'A wounded adventurer fled off the map.');
+                    return;
+                }
+
                 this.moveWithPath(raid.world, this.exitX, this.exitY, this.speed * this.bodyHealth.movementMultiplier() * TICK_DT, this.id + '_exit');
 
-                if (this.x <= 12 && Distance(this.x, this.y, this.exitX, this.exitY) <= 34) {
+                if (this.hasReachedExit(raid.world)) {
                     this.escaped = true;
                     raid.addEvent(this.carryingTreasure ? 'An adventurer escaped with treasure.' : 'A wounded adventurer fled off the map.');
                 }
@@ -1780,6 +1847,7 @@ button:hover { background: #ffd768; }
                 return;
             }
 
+            this.tryPickupImprovisedWeapon(raid);
             var target = this.chooseTreasure(raid);
             this.targetTreasureId = target ? target.id : null;
 
@@ -1797,6 +1865,63 @@ button:hover { background: #ffd768; }
             }
         }
 
+        getExitEdge(world) {
+            if (this.exitEdge) {
+                return this.exitEdge;
+            }
+            if (this.exitX <= 0) {
+                return 'left';
+            }
+            if (this.exitX >= world.width) {
+                return 'right';
+            }
+            if (this.exitY <= 0) {
+                return 'top';
+            }
+            if (this.exitY >= world.height) {
+                return 'bottom';
+            }
+            return null;
+        }
+
+        exitEdgeTolerance() {
+            return Math.max(2, this.radius || 0);
+        }
+
+        hasReachedExit(world) {
+            var exitEdge = this.getExitEdge(world);
+            var tolerance = this.exitEdgeTolerance();
+            if (exitEdge === 'left') {
+                return this.x <= tolerance;
+            }
+            if (exitEdge === 'right') {
+                return this.x >= world.width - tolerance;
+            }
+            if (exitEdge === 'top') {
+                return this.y <= tolerance;
+            }
+            if (exitEdge === 'bottom') {
+                return this.y >= world.height - tolerance;
+            }
+            return this.hasReachedMapExitTarget(world, this.exitX, this.exitY) && Distance(this.x, this.y, this.exitX, this.exitY) <= 34;
+        }
+
+        scoreTreasureTarget(treasure) {
+            var profile = TREASURE_TYPES[treasure.treasureType];
+            var unitValue = profile ? profile.unitValue : 1;
+            var distance = Math.max(1, Distance(this.x, this.y, treasure.x, treasure.y));
+
+            // Villagers have low risk tolerance and weak planning: nearby treasure
+            // dominates. Higher-value treasure wins only when it is not much farther.
+            if (this.className === 'villager') {
+                return unitValue / Math.pow(distance, 4);
+            }
+
+            var greedWeight = 0.85 + (this.greed || 0.5) * 0.6;
+            var intelligenceWeight = 0.85 + (this.intelligence || 0.5) * 0.45;
+            return (unitValue * greedWeight * intelligenceWeight) / Math.pow(distance, 1.05);
+        }
+
         chooseTreasure(raid) {
             var available = raid.world.treasureDeposits.filter(function (deposit) {
                 return !deposit.isEmpty();
@@ -1809,7 +1934,7 @@ button:hover { background: #ffd768; }
             }
 
             available.sort(function (a, b) {
-                return Distance(this.x, this.y, a.x, a.y) - Distance(this.x, this.y, b.x, b.y);
+                return this.scoreTreasureTarget(b) - this.scoreTreasureTarget(a);
             }.bind(this));
 
             return available[0];
@@ -1830,6 +1955,68 @@ button:hover { background: #ffd768; }
             }
         }
 
+        tryPickupImprovisedWeapon(raid) {
+            if (this.carriedWorldObjectId || this.carryingTreasure || this.className !== 'villager') {
+                return false;
+            }
+            var best = null;
+            var bestDistance = ADVENTURER_PICKUP_RANGE;
+            for (var i = 0; i < raid.world.terrainObjects.length; i += 1) {
+                var object = raid.world.terrainObjects[i];
+                if (!object.carryable || !object.throwable || object.carriedById) { continue; }
+                var distance = this.distanceTo(object);
+                if (distance < bestDistance) { best = object; bestDistance = distance; }
+            }
+            if (!best) { return false; }
+            best.carriedById = this.id;
+            this.carriedWorldObjectId = best.id;
+            this.carriedWorldObjectType = best.type;
+            this.carriedWorldObjectDamage = best.damage || 5;
+            this.carriedWorldObjectWeight = best.weight || 1;
+            this.behaviourState = 'armingSelf';
+            raid.addEvent('A villager picked up a ' + (best.type === 'stick' ? 'stick' : 'rock') + '.');
+            return true;
+        }
+
+        getCarriedWorldObject(raid) {
+            if (!this.carriedWorldObjectId) { return null; }
+            for (var i = 0; i < raid.world.terrainObjects.length; i += 1) {
+                if (raid.world.terrainObjects[i].id === this.carriedWorldObjectId) { return raid.world.terrainObjects[i]; }
+            }
+            return null;
+        }
+
+        throwImprovisedWeaponAt(target, raid) {
+            var object = this.getCarriedWorldObject(raid);
+            if (!object || !target || !target.isActive()) { return false; }
+            // Later adventurer genetics/traits should feed into these two values:
+            // strength should affect throwStrength, while skill/perception/caution should affect aimError.
+            var throwStrength = raid.rng.range(0.78, 1.22);
+            var aimError = raid.rng.range(10, 48) * (1.25 - Clamp(this.perception || 0.3, 0, 1) * 0.45);
+            var angle = Math.atan2(target.y - this.y, target.x - this.x) + raid.rng.range(-0.28, 0.28);
+            var endX = Clamp(target.x + Math.cos(angle + Math.PI / 2) * raid.rng.range(-aimError, aimError), 20, raid.world.width - 20);
+            var endY = Clamp(target.y + Math.sin(angle + Math.PI / 2) * raid.rng.range(-aimError, aimError), 20, raid.world.height - 20);
+            var hit = Distance(endX, endY, target.x, target.y) <= target.radius + 18;
+            var damage = Math.max(1, Math.round((object.damage || this.carriedWorldObjectDamage || 5) * throwStrength));
+            object.x = endX;
+            object.y = endY;
+            object.carriedById = null;
+            raid.thrownProjectiles.push({ id: 'throw_' + raid.nextThrownProjectileId, objectId: object.id, objectType: object.type, startX: this.x, startY: this.y, endX: endX, endY: endY, startTick: raid.tickNumber, durationTicks: THROWN_PROJECTILE_ANIMATION_TICKS, hit: hit });
+            raid.nextThrownProjectileId += 1;
+            this.carriedWorldObjectId = null;
+            this.carriedWorldObjectType = null;
+            this.carriedWorldObjectDamage = 0;
+            this.carriedWorldObjectWeight = 0;
+            this.behaviourState = 'throwing';
+            if (hit) {
+                target.applyDamage(damage, raid.rng);
+                raid.addEvent('A villager hit ' + target.name + ' with a thrown ' + (object.type === 'stick' ? 'stick' : 'rock') + '.');
+            } else {
+                raid.addEvent('A villager threw a ' + (object.type === 'stick' ? 'stick' : 'rock') + ' and missed.');
+            }
+            return true;
+        }
+
         applyDamage(amount, rng, raid) {
             var part = this.bodyHealth.applyGeneralDamage(amount, rng);
             this.health = this.bodyHealth.total();
@@ -1840,6 +2027,7 @@ button:hover { background: #ffd768; }
 
             if (this.bodyHealth.isDead()) {
                 this.alive = false;
+                this.corpseState = 'corpse';
                 this.edibleFoodRemaining = Math.max(this.edibleFoodRemaining || 0, this.foodValue || HUMAN_FOOD_VALUE);
                 this.dropTreasure(raid, 'death');
             } else if (!this.fleeing && this.health < this.maxHealth * 0.35) {
@@ -1882,6 +2070,13 @@ button:hover { background: #ffd768; }
             s.fleeing = this.fleeing;
             s.foodValue = this.foodValue;
             s.edibleFoodRemaining = this.edibleFoodRemaining;
+            s.carriedWorldObjectId = this.carriedWorldObjectId;
+            s.carriedWorldObjectType = this.carriedWorldObjectType;
+            s.carriedWorldObjectDamage = this.carriedWorldObjectDamage;
+            s.carriedWorldObjectWeight = this.carriedWorldObjectWeight;
+            s.humanFear = this.humanFear;
+            s.attackHumans = this.attackHumans;
+            s.humanTargetId = this.humanTargetId;
             return s;
         }
     }
@@ -1939,6 +2134,10 @@ button:hover { background: #ffd768; }
                 return 0;
             }
             carcass.edibleFoodRemaining = Math.max(0, (carcass.edibleFoodRemaining || 0) - 1);
+            if (carcass.edibleFoodRemaining <= 0) {
+                carcass.corpseState = 'skeleton';
+                carcass.behaviourState = 'skeleton';
+            }
             monster.foodEatenThisSeason = (monster.foodEatenThisSeason || 0) + 1;
             return 1;
         },
@@ -2092,6 +2291,10 @@ button:hover { background: #ffd768; }
             this.eatingTicksRemaining = 0;
             this.wildExitTargetX = null;
             this.wildExitTargetY = null;
+            this.lastMacrofaunaTargetId = null;
+            this.lastMacrofaunaTargetX = null;
+            this.lastMacrofaunaTargetY = null;
+            this.lastMacrofaunaTargetTick = -1;
         }
 
         static randomName(rng) {
@@ -2124,6 +2327,25 @@ button:hover { background: #ffd768; }
                 this.x = Clamp(this.x, 0, raid.world.width);
                 this.y = Clamp(this.y, 0, raid.world.height);
                 raid.addEvent('An uncollared wild monster wandered away from the map.');
+            }
+        }
+
+        rememberMacrofaunaTarget(target, raid) {
+            this.lastMacrofaunaTargetId = target.id;
+            this.lastMacrofaunaTargetX = target.x;
+            this.lastMacrofaunaTargetY = target.y;
+            this.lastMacrofaunaTargetTick = raid.tickNumber;
+        }
+
+        continueDepartedMacrofaunaChase(raid, trail) {
+            this.behaviourState = 'pursuingFaunaOffMap';
+            this.moveWithPath(raid.world, trail.exitX, trail.exitY, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT, this.id + '_departed_' + trail.id);
+            if (this.hasReachedMapExitTarget(raid.world, trail.exitX, trail.exitY)) {
+                this.escaped = true;
+                this.deployed = false;
+                this.x = Clamp(this.x, 0, raid.world.width);
+                this.y = Clamp(this.y, 0, raid.world.height);
+                raid.addEvent('An uncollared wild monster pursued escaped macrofauna off the map.');
             }
         }
 
@@ -2221,6 +2443,7 @@ button:hover { background: #ffd768; }
 
             var preyTarget = this.chooseMacrofaunaTarget(raid);
             if (preyTarget) {
+                this.rememberMacrofaunaTarget(preyTarget, raid);
                 if (this.distanceTo(preyTarget) > MONSTER_ATTACK_RANGE) {
                     this.behaviourState = 'huntingFauna';
                     this.moveWithPath(raid.world, preyTarget.x, preyTarget.y, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT, this.id + '_hunt_' + preyTarget.id);
@@ -2228,6 +2451,14 @@ button:hover { background: #ffd768; }
                     this.behaviourState = 'attackingFauna';
                 }
                 return;
+            }
+
+            if (this.canLeavePlayableArea()) {
+                var departedPreyTrail = raid.findDepartedMacrofaunaTrailForMonster(this);
+                if (departedPreyTrail) {
+                    this.continueDepartedMacrofaunaChase(raid, departedPreyTrail);
+                    return;
+                }
             }
 
             if (this.canLeavePlayableArea() && (this.behaviourState === 'wanderingOff' || raid.rng.nextFloat() < 0.0025)) {
@@ -2335,6 +2566,7 @@ button:hover { background: #ffd768; }
 
             if (this.bodyHealth.isDead()) {
                 this.alive = false;
+                this.corpseState = 'corpse';
                 this.behaviourState = 'dead';
             }
         }
@@ -2403,9 +2635,10 @@ button:hover { background: #ffd768; }
     }
 
     var MACROFAUNA_PROFILE = {
-        deer: { displayName: 'deer', radius: 12, speedMin: 118, speedMax: 154, health: 42, foodValue: 10, colour: '#8b5a2b' },
-        boar: { displayName: 'boar', radius: 13, speedMin: 88, speedMax: 120, health: 56, foodValue: 8, colour: '#4b3528' },
-        hare: { displayName: 'hare', radius: 8, speedMin: 138, speedMax: 178, health: 18, foodValue: 2, colour: '#b08a5b' }
+        deer: { displayName: 'deer', radius: 12, speedMin: 118, speedMax: 154, health: 42, foodValue: 10, colour: '#8b5a2b', fleesHumans: true, humanFleeChance: 0.98, humanFear: 0.05, humanThreatRange: 120, attackHumans: false, attackChance: 0, attackDamageMin: 0, attackDamageMax: 0 },
+        boar: { displayName: 'boar', radius: 13, speedMin: 88, speedMax: 120, health: 56, foodValue: 8, colour: '#4b3528', fleesHumans: true, humanFleeChance: 0.86, humanFear: 0.42, humanThreatRange: 185, attackHumans: true, attackChance: 0.16, attackDamageMin: 10, attackDamageMax: 22 },
+        hare: { displayName: 'hare', radius: 8, speedMin: 138, speedMax: 178, health: 18, foodValue: 2, colour: '#b08a5b', fleesHumans: true, humanFleeChance: 1, humanFear: 0.01, humanThreatRange: 80, attackHumans: false, attackChance: 0, attackDamageMin: 0, attackDamageMax: 0 },
+        bear: { displayName: 'bear', radius: 18, speedMin: 92, speedMax: 126, health: 112, foodValue: 16, colour: '#3b2f2a', fleesHumans: true, humanFleeChance: 0.74, humanFear: 0.86, humanThreatRange: 280, attackHumans: true, attackChance: 0.28, attackDamageMin: 18, attackDamageMax: 38 }
     };
 
     class Macrofauna extends Agent {
@@ -2420,9 +2653,19 @@ button:hover { background: #ffd768; }
             this.health = profile.health;
             this.foodValue = profile.foodValue;
             this.edibleFoodRemaining = 0;
+            this.fleesHumans = profile.fleesHumans !== false;
+            this.humanFleeChance = profile.humanFleeChance || 0;
+            this.humanFear = profile.humanFear || 0;
+            this.humanThreatRange = profile.humanThreatRange || 0;
+            this.attackHumans = !!profile.attackHumans;
+            this.attackChance = profile.attackChance || 0;
+            this.attackDamageMin = profile.attackDamageMin || 0;
+            this.attackDamageMax = profile.attackDamageMax || 0;
+            this.humanTargetId = null;
             this.behaviourState = 'grazing';
             this.wanderTargetX = x;
             this.wanderTargetY = y;
+            this.wanderHeading = rng.range(0, Math.PI * 2);
             this.wanderRetargetTicks = rng.integer(MACROFAUNA_WANDER_RETARGET_TICKS_MIN, MACROFAUNA_WANDER_RETARGET_TICKS_MAX);
             this.eyeHeight = 3;
             this.sightRange = 260;
@@ -2436,18 +2679,36 @@ button:hover { background: #ffd768; }
             if (!this.isActive()) {
                 return;
             }
-            var threat = this.findNearestThreat(raid);
+
+            this.humanTargetId = null;
+            var monsterThreat = this.findNearestMonsterThreat(raid);
+            var humanThreat = this.findNearestHumanThreat(raid);
             var speedMultiplier = 1;
             var targetX;
             var targetY;
-            if (threat && this.distanceTo(threat) <= MACROFAUNA_FLEE_RANGE) {
-                this.behaviourState = 'fleeing';
-                var dx = this.x - threat.x;
-                var dy = this.y - threat.y;
-                var len = Math.hypot(dx, dy) || 1;
-                targetX = this.x + (dx / len) * 260;
-                targetY = this.y + (dy / len) * 260;
-                speedMultiplier = 1.22;
+
+            if (monsterThreat && this.distanceTo(monsterThreat) <= MACROFAUNA_FLEE_RANGE) {
+                this.behaviourState = 'fleeingFromMonster';
+                var mdx = this.x - monsterThreat.x;
+                var mdy = this.y - monsterThreat.y;
+                var mlen = Math.hypot(mdx, mdy) || 1;
+                targetX = this.x + (mdx / mlen) * 280;
+                targetY = this.y + (mdy / mlen) * 280;
+                speedMultiplier = 1.26;
+            } else if (humanThreat && this.distanceTo(humanThreat) <= MACROFAUNA_FLEE_RANGE && this.shouldFleeFromHuman(humanThreat, raid)) {
+                this.behaviourState = 'fleeingFromHuman';
+                var hdx = this.x - humanThreat.x;
+                var hdy = this.y - humanThreat.y;
+                var hlen = Math.hypot(hdx, hdy) || 1;
+                targetX = this.x + (hdx / hlen) * 250;
+                targetY = this.y + (hdy / hlen) * 250;
+                speedMultiplier = this.species === 'hare' ? 1.34 : 1.18;
+            } else if (humanThreat && this.attackHumans && this.distanceTo(humanThreat) <= this.humanThreatRange) {
+                this.humanTargetId = humanThreat.id;
+                this.behaviourState = 'menacingHuman';
+                targetX = humanThreat.x;
+                targetY = humanThreat.y;
+                speedMultiplier = 0.72;
             } else {
                 this.behaviourState = 'grazing';
                 this.wanderRetargetTicks -= 1;
@@ -2458,21 +2719,32 @@ button:hover { background: #ffd768; }
                 targetY = this.wanderTargetY;
                 speedMultiplier = 0.55;
             }
+
             this.moveWithPath(raid.world, targetX, targetY, this.speed * speedMultiplier * TICK_DT, this.id + '_' + this.behaviourState);
             if (this.hasReachedMapExitTarget(raid.world, targetX, targetY)) {
                 this.escaped = true;
                 this.x = Clamp(this.x, 0, raid.world.width);
                 this.y = Clamp(this.y, 0, raid.world.height);
+                raid.recordDepartedMacrofauna(this, targetX, targetY);
                 raid.addEvent('A ' + this.displayName + ' wandered away from the map.');
             }
         }
 
-        findNearestThreat(raid) {
+        findNearestMonsterThreat(raid) {
             var candidates = raid.monsters.filter(function (monster) {
                 return monster.isActive() && monster.deployed;
-            }).concat(raid.adventurers.filter(function (adventurer) {
+            });
+            return this.findNearestAgent(candidates);
+        }
+
+        findNearestHumanThreat(raid) {
+            var candidates = raid.adventurers.filter(function (adventurer) {
                 return adventurer.isActive();
-            }));
+            });
+            return this.findNearestAgent(candidates);
+        }
+
+        findNearestAgent(candidates) {
             var best = null;
             var bestDistance = Infinity;
             for (var i = 0; i < candidates.length; i += 1) {
@@ -2485,20 +2757,39 @@ button:hover { background: #ffd768; }
             return best;
         }
 
+        shouldFleeFromHuman(human, raid) {
+            if (!this.fleesHumans) {
+                return false;
+            }
+            if (!this.attackHumans) {
+                return true;
+            }
+            if (this.health < this.maxHealth * 0.55) {
+                return true;
+            }
+            var humanCouragePressure = Clamp(0.28 + (human.courage || 0) * 0.45, 0, 0.82);
+            var fleeProbability = Clamp(this.humanFleeChance + humanCouragePressure - this.humanFear * 0.22, 0.2, 0.98);
+            return raid.rng.nextFloat() < fleeProbability;
+        }
+
         chooseWanderTarget(world, rng) {
             this.wanderRetargetTicks = rng.integer(MACROFAUNA_WANDER_RETARGET_TICKS_MIN, MACROFAUNA_WANDER_RETARGET_TICKS_MAX);
             if (rng.nextFloat() < 0.08) {
                 var exitPoint = RandomOffMapPoint(world, rng, OFF_MAP_ESCAPE_MARGIN);
+                this.wanderHeading = Math.atan2(exitPoint.y - this.y, exitPoint.x - this.x);
                 this.wanderTargetX = exitPoint.x;
                 this.wanderTargetY = exitPoint.y;
                 return;
             }
             for (var attempt = 0; attempt < 40; attempt += 1) {
-                var angle = rng.range(0, Math.PI * 2);
-                var distance = rng.range(70, 210);
+                var baseTurnLimit = this.species === 'hare' ? MACROFAUNA_WANDER_TURN_LIMIT_RADIANS * 0.62 : MACROFAUNA_WANDER_TURN_LIMIT_RADIANS;
+                var turnLimit = attempt < 34 ? baseTurnLimit : Math.PI * 0.72;
+                var angle = this.wanderHeading + rng.range(-turnLimit, turnLimit);
+                var distance = this.species === 'hare' ? rng.range(135, 260) : rng.range(105, 235);
                 var x = Clamp(this.x + Math.cos(angle) * distance, 80, world.width - 80);
                 var y = Clamp(this.y + Math.sin(angle) * distance, 80, world.height - 80);
                 if (!this.isInsideObstacle(world, x, y)) {
+                    this.wanderHeading = angle;
                     this.wanderTargetX = x;
                     this.wanderTargetY = y;
                     return;
@@ -2515,6 +2806,7 @@ button:hover { background: #ffd768; }
             this.health = Math.max(0, this.health - amount);
             if (this.health <= 0) {
                 this.alive = false;
+                this.corpseState = 'corpse';
                 this.behaviourState = 'dead';
                 this.edibleFoodRemaining = Math.max(this.edibleFoodRemaining || 0, this.foodValue || LARGE_MACROFAUNA_FOOD_VALUE);
             }
@@ -2649,18 +2941,23 @@ button:hover { background: #ffd768; }
             });
             this.adventurers = this.createAdventurers();
             this.macrofauna = this.createMacrofauna();
+            this.departedMacrofaunaTrails = [];
             this.wildMonsters = [];
             this.pendingWildMonsters = this.createWildMonsters();
             this.monsters = gameState.ownedMonsters.concat(this.wildMonsters);
             this.deploySelectedOwnedMonsters();
             this.droppedTreasure = [];
             this.nextDroppedTreasureId = 1;
+            this.thrownProjectiles = [];
+            this.nextThrownProjectileId = 1;
             this.addEvent('Season ' + this.seasonNumber + ' raid started in world seed ' + this.world.seed + '.');
         }
 
         createAdventurers() {
             var settlementFactor = Clamp((35 - this.world.distanceToSettlementMiles) / 35, 0.15, 1);
-            var count = Clamp(1 + Math.round(settlementFactor * 2 + this.world.getRemainingTreasureValue() / 900), 1, 5);
+            var treasureValue = this.world.getRemainingTreasureValue();
+            var treasurePressure = Math.sqrt(treasureValue / 2000);
+            var count = Clamp(1 + Math.round(settlementFactor * 1.5 + treasurePressure), 1, 5);
             var adventurers = [];
 
             for (var i = 0; i < count; i += 1) {
@@ -2677,6 +2974,7 @@ button:hover { background: #ffd768; }
                 adventurer.entryY = point.y;
                 adventurer.exitX = point.x;
                 adventurer.exitY = point.y;
+                adventurer.exitEdge = adventurer.entryEdge;
                 adventurers.push(adventurer);
             }
 
@@ -2685,6 +2983,16 @@ button:hover { background: #ffd768; }
 
         chooseMacrofaunaSpecies() {
             var environment = this.world.environment || {};
+            var bearChance = 0.025;
+            if ((environment.vegetationDensity || 0) > 0.62) {
+                bearChance += 0.025;
+            }
+            if ((environment.altitude || 0) > 0.48 || (environment.ruggedness || 0) > 0.42) {
+                bearChance += 0.018;
+            }
+            if (this.rng.nextFloat() < bearChance) {
+                return 'bear';
+            }
             if ((environment.vegetationDensity || 0) > 0.58 && this.rng.nextFloat() < 0.55) {
                 return 'deer';
             }
@@ -2744,6 +3052,73 @@ button:hover { background: #ffd768; }
             for (var i = 0; i < carcasses.length; i += 1) {
                 if (carcasses[i].id === id) {
                     return carcasses[i];
+                }
+            }
+            return null;
+        }
+
+        recordDepartedMacrofauna(animal, targetX, targetY) {
+            var exitX = Clamp(targetX, 0, this.world.width);
+            var exitY = Clamp(targetY, 0, this.world.height);
+            this.departedMacrofaunaTrails = this.departedMacrofaunaTrails.filter(function (trail) {
+                return trail.id !== animal.id;
+            });
+            this.departedMacrofaunaTrails.push({
+                id: animal.id,
+                species: animal.species,
+                x: animal.x,
+                y: animal.y,
+                exitX: exitX,
+                exitY: exitY,
+                departedTick: this.tickNumber,
+                expiresTick: this.tickNumber + DEPARTED_MACROFAUNA_TRACK_TICKS
+            });
+        }
+
+        purgeDepartedMacrofaunaTrails() {
+            this.departedMacrofaunaTrails = this.departedMacrofaunaTrails.filter(function (trail) {
+                return trail.expiresTick >= this.tickNumber;
+            }, this);
+        }
+        getTreasureBreakdown() {
+            return this.world.getTreasureBreakdown(this.droppedTreasure);
+        }
+
+        hasTreasureRemaining() {
+            return this.world.hasTreasureRemaining(this.droppedTreasure);
+        }
+
+        recoverDroppedTreasureToWorld() {
+            var recoveredCount = 0;
+            for (var i = 0; i < this.droppedTreasure.length; i += 1) {
+                var drop = this.droppedTreasure[i];
+                if ((drop.amountRemaining || 0) <= 0) {
+                    continue;
+                }
+                var deposit = new TreasureDeposit('recovered_' + this.seasonNumber + '_' + (i + 1), drop.x, drop.y, drop.treasureType, drop.amountRemaining);
+                deposit.startingAmount = 0;
+                this.world.treasureDeposits.push(deposit);
+                recoveredCount += drop.amountRemaining;
+                drop.amountRemaining = 0;
+            }
+            if (recoveredCount > 0) {
+                this.addEvent('Dropped treasure was recovered into loose piles after the raid.');
+            }
+            this.droppedTreasure = this.droppedTreasure.filter(function (drop) {
+                return (drop.amountRemaining || 0) > 0;
+            });
+            return recoveredCount;
+        }
+
+
+        findDepartedMacrofaunaTrailForMonster(monster) {
+            if (!monster || !monster.canLeavePlayableArea() || !monster.lastMacrofaunaTargetId) {
+                return null;
+            }
+            for (var i = this.departedMacrofaunaTrails.length - 1; i >= 0; i -= 1) {
+                var trail = this.departedMacrofaunaTrails[i];
+                if (trail.id === monster.lastMacrofaunaTargetId && trail.expiresTick >= this.tickNumber) {
+                    return trail;
                 }
             }
             return null;
@@ -2810,10 +3185,35 @@ button:hover { background: #ffd768; }
             return { ok: true };
         }
 
+        recallMonster(monsterId) {
+            var monster = this.gameState.ownedMonsters.find(function (m) {
+                return m.id === monsterId && m.alive && m.deployed;
+            });
+            if (!monster) { return { ok: false, reason: 'No deployed living captive monster has that id.' }; }
+            monster.deployed = false;
+            monster.escaped = false;
+            monster.path = [];
+            monster.pathKey = '';
+            monster.pathIntentKey = '';
+            monster.eatingTargetId = null;
+            monster.eatingTicksRemaining = 0;
+            monster.behaviourState = 'recalled';
+            monster.x = RIGHT_EDGE_X;
+            monster.y = Clamp(monster.y, 0, this.world.height);
+            this.addEvent(monster.name + ' was recalled to base.');
+            return { ok: true };
+        }
+
         captureWildMonster(monsterId) {
             var monster = this.wildMonsters.find(function (m) {
                 return m.id === monsterId;
             });
+
+            if (!monster) {
+                monster = this.monsters.find(function (m) {
+                    return m.id === monsterId && m.wild;
+                });
+            }
 
             if (!monster || !monster.isActive()) {
                 return { ok: false, reason: 'No active wild monster with that id is available to capture.' };
@@ -2835,12 +3235,21 @@ button:hover { background: #ffd768; }
 
             this.tickNumber += 1;
             this.spawnDueWildMonsters();
+            this.purgeDepartedMacrofaunaTrails();
+            this.purgeExpiredThrownProjectiles();
             this.tickCooldowns();
+            this.resolveHumanMacrofaunaFear();
             this.adventurers.forEach(function (adventurer) { adventurer.update(this); }, this);
             this.macrofauna.forEach(function (animal) { animal.update(this); }, this);
             this.monsters.forEach(function (monster) { monster.update(this); }, this);
             this.resolveCombat();
             this.checkRaidEnd();
+        }
+
+        purgeExpiredThrownProjectiles() {
+            this.thrownProjectiles = this.thrownProjectiles.filter(function (projectile) {
+                return this.tickNumber - projectile.startTick <= projectile.durationTicks + 4;
+            }, this);
         }
 
         tickCooldowns() {
@@ -2849,7 +3258,58 @@ button:hover { background: #ffd768; }
             this.monsters.forEach(function (monster) { monster.tickCooldowns(); });
         }
 
+        resolveHumanMacrofaunaFear() {
+            for (var i = 0; i < this.adventurers.length; i += 1) {
+                var adventurer = this.adventurers[i];
+
+                if (!adventurer.isActive() || adventurer.fleeing || adventurer.carryingTreasure) {
+                    continue;
+                }
+
+                var threat = this.findNearestIntimidatingMacrofauna(adventurer);
+                if (!threat) {
+                    continue;
+                }
+
+                var threatDistance = adventurer.distanceTo(threat);
+                if (threatDistance > threat.humanThreatRange) {
+                    continue;
+                }
+
+                var fearPressure = Clamp(threat.humanFear * (1 - threatDistance / Math.max(1, threat.humanThreatRange)) + (threat.attackHumans ? 0.18 : 0), 0, 1);
+                var courageResistance = Clamp((adventurer.courage || 0) * 0.88 + (adventurer.strength || 0) * 0.12, 0, 1);
+                var fleeChance = Clamp(fearPressure - courageResistance * 0.62 + 0.12, 0, 0.92);
+
+                if (this.rng.nextFloat() < fleeChance) {
+                    adventurer.fleeing = true;
+                    adventurer.behaviourState = 'fleeingFromFauna';
+                    this.addEvent('An adventurer fled from a ' + threat.displayName + '.');
+                }
+            }
+        }
+
+        findNearestIntimidatingMacrofauna(adventurer) {
+            var best = null;
+            var bestDistance = Infinity;
+            for (var i = 0; i < this.macrofauna.length; i += 1) {
+                var animal = this.macrofauna[i];
+
+                if (!animal.isActive() || animal.humanFear <= 0) {
+                    continue;
+                }
+
+                var distance = adventurer.distanceTo(animal);
+                if (distance < bestDistance) {
+                    best = animal;
+                    bestDistance = distance;
+                }
+            }
+            return best;
+        }
+
         resolveCombat() {
+            this.resolveMacrofaunaHumanCombat();
+
             for (var i = 0; i < this.monsters.length; i += 1) {
                 var monster = this.monsters[i];
 
@@ -2860,7 +3320,16 @@ button:hover { background: #ffd768; }
                 for (var j = 0; j < this.adventurers.length; j += 1) {
                     var adventurer = this.adventurers[j];
 
-                    if (!adventurer.isActive() || monster.distanceTo(adventurer) > MONSTER_ATTACK_RANGE) {
+                    var distanceToMonster = monster.distanceTo(adventurer);
+                    if (!adventurer.isActive() || distanceToMonster > ADVENTURER_THROW_RANGE) {
+                        continue;
+                    }
+                    if (distanceToMonster > MONSTER_ATTACK_RANGE && adventurer.carriedWorldObjectId && adventurer.attackCooldownTicks <= 0) {
+                        adventurer.attackCooldownTicks = COMBAT_COOLDOWN_TICKS * 2;
+                        adventurer.throwImprovisedWeaponAt(monster, this);
+                        continue;
+                    }
+                    if (distanceToMonster > MONSTER_ATTACK_RANGE) {
                         continue;
                     }
 
@@ -2902,6 +3371,36 @@ button:hover { background: #ffd768; }
             }
         }
 
+        resolveMacrofaunaHumanCombat() {
+            for (var i = 0; i < this.macrofauna.length; i += 1) {
+                var animal = this.macrofauna[i];
+
+                if (!animal.isActive() || !animal.attackHumans || animal.attackCooldownTicks > 0) {
+                    continue;
+                }
+
+                for (var j = 0; j < this.adventurers.length; j += 1) {
+                    var adventurer = this.adventurers[j];
+
+                    if (!adventurer.isActive() || adventurer.fleeing || animal.distanceTo(adventurer) > MONSTER_ATTACK_RANGE) {
+                        continue;
+                    }
+
+                    var likelyToAttack = animal.behaviourState === 'menacingHuman' || animal.humanTargetId === adventurer.id;
+                    if (!likelyToAttack && this.rng.nextFloat() > 0.035) {
+                        continue;
+                    }
+
+                    animal.attackCooldownTicks = COMBAT_COOLDOWN_TICKS * 2;
+                    if (this.rng.nextFloat() <= animal.attackChance) {
+                        var part = adventurer.applyDamage(this.rng.integer(animal.attackDamageMin, animal.attackDamageMax), this.rng, this);
+                        this.addEvent('A ' + animal.displayName + ' attacked an adventurer in the ' + part + '.');
+                    }
+                    break;
+                }
+            }
+        }
+
         feedingShouldContinueAfterAdventurersGone() {
             return this.monsters.some(function (monster) {
                 if (!monster.isActive() || !monster.deployed || NutritionSystem.isFullyNourishedThisSeason(monster)) {
@@ -2911,6 +3410,12 @@ button:hover { background: #ffd768; }
                     return true;
                 }
                 return monster.chooseFoodTarget(this) !== null;
+            }, this);
+        }
+
+        departedMacrofaunaChaseShouldContinue() {
+            return this.monsters.some(function (monster) {
+                return monster.isActive() && monster.deployed && monster.canLeavePlayableArea() && this.findDepartedMacrofaunaTrailForMonster(monster) !== null;
             }, this);
         }
 
@@ -2925,6 +3430,11 @@ button:hover { background: #ffd768; }
 
             if (this.feedingShouldContinueAfterAdventurersGone()) {
                 this.raidResult = 'Raid won: monsters are feeding before returning to base.';
+                return;
+            }
+
+            if (this.departedMacrofaunaChaseShouldContinue()) {
+                this.raidResult = 'Raid won: uncollared monsters are chasing escaped macrofauna.';
                 return;
             }
 
@@ -2958,7 +3468,7 @@ button:hover { background: #ffd768; }
             var macrofaunaFoodRemaining = this.macrofauna.reduce(function (sum, animal) {
                 return sum + (animal.edibleFoodRemaining || 0);
             }, 0);
-            var treasureBreakdown = this.world.getTreasureBreakdown();
+            var treasureBreakdown = this.getTreasureBreakdown();
             var ownedNutrition = this.gameState.ownedMonsters.map(function (monster) {
                 return {
                     id: monster.id,
@@ -2997,7 +3507,7 @@ button:hover { background: #ffd768; }
                 foodEatenInRaidTotal: ownedNutrition.reduce(function (sum, row) { return sum + row.eatenInRaid; }, 0),
                 foodFedAtBaseTotal: ownedNutrition.reduce(function (sum, row) { return sum + row.fedAtBase; }, 0),
                 treasureRemaining: treasureBreakdown.remaining.totalUnits,
-                treasureDepleted: !this.world.hasTreasureRemaining(),
+                treasureDepleted: !this.hasTreasureRemaining(),
                 pathfindingTotalCalls: this.getPathfindingTotalCalls(),
                 maxStuckTicks: this.getMaxStuckTicks(),
                 navBlockedCacheEntries: this.getNavBlockedCacheEntryCount(),
@@ -3050,12 +3560,14 @@ button:hover { background: #ffd768; }
                 raidResult: this.raidResult,
                 treasures: treasureSnapshots,
                 treasureDeposits: treasureSnapshots,
-                treasureBreakdown: this.world.getTreasureBreakdown(),
+                treasureBreakdown: this.getTreasureBreakdown(),
                 droppedTreasure: this.droppedTreasure.map(function (drop) { return drop.getSnapshot(); }),
-                macrofauna: this.macrofauna.filter(function (animal) { return animal.alive && !animal.escaped; }).map(function (animal) { return animal.getSnapshot(); }),
+                movableTerrainObjects: this.world.terrainObjects.filter(function (object) { return object.carryable; }).map(function (object) { return object.getSnapshot(); }),
+                thrownProjectiles: this.thrownProjectiles.slice(0),
+                macrofauna: this.macrofauna.filter(function (animal) { return !animal.escaped; }).map(function (animal) { return animal.getSnapshot(); }),
                 foodExpenditureCredits: this.world.foodExpenditureCredits || 0,
-                monsters: this.monsters.filter(function (monster) { return monster.alive && !monster.escaped && monster.deployed; }).map(function (monster) { return monster.getSnapshot(); }),
-                adventurers: this.adventurers.filter(function (adventurer) { return adventurer.alive && !adventurer.escaped; }).map(function (adventurer) { return adventurer.getSnapshot(); })
+                monsters: this.monsters.filter(function (monster) { return !monster.escaped && monster.deployed; }).map(function (monster) { return monster.getSnapshot(); }),
+                adventurers: this.adventurers.filter(function (adventurer) { return !adventurer.escaped; }).map(function (adventurer) { return adventurer.getSnapshot(); })
             };
         }
     }
@@ -3077,6 +3589,7 @@ button:hover { background: #ffd768; }
             this.gameState.roundNumber = this.roundNumber;
             this.world = WorldGenerator.createWorld(this.seed, options && options.worldOptions ? options.worldOptions : {});
             this.currentRaid = null;
+            this.roundRemains = [];
             this.pendingEvents = [{ tickNumber: 0, text: (this.mode === 'campaign' ? 'Campaign' : 'Single game') + ' created. Choose monsters for round 1 season 1.' }];
         }
 
@@ -3089,12 +3602,60 @@ button:hover { background: #ffd768; }
             }
         }
 
+        capturePersistentRemains(raid) {
+            if (!raid) {
+                return;
+            }
+
+            var seasonPrefix = 'season_' + this.seasonNumber + '_';
+            this.roundRemains.forEach(function (remain) {
+                remain.corpseState = 'skeleton';
+                remain.behaviourState = 'skeleton';
+                remain.edibleFoodRemaining = 0;
+            });
+            var alreadyPresent = {};
+            this.roundRemains.forEach(function (remain) {
+                alreadyPresent[remain.id] = true;
+            });
+
+            function addRemain(agent, kind) {
+                if (!agent || agent.alive || agent.escaped) {
+                    return;
+                }
+                if (kind === 'monster' && !agent.deployed) {
+                    return;
+                }
+                var snapshot = agent.getSnapshot();
+                snapshot.id = 'remain_' + seasonPrefix + agent.id;
+                if (alreadyPresent[snapshot.id]) {
+                    return;
+                }
+                snapshot.originalEntityId = agent.id;
+                snapshot.agentKind = kind;
+                snapshot.remain = true;
+                snapshot.alive = false;
+                snapshot.escaped = false;
+                snapshot.deployed = true;
+                snapshot.corpseState = 'skeleton';
+                snapshot.behaviourState = 'skeleton';
+                snapshot.edibleFoodRemaining = 0;
+                alreadyPresent[snapshot.id] = true;
+                this.roundRemains.push(snapshot);
+            }
+
+            raid.adventurers.forEach(function (adventurer) { addRemain.call(this, adventurer, 'adventurer'); }, this);
+            raid.macrofauna.forEach(function (animal) { addRemain.call(this, animal, 'macrofauna'); }, this);
+            raid.monsters.forEach(function (monster) { addRemain.call(this, monster, 'monster'); }, this);
+        }
+
         finishRaid() {
             if (!this.currentRaid || this.phase !== 'raid') {
                 return;
             }
 
+            this.currentRaid.recoverDroppedTreasureToWorld();
             var nutritionResult = NutritionSystem.applyBetweenSeasonFeeding(this.gameState, this.world, this.currentRaid.monsters, this.currentRaid.rng);
+            this.capturePersistentRemains(this.currentRaid);
             var summary = this.currentRaid.getConclusionSummary();
             summary.nutritionResult = nutritionResult;
             this.lastRaidSummary = summary;
@@ -3155,6 +3716,7 @@ button:hover { background: #ffd768; }
             this.roundEnded = false;
             this.roundResult = 'Round in progress';
             this.lastRaidSummary = null;
+            this.roundRemains = [];
             this.gameState.roundFoodExpenditureCredits = 0;
             this.world = WorldGenerator.createWorld(this.rng.integer(1, 0x7fffffff), {});
             this.pendingEvents.push({ tickNumber: 0, text: 'Round ' + this.roundNumber + ' created. Choose monsters for season 1.' });
@@ -3199,6 +3761,13 @@ button:hover { background: #ffd768; }
                 return { ok: false, reason: 'Captive monsters can be deployed only during a raid.' };
             }
             return this.currentRaid.releaseMonster(monsterId);
+        }
+
+        recallMonster(monsterId) {
+            if (!this.currentRaid || this.phase !== 'raid') {
+                return { ok: false, reason: 'Captive monsters can be recalled only during a raid.' };
+            }
+            return this.currentRaid.recallMonster(monsterId);
         }
 
         pause() {
@@ -3258,6 +3827,7 @@ button:hover { background: #ffd768; }
                 raidSnapshot.roundResult = this.roundResult;
                 raidSnapshot.consecutiveSeasonsWithNoReturningAdventurers = this.consecutiveSeasonsWithNoReturningAdventurers;
                 raidSnapshot.management = this.gameState.getManagementSnapshot();
+                raidSnapshot.remains = this.roundRemains.slice(0);
                 return raidSnapshot;
             }
 
@@ -3284,6 +3854,7 @@ button:hover { background: #ffd768; }
                 treasureBreakdown: this.world.getTreasureBreakdown(),
                 foodExpenditureCredits: this.world.foodExpenditureCredits || 0,
                 droppedTreasure: [],
+                remains: this.roundRemains.slice(0),
                 macrofauna: [],
                 monsters: this.gameState.ownedMonsters.map(function (monster) { return monster.getSnapshot(); }),
                 adventurers: [],
@@ -3373,11 +3944,82 @@ button:hover { background: #ffd768; }
             consecutiveSeasonsWithNoReturningAdventurers: session.consecutiveSeasonsWithNoReturningAdventurers
         };
     }
+    function AddRegressionResult(results, name, passed, details) {
+        results.push({ name: name, passed: !!passed, details: details || '' });
+    }
+
+    function RunRegressionTests() {
+        var results = [];
+
+        var session = new GameSession(24681012, { mode: 'quick' });
+        session.startSeason();
+        var raid = session.currentRaid;
+        var deposit = session.world.treasureDeposits[0];
+        var treasureType = deposit.treasureType;
+        var beforeAmount = session.world.getTreasureBreakdown().remaining.byType[treasureType].amount;
+        var movedAmount = Math.min(5, deposit.amountRemaining);
+        deposit.take(movedAmount);
+        raid.droppedTreasure.push(new DroppedTreasure('regression_drop_1', deposit.x + 20, deposit.y + 20, treasureType, movedAmount, 'regression'));
+        var duringAmount = raid.getTreasureBreakdown().remaining.byType[treasureType].amount;
+        AddRegressionResult(results, 'Dropped treasure still counts as remaining while on the ground', duringAmount === beforeAmount, 'before=' + beforeAmount + ', during=' + duringAmount);
+        var snapshotWithDrop = raid.getSnapshot(false);
+        AddRegressionResult(results, 'Dropped treasure appears in dynamic raid snapshot', snapshotWithDrop.droppedTreasure.length === 1 && snapshotWithDrop.droppedTreasure[0].amountRemaining === movedAmount, 'drops=' + snapshotWithDrop.droppedTreasure.length);
+        raid.recoverDroppedTreasureToWorld();
+        var afterAmount = session.world.getTreasureBreakdown().remaining.byType[treasureType].amount;
+        AddRegressionResult(results, 'Dropped treasure persists as recovered loose treasure after raid', afterAmount === beforeAmount, 'before=' + beforeAmount + ', after=' + afterAmount);
+
+        var rng = new SeededRng(111);
+        var villager = new Villager('regression_villager', 0, 0, rng);
+        var nearBronze = new TreasureDeposit('near_bronze', 100, 0, 'bronze', 10);
+        var farEmerald = new TreasureDeposit('far_emerald', 280, 0, 'emeralds', 10);
+        var closeEmerald = new TreasureDeposit('close_emerald', 115, 0, 'emeralds', 10);
+        var mockRaidNear = { world: { treasureDeposits: [nearBronze, farEmerald] }, droppedTreasure: [] };
+        var mockRaidClose = { world: { treasureDeposits: [nearBronze, closeEmerald] }, droppedTreasure: [] };
+        AddRegressionResult(results, 'Villagers prefer nearby treasure over much farther high-value treasure', villager.chooseTreasure(mockRaidNear).id === 'near_bronze', 'chosen=' + villager.chooseTreasure(mockRaidNear).id);
+        AddRegressionResult(results, 'Villagers will choose higher-value treasure when it is not much farther', villager.chooseTreasure(mockRaidClose).id === 'close_emerald', 'chosen=' + villager.chooseTreasure(mockRaidClose).id);
+
+        var leftExitAdventurer = new Villager('regression_exit_left', 0, 300, new SeededRng(222));
+        leftExitAdventurer.exitX = 0;
+        leftExitAdventurer.exitY = 300;
+        leftExitAdventurer.exitEdge = 'left';
+        var leftEdgeDifferentYAdventurer = new Villager('regression_exit_left_any_y', 0, 640, new SeededRng(223));
+        leftEdgeDifferentYAdventurer.exitX = 0;
+        leftEdgeDifferentYAdventurer.exitY = 300;
+        leftEdgeDifferentYAdventurer.exitEdge = 'left';
+        var nearLeftEdgeCarryingAdventurer = new Villager('regression_exit_left_tolerance', 8, 640, new SeededRng(224));
+        nearLeftEdgeCarryingAdventurer.exitX = 0;
+        nearLeftEdgeCarryingAdventurer.exitY = 300;
+        nearLeftEdgeCarryingAdventurer.exitEdge = 'left';
+        nearLeftEdgeCarryingAdventurer.carryingTreasure = true;
+        nearLeftEdgeCarryingAdventurer.carryingAmount = 5;
+        nearLeftEdgeCarryingAdventurer.carryingTreasureType = 'gold';
+        var rightExitAdventurer = new Villager('regression_exit_right', session.world.width, 300, new SeededRng(333));
+        rightExitAdventurer.exitX = session.world.width;
+        rightExitAdventurer.exitY = 300;
+        rightExitAdventurer.exitEdge = 'right';
+        AddRegressionResult(results, 'Adventurer exit check works for the current left-edge behaviour', leftExitAdventurer.hasReachedExit(session.world), 'left exit');
+        AddRegressionResult(results, 'Fleeing adventurer at the correct exit edge escapes even if pushed along the edge', leftEdgeDifferentYAdventurer.hasReachedExit(session.world), 'left edge any y');
+        AddRegressionResult(results, 'Treasure-carrying adventurer within body radius of the exit edge escapes', nearLeftEdgeCarryingAdventurer.hasReachedExit(session.world), 'near left edge carrying');
+        nearLeftEdgeCarryingAdventurer.update(raid);
+        AddRegressionResult(results, 'Treasure-carrying adventurer already at exit tolerance is marked escaped before another movement step', nearLeftEdgeCarryingAdventurer.escaped, 'escaped=' + nearLeftEdgeCarryingAdventurer.escaped);
+        AddRegressionResult(results, 'Adventurer exit check is edge-flexible for future entry sides', rightExitAdventurer.hasReachedExit(session.world), 'right exit');
+
+        var staticOnlySnapshot = session.getSnapshot();
+        AddRegressionResult(results, 'Dynamic raid snapshot does not resend static world data', !staticOnlySnapshot.world && !staticOnlySnapshot.obstacles && !staticOnlySnapshot.terrainObjects, 'phase=' + staticOnlySnapshot.phase);
+
+        var microfaunaObjects = session.world.terrainObjects.filter(function (object) { return object.type === 'microfauna'; });
+        AddRegressionResult(results, 'Microfauna emitters use the dedicated class', microfaunaObjects.length === 0 || microfaunaObjects.every(function (object) { return object instanceof MicrofaunaEmitter; }), 'microfauna=' + microfaunaObjects.length);
+
+        var failed = results.filter(function (result) { return !result.passed; });
+        return { count: results.length, passed: failed.length === 0, failures: failed.length, results: results };
+    }
+
     function RunHeadlessTests(payload) {
         var options = payload || {};
         var count = Number.isFinite(options.count) ? Math.max(1, Math.floor(options.count)) : 20;
         var firstSeed = Number.isFinite(options.seed) ? Math.floor(options.seed) : 100000;
         var maxTicks = Number.isFinite(options.maxTicks) ? Math.max(1, Math.floor(options.maxTicks)) : 3600;
+        var regressionTests = RunRegressionTests();
         var results = [];
         var endedCount = 0;
         var treasureRemainingTotal = 0;
@@ -3417,7 +4059,8 @@ button:hover { background: #ffd768; }
             maxTicks: maxTicks,
             endedCount: endedCount,
             timedOutCount: count - endedCount,
-            averageTreasureRemaining: treasureRemainingTotal / count,
+            regressionTests: regressionTests,
+            averageTreasureRemainingUnits: treasureRemainingTotal / count,
             averageTreasureLostValue: treasureLostTotal / count,
             averageFoodExpenditureCredits: foodExpenditureTotal / count,
             averageFoodEatenInRaid: foodEatenInRaidTotal / count,
@@ -3555,6 +4198,13 @@ button:hover { background: #ffd768; }
                     SendSnapshotAndEvents(command.messageId);
                     break;
 
+                case 'RECALL_MONSTER':
+                    EnsureGameSession();
+                    var recallResult = gameSession.recallMonster(command.payload && command.payload.monsterId);
+                    Post(recallResult.ok ? { replyTo: command.messageId, type: 'COMMAND_ACCEPTED' } : { replyTo: command.messageId, type: 'COMMAND_REJECTED', payload: { reason: recallResult.reason } });
+                    SendSnapshotAndEvents(command.messageId);
+                    break;
+
                 case 'RELEASE_MONSTER':
                     EnsureGameSession();
                     var result = gameSession.releaseMonster();
@@ -3623,7 +4273,7 @@ button:hover { background: #ffd768; }
     var PROTOCOL_VERSION=1, TILE_SIZE=100, ISO_W=92, ISO_H=46, WORLD_WIDTH=1800, WORLD_HEIGHT=1200, MAP_VIEW_MARGIN=120;
     var TREASURE_TYPES={bronze:{displayName:'bronze coins',unitValue:10},silver:{displayName:'silver coins',unitValue:30},gold:{displayName:'gold coins',unitValue:100},rubies:{displayName:'rubies',unitValue:200},emeralds:{displayName:'emeralds',unitValue:350}};
     var TREASURE_TYPE_ORDER=['bronze','silver','gold','rubies','emeralds'];
-    var canvas=document.getElementById('raidCanvas'), ctx=canvas.getContext('2d'), statusBox=document.getElementById('statusBox'), objectDetails=document.getElementById('objectDetails'), eventLog=document.getElementById('eventLog'), monsterPortrait=document.getElementById('monsterPortrait'), managementDrawer=document.getElementById('managementDrawer'), managementSummary=document.getElementById('managementSummary'), rosterList=document.getElementById('rosterList'), selectedMonsterPanel=document.getElementById('selectedMonsterPanel'), startSeasonButton=document.getElementById('startSeasonButton'), managementHint=document.getElementById('managementHint'), monsterTooltip=document.getElementById('monsterTooltip'), monsterManagementTab=document.getElementById('monsterManagementTab'), closeManagementButton=document.getElementById('closeManagementButton'), seasonDisplay=document.getElementById('seasonDisplay'), mainMenuOverlay=document.getElementById('mainMenuOverlay');
+    var canvas=document.getElementById('raidCanvas'), ctx=canvas.getContext('2d'), statusBox=document.getElementById('statusBox'), objectDetails=document.getElementById('objectDetails'), eventLog=document.getElementById('eventLog'), monsterPortrait=document.getElementById('monsterPortrait'), managementDrawer=document.getElementById('managementDrawer'), managementSummary=document.getElementById('managementSummary'), rosterList=document.getElementById('rosterList'), selectedMonsterPanel=document.getElementById('selectedMonsterPanel'), startSeasonButton=document.getElementById('startSeasonButton'), managementHint=document.getElementById('managementHint'), monsterTooltip=document.getElementById('monsterTooltip'), monsterManagementTab=document.getElementById('monsterManagementTab'), closeManagementButton=document.getElementById('closeManagementButton'), seasonDisplay=document.getElementById('seasonDisplay'), mainMenuOverlay=document.getElementById('mainMenuOverlay'), resumeGameMenuButton=document.getElementById('resumeGameMenuButton');
     var latestWorldSnapshot=null,latestStaticObstacles=[];
     var latestSnapshot=null,previousSnapshot=null,currentSnapshot=null,previousSnapshotTime=0,currentSnapshotTime=0,nextMessageId=1,keys=new Set();
     var RENDER_INTERPOLATION_DELAY_MS=50;
@@ -3636,7 +4286,10 @@ button:hover { background: #ffd768; }
     var visualFacingById={
     }
     ;
-    var selectedRosterMonsterId=null, lastManagementRenderKey='', managementDrawerVisible=true, hoveredMonsterId=null, hoveredMonster=null, selectedObject=null, lastSnapshotPhase=null, gameStarted=false;
+    var visualFacingCandidateById={
+    }
+    ;
+    var selectedRosterMonsterId=null, lastManagementRenderKey='', managementDrawerVisible=true, hoveredMonsterId=null, hoveredMonster=null, selectedObject=null, selectionCycleKey='', selectionCycleIndex=0, lastSnapshotPhase=null, gameStarted=false;
     monsterPortrait.innerHTML='<svg viewBox="0 0 180 120" role="img" aria-label="Purple starter monster"><ellipse cx="90" cy="70" rx="55" ry="30" fill="#6b2d83"/><circle cx="62" cy="57" r="8" fill="white"/><circle cx="118" cy="57" r="8" fill="white"/><circle cx="64" cy="58" r="4" fill="#1f2730"/><circle cx="116" cy="58" r="4" fill="#1f2730"/><rect x="52" y="68" width="76" height="8" rx="4" fill="#f2c14e"/></svg>';
     // ============================================================================
     // MODULE: VIEW TRANSFORMS AND WORKER COMMANDS
@@ -3677,8 +4330,13 @@ button:hover { background: #ffd768; }
         if(!snapshot) return snapshot;
         if(latestWorldSnapshot){
             snapshot.world=latestWorldSnapshot.world;
-            snapshot.obstacles=latestStaticObstacles;
-            snapshot.terrainObjects=latestStaticObstacles;
+            snapshot.obstacles=snapshot.obstacles || latestStaticObstacles;
+            if(snapshot.movableTerrainObjects&&snapshot.movableTerrainObjects.length>0){
+                var movableById={};
+                snapshot.movableTerrainObjects.forEach(function(object){ movableById[object.id]=object; });
+                snapshot.obstacles=latestStaticObstacles.map(function(object){ return movableById[object.id]||object; });
+            }
+            snapshot.terrainObjects=snapshot.terrainObjects || snapshot.obstacles || latestStaticObstacles;
             snapshot.mapWidth=latestWorldSnapshot.mapWidth;
             snapshot.mapHeight=latestWorldSnapshot.mapHeight;
         }
@@ -3841,6 +4499,7 @@ button:hover { background: #ffd768; }
             '',
             FormatTreasureSection('Treasure remaining',treasureBreakdown.remaining),
             'Food expenditure this round: '+FormatNumber(treasureBreakdown.foodExpenditureCredits||s.foodExpenditureCredits||0)+' credits',
+            'Campaign food expenditure total: '+FormatNumber((s.management&&s.management.foodExpenditureCredits)||0)+' credits',
             'Treasure after food costs: '+FormatNumber(treasureBreakdown.remainingAfterFoodValue!==undefined?treasureBreakdown.remainingAfterFoodValue:treasureBreakdown.remaining.totalValue),
             '',
             FormatCampaignRoundHistory(stats,mode)
@@ -4106,23 +4765,100 @@ button:hover { background: #ffd768; }
         ctx.strokeStyle='#4e504a';
         ctx.stroke();
     }
-    function DrawChest(t){
-        var p=ToScreen(t.x,t.y);
-        ctx.globalAlpha=t.stolen?0.25:1;
-        ctx.fillStyle='#7b4a22';
-        ctx.fillRect(p.x-18,p.y-24,36,24);
-        ctx.fillStyle='#9a632d';
+    function DrawStick(o){
+        var p=ToScreen(o.x,o.y);
+        var angle=StablePhase(o.id||'stick') % Math.PI;
+        var length=22+(o.weight||0.8)*7;
+        var dx=Math.cos(angle)*length*0.5;
+        var dy=Math.sin(angle)*length*0.22;
+        ctx.save();
+        ctx.strokeStyle='#6b3f1d';
+        ctx.lineWidth=4;
+        ctx.lineCap='round';
         ctx.beginPath();
-        ctx.moveTo(p.x-18,p.y-24);
-        ctx.lineTo(p.x,p.y-38);
-        ctx.lineTo(p.x+18,p.y-24);
-        ctx.closePath();
+        ctx.moveTo(p.x-dx,p.y-dy);
+        ctx.quadraticCurveTo(p.x+Math.sin(angle)*3,p.y-4,p.x+dx,p.y+dy);
+        ctx.stroke();
+        ctx.strokeStyle='#3f2412';
+        ctx.lineWidth=1.4;
+        ctx.beginPath();
+        ctx.moveTo(p.x-dx*0.65,p.y-dy*0.65-1);
+        ctx.lineTo(p.x+dx*0.25,p.y+dy*0.25-2);
+        ctx.stroke();
+        ctx.restore();
+    }
+    function TreasurePileState(t){
+        var amount=Math.max(0,t.amountRemaining||0);
+        var reference=Math.max(1,t.startingAmount||amount||1);
+        var ratio=Math.max(0,Math.min(1,amount/reference));
+        if(amount<=0)return 0;
+        if(ratio<=0.2)return 1;
+        if(ratio<=0.4)return 2;
+        if(ratio<=0.62)return 3;
+        if(ratio<=0.82)return 4;
+        return 5;
+    }
+    function TreasureAccentColour(t){
+        if(t.treasureType==='bronze')return '#7c3f16';
+        if(t.treasureType==='silver')return '#f8fafc';
+        if(t.treasureType==='gold')return '#fff3a3';
+        if(t.treasureType==='rubies')return '#fecdd3';
+        if(t.treasureType==='emeralds')return '#bbf7d0';
+        return '#ffffff';
+    }
+    function DrawTreasurePile(t){
+        var state=TreasurePileState(t);
+        if(state<=0){
+            return;
+        }
+        var p=ToScreen(t.x,t.y);
+        var baseColour=t.colour||'#f2c14e';
+        var accent=TreasureAccentColour(t);
+        var phase=StablePhase(t.id||t.treasureType||'treasure');
+        var scale=0.72+state*0.16;
+        var width=18+state*7;
+        var height=8+state*3;
+        ctx.save();
+        ctx.globalAlpha=t.stolen?0.25:1;
+        ctx.fillStyle='rgba(39,31,18,0.24)';
+        ctx.beginPath();
+        ctx.ellipse(p.x,p.y-4,width*0.78,height*0.65,0,0,Math.PI*2);
         ctx.fill();
-        ctx.fillStyle='#f2c14e';
-        ctx.fillRect(p.x-3,p.y-28,6,28);
-        ctx.strokeStyle='#3a2412';
-        ctx.strokeRect(p.x-18,p.y-24,36,24);
-        ctx.globalAlpha=1;
+        ctx.fillStyle=baseColour;
+        ctx.strokeStyle='rgba(31,39,48,0.52)';
+        for(var layer=0;layer<state;layer+=1){
+            var layerWidth=width*(1-layer*0.1);
+            var layerY=p.y-8-layer*4;
+            ctx.beginPath();
+            ctx.ellipse(p.x,layerY,layerWidth*0.55,height*0.45,0,Math.PI,0,true);
+            ctx.lineTo(p.x+layerWidth*0.55,layerY+height*0.32);
+            ctx.quadraticCurveTo(p.x,layerY+height*0.82,p.x-layerWidth*0.55,layerY+height*0.32);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+        var pieces=4+state*4;
+        for(var i=0;i<pieces;i+=1){
+            var angle=phase+i*2.399;
+            var radial=(0.12+((i*37)%100)/100*0.82)*scale;
+            var x=p.x+Math.cos(angle)*width*0.52*radial;
+            var y=p.y-11-state*1.8+Math.sin(angle*1.7)*height*0.5*radial-((i%state)*2.1);
+            ctx.fillStyle=(i%3===0)?accent:baseColour;
+            ctx.strokeStyle='rgba(31,39,48,0.45)';
+            ctx.beginPath();
+            if(t.treasureType==='rubies'||t.treasureType==='emeralds'){
+                ctx.moveTo(x,y-4);
+                ctx.lineTo(x+5,y);
+                ctx.lineTo(x,y+4);
+                ctx.lineTo(x-5,y);
+                ctx.closePath();
+            }else{
+                ctx.ellipse(x,y,4.2,2.7,angle,0,Math.PI*2);
+            }
+            ctx.fill();
+            ctx.stroke();
+        }
+        ctx.restore();
     }
     function DrawHealthBar(p,w,h,health,maxHealth){
         var ratio=maxHealth>0?Math.max(0,Math.min(1,health/maxHealth)):0;
@@ -4184,7 +4920,32 @@ button:hover { background: #ffd768; }
         // - Idle agents retain their last visual octant so they do not snap back to a default direction.
         // - Facing/animation are visual only and must never be sent back to the authoritative worker.
         if(entity.renderMoving&&Number.isFinite(entity.renderAngle)){
-            visualFacingById[entity.id]=QuantizeAngleToOctant(entity.renderAngle);
+            var newOctant=QuantizeAngleToOctant(entity.renderAngle);
+            if(entity.agentKind==='macrofauna'){
+                if(visualFacingById[entity.id]===undefined){
+                    visualFacingById[entity.id]=newOctant;
+                    visualFacingCandidateById[entity.id]=null;
+                }
+                else if(visualFacingById[entity.id]!==newOctant){
+                    var candidate=visualFacingCandidateById[entity.id];
+                    if(!candidate||candidate.octant!==newOctant){
+                        visualFacingCandidateById[entity.id]={ octant:newOctant, frames:1 };
+                    }
+                    else {
+                        candidate.frames+=1;
+                        if(candidate.frames>=3){
+                            visualFacingById[entity.id]=newOctant;
+                            visualFacingCandidateById[entity.id]=null;
+                        }
+                    }
+                }
+                else {
+                    visualFacingCandidateById[entity.id]=null;
+                }
+            }
+            else {
+                visualFacingById[entity.id]=newOctant;
+            }
         }
         if(visualFacingById[entity.id]===undefined){
             visualFacingById[entity.id]=defaultOctant;
@@ -4271,12 +5032,72 @@ button:hover { background: #ffd768; }
         ctx.lineTo(x+flip*7,y+5);
         ctx.stroke();
     }
+
+    function DrawGroundRemain(entity,kind){
+        var p=ToScreen(entity.x,entity.y);
+        var skeleton=entity.corpseState==='skeleton';
+        var radius=entity.radius||12;
+        var scale=kind==='monster'?1.25:(kind==='macrofauna'?1.05:0.9);
+        ctx.save();
+        ctx.translate(p.x,p.y);
+        ctx.scale(scale,scale);
+        ctx.globalAlpha=0.92;
+        ctx.fillStyle='rgba(0,0,0,0.2)';
+        ctx.beginPath();
+        ctx.ellipse(0,3,radius*1.45,5,0,0,Math.PI*2);
+        ctx.fill();
+        if(skeleton){
+            ctx.strokeStyle='#e6dcc4';
+            ctx.fillStyle='#f4ecd7';
+            ctx.lineWidth=3;
+            ctx.lineCap='round';
+            ctx.beginPath();
+            ctx.moveTo(-radius*1.1,-1);
+            ctx.lineTo(radius*1.1,1);
+            ctx.moveTo(-radius*0.65,-6);
+            ctx.lineTo(-radius*0.15,6);
+            ctx.moveTo(radius*0.15,-6);
+            ctx.lineTo(radius*0.65,6);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(-radius*1.28,-2,4.2,0,Math.PI*2);
+            ctx.fill();
+            ctx.strokeStyle='#7a6a4d';
+            ctx.lineWidth=1.2;
+            ctx.beginPath();
+            ctx.arc(-radius*1.28,-2,4.2,0,Math.PI*2);
+            ctx.moveTo(-radius*1.38,-3);
+            ctx.lineTo(-radius*1.32,-3);
+            ctx.moveTo(-radius*1.25,-3);
+            ctx.lineTo(-radius*1.19,-3);
+            ctx.stroke();
+        } else {
+            var colour=kind==='adventurer'?'#6b7280':(kind==='macrofauna'?(entity.colour||'#8b5a2b'):'#6b2d83');
+            ctx.fillStyle=colour;
+            ctx.strokeStyle='#1f2730';
+            ctx.lineWidth=2;
+            ctx.beginPath();
+            ctx.ellipse(0,0,radius*1.35,radius*0.55,-0.18,0,Math.PI*2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle='rgba(120,20,20,0.5)';
+            ctx.beginPath();
+            ctx.ellipse(radius*0.45,2,radius*0.36,radius*0.14,-0.25,0,Math.PI*2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
     // ============================================================================
     // MODULE: ADVENTURER RENDERING
     // ============================================================================
     // Draws humanoid adventurers based on authoritative snapshot state plus visual
     // interpolation/facing.
     function DrawAdventurer(a,now){
+        if(!a.alive){
+            DrawGroundRemain(a,'adventurer');
+            return;
+        }
         var p=ToScreen(a.x,a.y);
         var facing=FacingForEntity(a,0);
         var moving=!!a.renderMoving&&a.alive&&!a.escaped;
@@ -4333,8 +5154,20 @@ button:hover { background: #ffd768; }
         ctx.fillRect(-12+torsoLeanX*0.35,-31,24,4);
         var weaponSide=facing.side;
         var shieldSide=-weaponSide;
-        DrawArm(weaponSide*11+torsoLeanX*0.35,-43,24,walk,'#f1c27d',dark,true,facing,weaponSide);
+        var throwing=a.behaviourState==='throwing';
+        DrawArm(weaponSide*11+torsoLeanX*0.35,-43,24,throwing?walk+1.6:walk,'#f1c27d',dark,true,facing,weaponSide);
         DrawArm(shieldSide*11+torsoLeanX*0.35,-43,24,walk+Math.PI,'#f1c27d',dark,false,facing,shieldSide);
+        if(a.carriedWorldObjectId){
+            ctx.save();
+            ctx.translate(weaponSide*24+facing.facingX*6,-43+facing.facingY*4);
+            ctx.rotate(throwing?-0.8:0.35);
+            if(a.carriedWorldObjectType==='stick'){
+                ctx.strokeStyle='#6b3f1d'; ctx.lineWidth=4; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(-10,0); ctx.lineTo(12,0); ctx.stroke();
+            } else {
+                ctx.fillStyle='#8d8d84'; ctx.strokeStyle=dark; ctx.beginPath(); ctx.ellipse(0,0,6,4,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+            }
+            ctx.restore();
+        }
         ctx.fillStyle='#6b7280';
         ctx.strokeStyle=dark;
         ctx.lineWidth=2;
@@ -4405,6 +5238,10 @@ else {
         DrawClaw(footX,footY,side>=0?1:-1);
     }
     function DrawMonster(m,now){
+        if(!m.alive){
+            DrawGroundRemain(m,'monster');
+            return;
+        }
         var p=ToScreen(m.x,m.y);
         var facing=FacingForEntity(m,4);
         var moving=!!m.renderMoving&&m.alive&&m.deployed;
@@ -4612,6 +5449,10 @@ else {
     }
 
     function DrawMacrofauna(animal,now){
+        if(!animal.alive){
+            DrawGroundRemain(animal,'macrofauna');
+            return;
+        }
         var p=ToScreen(animal.x,animal.y);
         var facing=FacingForEntity(animal,0);
         var moving=!!animal.renderMoving&&animal.alive;
@@ -4750,10 +5591,46 @@ else {
         result.macrofauna=InterpolateEntityList(previousSnapshot.macrofauna,currentSnapshot.macrofauna,alpha);
         result.treasures=currentSnapshot.treasures;
         result.droppedTreasure=currentSnapshot.droppedTreasure;
+        result.thrownProjectiles=currentSnapshot.thrownProjectiles || [];
         result.obstacles=currentSnapshot.obstacles || latestStaticObstacles;
         result.terrainObjects=result.obstacles;
         result.world=latestWorldSnapshot ? latestWorldSnapshot.world : currentSnapshot.world;
         return result;
+    }
+    function DrawThrownProjectile(projectile,currentTick){
+        var duration=Math.max(1,projectile.durationTicks||18);
+        var t=Clamp01(((currentTick||0)-(projectile.startTick||0))/duration);
+        if(t<0||t>1){ return; }
+        var x=projectile.startX+(projectile.endX-projectile.startX)*t;
+        var y=projectile.startY+(projectile.endY-projectile.startY)*t;
+        var height=Math.sin(Math.PI*t)*54;
+        var p=ToScreen(x,y);
+        ctx.save();
+        ctx.globalAlpha=0.92;
+        ctx.translate(p.x,p.y-height);
+        ctx.rotate(t*Math.PI*3.4+StablePhase(projectile.id));
+        if(projectile.objectType==='stick'){
+            ctx.strokeStyle='#6b3f1d'; ctx.lineWidth=4; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(-13,0); ctx.lineTo(13,0); ctx.stroke();
+        } else {
+            ctx.fillStyle='#8d8d84'; ctx.strokeStyle='#4e504a'; ctx.beginPath(); ctx.ellipse(0,0,6,4,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+        }
+        ctx.restore();
+    }
+    function IsSelectedRenderObject(kind,obj){
+        return selectedObject && selectedObject.kind===kind && selectedObject.obj && selectedObject.obj.id===obj.id;
+    }
+    function DrawSelectionGleam(obj,kind){
+        if(!obj){ return; }
+        var p=ToScreen(obj.x,obj.y);
+        var r=kind==='monster'?34:(kind==='adventurer'?28:(kind==='macrofauna'?26:Math.max(20,obj.radius||20)));
+        ctx.save();
+        ctx.globalCompositeOperation='screen';
+        ctx.fillStyle='rgba(255,255,210,0.42)';
+        ctx.beginPath(); ctx.ellipse(p.x,p.y-r*0.35,r*0.9,r*0.55,0,0,Math.PI*2); ctx.fill();
+        ctx.globalCompositeOperation='source-over';
+        ctx.strokeStyle='rgba(255,247,153,0.95)'; ctx.lineWidth=3; ctx.setLineDash([7,5]);
+        ctx.beginPath(); ctx.ellipse(p.x,p.y-r*0.35,r,r*0.62,0,0,Math.PI*2); ctx.stroke();
+        ctx.restore();
     }
     // ============================================================================
     // MODULE: RAID SCENE COMPOSITION
@@ -4779,6 +5656,7 @@ else {
         }
         var renderables=[];
         (s.obstacles||[]).forEach(function(o){
+            if(o.carriedById){ return; }
             renderables.push({
                 sort:o.x+o.y,kind:'obstacle',obj:o
             }
@@ -4792,8 +5670,20 @@ else {
             );
         }
         );
+        (s.droppedTreasure||[]).forEach(function(t){
+            if((t.amountRemaining||0)<=0)return;
+            renderables.push({
+                sort:t.x+t.y+2,kind:'droppedTreasure',obj:t
+            }
+            );
+        }
+        );
+        (s.remains||[]).forEach(function(remain){
+            if(remain.escaped)return;
+            renderables.push({ sort:remain.x+remain.y+8,kind:remain.agentKind||'remain',obj:remain });
+        });
         s.adventurers.forEach(function(a){
-            if(!a.alive||a.escaped)return;
+            if(a.escaped)return;
             renderables.push({
                 sort:a.x+a.y+12,kind:'adventurer',obj:a
             }
@@ -4801,7 +5691,7 @@ else {
         }
         );
         (s.macrofauna||[]).forEach(function(animal){
-            if(!animal.alive||animal.escaped)return;
+            if(animal.escaped)return;
             renderables.push({
                 sort:animal.x+animal.y+10,kind:'macrofauna',obj:animal
             }
@@ -4809,7 +5699,7 @@ else {
         }
         );
         s.monsters.forEach(function(m){
-            if(!m.alive||m.escaped||!m.deployed)return;
+            if(m.escaped||!m.deployed)return;
             renderables.push({
                 sort:m.x+m.y+12,kind:'monster',obj:m
             }
@@ -4824,14 +5714,19 @@ else {
             if(r.kind==='obstacle'){
                 if(r.obj.type==='tree')DrawTree(r.obj);
 else if(r.obj.type==='microfauna')DrawMicrofaunaEmitter(r.obj,now);
+else if(r.obj.type==='stick')DrawStick(r.obj);
 else DrawRock(r.obj);
             }
-else if(r.kind==='treasure')DrawChest(r.obj);
+else if(r.kind==='treasure'||r.kind==='droppedTreasure')DrawTreasurePile(r.obj);
 else if(r.kind==='adventurer')DrawAdventurer(r.obj,now);
 else if(r.kind==='macrofauna')DrawMacrofauna(r.obj,now);
-else DrawMonster(r.obj,now);
+else if(r.kind==='monster')DrawMonster(r.obj,now);
+else if(r.kind==='adventurer')DrawAdventurer(r.obj,now);
+else DrawGroundRemain(r.obj,r.obj.agentKind||'adventurer');
+            if(IsSelectedRenderObject(r.kind==='obstacle'?'worldObject':r.kind,r.obj)){ DrawSelectionGleam(r.obj,r.kind); }
         }
         );
+        (s.thrownProjectiles||[]).forEach(function(projectile){ DrawThrownProjectile(projectile,s.tickNumber||0); });
         EndWorldRenderTransform();
     }
     function ClientToWorldPoint(clientX,clientY){
@@ -4840,35 +5735,71 @@ else DrawMonster(r.obj,now);
         var sy=(clientY-rect.top)*(canvas.height/Math.max(1,rect.height));
         return ScreenToIso(sx,sy);
     }
-    function FindObjectAt(clientX,clientY){
+    function FindObjectsAt(clientX,clientY){
         var renderSnapshot=MakeRenderSnapshot(performance.now());
-        if(!renderSnapshot){ return null; }
+        if(!renderSnapshot){ return []; }
         var worldPoint=ClientToWorldPoint(clientX,clientY);
-        var best=null;
-        var bestDistance=34/Math.max(0.1,camera.zoom);
+        var matches=[];
         function consider(kind,obj,radius,onlyActive){
-            if(onlyActive && (!obj.alive || obj.escaped || obj.deployed===false)){ return; }
+            if(!obj){ return; }
+            if(onlyActive && (obj.escaped || obj.deployed===false)){ return; }
+            if(obj.carriedById){ return; }
             var p=ToScreen(obj.x,obj.y);
             var d=Math.hypot(p.x-worldPoint.x,p.y-worldPoint.y);
-            if(d<bestDistance){
-                bestDistance=d;
-                best={ kind:kind, obj:obj };
-            }
+            if(d<=Math.max(12,radius||22)){ matches.push({ kind:kind, obj:obj, distance:d, sort:(obj.x||0)+(obj.y||0) }); }
         }
-        (renderSnapshot.monsters||[]).forEach(function(monster){ consider('monster',monster,32,true); });
-        (renderSnapshot.adventurers||[]).forEach(function(adventurer){ consider('adventurer',adventurer,26,false); });
-        (renderSnapshot.macrofauna||[]).forEach(function(animal){ consider('macrofauna',animal,24,false); });
-        (renderSnapshot.treasures||[]).forEach(function(treasure){ consider('treasure',treasure,26,false); });
-        (renderSnapshot.droppedTreasure||[]).forEach(function(treasure){ consider('droppedTreasure',treasure,20,false); });
+        (renderSnapshot.monsters||[]).forEach(function(monster){ consider('monster',monster,34,true); });
+        (renderSnapshot.adventurers||[]).forEach(function(adventurer){ consider('adventurer',adventurer,28,false); });
+        (renderSnapshot.macrofauna||[]).forEach(function(animal){ consider('macrofauna',animal,26,false); });
+        (renderSnapshot.remains||[]).forEach(function(remain){ consider(remain.agentKind||'remain',remain,26,false); });
+        (renderSnapshot.treasures||[]).forEach(function(treasure){ consider('treasure',treasure,30,false); });
+        (renderSnapshot.droppedTreasure||[]).forEach(function(treasure){ consider('droppedTreasure',treasure,24,false); });
         (renderSnapshot.obstacles||[]).forEach(function(obstacle){ consider('worldObject',obstacle,Math.max(18,obstacle.radius||18),false); });
-        if(best){ return best; }
+        matches.sort(function(a,b){ if(Math.abs(a.distance-b.distance)>2){ return a.distance-b.distance; } return b.sort-a.sort; });
+        if(matches.length>0){ return matches; }
         var tileX=Math.floor(worldPoint.x/TILE_SIZE);
         var tileY=Math.floor(worldPoint.y/TILE_SIZE);
         if(tileX>=0&&tileY>=0&&tileX<Math.ceil((renderSnapshot.mapWidth||WORLD_WIDTH)/TILE_SIZE)&&tileY<Math.ceil((renderSnapshot.mapHeight||WORLD_HEIGHT)/TILE_SIZE)){
             var terrainType=TerrainTypeAtRenderTile(renderSnapshot,tileX,tileY);
-            return { kind:'terrain', obj:{ id:'tile_'+tileX+'_'+tileY, tileX:tileX, tileY:tileY, terrainType:terrainType, x:worldPoint.x, y:worldPoint.y } };
+            return [{ kind:'terrain', obj:{ id:'tile_'+tileX+'_'+tileY, tileX:tileX, tileY:tileY, terrainType:terrainType, x:worldPoint.x, y:worldPoint.y }, distance:9999, sort:0 }];
+        }
+        return [];
+    }
+    function FindObjectAt(clientX,clientY){
+        var matches=FindObjectsAt(clientX,clientY);
+        return matches.length>0?{ kind:matches[0].kind, obj:matches[0].obj }:null;
+    }
+    function FindObjectInSnapshotBySelection(selection,snapshot){
+        if(!selection||!selection.obj||!snapshot){
+            return null;
+        }
+        var id=selection.obj.id;
+        var lists=[];
+        if(selection.kind==='monster') lists=[snapshot.monsters||[], (snapshot.management&&snapshot.management.ownedMonsters)||[]];
+        else if(selection.kind==='adventurer') lists=[snapshot.adventurers||[]];
+        else if(selection.kind==='macrofauna') lists=[snapshot.macrofauna||[]];
+        else if(selection.kind==='treasure') lists=[snapshot.treasures||[], snapshot.treasureDeposits||[]];
+        else if(selection.kind==='droppedTreasure') lists=[snapshot.droppedTreasure||[]];
+        else if(selection.kind==='worldObject') lists=[snapshot.obstacles||[], snapshot.terrainObjects||[]];
+        else if(selection.kind==='terrain') return selection.obj;
+        else lists=[snapshot.remains||[]];
+        for(var i=0;i<lists.length;i+=1){
+            for(var j=0;j<lists[i].length;j+=1){
+                if(lists[i][j]&&lists[i][j].id===id){
+                    return lists[i][j];
+                }
+            }
         }
         return null;
+    }
+    function RefreshSelectedObjectFromSnapshot(snapshot){
+        if(!selectedObject){
+            return;
+        }
+        var refreshed=FindObjectInSnapshotBySelection(selectedObject,snapshot);
+        if(refreshed){
+            selectedObject={ kind:selectedObject.kind, obj:refreshed };
+        }
     }
     function FindMonsterAt(clientX,clientY){
         var picked=FindObjectAt(clientX,clientY);
@@ -4880,12 +5811,29 @@ else DrawMonster(r.obj,now);
     function MonsterDisplayName(monster){
         return monster.name || (monster.collared ? 'Collared monster' : 'Uncollared wild monster');
     }
+    function DescribeRemain(o,label){
+        var state=o.corpseState==='skeleton'?'Skeleton':'Corpse';
+        var lines=[label+': '+state];
+        if(o.corpseState==='skeleton'){
+            lines.push('Condition: bones only');
+            lines.push('Edible food remaining: 0');
+        } else {
+            lines.push('Condition: corpse');
+            lines.push('Edible food remaining: '+FormatNumber(o.edibleFoodRemaining||0));
+        }
+        lines.push('State: '+(o.behaviourState||o.corpseState||'dead'));
+        lines.push('Position: '+Math.round(o.x)+', '+Math.round(o.y));
+        return lines.join('\n');
+    }
     function DescribeSelectedObject(selection){
         if(!selection){
             return 'Click any monster, adventurer, treasure, scenery object or terrain tile to inspect it.';
         }
         var o=selection.obj;
         if(selection.kind==='monster'){
+            if(!o.alive){
+                return DescribeRemain(o,'Monster '+MonsterDisplayName(o));
+            }
             return [
                 'Monster: '+MonsterDisplayName(o),
                 'Health: '+Math.round(o.health)+' / '+Math.round(o.maxHealth),
@@ -4899,11 +5847,13 @@ else DrawMonster(r.obj,now);
                 'Collar: '+(o.collared?'Collared':'Uncollared'),
                 'Map state: '+(o.deployed?'On map':'In cage/reserve'),
                 'Behaviour: '+(o.behaviourState||'unknown'),
-                'Deployment order: '+(o.selectedForDeployment?'Deploy at season start':'Reserve'),
-                o.owned?'':'Click again to collar this wild monster.'
+                'Deployment order: '+(o.selectedForDeployment?'Deploy at season start':'Reserve')
             ].join('\n');
         }
         if(selection.kind==='adventurer'){
+            if(!o.alive){
+                return DescribeRemain(o,'Adventurer '+(o.className||'unknown'));
+            }
             return [
                 'Adventurer: '+(o.className||'unknown'),
                 'Health: '+Math.round(o.health)+' / '+Math.round(o.maxHealth),
@@ -4915,6 +5865,9 @@ else DrawMonster(r.obj,now);
             ].join('\n');
         }
         if(selection.kind==='macrofauna'){
+            if(!o.alive){
+                return DescribeRemain(o,'Macrofauna '+(o.displayName||o.species||'animal'));
+            }
             return [
                 'Macrofauna: '+(o.displayName||o.species||'animal'),
                 'Health: '+Math.round(o.health)+' / '+Math.round(o.maxHealth),
@@ -4961,19 +5914,43 @@ else DrawMonster(r.obj,now);
         });
     }
     function UpdateSelectedObjectPanel(){
+        objectDetails.innerHTML='';
+        var details=document.createElement('div');
+        details.textContent=DescribeSelectedObject(selectedObject);
+        objectDetails.appendChild(details);
         if(selectedObject&&selectedObject.kind==='monster'){
-            var lines=DescribeSelectedObject(selectedObject).split('\n').map(function(line){
-                return '<div>'+EscapeHtml(line)+'</div>';
-            });
             var monster=selectedObject.obj;
             var shortfall=GetFoodShortfall(monster);
             if(shortfall>0){
-                lines.splice(4,0,'<div><span class="nutritionShortfall">Food shortfall: '+EscapeHtml(FormatNumber(shortfall))+'</span></div>');
+                var warning=document.createElement('div');
+                var warningText=document.createElement('span');
+                warningText.className='nutritionShortfall';
+                warningText.textContent='Food shortfall: '+FormatNumber(shortfall);
+                warning.appendChild(warningText);
+                objectDetails.appendChild(warning);
             }
-            objectDetails.innerHTML=lines.join('');
-            return;
+            var actions=document.createElement('div');
+            actions.className='selectionActions';
+            if(!monster.owned){
+                var collarButton=document.createElement('button');
+                collarButton.type='button';
+                collarButton.textContent='Collar wild monster';
+                collarButton.addEventListener('click',function(event){
+                    event.stopPropagation();
+                    collarButton.disabled=true;
+                    collarButton.textContent='Collaring...';
+                    SendCommand('CAPTURE_WILD_MONSTER',{ monsterId:monster.id });
+                });
+                actions.appendChild(collarButton);
+            } else if(monster.collared&&monster.deployed){
+                var recallButton=document.createElement('button');
+                recallButton.type='button';
+                recallButton.textContent='Recall to base';
+                recallButton.addEventListener('click',function(){ SendCommand('RECALL_MONSTER',{ monsterId:monster.id }); });
+                actions.appendChild(recallButton);
+            }
+            if(actions.children.length>0){ objectDetails.appendChild(actions); }
         }
-        objectDetails.textContent=DescribeSelectedObject(selectedObject);
     }
     function UpdateMonsterHover(clientX,clientY){
         var picked=FindObjectAt(clientX,clientY);
@@ -4988,13 +5965,22 @@ else DrawMonster(r.obj,now);
         }
     }
     function SelectObjectAt(clientX,clientY){
-        selectedObject=FindObjectAt(clientX,clientY);
-        UpdateSelectedObjectPanel();
-        if(selectedObject&&selectedObject.kind==='monster'&&!selectedObject.obj.owned){
-            SendCommand('CAPTURE_WILD_MONSTER',{ monsterId:selectedObject.obj.id });
-            return true;
+        var matches=FindObjectsAt(clientX,clientY);
+        if(matches.length===0){
+            selectedObject=null;
+            selectionCycleKey='';
+            selectionCycleIndex=0;
+            UpdateSelectedObjectPanel();
+            return false;
         }
-        return !!selectedObject;
+        var worldPoint=ClientToWorldPoint(clientX,clientY);
+        var key=Math.round(worldPoint.x/8)+','+Math.round(worldPoint.y/8);
+        if(key===selectionCycleKey){ selectionCycleIndex=(selectionCycleIndex+1)%matches.length; }
+        else { selectionCycleKey=key; selectionCycleIndex=0; }
+        var picked=matches[selectionCycleIndex]||matches[0];
+        selectedObject={ kind:picked.kind, obj:picked.obj };
+        UpdateSelectedObjectPanel();
+        return true;
     }
     function TryCaptureWildMonsterAt(clientX,clientY){
         return SelectObjectAt(clientX,clientY);
@@ -5045,6 +6031,7 @@ else DrawMonster(r.obj,now);
             }
             lastSnapshotPhase=latestSnapshot.phase||'raid';
             UpdateManagementDrawer(latestSnapshot);
+            RefreshSelectedObjectFromSnapshot(latestSnapshot);
             UpdateSelectedObjectPanel();
             if(latestSnapshot.phase==='gameOver'){
                 ShowMainMenu();
@@ -5057,7 +6044,7 @@ else DrawMonster(r.obj,now);
             break;
             case'WORKER_ERROR':AppendLog('Worker error: '+message.payload.message);
             break;
-            case'HEADLESS_TEST_RESULTS':AppendLog('Harness: '+message.payload.endedCount+'/'+message.payload.count+' raids ended; avg treasure remaining '+message.payload.averageTreasureRemaining.toFixed(2)+', avg treasure lost value '+message.payload.averageTreasureLostValue.toFixed(2)+', avg pathfinding calls '+message.payload.averagePathfindingCalls.toFixed(2)+'.');
+            case'HEADLESS_TEST_RESULTS':AppendLog('Harness: '+message.payload.endedCount+'/'+message.payload.count+' raids ended; avg treasure units remaining '+message.payload.averageTreasureRemainingUnits.toFixed(2)+', avg treasure lost value '+message.payload.averageTreasureLostValue.toFixed(2)+', avg pathfinding calls '+message.payload.averagePathfindingCalls.toFixed(2)+', regression failures '+(message.payload.regressionTests?message.payload.regressionTests.failures:'?')+'.');
             break;
         }
     }
@@ -5066,12 +6053,22 @@ else DrawMonster(r.obj,now);
     // MODULE: INPUT HANDLERS
     // ============================================================================
     // Converts user input into worker commands or camera-only UI changes.
+    function GameCanResume(){
+        return gameStarted && latestSnapshot && latestSnapshot.phase !== 'gameOver';
+    }
+    function UpdateResumeGameButton(){
+        resumeGameMenuButton.disabled=!GameCanResume();
+    }
     function ShowMainMenu(){
+        UpdateResumeGameButton();
         mainMenuOverlay.classList.remove('menuHidden');
         seasonDisplay.textContent='Main Menu';
     }
     function HideMainMenu(){
         mainMenuOverlay.classList.add('menuHidden');
+        if(latestSnapshot){
+            UpdateSeasonDisplay(latestSnapshot);
+        }
     }
     function StartNewGame(mode){
         gameStarted=true;
@@ -5085,6 +6082,12 @@ else DrawMonster(r.obj,now);
             mode:mode
         });
     }
+    resumeGameMenuButton.addEventListener('click',function(){
+        if(!GameCanResume()){
+            return;
+        }
+        HideMainMenu();
+    });
     document.getElementById('campaignMenuButton').addEventListener('click',function(){
         StartNewGame('campaign');
     });
@@ -5121,7 +6124,7 @@ else DrawMonster(r.obj,now);
     );
     document.getElementById('harnessButton').addEventListener('click',function(){
         SendCommand('RUN_HEADLESS_TESTS',{
-            seed:100000,count:3,maxTicks:600
+            seed:100000,count:3
         }
         );
     }
