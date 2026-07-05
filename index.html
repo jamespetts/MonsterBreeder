@@ -66,6 +66,14 @@ button:hover { background: #ffd768; }
 .monsterDetailGrid dt { font-weight: 700; color: #526052; }
 .monsterDetailGrid dd { margin: 0; }
 #managementActions { margin-top: 0.65rem; }
+.breedingPanel { margin-top: 0.65rem; border-top: 1px solid #d8d0b8; padding-top: 0.6rem; }
+.breedingPanel h4 { margin: 0 0 0.35rem; font-size: 0.95rem; color: #394732; }
+.breedingPanel p { margin: 0.25rem 0 0.45rem; font-size: 0.88rem; }
+.breedingPanel select { width: 100%; box-sizing: border-box; margin: 0.2rem 0 0.45rem; padding: 0.35rem; }
+.breedingPanel button { width: 100%; margin-top: 0.2rem; }
+.breedingStatus { font-size: 0.84rem; color: #526052; }
+.breedingBlocked { color: #9f4211; font-weight: 700; }
+
 @media (max-width: 900px) { #managementBody { grid-template-columns: 1fr; } }
 .hint { margin: 0.5rem 0 0; color: #526052; }
 #sidePanel { margin-top: 0; display: grid; grid-template-rows: 1fr 1fr; gap: 0.75rem; min-height: 0; background: #020617; color: #e5e7eb; border: 1px solid #111827; box-shadow: 0 1px 8px rgba(0,0,0,0.45); }
@@ -233,6 +241,18 @@ button:hover { background: #ffd768; }
         SEVERELY_MALNOURISHED: 'Severely malnourished',
         STARVED: 'Starved'
     };
+    var MONSTER_SEX = {
+        FEMALE: 'female',
+        MALE: 'male'
+    };
+    var MONSTER_LIFE_STAGE = {
+        JUVENILE: 'juvenile',
+        ADULT: 'adult'
+    };
+    var MONSTER_JUVENILE_MATURATION_SEASONS = 1;
+    var MONSTER_MOTHER_BREEDING_HOLD_SEASONS = 1;
+    var MONSTER_CLUTCH_SIZE_MIN = 2;
+    var MONSTER_CLUTCH_SIZE_MAX = 4;
 
     var SOUND_LOUDNESS = {
         EXTREMELY_QUIET: 6000,
@@ -5285,6 +5305,13 @@ button:hover { background: #ffd768; }
             this.roamRetargetTick = -1;
             this.genome = options && options.genome ? options.genome : MonsterGenePool.createGenome(rng, options && options.world ? options.world : null);
             this.phenotype = MonsterPhenotypeSystem.buildPhenotype(this.genome);
+            this.sex = options && options.sex ? options.sex : (rng.nextFloat() < 0.5 ? MONSTER_SEX.FEMALE : MONSTER_SEX.MALE);
+            this.ageInSeasons = options && Number.isFinite(options.ageInSeasons) ? Math.max(0, Math.floor(options.ageInSeasons)) : (options && options.lifeStage === MONSTER_LIFE_STAGE.JUVENILE ? 0 : rng.integer(8, 24));
+            this.lifeStage = options && options.lifeStage ? options.lifeStage : MONSTER_LIFE_STAGE.ADULT;
+            this.juvenileMaturationSeasonsRemaining = options && Number.isFinite(options.juvenileMaturationSeasonsRemaining) ? Math.max(0, Math.floor(options.juvenileMaturationSeasonsRemaining)) : 0;
+            this.breedingHoldSeasonsRemaining = options && Number.isFinite(options.breedingHoldSeasonsRemaining) ? Math.max(0, Math.floor(options.breedingHoldSeasonsRemaining)) : 0;
+            this.motherId = options && options.motherId ? options.motherId : null;
+            this.fatherId = options && options.fatherId ? options.fatherId : null;
         }
 
         static randomName(rng) {
@@ -5438,6 +5465,31 @@ button:hover { background: #ffd768; }
             this.wildExitTargetY = null;
             return true;
         }
+        getBreedingBlockReason(requiredSex) {
+            if (!this.alive) { return 'Dead monsters cannot breed.'; }
+            if (!this.owned) { return 'Only captive collared monsters can be bred.'; }
+            if (requiredSex && this.sex !== requiredSex) { return requiredSex === MONSTER_SEX.FEMALE ? 'A mother is required.' : 'A sire is required.'; }
+            if (this.lifeStage !== MONSTER_LIFE_STAGE.ADULT) { return 'Juveniles cannot breed until they mature.'; }
+            if ((this.breedingHoldSeasonsRemaining || 0) > 0) { return 'This monster is already committed to a brood this season.'; }
+            if (this.nutritionState === NUTRITION_STATE.STARVED) { return 'Starved monsters cannot breed.'; }
+            return '';
+        }
+
+        canBreed(requiredSex) {
+            return this.getBreedingBlockReason(requiredSex) === '';
+        }
+
+        getDeploymentBlockReason() {
+            if (!this.alive) { return 'Dead monsters cannot be deployed.'; }
+            if (this.lifeStage !== MONSTER_LIFE_STAGE.ADULT) { return 'Juveniles must mature for one more season before deployment.'; }
+            if ((this.breedingHoldSeasonsRemaining || 0) > 0) { return 'Mother is incubating a brood this season.'; }
+            return '';
+        }
+
+        canDeploy() {
+            return this.getDeploymentBlockReason() === '';
+        }
+
         capture(rng) {
             if (this.owned || !this.alive) {
                 return false;
@@ -5758,6 +5810,17 @@ button:hover { background: #ffd768; }
             s.recallTargetX = this.recallTargetX;
             s.recallTargetY = this.recallTargetY;
             s.phenotype = MonsterPhenotypeSystem.snapshot(this.phenotype);
+            s.sex = this.sex;
+            s.ageInSeasons = this.ageInSeasons || 0;
+            s.lifeStage = this.lifeStage || MONSTER_LIFE_STAGE.ADULT;
+            s.juvenileMaturationSeasonsRemaining = this.juvenileMaturationSeasonsRemaining || 0;
+            s.breedingHoldSeasonsRemaining = this.breedingHoldSeasonsRemaining || 0;
+            s.motherId = this.motherId;
+            s.fatherId = this.fatherId;
+            s.canBreed = this.canBreed();
+            s.canDeploy = this.canDeploy();
+            s.breedingBlockReason = this.getBreedingBlockReason();
+            s.deploymentBlockReason = this.getDeploymentBlockReason();
             return s;
         }
     }
@@ -6122,6 +6185,7 @@ button:hover { background: #ffd768; }
             this.nextMonsterId = 2;
             this.ownedMonsters = [new Monster('monster_1', RIGHT_EDGE_X, rng.range(120, MAP_HEIGHT - 120), rng, { owned: true, name: 'Gribble', selectedForDeployment: true, world: world })];
             this.eggs = [];
+            this.nextBroodId = 1;
             this.foodExpenditureCredits = 0;
             this.roundFoodExpenditureCredits = 0;
         }
@@ -6163,12 +6227,116 @@ button:hover { background: #ffd768; }
                 return monster.alive;
             });
         }
+        findOwnedMonster(monsterId) {
+            return this.ownedMonsters.find(function (monster) {
+                return monster.id === monsterId;
+            }) || null;
+        }
+        setEveryMonsterSexForTesting(femaleId, maleId) {
+            var female = this.findOwnedMonster(femaleId);
+            var male = this.findOwnedMonster(maleId);
+            if (female) { female.sex = MONSTER_SEX.FEMALE; }
+            if (male) { male.sex = MONSTER_SEX.MALE; }
+        }
+        breedMonsters(motherId, fatherId, rng, world, seasonNumber) {
+            var mother = this.findOwnedMonster(motherId);
+            var father = this.findOwnedMonster(fatherId);
+            if (!mother) { return { ok: false, reason: 'Choose a living captive mother.' }; }
+            if (!father) { return { ok: false, reason: 'Choose a living captive sire.' }; }
+            if (mother.id === father.id) { return { ok: false, reason: 'Choose two different monsters.' }; }
+            var motherReason = mother.getBreedingBlockReason(MONSTER_SEX.FEMALE);
+            if (motherReason) { return { ok: false, reason: mother.name + ': ' + motherReason }; }
+            var fatherReason = father.getBreedingBlockReason(MONSTER_SEX.MALE);
+            if (fatherReason) { return { ok: false, reason: father.name + ': ' + fatherReason }; }
+            var broodId = 'brood_' + this.nextBroodId;
+            this.nextBroodId += 1;
+            var clutchSize = rng.integer(MONSTER_CLUTCH_SIZE_MIN, MONSTER_CLUTCH_SIZE_MAX);
+            var offspring = [];
+            for (var i = 0; i < clutchSize; i += 1) {
+                offspring.push({
+                    genome: MonsterGenePool.createOffspringGenome(mother.genome, father.genome, rng),
+                    sex: rng.nextFloat() < 0.5 ? MONSTER_SEX.FEMALE : MONSTER_SEX.MALE
+                });
+            }
+            this.eggs.push({
+                id: broodId,
+                motherId: mother.id,
+                motherName: mother.name,
+                fatherId: father.id,
+                fatherName: father.name,
+                seasonMated: seasonNumber || 1,
+                incubationSeasonsRemaining: 1,
+                clutchSize: clutchSize,
+                offspring: offspring
+            });
+            mother.breedingHoldSeasonsRemaining = Math.max(mother.breedingHoldSeasonsRemaining || 0, MONSTER_MOTHER_BREEDING_HOLD_SEASONS);
+            mother.selectedForDeployment = false;
+            return { ok: true, broodId: broodId, clutchSize: clutchSize, motherName: mother.name, fatherName: father.name };
+        }
+        advanceLifecycleAfterSeason(rng, world, seasonNumber) {
+            var events = [];
+            this.ownedMonsters.forEach(function (monster) {
+                if (!monster.alive) { return; }
+                monster.ageInSeasons = (monster.ageInSeasons || 0) + 1;
+                if ((monster.breedingHoldSeasonsRemaining || 0) > 0) {
+                    monster.breedingHoldSeasonsRemaining -= 1;
+                }
+                if (monster.lifeStage === MONSTER_LIFE_STAGE.JUVENILE && (monster.juvenileMaturationSeasonsRemaining || 0) > 0) {
+                    monster.juvenileMaturationSeasonsRemaining -= 1;
+                    if (monster.juvenileMaturationSeasonsRemaining <= 0) {
+                        monster.lifeStage = MONSTER_LIFE_STAGE.ADULT;
+                        monster.selectedForDeployment = false;
+                        events.push(monster.name + ' has matured and can be bred or deployed from next season.');
+                    }
+                }
+            });
+            var remainingEggs = [];
+            this.eggs.forEach(function (brood) {
+                brood.incubationSeasonsRemaining -= 1;
+                if (brood.incubationSeasonsRemaining > 0) {
+                    remainingEggs.push(brood);
+                    return;
+                }
+                var hatchedCount = 0;
+                brood.offspring.forEach(function (offspring) {
+                    var hatchling = new Monster(this.createMonsterId('hatchling'), RIGHT_EDGE_X, rng.range(120, MAP_HEIGHT - 120), rng, {
+                        owned: true,
+                        name: Monster.randomName(rng),
+                        selectedForDeployment: false,
+                        world: world,
+                        genome: offspring.genome,
+                        sex: offspring.sex,
+                        ageInSeasons: 0,
+                        lifeStage: MONSTER_LIFE_STAGE.JUVENILE,
+                        juvenileMaturationSeasonsRemaining: MONSTER_JUVENILE_MATURATION_SEASONS,
+                        motherId: brood.motherId,
+                        fatherId: brood.fatherId
+                    });
+                    this.ownedMonsters.push(hatchling);
+                    hatchedCount += 1;
+                }, this);
+                events.push(brood.motherName + ' and ' + brood.fatherName + ' produced ' + hatchedCount + ' hatchling' + (hatchedCount === 1 ? '' : 's') + '. They will mature after one more season.');
+            }, this);
+            this.eggs = remainingEggs;
+            return { events: events };
+        }
         getManagementSnapshot() {
             return {
                 ownedMonsters: this.ownedMonsters.map(function (monster) {
                     return monster.getSnapshot();
                 }),
-                eggs: this.eggs.slice(0),
+                eggs: this.eggs.map(function (brood) {
+                    return {
+                        id: brood.id,
+                        motherId: brood.motherId,
+                        motherName: brood.motherName,
+                        fatherId: brood.fatherId,
+                        fatherName: brood.fatherName,
+                        seasonMated: brood.seasonMated,
+                        incubationSeasonsRemaining: brood.incubationSeasonsRemaining,
+                        clutchSize: brood.clutchSize
+                    };
+                }),
                 foodExpenditureCredits: this.foodExpenditureCredits || 0,
                 roundFoodExpenditureCredits: this.roundFoodExpenditureCredits || 0
             };
@@ -6638,6 +6806,10 @@ button:hover { background: #ffd768; }
             this.gameState.ownedMonsters.forEach(function (monster) {
                 monster.resetForManagement();
                 if (monster.alive && monster.selectedForDeployment) {
+                    if (!monster.canDeploy()) {
+                        this.addEvent(monster.name + ' remained in reserve: ' + monster.getDeploymentBlockReason());
+                        return;
+                    }
                     if (monster.enterFromRight(this.world, this.rng)) {
                         this.addEvent(monster.name + ' was released for this season.');
                     } else {
@@ -6973,11 +7145,11 @@ button:hover { background: #ffd768; }
                 if (monsterId && m.id !== monsterId) {
                     return false;
                 }
-                return m.alive && !m.deployed;
+                return m.alive && !m.deployed && m.canDeploy();
             });
 
             if (!monster) {
-                return { ok: false, reason: 'No living reserve monster is available.' };
+                return { ok: false, reason: 'No living deployable reserve monster is available.' };
             }
 
             if (!monster.enterFromRight(this.world, this.rng)) {
@@ -7528,6 +7700,10 @@ button:hover { background: #ffd768; }
             nutritionResult.events.forEach(function (eventText) {
                 this.pendingEvents.push({ tickNumber: finishedTickNumber, text: eventText });
             }, this);
+            var lifecycleResult = this.gameState.advanceLifecycleAfterSeason(this.currentRaid.rng, this.world, this.seasonNumber);
+            lifecycleResult.events.forEach(function (eventText) {
+                this.pendingEvents.push({ tickNumber: finishedTickNumber, text: eventText });
+            }, this);
             this.gameState.resetAllOwnedForManagement();
             this.currentRaid = null;
 
@@ -7620,6 +7796,17 @@ button:hover { background: #ffd768; }
             }
 
             return this.gameState.setMonsterDeploymentSelection(monsterId, selected);
+        }
+
+        breedMonsters(motherId, fatherId) {
+            if (this.phase === 'raid') {
+                return { ok: false, reason: 'Breeding is available only during management.' };
+            }
+            var result = this.gameState.breedMonsters(motherId, fatherId, this.rng, this.world, this.seasonNumber);
+            if (result.ok) {
+                this.pendingEvents.push({ tickNumber: 0, text: result.motherName + ' and ' + result.fatherName + ' mated. The mother will incubate a brood of ' + result.clutchSize + ' eggs this season.' });
+            }
+            return result;
         }
 
         captureWildMonster(monsterId) {
@@ -7886,6 +8073,22 @@ button:hover { background: #ffd768; }
         var rockyColourStats = sampleColourPopulation(TERRAIN_TYPE.ROCKY, 7103);
         AddRegressionResult(results, 'Wild colour selection favours green populations in forest but not in desert', forestColourStats.g > forestColourStats.r + 18 && forestColourStats.g > forestColourStats.b + 18 && desertColourStats.r > desertColourStats.g - 8 && desertColourStats.r > desertColourStats.b + 35, 'forest=' + JSON.stringify(forestColourStats) + ', desert=' + JSON.stringify(desertColourStats));
         AddRegressionResult(results, 'Wild colour selection makes rocky populations greyer than forest populations', Math.max(rockyColourStats.r, rockyColourStats.g, rockyColourStats.b) - Math.min(rockyColourStats.r, rockyColourStats.g, rockyColourStats.b) < 65, 'rocky=' + JSON.stringify(rockyColourStats));
+
+        var breedingWorld = WorldGenerator.createWorld(7104, { mapSizeKey: 'legacy', customTreasureAmounts: { bronze: 40 } });
+        var breedingState = new GameState(new SeededRng(7105), 'quick', breedingWorld);
+        var regressionMother = breedingState.ownedMonsters[0];
+        var regressionFather = new Monster('regression_sire', RIGHT_EDGE_X, 200, new SeededRng(7106), { owned: true, sex: MONSTER_SEX.MALE, world: breedingWorld, name: 'Sire', selectedForDeployment: false });
+        regressionMother.sex = MONSTER_SEX.FEMALE;
+        regressionMother.lifeStage = MONSTER_LIFE_STAGE.ADULT;
+        regressionFather.lifeStage = MONSTER_LIFE_STAGE.ADULT;
+        breedingState.ownedMonsters.push(regressionFather);
+        var breedingResult = breedingState.breedMonsters(regressionMother.id, regressionFather.id, new SeededRng(7107), breedingWorld, 1);
+        AddRegressionResult(results, 'Breeding creates an incubating brood and holds the mother out of deployment', breedingResult.ok && breedingState.eggs.length === 1 && regressionMother.breedingHoldSeasonsRemaining === 1 && !regressionMother.selectedForDeployment, 'ok=' + breedingResult.ok + ', eggs=' + breedingState.eggs.length + ', hold=' + regressionMother.breedingHoldSeasonsRemaining);
+        var firstLifecycle = breedingState.advanceLifecycleAfterSeason(new SeededRng(7108), breedingWorld, 1);
+        var juveniles = breedingState.ownedMonsters.filter(function (monster) { return monster.lifeStage === MONSTER_LIFE_STAGE.JUVENILE; });
+        AddRegressionResult(results, 'Incubating brood hatches into juveniles after one season', breedingState.eggs.length === 0 && juveniles.length === breedingResult.clutchSize && juveniles.every(function (monster) { return !monster.canDeploy() && !monster.canBreed(); }), 'juveniles=' + juveniles.length + ', clutch=' + breedingResult.clutchSize + ', events=' + firstLifecycle.events.length);
+        breedingState.advanceLifecycleAfterSeason(new SeededRng(7109), breedingWorld, 2);
+        AddRegressionResult(results, 'Juveniles mature after one further season', juveniles.every(function (monster) { return monster.lifeStage === MONSTER_LIFE_STAGE.ADULT && monster.canDeploy(); }), 'mature=' + juveniles.filter(function (monster) { return monster.lifeStage === MONSTER_LIFE_STAGE.ADULT; }).length);
 
         var session = new GameSession(24681012, { mode: 'quick', worldOptions: { mapSizeKey: 'legacy' } });
         session.startSeason();
@@ -8546,6 +8749,13 @@ button:hover { background: #ffd768; }
                     SendSnapshotAndEvents(command.messageId);
                     break;
 
+                case 'BREED_MONSTERS':
+                    EnsureGameSession();
+                    var breedResult = gameSession.breedMonsters(command.payload && command.payload.motherId, command.payload && command.payload.fatherId);
+                    Post(breedResult.ok ? { replyTo: command.messageId, type: 'COMMAND_ACCEPTED' } : { replyTo: command.messageId, type: 'COMMAND_REJECTED', payload: { reason: breedResult.reason } });
+                    SendSnapshotAndEvents(command.messageId);
+                    break;
+
                 case 'CAPTURE_WILD_MONSTER':
                     EnsureGameSession();
                     var captureResult = gameSession.captureWildMonster(command.payload && command.payload.monsterId);
@@ -8907,9 +9117,10 @@ button:hover { background: #ffd768; }
         ].join('\n');
     }
     function BuildManagementRenderKey(s, monsters){
+        var eggs=(s.management&&s.management.eggs)||[];
         return [s.phase||'raid',s.seasonNumber,managementDrawerVisible?1:0].concat(monsters.map(function(monster){
-            return [monster.id,monster.name,monster.alive?1:0,monster.selectedForDeployment?1:0,monster.deployed?1:0,monster.capturedThisRaid?1:0,Math.round(monster.health),Math.round(monster.maxHealth),monster.nutritionState,monster.foodEatenThisSeason||0,monster.foodBoughtThisSeason||0,monster.foodBoughtCostCreditsThisSeason||0,monster.foodNeededThisSeason||0].join(':');
-        })).join('|');
+            return [monster.id,monster.name,monster.alive?1:0,monster.selectedForDeployment?1:0,monster.deployed?1:0,monster.capturedThisRaid?1:0,Math.round(monster.health),Math.round(monster.maxHealth),monster.nutritionState,monster.foodEatenThisSeason||0,monster.foodBoughtThisSeason||0,monster.foodBoughtCostCreditsThisSeason||0,monster.foodNeededThisSeason||0,monster.sex||'',monster.lifeStage||'',monster.canBreed?1:0,monster.canDeploy?1:0,monster.breedingHoldSeasonsRemaining||0,monster.juvenileMaturationSeasonsRemaining||0].join(':');
+        })).concat(eggs.map(function(brood){ return ['brood',brood.id,brood.motherId,brood.fatherId,brood.clutchSize,brood.incubationSeasonsRemaining].join(':'); })).join('|');
     }
     function MonsterColourPhenotype(monster){
         var colour = monster && monster.phenotype && monster.phenotype.colour ? monster.phenotype.colour : null;
@@ -8948,6 +9159,94 @@ button:hover { background: #ffd768; }
             + '<path d="M128 68 Q145 75 158 70" stroke="'+collar+'" stroke-width="7" stroke-linecap="round" fill="none"/>'
             + '</svg>';
     }
+    function MonsterSexLabel(monster){
+        if(!monster||!monster.sex){ return 'unknown'; }
+        return monster.sex==='female'?'female':'male';
+    }
+    function MonsterAgeLabel(monster){
+        var seasons=Math.max(0,Math.floor(monster&&monster.ageInSeasons||0));
+        var years=Math.floor(seasons/4);
+        var rem=seasons%4;
+        return years+'y '+rem+'s';
+    }
+    function MonsterLifeStageLabel(monster){
+        if(!monster){ return 'unknown'; }
+        if(monster.lifeStage==='juvenile'){
+            return 'juvenile'+((monster.juvenileMaturationSeasonsRemaining||0)>0?' - matures after '+monster.juvenileMaturationSeasonsRemaining+' season'+(monster.juvenileMaturationSeasonsRemaining===1?'':'s'):'');
+        }
+        if((monster.breedingHoldSeasonsRemaining||0)>0){
+            return 'adult - incubating brood';
+        }
+        return 'adult';
+    }
+    function RenderBreedingPanel(monster){
+        var s=currentSnapshot||latestSnapshot;
+        if(!s||s.phase==='raid'){
+            return;
+        }
+        var management=s.management||{};
+        var monsters=management.ownedMonsters||[];
+        var broods=management.eggs||[];
+        var panel=document.createElement('div');
+        panel.className='breedingPanel';
+        var heading=document.createElement('h4');
+        heading.textContent='Breeding';
+        panel.appendChild(heading);
+        var relatedBroods=broods.filter(function(brood){ return brood.motherId===monster.id||brood.fatherId===monster.id; });
+        if(relatedBroods.length>0){
+            relatedBroods.forEach(function(brood){
+                var broodLine=document.createElement('p');
+                broodLine.className='breedingStatus';
+                broodLine.textContent='Incubating brood with '+brood.clutchSize+' egg'+(brood.clutchSize===1?'':'s')+' from '+brood.motherName+' and '+brood.fatherName+'. Hatches after '+brood.incubationSeasonsRemaining+' season'+(brood.incubationSeasonsRemaining===1?'':'s')+'.';
+                panel.appendChild(broodLine);
+            });
+        }
+        if(!monster.canBreed){
+            var blocked=document.createElement('p');
+            blocked.className='breedingBlocked';
+            blocked.textContent=monster.breedingBlockReason||'This monster cannot breed now.';
+            panel.appendChild(blocked);
+            selectedMonsterPanel.appendChild(panel);
+            return;
+        }
+        var intro=document.createElement('p');
+        intro.textContent='Choose a mate. The mother will stay in the cage for the next season; hatchlings then need one further season to mature.';
+        panel.appendChild(intro);
+        var selectedIsFemale=monster.sex==='female';
+        var eligiblePartners=monsters.filter(function(candidate){
+            if(candidate.id===monster.id){ return false; }
+            if(!candidate.canBreed){ return false; }
+            return selectedIsFemale?candidate.sex==='male':candidate.sex==='female';
+        });
+        if(eligiblePartners.length===0){
+            var none=document.createElement('p');
+            none.className='breedingBlocked';
+            none.textContent=selectedIsFemale?'No eligible sire is available. Capture or mature a male monster.':'No eligible mother is available. Capture or mature a female monster.';
+            panel.appendChild(none);
+            selectedMonsterPanel.appendChild(panel);
+            return;
+        }
+        var label=document.createElement('label');
+        label.textContent=selectedIsFemale?'Mate with sire':'Mate with mother';
+        var select=document.createElement('select');
+        eligiblePartners.forEach(function(partner){
+            var option=document.createElement('option');
+            option.value=partner.id;
+            option.textContent=partner.name+' - '+MonsterSexLabel(partner)+', '+MonsterLifeStageLabel(partner)+', '+MonsterAgeLabel(partner);
+            select.appendChild(option);
+        });
+        var button=document.createElement('button');
+        button.type='button';
+        button.textContent=selectedIsFemale?'Breed this mother':'Breed with this sire';
+        button.addEventListener('click',function(){
+            var partnerId=select.value;
+            SendCommand('BREED_MONSTERS', selectedIsFemale?{ motherId:monster.id, fatherId:partnerId }:{ motherId:partnerId, fatherId:monster.id });
+        });
+        panel.appendChild(label);
+        panel.appendChild(select);
+        panel.appendChild(button);
+        selectedMonsterPanel.appendChild(panel);
+    }
     function RenderSelectedMonsterPanel(monster){
         selectedMonsterPanel.innerHTML='';
         if(!monster){
@@ -8971,7 +9270,7 @@ button:hover { background: #ffd768; }
             detailRows.push(['Food shortfall',FormatNumber(shortfall),'nutritionShortfall']);
         }
         var visibleColour=MonsterColourPhenotype(monster);
-        detailRows=detailRows.concat([['Visible colour',visibleColour.pattern&&visibleColour.pattern.type==='stripes'?'striped':'solid'],['Collar',monster.collared?'Collared':'Uncollared'],['Raid state',monster.deployed?'Deployed':'In cage'],['Season order',monster.selectedForDeployment?'Deploy at start':'Reserve'],['Origin',monster.capturedThisRaid?'Captured wild monster':'Captive monsters']]);
+        detailRows=detailRows.concat([['Visible colour',visibleColour.pattern&&visibleColour.pattern.type==='stripes'?'striped':'solid'],['Sex',MonsterSexLabel(monster)],['Age',MonsterAgeLabel(monster)],['Life stage',MonsterLifeStageLabel(monster)],['Breeding',monster.canBreed?'available':(monster.breedingBlockReason||'unavailable')],['Collar',monster.collared?'Collared':'Uncollared'],['Raid state',monster.deployed?'Deployed':'In cage'],['Season order',monster.selectedForDeployment?'Deploy at start':'Reserve'],['Origin',monster.capturedThisRaid?'Captured wild monster':'Captive monsters']]);
         detailRows.forEach(function(row){
             var dt=document.createElement('dt');
             var dd=document.createElement('dd');
@@ -8987,6 +9286,7 @@ button:hover { background: #ffd768; }
         selectedMonsterPanel.appendChild(title);
         selectedMonsterPanel.appendChild(icon);
         selectedMonsterPanel.appendChild(details);
+        RenderBreedingPanel(monster);
     }
     function UpdateManagementDrawer(s){
         var phase=s.phase||'raid';
@@ -9028,7 +9328,7 @@ button:hover { background: #ffd768; }
             name.textContent=monster.name;
             header.appendChild(name);
             if(phase==='raid'){
-                if(monster.alive&&!monster.deployed){
+                if(monster.alive&&!monster.deployed&&monster.canDeploy){
                     var deployButton=document.createElement('button');
                     deployButton.type='button';
                     deployButton.className='deployNowButton';
@@ -9048,7 +9348,8 @@ button:hover { background: #ffd768; }
                 var checkbox=document.createElement('input');
                 checkbox.type='checkbox';
                 checkbox.checked=!!monster.selectedForDeployment;
-                checkbox.disabled=!monster.alive;
+                checkbox.disabled=!monster.alive||!monster.canDeploy;
+                checkbox.title=monster.deploymentBlockReason||'';
                 checkbox.addEventListener('change',function(event){ event.stopPropagation(); lastManagementRenderKey='';
                     SendCommand('SET_MONSTER_DEPLOYMENT',{ monsterId:monster.id,selected:checkbox.checked }); });
                 var deployText=document.createElement('span');
@@ -9071,7 +9372,7 @@ button:hover { background: #ffd768; }
             var status=document.createElement('span');
             status.textContent=monster.alive?'HP '+Math.round(monster.health)+'/'+Math.round(monster.maxHealth):'dead';
             var state=document.createElement('span');
-            state.textContent=(monster.nutritionState||'Nourished')+' | '+(phase==='raid'?(monster.deployed?'deployed':'in cage'):(monster.capturedThisRaid?'new capture':(monster.selectedForDeployment?'deploy':'reserve')));
+            state.textContent=MonsterSexLabel(monster)+' | '+MonsterLifeStageLabel(monster)+' | '+(monster.nutritionState||'Nourished')+' | '+(phase==='raid'?(monster.deployed?'deployed':'in cage'):(monster.capturedThisRaid?'new capture':(monster.selectedForDeployment?'deploy':'reserve')));
             var shortfall=GetFoodShortfall(monster);
             if(shortfall>0){
                 state.textContent+=' | shortfall '+FormatNumber(shortfall);
@@ -9087,6 +9388,7 @@ button:hover { background: #ffd768; }
         });
         var selectedMonster=monsters.find(function(monster){ return monster.id===selectedRosterMonsterId; })||null;
         RenderSelectedMonsterPanel(selectedMonster);
+        var activeBroods=(management.eggs||[]).length;
         var selected=monsters.filter(function(monster){ return monster.alive&&monster.selectedForDeployment; }).length;
         startSeasonButton.style.display=phase==='raid'?'none':'';
         startSeasonButton.disabled=false;
@@ -9094,7 +9396,7 @@ button:hover { background: #ffd768; }
             var reserves=monsters.filter(function(monster){ return monster.alive&&!monster.deployed; }).length;
             managementHint.textContent=reserves+' reserve monster'+(reserves===1?'':'s')+' available.';
         } else {
-            managementHint.textContent=selected+' monster'+(selected===1?'':'s')+' selected for deployment. Food expense this round: '+FormatNumber((s.treasureBreakdown&&s.treasureBreakdown.foodExpenditureCredits)||s.foodExpenditureCredits||0)+' credits.';
+            managementHint.textContent=selected+' monster'+(selected===1?'':'s')+' selected for deployment. '+(activeBroods>0?activeBroods+' brood'+(activeBroods===1?'':'s')+' incubating. ':'')+'Food expense this round: '+FormatNumber((s.treasureBreakdown&&s.treasureBreakdown.foodExpenditureCredits)||s.foodExpenditureCredits||0)+' credits.';
         }
     }
     // ============================================================================
