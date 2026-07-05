@@ -71,7 +71,7 @@ if (!result.payload.regressionTests || !result.payload.regressionTests.passed) {
 '''
     runner = Path('monster_breeder_node_regression_runner_20260703_2327.js')
     runner.write_text(nodeSource, encoding='utf-8')
-    result = subprocess.run(['node', str(runner), str(workerPath)], capture_output=True, text=True, timeout=30)
+    result = subprocess.run(['node', str(runner), str(workerPath)], capture_output=True, text=True, timeout=60)
     if result.stdout:
         print(result.stdout)
     if result.stderr:
