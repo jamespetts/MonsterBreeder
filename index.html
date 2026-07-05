@@ -253,6 +253,15 @@ button:hover { background: #ffd768; }
     var MONSTER_MOTHER_BREEDING_HOLD_SEASONS = 1;
     var MONSTER_CLUTCH_SIZE_MIN = 2;
     var MONSTER_CLUTCH_SIZE_MAX = 4;
+    // One year is four seasons. The current genetic/lifecycle target is an
+    // average life expectancy of about ten years, with noticeable weakening in
+    // the last two years for monsters that live that long. These values describe
+    // seasonal ageing, not an absolute calendar date, so exported/imported
+    // monsters can move between games without date-conversion problems.
+    var MONSTER_SEASONS_PER_YEAR = 4;
+    var MONSTER_AGEING_START_SEASONS = 8 * MONSTER_SEASONS_PER_YEAR;
+    var MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS = 10 * MONSTER_SEASONS_PER_YEAR;
+    var MONSTER_SENESCENT_START_SEASONS = 12 * MONSTER_SEASONS_PER_YEAR;
 
     var SOUND_LOUDNESS = {
         EXTREMELY_QUIET: 6000,
@@ -5312,6 +5321,10 @@ button:hover { background: #ffd768; }
             this.breedingHoldSeasonsRemaining = options && Number.isFinite(options.breedingHoldSeasonsRemaining) ? Math.max(0, Math.floor(options.breedingHoldSeasonsRemaining)) : 0;
             this.motherId = options && options.motherId ? options.motherId : null;
             this.fatherId = options && options.fatherId ? options.fatherId : null;
+            this.adultBaseSpeed = this.speed;
+            this.ageFrailtyMultiplier = 1;
+            this.ageCategory = 'adult';
+            this.applyAgeEffects();
         }
 
         static randomName(rng) {
@@ -5465,6 +5478,61 @@ button:hover { background: #ffd768; }
             this.wildExitTargetY = null;
             return true;
         }
+        getAgeCategory() {
+            if (this.lifeStage === MONSTER_LIFE_STAGE.JUVENILE) {
+                return 'juvenile';
+            }
+            var age = this.ageInSeasons || 0;
+            if (age >= MONSTER_SENESCENT_START_SEASONS) {
+                return 'senescent';
+            }
+            if (age >= MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS) {
+                return 'old';
+            }
+            if (age >= MONSTER_AGEING_START_SEASONS) {
+                return 'mature';
+            }
+            return 'adult';
+        }
+
+        getAgeFrailtyMultiplier() {
+            if (this.lifeStage === MONSTER_LIFE_STAGE.JUVENILE) {
+                return 0.72;
+            }
+            var age = this.ageInSeasons || 0;
+            if (age < MONSTER_AGEING_START_SEASONS) {
+                return 1;
+            }
+            if (age < MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS) {
+                return Clamp(1 - (age - MONSTER_AGEING_START_SEASONS) / 8 * 0.15, 0.85, 1);
+            }
+            if (age < MONSTER_SENESCENT_START_SEASONS) {
+                return Clamp(0.85 - (age - MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS) / 8 * 0.20, 0.65, 0.85);
+            }
+            return Clamp(0.65 - (age - MONSTER_SENESCENT_START_SEASONS) / 12 * 0.20, 0.45, 0.65);
+        }
+
+        getOldAgeMortalityChance() {
+            if (!this.alive || this.lifeStage !== MONSTER_LIFE_STAGE.ADULT) {
+                return 0;
+            }
+            var age = this.ageInSeasons || 0;
+            if (age < MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS) {
+                return 0;
+            }
+            if (age < MONSTER_SENESCENT_START_SEASONS) {
+                return Clamp(0.035 + (age - MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS) * 0.018, 0.035, 0.18);
+            }
+            return Clamp(0.20 + (age - MONSTER_SENESCENT_START_SEASONS) * 0.035, 0.20, 0.58);
+        }
+
+        applyAgeEffects() {
+            this.ageCategory = this.getAgeCategory();
+            this.ageFrailtyMultiplier = this.getAgeFrailtyMultiplier();
+            var baseSpeed = Number.isFinite(this.adultBaseSpeed) ? this.adultBaseSpeed : this.speed;
+            this.speed = Math.max(50, baseSpeed * this.ageFrailtyMultiplier);
+        }
+
         getBreedingBlockReason(requiredSex) {
             if (!this.alive) { return 'Dead monsters cannot breed.'; }
             if (!this.owned) { return 'Only captive collared monsters can be bred.'; }
@@ -5502,6 +5570,7 @@ button:hover { background: #ffd768; }
                 this.name = Monster.randomName(rng);
             }
             this.selectedForDeployment = false;
+            this.applyAgeEffects();
             return true;
         }
         resetForManagement() {
@@ -5515,6 +5584,7 @@ button:hover { background: #ffd768; }
             this.roamTargetX = null;
             this.roamTargetY = null;
             this.roamRetargetTick = -1;
+            this.applyAgeEffects();
             this.behaviourState = this.alive ? 'captive' : 'dead';
         }
 
@@ -5821,6 +5891,9 @@ button:hover { background: #ffd768; }
             s.canDeploy = this.canDeploy();
             s.breedingBlockReason = this.getBreedingBlockReason();
             s.deploymentBlockReason = this.getDeploymentBlockReason();
+            s.ageCategory = this.ageCategory || this.getAgeCategory();
+            s.ageFrailtyMultiplier = this.ageFrailtyMultiplier || this.getAgeFrailtyMultiplier();
+            s.seasonalOldAgeMortalityChance = this.getOldAgeMortalityChance();
             return s;
         }
     }
@@ -6288,6 +6361,16 @@ button:hover { background: #ffd768; }
                         monster.selectedForDeployment = false;
                         events.push(monster.name + ' has matured and can be bred or deployed from next season.');
                     }
+                }
+                monster.applyAgeEffects();
+                var mortalityChance = monster.getOldAgeMortalityChance();
+                if (mortalityChance > 0 && rng.nextFloat() < mortalityChance) {
+                    monster.alive = false;
+                    monster.deployed = false;
+                    monster.selectedForDeployment = false;
+                    monster.corpseState = 'corpse';
+                    monster.behaviourState = 'dead';
+                    events.push(monster.name + ' died of old age at ' + Math.floor((monster.ageInSeasons || 0) / MONSTER_SEASONS_PER_YEAR) + ' years ' + ((monster.ageInSeasons || 0) % MONSTER_SEASONS_PER_YEAR) + ' seasons.');
                 }
             });
             var remainingEggs = [];
@@ -8089,6 +8172,13 @@ button:hover { background: #ffd768; }
         AddRegressionResult(results, 'Incubating brood hatches into juveniles after one season', breedingState.eggs.length === 0 && juveniles.length === breedingResult.clutchSize && juveniles.every(function (monster) { return !monster.canDeploy() && !monster.canBreed(); }), 'juveniles=' + juveniles.length + ', clutch=' + breedingResult.clutchSize + ', events=' + firstLifecycle.events.length);
         breedingState.advanceLifecycleAfterSeason(new SeededRng(7109), breedingWorld, 2);
         AddRegressionResult(results, 'Juveniles mature after one further season', juveniles.every(function (monster) { return monster.lifeStage === MONSTER_LIFE_STAGE.ADULT && monster.canDeploy(); }), 'mature=' + juveniles.filter(function (monster) { return monster.lifeStage === MONSTER_LIFE_STAGE.ADULT; }).length);
+        var ageingMonster = new Monster('ageing_regression', RIGHT_EDGE_X, 180, new SeededRng(7110), { owned: true, sex: MONSTER_SEX.MALE, world: breedingWorld, name: 'Ageing', ageInSeasons: MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS + 2 });
+        var startingAgeingSpeed = ageingMonster.adultBaseSpeed;
+        ageingMonster.applyAgeEffects();
+        AddRegressionResult(results, 'Old monsters are weakened by seasonal ageing before death is forced', ageingMonster.speed < startingAgeingSpeed && ageingMonster.ageFrailtyMultiplier < 1 && ageingMonster.getOldAgeMortalityChance() > 0, 'speed=' + ageingMonster.speed.toFixed(2) + ', base=' + startingAgeingSpeed.toFixed(2) + ', risk=' + ageingMonster.getOldAgeMortalityChance().toFixed(3));
+        var senescentMonster = new Monster('senescent_regression', RIGHT_EDGE_X, 220, new SeededRng(7111), { owned: true, sex: MONSTER_SEX.FEMALE, world: breedingWorld, name: 'Senescent', ageInSeasons: MONSTER_SENESCENT_START_SEASONS + 8 });
+        senescentMonster.applyAgeEffects();
+        AddRegressionResult(results, 'Senescent monsters carry a substantial but non-certain old-age mortality risk', senescentMonster.getOldAgeMortalityChance() > 0.35 && senescentMonster.getOldAgeMortalityChance() < 0.60, 'risk=' + senescentMonster.getOldAgeMortalityChance().toFixed(3));
 
         var session = new GameSession(24681012, { mode: 'quick', worldOptions: { mapSizeKey: 'legacy' } });
         session.startSeason();
@@ -9119,7 +9209,7 @@ button:hover { background: #ffd768; }
     function BuildManagementRenderKey(s, monsters){
         var eggs=(s.management&&s.management.eggs)||[];
         return [s.phase||'raid',s.seasonNumber,managementDrawerVisible?1:0].concat(monsters.map(function(monster){
-            return [monster.id,monster.name,monster.alive?1:0,monster.selectedForDeployment?1:0,monster.deployed?1:0,monster.capturedThisRaid?1:0,Math.round(monster.health),Math.round(monster.maxHealth),monster.nutritionState,monster.foodEatenThisSeason||0,monster.foodBoughtThisSeason||0,monster.foodBoughtCostCreditsThisSeason||0,monster.foodNeededThisSeason||0,monster.sex||'',monster.lifeStage||'',monster.canBreed?1:0,monster.canDeploy?1:0,monster.breedingHoldSeasonsRemaining||0,monster.juvenileMaturationSeasonsRemaining||0].join(':');
+            return [monster.id,monster.name,monster.alive?1:0,monster.selectedForDeployment?1:0,monster.deployed?1:0,monster.capturedThisRaid?1:0,Math.round(monster.health),Math.round(monster.maxHealth),monster.nutritionState,monster.foodEatenThisSeason||0,monster.foodBoughtThisSeason||0,monster.foodBoughtCostCreditsThisSeason||0,monster.foodNeededThisSeason||0,monster.sex||'',monster.lifeStage||'',monster.ageCategory||'',Math.round((monster.ageFrailtyMultiplier||1)*100),Math.round((monster.seasonalOldAgeMortalityChance||0)*100),monster.canBreed?1:0,monster.canDeploy?1:0,monster.breedingHoldSeasonsRemaining||0,monster.juvenileMaturationSeasonsRemaining||0].join(':');
         })).concat(eggs.map(function(brood){ return ['brood',brood.id,brood.motherId,brood.fatherId,brood.clutchSize,brood.incubationSeasonsRemaining].join(':'); })).join('|');
     }
     function MonsterColourPhenotype(monster){
@@ -9174,10 +9264,21 @@ button:hover { background: #ffd768; }
         if(monster.lifeStage==='juvenile'){
             return 'juvenile'+((monster.juvenileMaturationSeasonsRemaining||0)>0?' - matures after '+monster.juvenileMaturationSeasonsRemaining+' season'+(monster.juvenileMaturationSeasonsRemaining===1?'':'s'):'');
         }
+        var category=monster.ageCategory||'adult';
+        var prefix=category==='senescent'?'senescent':(category==='old'?'old':(category==='mature'?'mature adult':'adult'));
         if((monster.breedingHoldSeasonsRemaining||0)>0){
-            return 'adult - incubating brood';
+            return prefix+' - incubating brood';
         }
-        return 'adult';
+        return prefix;
+    }
+    function MonsterAgeEffectLabel(monster){
+        if(!monster){ return ''; }
+        var frailty=Number.isFinite(monster.ageFrailtyMultiplier)?monster.ageFrailtyMultiplier:1;
+        var mortality=Number.isFinite(monster.seasonalOldAgeMortalityChance)?monster.seasonalOldAgeMortalityChance:0;
+        var parts=[];
+        if(frailty<0.995){ parts.push('speed '+Math.round(frailty*100)+'%'); }
+        if(mortality>0){ parts.push('old-age risk '+Math.round(mortality*100)+'%/season'); }
+        return parts.length>0?parts.join(', '):'none';
     }
     function RenderBreedingPanel(monster){
         var s=currentSnapshot||latestSnapshot;
@@ -9270,7 +9371,7 @@ button:hover { background: #ffd768; }
             detailRows.push(['Food shortfall',FormatNumber(shortfall),'nutritionShortfall']);
         }
         var visibleColour=MonsterColourPhenotype(monster);
-        detailRows=detailRows.concat([['Visible colour',visibleColour.pattern&&visibleColour.pattern.type==='stripes'?'striped':'solid'],['Sex',MonsterSexLabel(monster)],['Age',MonsterAgeLabel(monster)],['Life stage',MonsterLifeStageLabel(monster)],['Breeding',monster.canBreed?'available':(monster.breedingBlockReason||'unavailable')],['Collar',monster.collared?'Collared':'Uncollared'],['Raid state',monster.deployed?'Deployed':'In cage'],['Season order',monster.selectedForDeployment?'Deploy at start':'Reserve'],['Origin',monster.capturedThisRaid?'Captured wild monster':'Captive monsters']]);
+        detailRows=detailRows.concat([['Visible colour',visibleColour.pattern&&visibleColour.pattern.type==='stripes'?'striped':'solid'],['Sex',MonsterSexLabel(monster)],['Age',MonsterAgeLabel(monster)],['Life stage',MonsterLifeStageLabel(monster)],['Age effects',MonsterAgeEffectLabel(monster)],['Breeding',monster.canBreed?'available':(monster.breedingBlockReason||'unavailable')],['Collar',monster.collared?'Collared':'Uncollared'],['Raid state',monster.deployed?'Deployed':'In cage'],['Season order',monster.selectedForDeployment?'Deploy at start':'Reserve'],['Origin',monster.capturedThisRaid?'Captured wild monster':'Captive monsters']]);
         detailRows.forEach(function(row){
             var dt=document.createElement('dt');
             var dd=document.createElement('dd');
@@ -9372,7 +9473,7 @@ button:hover { background: #ffd768; }
             var status=document.createElement('span');
             status.textContent=monster.alive?'HP '+Math.round(monster.health)+'/'+Math.round(monster.maxHealth):'dead';
             var state=document.createElement('span');
-            state.textContent=MonsterSexLabel(monster)+' | '+MonsterLifeStageLabel(monster)+' | '+(monster.nutritionState||'Nourished')+' | '+(phase==='raid'?(monster.deployed?'deployed':'in cage'):(monster.capturedThisRaid?'new capture':(monster.selectedForDeployment?'deploy':'reserve')));
+            state.textContent=MonsterSexLabel(monster)+' | '+MonsterAgeLabel(monster)+' | '+MonsterLifeStageLabel(monster)+' | '+(monster.nutritionState||'Nourished')+' | '+(phase==='raid'?(monster.deployed?'deployed':'in cage'):(monster.capturedThisRaid?'new capture':(monster.selectedForDeployment?'deploy':'reserve')));
             var shortfall=GetFoodShortfall(monster);
             if(shortfall>0){
                 state.textContent+=' | shortfall '+FormatNumber(shortfall);
@@ -11024,6 +11125,7 @@ else DrawGroundRemain(r.obj,r.obj.agentKind||'adventurer');
             }
             return [
                 'Monster: '+MonsterDisplayName(o),
+                'Sex: '+MonsterSexLabel(o),
                 'Health: '+Math.round(o.health)+' / '+Math.round(o.maxHealth),
                 'Nutrition: '+FormatNutritionLine(o),
                 'Season food requirement: '+FormatNumber(GetFoodRequirement(o)),
