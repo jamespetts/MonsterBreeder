@@ -4758,6 +4758,9 @@ button:hover { background: #ffd768; }
     // alleles may have much lower values. Avoid casually using the whole 0..255
     // range, because future maintainers need space for exceptional biology.
     var DOMINANCE_DEFAULT = 100;
+    var GENETIC_TRAIT = {
+        COLOUR: 'colour'
+    };
     var COLOUR_CHROMOSOME_INDEX = 0;
     var COLOUR_CHROMOSOME_SLOT_COUNT = 4;
 
@@ -5063,8 +5066,18 @@ button:hover { background: #ffd768; }
             this.chromosomes = chromosomes.slice(0);
         }
 
+        getChromosome(traitDefinitionOrIndex) {
+            if (traitDefinitionOrIndex && Number.isFinite(traitDefinitionOrIndex.chromosomeIndex)) {
+                return this.chromosomes[traitDefinitionOrIndex.chromosomeIndex];
+            }
+            if (Number.isFinite(traitDefinitionOrIndex)) {
+                return this.chromosomes[traitDefinitionOrIndex];
+            }
+            return null;
+        }
+
         getColourChromosome() {
-            return this.chromosomes[COLOUR_CHROMOSOME_INDEX];
+            return this.getChromosome(COLOUR_CHROMOSOME_INDEX);
         }
     }
 
@@ -5149,12 +5162,59 @@ button:hover { background: #ffd768; }
         }
     };
 
+    class GeneticTraitDefinition {
+        constructor(key, chromosomeIndex, slotCount) {
+            this.key = key;
+            this.chromosomeIndex = chromosomeIndex;
+            this.slotCount = slotCount;
+        }
+
+        createRandomChromosomePair(rng, genePool, world) {
+            throw new Error('GeneticTraitDefinition.createRandomChromosomePair must be implemented by the trait definition.');
+        }
+
+        createOffspringChromosomePair(motherGenome, fatherGenome, rng) {
+            var motherChromosome = motherGenome.getChromosome(this);
+            var fatherChromosome = fatherGenome.getChromosome(this);
+            if (!motherChromosome || !fatherChromosome) {
+                throw new Error('Cannot create offspring chromosome for missing trait: ' + this.key);
+            }
+            var motherHomologue = motherChromosome.createGameteHomologue(rng, 1, 2);
+            var fatherHomologue = fatherChromosome.createGameteHomologue(rng, 1, 2);
+            return new ChromosomePair(motherHomologue, fatherHomologue);
+        }
+
+        expressToPhenotype(genome, context) {
+            var chromosome = genome ? genome.getChromosome(this) : null;
+            if (chromosome) {
+                chromosome.expressTo(context);
+            }
+        }
+    }
+
+    class ColourGeneticTraitDefinition extends GeneticTraitDefinition {
+        constructor() {
+            super(GENETIC_TRAIT.COLOUR, COLOUR_CHROMOSOME_INDEX, COLOUR_CHROMOSOME_SLOT_COUNT);
+        }
+
+        createRandomChromosomePair(rng, genePool, world) {
+            var profile = genePool.getWorldColourSelectionProfile(world);
+            var homologueA = [];
+            var homologueB = [];
+            for (var i = 0; i < this.slotCount; i += 1) {
+                homologueA.push(genePool.pickAlleleForColourSlot(i, rng, profile));
+                homologueB.push(genePool.pickAlleleForColourSlot(i, rng, profile));
+            }
+            return new ChromosomePair(homologueA, homologueB);
+        }
+    }
+
+    var MonsterColourTraitDefinition = new ColourGeneticTraitDefinition();
+
     var MonsterPhenotypeSystem = {
         buildPhenotype: function (genome) {
             var context = new PhenotypeBuildContext();
-            if (genome && genome.getColourChromosome()) {
-                genome.getColourChromosome().expressTo(context);
-            }
+            MonsterColourTraitDefinition.expressToPhenotype(genome, context);
             return {
                 colour: ColourPhenotypeSystem.resolve(context)
             };
@@ -5168,23 +5228,25 @@ button:hover { background: #ffd768; }
     class GenePool {
         constructor() {
             this.colourChromosomeSlots = GenePool.createDefaultColourSlots();
+            this.traitDefinitions = [MonsterColourTraitDefinition];
         }
 
         createGenome(rng, world) {
-            var profile = this.getWorldColourSelectionProfile(world);
-            var a = [];
-            var b = [];
-            for (var i = 0; i < COLOUR_CHROMOSOME_SLOT_COUNT; i += 1) {
-                a.push(this.pickAlleleForColourSlot(i, rng, profile));
-                b.push(this.pickAlleleForColourSlot(i, rng, profile));
+            var chromosomes = [];
+            for (var i = 0; i < this.traitDefinitions.length; i += 1) {
+                var traitDefinition = this.traitDefinitions[i];
+                chromosomes[traitDefinition.chromosomeIndex] = traitDefinition.createRandomChromosomePair(rng, this, world);
             }
-            return new Genome([new ChromosomePair(a, b)]);
+            return new Genome(chromosomes);
         }
 
         createOffspringGenome(motherGenome, fatherGenome, rng) {
-            var motherColour = motherGenome.getColourChromosome().createGameteHomologue(rng, 1, 2);
-            var fatherColour = fatherGenome.getColourChromosome().createGameteHomologue(rng, 1, 2);
-            return new Genome([new ChromosomePair(motherColour, fatherColour)]);
+            var chromosomes = [];
+            for (var i = 0; i < this.traitDefinitions.length; i += 1) {
+                var traitDefinition = this.traitDefinitions[i];
+                chromosomes[traitDefinition.chromosomeIndex] = traitDefinition.createOffspringChromosomePair(motherGenome, fatherGenome, rng);
+            }
+            return new Genome(chromosomes);
         }
 
         pickAlleleForColourSlot(slotIndex, rng, profile) {
@@ -8351,6 +8413,14 @@ button:hover { background: #ffd768; }
         var gamete = recombinationChromosome.createGameteHomologue(new SeededRng(7001), 1, 2);
         var objectReferencesPreserved = gamete.length === 4 && gamete.every(function (allele, index) { return allele === recombinationAllelesA[index] || allele === recombinationAllelesB[index]; });
         AddRegressionResult(results, 'Chunked crossover gamete preserves allele object references from homologues', objectReferencesPreserved, 'slots=' + gamete.length);
+
+        var traitGenome = MonsterGenePool.createGenome(new SeededRng(7002), null);
+        var traitChromosome = traitGenome.getChromosome(MonsterColourTraitDefinition);
+        AddRegressionResult(results, 'Genome chromosome lookup accepts genetic trait definitions', traitChromosome === traitGenome.getColourChromosome() && traitChromosome.getSlotCount() === COLOUR_CHROMOSOME_SLOT_COUNT, 'slots=' + (traitChromosome ? traitChromosome.getSlotCount() : 'missing'));
+
+        var traitOffspringGenome = MonsterGenePool.createOffspringGenome(traitGenome, traitGenome, new SeededRng(7003));
+        var traitOffspringChromosome = traitOffspringGenome.getChromosome(MonsterColourTraitDefinition);
+        AddRegressionResult(results, 'GenePool creates offspring chromosomes through trait definitions', traitOffspringChromosome && traitOffspringChromosome.getSlotCount() === COLOUR_CHROMOSOME_SLOT_COUNT, 'slots=' + (traitOffspringChromosome ? traitOffspringChromosome.getSlotCount() : 'missing'));
 
         function makeColourRegressionWorld(terrainType) {
             return { terrainGrid: { rows: 9, cols: 9, getTerrainTypeAtTile: function () { return terrainType; } } };
