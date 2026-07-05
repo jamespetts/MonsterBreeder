@@ -3424,12 +3424,23 @@ button:hover { background: #ffd768; }
             });
         }
 
+        getCurrentTemperatureC(seasonNumber) {
+            var environment = this.environment || {};
+            var mean = Number.isFinite(environment.meanAnnualTemperatureC) ? environment.meanAnnualTemperatureC : DEFAULT_COMFORTABLE_TEMPERATURE_C;
+            var amplitude = Number.isFinite(environment.seasonalTemperatureAmplitudeC) ? environment.seasonalTemperatureAmplitudeC : 8;
+            var seasonIndex = ((seasonNumber || 1) - 1) % 4;
+            if (seasonIndex < 0) { seasonIndex += 4; }
+            var seasonalOffset = [-1, 0.15, 1, -0.10][seasonIndex] || 0;
+            return Math.round((mean + amplitude * seasonalOffset) * 10) / 10;
+        }
+
         getStaticSnapshot() {
             return {
                 seed: this.seed,
                 width: this.width,
                 height: this.height,
                 environment: Object.assign({}, this.environment),
+                currentSeasonTemperatureC: this.getCurrentTemperatureC(1),
                 distanceToSettlementMiles: this.distanceToSettlementMiles,
                 seasonNames: SEASON_NAMES.slice(0),
                 adventurerEntryEdge: this.adventurerEntryEdge,
@@ -3471,6 +3482,36 @@ button:hover { background: #ffd768; }
             var part = rng.pick(parts);
             this[part] = Math.max(0, this[part] - amount);
             return part;
+        }
+
+        missingHealth() {
+            return Math.max(0, this.maxTotal() - this.total());
+        }
+
+        healGeneral(amount) {
+            var remaining = Math.max(0, amount || 0);
+            var parts = ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'];
+            var healed = 0;
+            while (remaining > 0.0001) {
+                var mostDamagedPart = null;
+                var mostMissing = 0;
+                for (var i = 0; i < parts.length; i += 1) {
+                    var part = parts[i];
+                    var missing = this.maxEach - this[part];
+                    if (missing > mostMissing) {
+                        mostMissing = missing;
+                        mostDamagedPart = part;
+                    }
+                }
+                if (!mostDamagedPart || mostMissing <= 0) {
+                    break;
+                }
+                var step = Math.min(remaining, mostMissing);
+                this[mostDamagedPart] += step;
+                healed += step;
+                remaining -= step;
+            }
+            return healed;
         }
 
         isDead() {
@@ -4557,6 +4598,162 @@ button:hover { background: #ffd768; }
         }
     }
 
+
+    // ============================================================================
+    // MODULE: DISEASES
+    // ============================================================================
+    // Disease has two deliberately separate surfaces:
+    // - UI effects: labels, descriptions and rendering hints.
+    // - Simulation effects: deployment/breeding blocks, movement/combat modifiers,
+    //   seasonal food effects and mortality. Diseases are not transmissible.
+    class MonsterDisease {
+        constructor(definition, severity, durationSeasons) {
+            this.id = definition.id;
+            this.displayName = definition.displayName;
+            this.description = definition.description;
+            this.severity = Clamp(severity || 0, 0, 1);
+            this.durationSeasons = Math.max(1, Math.floor(durationSeasons || 1));
+            this.ui = Object.assign({}, definition.ui || {});
+            this.effects = Object.assign({}, definition.effects || {});
+        }
+
+        tickSeason() {
+            this.durationSeasons -= 1;
+            return this.durationSeasons > 0;
+        }
+
+        getSnapshot() {
+            return {
+                id: this.id,
+                displayName: this.displayName,
+                description: this.description,
+                severity: this.severity,
+                durationSeasons: this.durationSeasons,
+                ui: Object.assign({}, this.ui),
+                effects: Object.assign({}, this.effects)
+            };
+        }
+    }
+
+    var MonsterDiseaseSystem = {
+        definitions: {
+            adiposeFever: {
+                id: 'adiposeFever',
+                displayName: 'Adipose fever',
+                description: 'A metabolic inflammatory illness in very over-fat monsters; severe cases leave the monster exhausted and infertile for a time.',
+                ui: { morphology: 'puffy', tint: '#f59e0b' },
+                effects: { speedMultiplier: 0.70, foodMultiplier: 1.18, infertileAt: 0.55, incapacitatedAt: 0.78, deathAt: 0.92, deathChance: 0.10, damageMultiplier: 1.12 }
+            },
+            wastingChill: {
+                id: 'wastingChill',
+                displayName: 'Wasting chill',
+                description: 'A wasting metabolic disorder in very lean or cold-stressed monsters; severe cases cause fragility and base-bound weakness.',
+                ui: { morphology: 'gaunt', tint: '#93c5fd' },
+                effects: { speedMultiplier: 0.76, foodMultiplier: 1.10, infertileAt: 0.62, incapacitatedAt: 0.82, deathAt: 0.94, deathChance: 0.12, damageMultiplier: 1.22 }
+            }
+        },
+
+        fromSnapshot: function (snapshot) {
+            var definition = this.definitions[snapshot.id] || {
+                id: snapshot.id,
+                displayName: snapshot.displayName || snapshot.id,
+                description: snapshot.description || '',
+                ui: snapshot.ui || {},
+                effects: snapshot.effects || {}
+            };
+            return new MonsterDisease(definition, snapshot.severity, snapshot.durationSeasons);
+        },
+
+        activeDiseases: function (monster) {
+            return (monster && monster.diseases ? monster.diseases : []).filter(function (disease) {
+                return disease && disease.durationSeasons > 0 && disease.severity > 0;
+            });
+        },
+
+        combinedEffects: function (monster) {
+            var effects = {
+                speedMultiplier: 1,
+                foodMultiplier: 1,
+                damageMultiplier: 1,
+                incapacitated: false,
+                infertile: false,
+                hasVisibleUiEffect: false
+            };
+            this.activeDiseases(monster).forEach(function (disease) {
+                var e = disease.effects || {};
+                effects.speedMultiplier *= (1 - (1 - (e.speedMultiplier || 1)) * disease.severity);
+                effects.foodMultiplier *= (1 + ((e.foodMultiplier || 1) - 1) * disease.severity);
+                effects.damageMultiplier *= (1 + ((e.damageMultiplier || 1) - 1) * disease.severity);
+                effects.incapacitated = effects.incapacitated || (Number.isFinite(e.incapacitatedAt) && disease.severity >= e.incapacitatedAt);
+                effects.infertile = effects.infertile || (Number.isFinite(e.infertileAt) && disease.severity >= e.infertileAt);
+                effects.hasVisibleUiEffect = true;
+            });
+            return effects;
+        },
+
+        addOrIntensify: function (monster, diseaseId, severity, durationSeasons) {
+            var definition = this.definitions[diseaseId];
+            if (!definition) { return null; }
+            monster.diseases = monster.diseases || [];
+            var existing = monster.diseases.find(function (disease) { return disease.id === diseaseId; });
+            if (existing) {
+                existing.severity = Clamp(Math.max(existing.severity, severity), 0, 1);
+                existing.durationSeasons = Math.max(existing.durationSeasons, Math.max(1, durationSeasons || 1));
+                return existing;
+            }
+            var disease = new MonsterDisease(definition, severity, durationSeasons || 2);
+            monster.diseases.push(disease);
+            return disease;
+        },
+
+        marginalMetabolicRiskFor: function (monster, world) {
+            var metabolism = monster.phenotype && monster.phenotype.metabolism ? monster.phenotype.metabolism : null;
+            var raw = metabolism && metabolism.rawFactors ? metabolism.rawFactors : {};
+            var fat = Number.isFinite(monster.fatStorage) ? monster.fatStorage : 0;
+            var thermal = MonsterMetabolismSystem.thermalStatus(monster, world, 1);
+            var injury = monster.bodyHealth && monster.bodyHealth.maxTotal ? monster.bodyHealth.missingHealth() / monster.bodyHealth.maxTotal() : 0;
+            var ageFactor = this.ageDiseaseRiskFactor(monster);
+            var obesityRisk = Math.max(0, fat - 6.0) * 0.018 + Math.max(0, (raw.plumptin || 0) - 120) * 0.00055 + Math.max(0, thermal.heatStress || 0) * 0.010;
+            var wastingRisk = Math.max(0, 0.45 - fat) * 0.045 + Math.max(0, -80 - (raw.plumptin || 0)) * 0.00060 + Math.max(0, thermal.coldStress || 0) * 0.010;
+            var commonRisk = ageFactor * 0.006 + injury * 0.018;
+            return { adiposeFever: obesityRisk + commonRisk, wastingChill: wastingRisk + commonRisk };
+        },
+
+        ageDiseaseRiskFactor: function (monster) {
+            var age = monster.ageInSeasons || 0;
+            var half = MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS * 0.5;
+            if (age <= half) { return 0; }
+            var span = Math.max(1, MONSTER_SENESCENT_START_SEASONS - half);
+            return Math.pow(Clamp((age - half) / span, 0, 2.0), 1.45);
+        },
+
+        applySeasonalDiseaseProgression: function (monster, rng, world, events) {
+            monster.diseases = (monster.diseases || []).filter(function (disease) {
+                return disease.tickSeason();
+            });
+            var risk = this.marginalMetabolicRiskFor(monster, world);
+            if (rng.nextFloat() < risk.adiposeFever) {
+                var disease = this.addOrIntensify(monster, 'adiposeFever', Clamp(0.30 + (monster.fatStorage || 0) * 0.075, 0.30, 0.96), rng.integer(2, 4));
+                if (disease && events) { events.push(monster.name + ' developed ' + disease.displayName + '.'); }
+            }
+            if (rng.nextFloat() < risk.wastingChill) {
+                var wasting = this.addOrIntensify(monster, 'wastingChill', Clamp(0.36 + Math.max(0, 0.6 - (monster.fatStorage || 0)) * 0.45, 0.30, 0.96), rng.integer(2, 4));
+                if (wasting && events) { events.push(monster.name + ' developed ' + wasting.displayName + '.'); }
+            }
+            this.activeDiseases(monster).forEach(function (disease) {
+                var e = disease.effects || {};
+                if (Number.isFinite(e.deathAt) && disease.severity >= e.deathAt && rng.nextFloat() < (e.deathChance || 0)) {
+                    monster.alive = false;
+                    monster.deployed = false;
+                    monster.selectedForDeployment = false;
+                    monster.corpseState = 'corpse';
+                    monster.behaviourState = 'dead';
+                    if (events) { events.push(monster.name + ' died from ' + disease.displayName + '.'); }
+                }
+            });
+        }
+    };
+
     // ============================================================================
     // MODULE: NUTRITION AND FEEDING
     // ============================================================================
@@ -4575,7 +4772,53 @@ button:hover { background: #ffd768; }
         },
 
         getMonsterRequirement: function (monster) {
-            return Number.isFinite(monster.nutritionRequirement) ? Math.max(0, monster.nutritionRequirement) : DEFAULT_MONSTER_NUTRITION_REQUIREMENT;
+            if (!monster) { return DEFAULT_MONSTER_NUTRITION_REQUIREMENT; }
+            var metabolism = monster.phenotype && monster.phenotype.metabolism ? monster.phenotype.metabolism : null;
+            if (!metabolism) {
+                return Number.isFinite(monster.nutritionRequirement) ? Math.max(0, monster.nutritionRequirement) : DEFAULT_MONSTER_NUTRITION_REQUIREMENT;
+            }
+            var baseFood = metabolism.baseMetabolicFood * this.getAgeMetabolicMultiplier(monster);
+            var baseMultiplier = monster.deployed ? 1.0 : 0.74;
+            var thermalStress = monster.thermalStress || 0;
+            var thermalCost = Math.min(4.0, thermalStress * 0.28);
+            var fat = Number.isFinite(monster.fatStorage) ? Math.max(0, monster.fatStorage) : 0;
+            var fatMaintenance = fat * 0.32;
+            var plumptinFatGainFood = Math.max(0, (metabolism.targetFatStorage || 0) - fat) * Math.max(0.05, metabolism.plumptinLevel || 0) * 0.42;
+            var activityFood = monster.activityFoodThisSeason || 0;
+            var reproductionFood = (monster.breedingHoldSeasonsRemaining || 0) > 0 ? 4.0 : 0;
+            var healingFood = this.getHealingFoodRequirement(monster);
+            var diseaseEffects = MonsterDiseaseSystem.combinedEffects(monster);
+            var requirement = (baseFood * baseMultiplier + thermalCost + fatMaintenance + plumptinFatGainFood + activityFood + reproductionFood + healingFood) * diseaseEffects.foodMultiplier;
+            return Math.max(1, Math.ceil(requirement));
+        },
+
+        getAgeMetabolicMultiplier: function (monster) {
+            if (!monster) { return 1; }
+            var age = monster.ageInSeasons || 0;
+            if (monster.lifeStage === MONSTER_LIFE_STAGE.JUVENILE) { return 1.18; }
+            var half = MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS * 0.5;
+            if (age <= half) { return 1; }
+            var span = Math.max(1, MONSTER_SENESCENT_START_SEASONS - half);
+            var progress = Clamp((age - half) / span, 0, 2.0);
+            return Clamp(1 - Math.pow(progress, 1.35) * 0.18, 0.70, 1);
+        },
+
+        getAgeHealingMultiplier: function (monster) {
+            var age = monster ? (monster.ageInSeasons || 0) : 0;
+            var half = MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS * 0.5;
+            if (age <= half) { return 1; }
+            var span = Math.max(1, MONSTER_SENESCENT_START_SEASONS - half);
+            var progress = Clamp((age - half) / span, 0, 2.0);
+            return Clamp(1 - Math.pow(progress, 1.6) * 0.58, 0.22, 1);
+        },
+
+        getHealingFoodRequirement: function (monster) {
+            if (!monster || !monster.bodyHealth || !monster.bodyHealth.missingHealth) { return 0; }
+            var missing = monster.bodyHealth.missingHealth();
+            var plannedHealing = Math.min(missing, 18 * this.getAgeHealingMultiplier(monster));
+            monster.plannedHealingThisSeason = plannedHealing;
+            monster.healingFoodRequirementThisSeason = Math.ceil(plannedHealing / 4);
+            return monster.healingFoodRequirementThisSeason;
         },
 
         resetSeasonNutrition: function (monster) {
@@ -4585,6 +4828,9 @@ button:hover { background: #ffd768; }
             monster.nutritionShortfallThisSeason = 0;
             monster.eatingTargetId = null;
             monster.eatingTicksRemaining = 0;
+            monster.activityFoodThisSeason = 0;
+            monster.healingFoodRequirementThisSeason = 0;
+            monster.plannedHealingThisSeason = 0;
         },
 
         getTotalFoodThisSeason: function (monster) {
@@ -4626,7 +4872,20 @@ button:hover { background: #ffd768; }
             if (monster.nutritionState === NUTRITION_STATE.STARVED) {
                 return 0;
             }
-            return 1;
+            var fat = Number.isFinite(monster.fatStorage) ? Math.max(0, monster.fatStorage) : 0;
+            var fatPenalty = Clamp(1 - Math.max(0, fat - 1.8) * 0.045, 0.58, 1);
+            var thermalPenalty = Clamp(1 - (monster.thermalStress || 0) * 0.055, 0.55, 1);
+            var diseaseSpeed = MonsterDiseaseSystem.combinedEffects(monster).speedMultiplier;
+            return fatPenalty * thermalPenalty * diseaseSpeed;
+        },
+
+        recordActivityTick: function (monster, intensity) {
+            if (!monster || !monster.deployed || !monster.alive) { return; }
+            var metabolism = monster.phenotype && monster.phenotype.metabolism ? monster.phenotype.metabolism : null;
+            var conservation = metabolism ? metabolism.energyConservation : 0.5;
+            var fat = Number.isFinite(monster.fatStorage) ? Math.max(0, monster.fatStorage) : 0;
+            var cost = Math.max(0, intensity || 0) * (1.12 - conservation * 0.32) * (1 + fat * 0.035) * 0.00062;
+            monster.activityFoodThisSeason = (monster.activityFoodThisSeason || 0) + cost;
         },
 
         applyNutritionStateFromSeason: function (monster, rng) {
@@ -4634,10 +4893,34 @@ button:hover { background: #ffd768; }
             var totalFood = this.getTotalFoodThisSeason(monster);
             var ratio = requirement > 0 ? totalFood / requirement : 1;
             monster.nutritionShortfallThisSeason = Math.max(0, requirement - totalFood);
-
+            var metabolism = monster.phenotype && monster.phenotype.metabolism ? monster.phenotype.metabolism : null;
             if (ratio >= 1) {
                 monster.nutritionState = NUTRITION_STATE.NOURISHED;
+                if (metabolism) {
+                    var targetFat = metabolism.targetFatStorage;
+                    var surplus = Math.max(0, totalFood - requirement);
+                    var plumptinGain = Math.min(1.2, surplus * 0.30 + metabolism.plumptinLevel * 0.18);
+                    monster.fatStorage = Clamp((monster.fatStorage || 0) + plumptinGain, 0, targetFat);
+                }
                 return { state: monster.nutritionState, died: false };
+            }
+            var shortfall = Math.max(0, requirement - totalFood);
+            if ((monster.fatStorage || 0) >= shortfall) {
+                monster.fatStorage = Math.max(0, (monster.fatStorage || 0) - shortfall);
+                monster.foodBoughtThisSeason = (monster.foodBoughtThisSeason || 0) + shortfall;
+                monster.nutritionShortfallThisSeason = 0;
+                monster.nutritionState = NUTRITION_STATE.NOURISHED;
+                return { state: monster.nutritionState, died: false, usedFatReserve: true };
+            }
+            if ((monster.fatStorage || 0) > 0) {
+                shortfall -= monster.fatStorage;
+                monster.fatStorage = 0;
+                totalFood = requirement - shortfall;
+                ratio = requirement > 0 ? totalFood / requirement : 1;
+                monster.nutritionShortfallThisSeason = shortfall;
+            }
+            if ((monster.fatStorage || 0) > 7.0) {
+                monster.health = Math.max(1, monster.health - Math.round(monster.maxHealth * 0.04));
             }
             if (ratio >= 0.5) {
                 monster.nutritionState = NUTRITION_STATE.MALNOURISHED;
@@ -4759,10 +5042,16 @@ button:hover { background: #ffd768; }
     // range, because future maintainers need space for exceptional biology.
     var DOMINANCE_DEFAULT = 100;
     var GENETIC_TRAIT = {
-        COLOUR: 'colour'
+        COLOUR: 'colour',
+        METABOLISM: 'metabolism'
     };
     var COLOUR_CHROMOSOME_INDEX = 0;
     var COLOUR_CHROMOSOME_SLOT_COUNT = 4;
+    var METABOLISM_CHROMOSOME_INDEX = 1;
+    var METABOLISM_CHROMOSOME_SLOT_COUNT = 4;
+    var DEFAULT_COMFORTABLE_TEMPERATURE_C = 12;
+    var DEFAULT_BASE_THERMAL_LOW_C = -4;
+    var DEFAULT_BASE_THERMAL_HIGH_C = 29;
 
     function ClampByte(value) {
         return Clamp(Math.round(Number.isFinite(value) ? value : 0), 0, 255);
@@ -4942,12 +5231,43 @@ button:hover { background: #ffd768; }
         }
     }
 
+    class MetabolicFactorState {
+        constructor() {
+            this.baseMetabolicRate = 0;
+            this.coldTolerance = 0;
+            this.heatTolerance = 0;
+            this.plumptin = 0;
+            this.energyConservation = 0;
+            this.satietyConservationEffect = 0;
+        }
+
+        add(amounts) {
+            if (!amounts) { return; }
+            this.baseMetabolicRate += Number.isFinite(amounts.baseMetabolicRate) ? amounts.baseMetabolicRate : 0;
+            this.coldTolerance += Number.isFinite(amounts.coldTolerance) ? amounts.coldTolerance : 0;
+            this.heatTolerance += Number.isFinite(amounts.heatTolerance) ? amounts.heatTolerance : 0;
+            this.plumptin += Number.isFinite(amounts.plumptin) ? amounts.plumptin : 0;
+            this.energyConservation += Number.isFinite(amounts.energyConservation) ? amounts.energyConservation : 0;
+            this.satietyConservationEffect += Number.isFinite(amounts.satietyConservationEffect) ? amounts.satietyConservationEffect : 0;
+        }
+
+        cloneWith(other) {
+            var result = new MetabolicFactorState();
+            result.add(this);
+            result.add(other);
+            return result;
+        }
+    }
+
     class PhenotypeBuildContext {
         constructor() {
             this.baseSkinProteins = new SkinProteinState();
             this.codominantSkinLayers = [new SkinProteinState(), new SkinProteinState()];
             this.activeCodominantLayerIndex = 0;
             this.usedCodominantSkinLayers = false;
+            this.baseMetabolicFactors = new MetabolicFactorState();
+            this.codominantMetabolicLayers = [new MetabolicFactorState(), new MetabolicFactorState()];
+            this.usedCodominantMetabolicLayers = false;
         }
 
         // normalise has no default value by design. Genetic maintainers must pass
@@ -4956,6 +5276,18 @@ button:hover { background: #ffd768; }
         // normalise or layer those effects. For colour, codominant calls write into
         // separate skin-protein layers so that visible striping can emerge instead
         // of accidentally doubling all protein production.
+        addMetabolicFactors(amounts, normalise) {
+            if (normalise === true) {
+                this.usedCodominantMetabolicLayers = true;
+                this.codominantMetabolicLayers[this.activeCodominantLayerIndex].add(amounts);
+                return;
+            }
+            if (normalise !== false) {
+                throw new Error('Metabolic allele phenotype methods must pass the normalise boolean explicitly.');
+            }
+            this.baseMetabolicFactors.add(amounts);
+        }
+
         addSkinProteins(amounts, normalise) {
             if (normalise === true) {
                 this.usedCodominantSkinLayers = true;
@@ -5162,6 +5494,81 @@ button:hover { background: #ffd768; }
         }
     };
 
+
+    var MetabolismPhenotypeSystem = {
+        combineLayers: function (context) {
+            if (context.usedCodominantMetabolicLayers) {
+                return context.baseMetabolicFactors.cloneWith(context.codominantMetabolicLayers[0]).cloneWith(context.codominantMetabolicLayers[1]);
+            }
+            return context.baseMetabolicFactors.cloneWith(null);
+        },
+
+        resolve: function (context) {
+            var f = this.combineLayers(context);
+            var baseMetabolicFood = Clamp(10 + f.baseMetabolicRate / 22, 6, 16);
+            var coldLimitC = Clamp(DEFAULT_BASE_THERMAL_LOW_C - f.coldTolerance / 11 + f.heatTolerance / 28, -22, 12);
+            var heatLimitC = Clamp(DEFAULT_BASE_THERMAL_HIGH_C + f.heatTolerance / 11 - f.coldTolerance / 30, 12, 48);
+            var plumptinLevel = Clamp((f.plumptin + 90) / 220, 0, 1.45);
+            var targetFatStorage = Clamp(0.6 + plumptinLevel * 4.2, 0.25, 8.5);
+            var energyConservation = Clamp(0.50 + f.energyConservation / 170, 0.15, 1.25);
+            var satietyConservationEffect = Clamp(f.satietyConservationEffect / 150, 0, 1.35);
+            return {
+                baseMetabolicFood: baseMetabolicFood,
+                coldLimitC: coldLimitC,
+                heatLimitC: heatLimitC,
+                plumptinLevel: plumptinLevel,
+                targetFatStorage: targetFatStorage,
+                energyConservation: energyConservation,
+                satietyConservationEffect: satietyConservationEffect,
+                labels: {
+                    metabolicRate: baseMetabolicFood < 8.5 ? 'low' : (baseMetabolicFood > 12.5 ? 'high' : 'moderate'),
+                    plumptin: targetFatStorage < 1.4 ? 'lean' : (targetFatStorage > 5.7 ? 'very fat-storing' : 'ordinary'),
+                    conservation: energyConservation > 0.87 ? 'energy-conserving' : (energyConservation < 0.35 ? 'restless' : 'balanced')
+                },
+                rawFactors: {
+                    baseMetabolicRate: f.baseMetabolicRate,
+                    coldTolerance: f.coldTolerance,
+                    heatTolerance: f.heatTolerance,
+                    plumptin: f.plumptin,
+                    energyConservation: f.energyConservation,
+                    satietyConservationEffect: f.satietyConservationEffect
+                }
+            };
+        }
+    };
+
+    var MonsterMetabolismSystem = {
+        currentTemperatureC: function (world, seasonNumber) {
+            if (world && typeof world.getCurrentTemperatureC === 'function') {
+                return world.getCurrentTemperatureC(seasonNumber || 1);
+            }
+            var environment = world && world.environment ? world.environment : {};
+            return Number.isFinite(environment.meanAnnualTemperatureC) ? environment.meanAnnualTemperatureC : DEFAULT_COMFORTABLE_TEMPERATURE_C;
+        },
+
+        thermalStatus: function (monster, world, seasonNumber) {
+            var m = monster && monster.phenotype && monster.phenotype.metabolism ? monster.phenotype.metabolism : MetabolismPhenotypeSystem.resolve(new PhenotypeBuildContext());
+            var fat = Number.isFinite(monster && monster.fatStorage) ? Math.max(0, monster.fatStorage) : m.targetFatStorage * 0.70;
+            var temperatureC = this.currentTemperatureC(world, seasonNumber);
+            var coldLimit = m.coldLimitC - fat * 1.35;
+            var heatLimit = m.heatLimitC - fat * 1.10;
+            var coldStress = Math.max(0, coldLimit - temperatureC);
+            var heatStress = Math.max(0, temperatureC - heatLimit);
+            var stress = Math.max(coldStress, heatStress);
+            var state = stress <= 0 ? 'comfortable' : (coldStress > heatStress ? 'tooCold' : 'tooHot');
+            return { state: state, stress: stress, temperatureC: temperatureC, coldLimitC: coldLimit, heatLimitC: heatLimit };
+        },
+
+        macrofaunaAvailability: function (world) {
+            var environment = world && world.environment ? world.environment : {};
+            var moisture = Number.isFinite(environment.moisture) ? environment.moisture : 0.45;
+            var vegetation = Number.isFinite(environment.vegetationDensity) ? environment.vegetationDensity : 0.45;
+            var temperature = Number.isFinite(environment.temperature) ? environment.temperature : 0.50;
+            var aridity = Number.isFinite(environment.aridity) ? environment.aridity : Math.max(0, 1 - moisture);
+            return Clamp(0.18 + vegetation * 0.48 + moisture * 0.22 + (1 - Math.abs(temperature - 0.50) * 1.3) * 0.22 - aridity * 0.35, 0.05, 1.25);
+        }
+    };
+
     class GeneticTraitDefinition {
         constructor(key, chromosomeIndex, slotCount) {
             this.key = key;
@@ -5192,6 +5599,23 @@ button:hover { background: #ffd768; }
         }
     }
 
+    class MetabolismGeneticTraitDefinition extends GeneticTraitDefinition {
+        constructor() {
+            super(GENETIC_TRAIT.METABOLISM, METABOLISM_CHROMOSOME_INDEX, METABOLISM_CHROMOSOME_SLOT_COUNT);
+        }
+
+        createRandomChromosomePair(rng, genePool, world) {
+            var profile = genePool.getWorldMetabolismSelectionProfile(world);
+            var homologueA = [];
+            var homologueB = [];
+            for (var i = 0; i < this.slotCount; i += 1) {
+                homologueA.push(genePool.pickAlleleForMetabolismSlot(i, rng, profile));
+                homologueB.push(genePool.pickAlleleForMetabolismSlot(i, rng, profile));
+            }
+            return new ChromosomePair(homologueA, homologueB);
+        }
+    }
+
     class ColourGeneticTraitDefinition extends GeneticTraitDefinition {
         constructor() {
             super(GENETIC_TRAIT.COLOUR, COLOUR_CHROMOSOME_INDEX, COLOUR_CHROMOSOME_SLOT_COUNT);
@@ -5210,13 +5634,16 @@ button:hover { background: #ffd768; }
     }
 
     var MonsterColourTraitDefinition = new ColourGeneticTraitDefinition();
+    var MonsterMetabolismTraitDefinition = new MetabolismGeneticTraitDefinition();
 
     var MonsterPhenotypeSystem = {
         buildPhenotype: function (genome) {
             var context = new PhenotypeBuildContext();
             MonsterColourTraitDefinition.expressToPhenotype(genome, context);
+            MonsterMetabolismTraitDefinition.expressToPhenotype(genome, context);
             return {
-                colour: ColourPhenotypeSystem.resolve(context)
+                colour: ColourPhenotypeSystem.resolve(context),
+                metabolism: MetabolismPhenotypeSystem.resolve(context)
             };
         },
 
@@ -5228,7 +5655,8 @@ button:hover { background: #ffd768; }
     class GenePool {
         constructor() {
             this.colourChromosomeSlots = GenePool.createDefaultColourSlots();
-            this.traitDefinitions = [MonsterColourTraitDefinition];
+            this.metabolismChromosomeSlots = GenePool.createDefaultMetabolismSlots();
+            this.traitDefinitions = [MonsterColourTraitDefinition, MonsterMetabolismTraitDefinition];
         }
 
         createGenome(rng, world) {
@@ -5270,6 +5698,39 @@ button:hover { background: #ffd768; }
                 }
             }
             return pool[pool.length - 1];
+        }
+
+        pickAlleleForMetabolismSlot(slotIndex, rng, profile) {
+            var pool = this.metabolismChromosomeSlots[slotIndex] || [];
+            var total = 0;
+            var weights = [];
+            for (var i = 0; i < pool.length; i += 1) {
+                var weight = this.getWildMetabolismWeight(pool[i], profile);
+                weights.push(weight);
+                total += weight;
+            }
+            if (total <= 0) { return pool[0]; }
+            var roll = rng.range(0, total);
+            var cumulative = 0;
+            for (i = 0; i < pool.length; i += 1) {
+                cumulative += weights[i];
+                if (roll <= cumulative) { return pool[i]; }
+            }
+            return pool[pool.length - 1];
+        }
+
+        getWildMetabolismWeight(allele, profile) {
+            var weight = Math.pow(allele.commonness || 1, 0.55);
+            if (!profile || !allele.selectionSensitive) { return weight; }
+            var context = new PhenotypeBuildContext();
+            allele.applyPhenotype(context, false);
+            var phenotype = MetabolismPhenotypeSystem.resolve(context);
+            var thermalMismatch = 0;
+            if (profile.currentTemperatureC < phenotype.coldLimitC) { thermalMismatch = (phenotype.coldLimitC - profile.currentTemperatureC) / 22; }
+            if (profile.currentTemperatureC > phenotype.heatLimitC) { thermalMismatch = (profile.currentTemperatureC - phenotype.heatLimitC) / 22; }
+            var foodMismatch = Math.max(0, phenotype.baseMetabolicFood - (8.5 + profile.macrofaunaAvailability * 4.0)) / 10;
+            var fatTemperatureMismatch = profile.currentTemperatureC > 20 ? phenotype.targetFatStorage / 12 : Math.max(0, 2.0 - phenotype.targetFatStorage) / 8;
+            return weight * Math.exp(-7.5 * thermalMismatch - 2.5 * foodMismatch - 2.0 * fatTemperatureMismatch);
         }
 
         getWildColourWeight(allele, profile) {
@@ -5373,6 +5834,51 @@ button:hover { background: #ffd768; }
             }, { commonness: commonness, selectionSensitive: true, debugLabel: debugLabel });
         }
 
+        getWorldMetabolismSelectionProfile(world) {
+            if (!world) {
+                return null;
+            }
+            if (world.metabolismSelectionProfile) {
+                return world.metabolismSelectionProfile;
+            }
+            world.metabolismSelectionProfile = {
+                currentTemperatureC: MonsterMetabolismSystem.currentTemperatureC(world, 2),
+                macrofaunaAvailability: MonsterMetabolismSystem.macrofaunaAvailability(world)
+            };
+            return world.metabolismSelectionProfile;
+        }
+
+        static createMetabolicAllele(dominanceIndex, amounts, commonness, debugLabel) {
+            return new Allele(dominanceIndex, function (context, normalise) {
+                context.addMetabolicFactors(amounts, normalise);
+            }, { commonness: commonness, selectionSensitive: true, debugLabel: debugLabel });
+        }
+
+        static createDefaultMetabolismSlots() {
+            var lowBurn = GenePool.createMetabolicAllele(100, { baseMetabolicRate: -55, coldTolerance: 24, heatTolerance: -8 }, 2.8, 'low burn cold thrift regulator');
+            var balancedBurn = GenePool.createMetabolicAllele(100, { baseMetabolicRate: 0, coldTolerance: 8, heatTolerance: 8 }, 5.0, 'balanced metabolic regulator');
+            var hotBurn = GenePool.createMetabolicAllele(105, { baseMetabolicRate: 42, coldTolerance: 18, heatTolerance: 16 }, 2.0, 'hot burn active regulator');
+            var heatShedding = GenePool.createMetabolicAllele(100, { baseMetabolicRate: -8, coldTolerance: -18, heatTolerance: 50 }, 1.7, 'heat shedding desert regulator');
+            var plumptinLow = GenePool.createMetabolicAllele(100, { plumptin: -58 }, 2.4, 'low plumptin regulator');
+            var plumptinMedium = GenePool.createMetabolicAllele(100, { plumptin: 0 }, 4.6, 'ordinary plumptin regulator');
+            var plumptinHigh = GenePool.createMetabolicAllele(105, { plumptin: 66 }, 2.1, 'high plumptin regulator');
+            var plumptinExtreme = GenePool.createMetabolicAllele(120, { plumptin: 155 }, 0.05, 'extreme plumptin disease regulator');
+            var conservationLow = GenePool.createMetabolicAllele(100, { energyConservation: -70 }, 1.5, 'restless energy regulator');
+            var conservationMedium = GenePool.createMetabolicAllele(100, { energyConservation: 16 }, 4.3, 'balanced energy conservation regulator');
+            var conservationHigh = GenePool.createMetabolicAllele(105, { energyConservation: 78 }, 2.7, 'high conservation regulator');
+            var conservationExtreme = GenePool.createMetabolicAllele(120, { energyConservation: 135 }, 0.15, 'extreme conservation regulator');
+            var satietyLow = GenePool.createMetabolicAllele(100, { satietyConservationEffect: -20 }, 2.2, 'weak satiety conservation regulator');
+            var satietyMedium = GenePool.createMetabolicAllele(100, { satietyConservationEffect: 35 }, 4.0, 'ordinary satiety conservation regulator');
+            var satietyHigh = GenePool.createMetabolicAllele(105, { satietyConservationEffect: 86 }, 2.0, 'strong satiety conservation regulator');
+            var zoomies = GenePool.createMetabolicAllele(120, { satietyConservationEffect: 160, energyConservation: -40 }, 0.08, 'well fed zoomies regulator');
+            return [
+                [lowBurn, balancedBurn, hotBurn, heatShedding],
+                [plumptinLow, plumptinMedium, plumptinHigh, plumptinExtreme],
+                [conservationLow, conservationMedium, conservationHigh, conservationExtreme],
+                [satietyLow, satietyMedium, satietyHigh, zoomies]
+            ];
+        }
+
         static createDefaultColourSlots() {
             var junkCommon = GenePool.createJunkAllele(DOMINANCE_DEFAULT, 12, 'common inactive colour regulator');
             var junkUncommon = GenePool.createJunkAllele(DOMINANCE_DEFAULT, 2.2, 'uncommon inactive colour regulator');
@@ -5455,6 +5961,16 @@ button:hover { background: #ffd768; }
             this.roamRetargetTick = -1;
             this.genome = options && options.genome ? options.genome : MonsterGenePool.createGenome(rng, options && options.world ? options.world : null);
             this.phenotype = MonsterPhenotypeSystem.buildPhenotype(this.genome);
+            this.fatStorage = options && Number.isFinite(options.fatStorage) ? Math.max(0, options.fatStorage) : ((this.phenotype.metabolism ? this.phenotype.metabolism.targetFatStorage : 2.5) * 0.70);
+            this.activityFoodThisSeason = 0;
+            this.thermalState = 'comfortable';
+            this.thermalStress = 0;
+            this.currentSeasonTemperatureC = DEFAULT_COMFORTABLE_TEMPERATURE_C;
+            this.currentSprintEnduranceTicks = 0;
+            this.sprinting = false;
+            this.healingFoodRequirementThisSeason = 0;
+            this.plannedHealingThisSeason = 0;
+            this.diseases = options && options.diseases ? options.diseases.map(function (disease) { return MonsterDiseaseSystem.fromSnapshot(disease); }) : [];
             this.sex = options && options.sex ? options.sex : (rng.nextFloat() < 0.5 ? MONSTER_SEX.FEMALE : MONSTER_SEX.MALE);
             this.ageInSeasons = options && Number.isFinite(options.ageInSeasons) ? Math.max(0, Math.floor(options.ageInSeasons)) : (options && options.lifeStage === MONSTER_LIFE_STAGE.JUVENILE ? 0 : rng.integer(8, 24));
             this.lifeStage = options && options.lifeStage ? options.lifeStage : MONSTER_LIFE_STAGE.ADULT;
@@ -5774,8 +6290,9 @@ button:hover { background: #ffd768; }
             if (!this.owned) { return 'Only captive collared monsters can be bred.'; }
             if (requiredSex && this.sex !== requiredSex) { return requiredSex === MONSTER_SEX.FEMALE ? 'A mother is required.' : 'A sire is required.'; }
             if (this.lifeStage !== MONSTER_LIFE_STAGE.ADULT) { return 'Juveniles cannot breed until they mature.'; }
-            if ((this.breedingHoldSeasonsRemaining || 0) > 0) { return 'This monster is already committed to a brood this season.'; }
             if (this.nutritionState === NUTRITION_STATE.STARVED) { return 'Starved monsters cannot breed.'; }
+            if (MonsterDiseaseSystem.combinedEffects(this).infertile) { return 'Disease has made this monster temporarily infertile.'; }
+            if ((this.breedingHoldSeasonsRemaining || 0) > 0) { return 'Mother is incubating a brood this season.'; }
             return '';
         }
 
@@ -5786,6 +6303,7 @@ button:hover { background: #ffd768; }
         getDeploymentBlockReason() {
             if (!this.alive) { return 'Dead monsters cannot be deployed.'; }
             if (this.lifeStage !== MONSTER_LIFE_STAGE.ADULT) { return 'Juveniles must mature for one more season before deployment.'; }
+            if (MonsterDiseaseSystem.combinedEffects(this).incapacitated) { return 'Incapacitated by disease and cannot leave base.'; }
             if ((this.breedingHoldSeasonsRemaining || 0) > 0) { return 'Mother is incubating a brood this season.'; }
             return '';
         }
@@ -5893,11 +6411,49 @@ button:hover { background: #ffd768; }
             return true;
         }
 
+        updateThermalState(raid) {
+            var status = MonsterMetabolismSystem.thermalStatus(this, raid.world, raid.seasonNumber);
+            this.thermalState = status.state;
+            this.thermalStress = status.stress;
+            this.currentSeasonTemperatureC = status.temperatureC;
+            if (status.stress > 2.5) {
+                this.recallRequested = true;
+                if (this.thermalState === 'tooHot') {
+                    this.behaviourState = 'overheated';
+                } else if (this.thermalState === 'tooCold') {
+                    this.behaviourState = 'chilled';
+                }
+            }
+        }
+
+        getSprintSpeedMultiplier(raid, target) {
+            var metabolism = this.phenotype && this.phenotype.metabolism ? this.phenotype.metabolism : null;
+            var conservation = metabolism ? metabolism.energyConservation : 0.5;
+            var fat = Number.isFinite(this.fatStorage) ? Math.max(0, this.fatStorage) : 0;
+            var maxTicks = Math.max(18, Math.round(150 * Clamp(1 - fat * 0.08, 0.32, 1.05)));
+            if (!Number.isFinite(this.currentSprintEnduranceTicks) || this.currentSprintEnduranceTicks <= 0) {
+                this.currentSprintEnduranceTicks = maxTicks;
+            }
+            var distance = target ? this.distanceTo(target) : 9999;
+            var lateSprintDistance = 145 - conservation * 55;
+            if (distance <= lateSprintDistance && this.currentSprintEnduranceTicks > 0 && this.thermalStress < 1.5) {
+                this.currentSprintEnduranceTicks -= 1;
+                this.sprinting = true;
+                NutritionSystem.recordActivityTick(this, 1.8);
+                return 2;
+            }
+            this.sprinting = false;
+            this.currentSprintEnduranceTicks = Math.min(maxTicks, this.currentSprintEnduranceTicks + 0.35);
+            return 1;
+        }
+
         update(raid) {
             if (!this.isActive() || !this.deployed) {
                 return;
             }
 
+            this.updateThermalState(raid);
+            NutritionSystem.recordActivityTick(this, this.behaviourState === 'recalling' ? 0.45 : 0.18);
             if (this.continueRecallToBase(raid)) {
                 return;
             }
@@ -5924,7 +6480,8 @@ button:hover { background: #ffd768; }
                 this.rememberMacrofaunaTarget(preyTarget, raid);
                 if (this.distanceTo(preyTarget) > MONSTER_ATTACK_RANGE) {
                     this.behaviourState = 'stalking';
-                    this.moveWithPath(raid.world, preyTarget.x, preyTarget.y, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT, this.id + '_hunt_' + preyTarget.id);
+                    NutritionSystem.recordActivityTick(this, 1.15);
+                    this.moveWithPath(raid.world, preyTarget.x, preyTarget.y, this.speed * this.getSprintSpeedMultiplier(raid, preyTarget) * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT, this.id + '_hunt_' + preyTarget.id);
                 } else {
                     this.behaviourState = 'attacking';
                 }
@@ -5955,7 +6512,8 @@ button:hover { background: #ffd768; }
 
             if (this.distanceTo(target) > MONSTER_ATTACK_RANGE) {
                 this.behaviourState = 'stalking';
-                this.moveWithPath(raid.world, target.x, target.y, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT, this.id + '_' + target.id);
+                NutritionSystem.recordActivityTick(this, 1.0);
+                this.moveWithPath(raid.world, target.x, target.y, this.speed * this.getSprintSpeedMultiplier(raid, target) * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT, this.id + '_' + target.id);
             } else {
                 this.behaviourState = 'attacking';
             }
@@ -6063,6 +6621,13 @@ button:hover { background: #ffd768; }
         }
 
         applyDamage(amount, rng, raid, attacker) {
+            var fat = Number.isFinite(this.fatStorage) ? Math.max(0, this.fatStorage) : 0;
+            if (fat < 0.35) {
+                amount = Math.round(amount * 1.22);
+            } else if (fat > 6.0) {
+                amount = Math.round(amount * Clamp(1 + (fat - 6.0) * 0.055, 1.05, 1.38));
+            }
+            amount = Math.round(amount * MonsterDiseaseSystem.combinedEffects(this).damageMultiplier);
             var healthBeforeDamage = this.health;
             this.bodyHealth.applyGeneralDamage(amount, rng);
             this.health = this.bodyHealth.total();
@@ -6105,13 +6670,23 @@ button:hover { background: #ffd768; }
             s.health = this.health;
             s.maxHealth = this.maxHealth;
             s.bodyHealth = this.bodyHealth.getSnapshot();
-            s.nutritionRequirement = this.nutritionRequirement;
+            s.nutritionRequirement = NutritionSystem.getMonsterRequirement(this);
             s.nutritionState = this.nutritionState;
             s.foodEatenThisSeason = this.foodEatenThisSeason;
             s.foodBoughtThisSeason = this.foodBoughtThisSeason;
             s.foodBoughtCostCreditsThisSeason = this.foodBoughtCostCreditsThisSeason || 0;
             s.nutritionShortfallThisSeason = this.nutritionShortfallThisSeason;
             s.foodNeededThisSeason = NutritionSystem.getFoodNeeded(this);
+            s.fatStorage = this.fatStorage || 0;
+            s.activityFoodThisSeason = this.activityFoodThisSeason || 0;
+            s.thermalState = this.thermalState || 'comfortable';
+            s.thermalStress = this.thermalStress || 0;
+            s.currentSeasonTemperatureC = this.currentSeasonTemperatureC;
+            s.sprinting = !!this.sprinting;
+            s.healingFoodRequirementThisSeason = this.healingFoodRequirementThisSeason || 0;
+            s.plannedHealingThisSeason = this.plannedHealingThisSeason || 0;
+            s.diseases = MonsterDiseaseSystem.activeDiseases(this).map(function (disease) { return disease.getSnapshot(); });
+            s.diseaseEffects = MonsterDiseaseSystem.combinedEffects(this);
             s.eatingTargetId = this.eatingTargetId;
             s.eatingTicksRemaining = this.eatingTicksRemaining;
             s.recallRequested = this.recallRequested;
@@ -6604,6 +7179,17 @@ button:hover { background: #ffd768; }
                     }
                 }
                 monster.applyAgeEffects();
+                var healed = 0;
+                if (monster.bodyHealth && monster.bodyHealth.healGeneral) {
+                    var healingAmount = Math.min(monster.bodyHealth.missingHealth(), 18 * NutritionSystem.getAgeHealingMultiplier(monster));
+                    healed = monster.bodyHealth.healGeneral(healingAmount);
+                    if (healed > 0) {
+                        monster.health = monster.bodyHealth.total();
+                        events.push(monster.name + ' recovered ' + Math.round(healed) + ' injury points.');
+                    }
+                }
+                MonsterDiseaseSystem.applySeasonalDiseaseProgression(monster, rng, world, events);
+                if (!monster.alive) { return; }
                 var mortalityChance = monster.getOldAgeMortalityChance();
                 if (mortalityChance > 0 && rng.nextFloat() < mortalityChance) {
                     monster.alive = false;
@@ -6695,7 +7281,11 @@ button:hover { background: #ffd768; }
             this.monsterSightedByAdventurerKeys = {};
             this.gameState.getLivingOwnedMonsters().forEach(function (monster) {
                 NutritionSystem.resetSeasonNutrition(monster);
-            });
+                monster.currentSeasonTemperatureC = this.world.getCurrentTemperatureC(this.seasonNumber);
+                var thermal = MonsterMetabolismSystem.thermalStatus(monster, this.world, this.seasonNumber);
+                monster.thermalState = thermal.state;
+                monster.thermalStress = thermal.stress;
+            }, this);
             this.adventurers = this.createAdventurers();
             this.macrofauna = this.createMacrofauna();
             this.departedMacrofaunaTrails = [];
@@ -6944,9 +7534,17 @@ button:hover { background: #ffd768; }
             return null;
         }
 
+        estimateMacrofaunaCapacity() {
+            var availability = MonsterMetabolismSystem.macrofaunaAvailability(this.world);
+            var mapScale = Math.sqrt((this.world.width * this.world.height) / (REFERENCE_MAP_WIDTH * REFERENCE_MAP_HEIGHT));
+            var baseMax = Math.max(MACROFAUNA_COUNT_MIN, Math.round(MACROFAUNA_COUNT_MAX * availability * Clamp(mapScale, 0.55, 2.2)));
+            return Clamp(baseMax, 0, Math.max(1, Math.round(MACROFAUNA_COUNT_MAX * 2.4)));
+        }
+
         createMacrofauna() {
             var animals = [];
-            var count = this.rng.integer(MACROFAUNA_COUNT_MIN, MACROFAUNA_COUNT_MAX);
+            var capacity = this.estimateMacrofaunaCapacity();
+            var count = capacity <= 0 ? 0 : this.rng.integer(MACROFAUNA_COUNT_MIN, capacity);
             var occupied = this.world.terrainObjects.concat(this.world.treasureDeposits);
             for (var i = 0; i < count; i += 1) {
                 var probe = WorldGenerator.findOpenPoint(this.rng, this.world.terrainGrid, occupied.concat(animals), 115, true);
@@ -7693,7 +8291,11 @@ button:hover { background: #ffd768; }
                         adventurer.behaviourState = 'meleeAttacking';
                         if (this.rng.nextFloat() <= adventurer.getMeleeHitChance()) {
                             this.addSound('adventurerAttack', adventurer, adventurer.x, adventurer.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
-                            monster.applyDamage(adventurer.getMeleeDamage(this.rng), this.rng, this, adventurer);
+                            var damage = adventurer.getMeleeDamage(this.rng);
+                            if ((monster.thermalStress || 0) > 0 && monster.behaviourState === 'recalling') {
+                                damage = Math.round(damage * Clamp(1 + monster.thermalStress * 0.09, 1, 1.65));
+                            }
+                            monster.applyDamage(damage, this.rng, this, adventurer);
                             this.addEvent('A ' + adventurer.displayName + ' wounded ' + monster.name + '.');
                         }
                     }
@@ -7854,6 +8456,7 @@ button:hover { background: #ffd768; }
                 worldSeed: this.world.seed,
                 seasonNumber: this.seasonNumber,
                 seasonName: WorldGenerator.seasonNameForNumber(this.seasonNumber),
+                currentSeasonTemperatureC: this.world.getCurrentTemperatureC(this.seasonNumber),
                 roundNumber: this.gameState && this.gameState.roundNumber ? this.gameState.roundNumber : undefined,
                 tickNumber: this.tickNumber,
                 raidEnded: this.raidEnded,
@@ -7912,6 +8515,7 @@ button:hover { background: #ffd768; }
                 worldSeed: this.world.seed,
                 mapWidth: this.world.width,
                 mapHeight: this.world.height,
+                currentSeasonTemperatureC: this.world.getCurrentTemperatureC(this.seasonNumber),
                 world: this.world.getStaticSnapshot(),
                 obstacles: this.world.getObstacleSnapshots(),
                 terrainObjects: this.world.getObstacleSnapshots()
@@ -7926,6 +8530,7 @@ button:hover { background: #ffd768; }
                 tickNumber: this.tickNumber,
                 seasonNumber: this.seasonNumber,
                 seasonName: WorldGenerator.seasonNameForNumber(this.seasonNumber),
+                currentSeasonTemperatureC: this.world.getCurrentTemperatureC(this.seasonNumber),
                 roundNumber: this.gameState && this.gameState.roundNumber ? this.gameState.roundNumber : undefined,
                 mapWidth: this.world.width,
                 mapHeight: this.world.height,
@@ -8236,6 +8841,7 @@ button:hover { background: #ffd768; }
                 worldSeed: this.world.seed,
                 mapWidth: this.world.width,
                 mapHeight: this.world.height,
+                currentSeasonTemperatureC: this.world.getCurrentTemperatureC(this.seasonNumber),
                 world: this.world.getStaticSnapshot(),
                 obstacles: this.world.getObstacleSnapshots(),
                 terrainObjects: this.world.getObstacleSnapshots()
@@ -8265,6 +8871,7 @@ button:hover { background: #ffd768; }
                 tickNumber: 0,
                 seasonNumber: this.seasonNumber,
                 seasonName: WorldGenerator.seasonNameForNumber(this.seasonNumber),
+                currentSeasonTemperatureC: this.world.getCurrentTemperatureC(this.seasonNumber),
                 roundNumber: this.roundNumber,
                 phase: this.phase,
                 gameMode: this.mode,
@@ -8421,6 +9028,47 @@ button:hover { background: #ffd768; }
         var traitOffspringGenome = MonsterGenePool.createOffspringGenome(traitGenome, traitGenome, new SeededRng(7003));
         var traitOffspringChromosome = traitOffspringGenome.getChromosome(MonsterColourTraitDefinition);
         AddRegressionResult(results, 'GenePool creates offspring chromosomes through trait definitions', traitOffspringChromosome && traitOffspringChromosome.getSlotCount() === COLOUR_CHROMOSOME_SLOT_COUNT, 'slots=' + (traitOffspringChromosome ? traitOffspringChromosome.getSlotCount() : 'missing'));
+
+        var metabolismChromosome = traitGenome.getChromosome(MonsterMetabolismTraitDefinition);
+        AddRegressionResult(results, 'Genome contains a metabolism chromosome built through trait definitions', metabolismChromosome && metabolismChromosome.getSlotCount() === METABOLISM_CHROMOSOME_SLOT_COUNT, 'slots=' + (metabolismChromosome ? metabolismChromosome.getSlotCount() : 'missing'));
+
+        var hotMetabolismWorld = WorldGenerator.createWorld(7004, { mapSizeKey: 'legacy', temperature: 0.88, moisture: 0.18, waterAbundance: 0.12, altitude: 0.08, vegetationDensity: 0.12, customTreasureAmounts: { bronze: 1 } });
+        var coldMetabolismWorld = WorldGenerator.createWorld(7005, { mapSizeKey: 'legacy', temperature: 0.10, moisture: 0.72, waterAbundance: 0.65, altitude: 0.55, vegetationDensity: 0.30, customTreasureAmounts: { bronze: 1 } });
+        AddRegressionResult(results, 'World seasonal temperature calculation distinguishes hot and cold worlds', hotMetabolismWorld.getCurrentTemperatureC(3) > coldMetabolismWorld.getCurrentTemperatureC(1) + 20, 'hot=' + hotMetabolismWorld.getCurrentTemperatureC(3) + ', cold=' + coldMetabolismWorld.getCurrentTemperatureC(1));
+
+        var metabolismMonster = new Monster('metabolism_regression', RIGHT_EDGE_X, 260, new SeededRng(7006), { owned: true, world: hotMetabolismWorld, name: 'Metabolic' });
+        metabolismMonster.deployed = true;
+        var baseMetabolicRequirement = NutritionSystem.getMonsterRequirement(metabolismMonster);
+        metabolismMonster.activityFoodThisSeason = 2.4;
+        metabolismMonster.fatStorage += 3.0;
+        var activeMetabolicRequirement = NutritionSystem.getMonsterRequirement(metabolismMonster);
+        AddRegressionResult(results, 'Metabolic food requirement rises with activity and fat storage', activeMetabolicRequirement > baseMetabolicRequirement, 'base=' + baseMetabolicRequirement + ', active=' + activeMetabolicRequirement);
+
+        var thermalStatus = MonsterMetabolismSystem.thermalStatus(metabolismMonster, hotMetabolismWorld, 3);
+        AddRegressionResult(results, 'Metabolic thermal status reports temperature and stress data', Number.isFinite(thermalStatus.temperatureC) && thermalStatus.state, 'state=' + thermalStatus.state + ', temp=' + thermalStatus.temperatureC);
+
+        var temperatureSnapshotSession = new GameSession(7020, { mapSizeKey: 'legacy', customTreasureAmounts: { bronze: 2 } }, 'single');
+        var temperatureStaticSnapshot = temperatureSnapshotSession.getStaticSnapshot();
+        var temperatureDynamicSnapshot = temperatureSnapshotSession.getSnapshot();
+        AddRegressionResult(results, 'Game session snapshots expose top-level numeric temperature for UI display', Number.isFinite(temperatureStaticSnapshot.currentSeasonTemperatureC) && Number.isFinite(temperatureDynamicSnapshot.currentSeasonTemperatureC), 'static=' + temperatureStaticSnapshot.currentSeasonTemperatureC + ', dynamic=' + temperatureDynamicSnapshot.currentSeasonTemperatureC);
+
+        temperatureSnapshotSession.startSeason();
+        var temperatureRaidSnapshot = temperatureSnapshotSession.getSnapshot();
+        AddRegressionResult(results, 'Raid snapshots expose top-level numeric temperature for UI display', Number.isFinite(temperatureRaidSnapshot.currentSeasonTemperatureC), 'raid=' + temperatureRaidSnapshot.currentSeasonTemperatureC);
+
+        var injuredMonster = new Monster('healing_regression', RIGHT_EDGE_X, 300, new SeededRng(7010), { owned: true, world: hotMetabolismWorld, name: 'Healer' });
+        injuredMonster.bodyHealth.torso -= 12;
+        injuredMonster.health = injuredMonster.bodyHealth.total();
+        var healingFood = NutritionSystem.getHealingFoodRequirement(injuredMonster);
+        var healedAmount = injuredMonster.bodyHealth.healGeneral(18 * NutritionSystem.getAgeHealingMultiplier(injuredMonster));
+        AddRegressionResult(results, 'Between-season healing has a food cost and restores partial injury', healingFood > 0 && healedAmount > 0 && injuredMonster.bodyHealth.torso > injuredMonster.bodyHealth.maxEach - 12, 'healingFood=' + healingFood + ', healed=' + healedAmount);
+
+        var oldHealingMonster = new Monster('old_healing_regression', RIGHT_EDGE_X, 300, new SeededRng(7011), { owned: true, world: hotMetabolismWorld, name: 'OldHealer', ageInSeasons: MONSTER_SENESCENT_START_SEASONS + 4 });
+        AddRegressionResult(results, 'Age reduces seasonal healing rate after half life expectancy', NutritionSystem.getAgeHealingMultiplier(oldHealingMonster) < NutritionSystem.getAgeHealingMultiplier(injuredMonster), 'young=' + NutritionSystem.getAgeHealingMultiplier(injuredMonster).toFixed(3) + ', old=' + NutritionSystem.getAgeHealingMultiplier(oldHealingMonster).toFixed(3));
+
+        var diseaseMonster = new Monster('disease_regression', RIGHT_EDGE_X, 300, new SeededRng(7012), { owned: true, world: hotMetabolismWorld, name: 'Diseased' });
+        MonsterDiseaseSystem.addOrIntensify(diseaseMonster, 'adiposeFever', 0.82, 3);
+        AddRegressionResult(results, 'Disease effect layer can incapacitate and block breeding/deployment', MonsterDiseaseSystem.combinedEffects(diseaseMonster).incapacitated && diseaseMonster.getDeploymentBlockReason().indexOf('Incapacitated') >= 0 && diseaseMonster.getBreedingBlockReason().indexOf('infertile') >= 0, 'effects=' + JSON.stringify(MonsterDiseaseSystem.combinedEffects(diseaseMonster)));
 
         function makeColourRegressionWorld(terrainType) {
             return { terrainGrid: { rows: 9, cols: 9, getTerrainTypeAtTile: function () { return terrainType; } } };
@@ -9405,7 +10053,11 @@ button:hover { background: #ffd768; }
         var bought=monster.foodBoughtThisSeason||0;
         var baseCost=monster.foodBoughtCostCreditsThisSeason||0;
         var requirement=monster.nutritionRequirement||10;
-        return (monster.nutritionState||'Nourished')+' | food '+FormatNumber(eaten+bought)+'/'+FormatNumber(requirement)+' (raid '+FormatNumber(eaten)+', base '+FormatNumber(bought)+', cost '+FormatNumber(baseCost)+')';
+        var fat=monster.fatStorage!==undefined?' | fat '+FormatFixed(monster.fatStorage,1):'';
+        var heat=monster.thermalState&&monster.thermalState!=='comfortable'?' | '+monster.thermalState+' '+FormatFixed(monster.thermalStress||0,1):'';
+        var healing=monster.healingFoodRequirementThisSeason?' | healing food '+FormatNumber(monster.healingFoodRequirementThisSeason):'';
+        var disease=(monster.diseases&&monster.diseases.length)?' | disease '+monster.diseases.map(function(d){ return d.displayName; }).join(', '):'';
+        return (monster.nutritionState||'Nourished')+' | food '+FormatNumber(eaten+bought)+'/'+FormatNumber(requirement)+' (raid '+FormatNumber(eaten)+', base '+FormatNumber(bought)+', cost '+FormatNumber(baseCost)+')'+fat+heat+healing+disease;
     }
     function GetFoodShortfall(monster){
         return monster&&monster.nutritionShortfallThisSeason ? monster.nutritionShortfallThisSeason : 0;
@@ -9450,6 +10102,19 @@ button:hover { background: #ffd768; }
         var n=s&&s.seasonNumber?s.seasonNumber:1;
         var names=['winter','spring','summer','autumn'];
         return names[((n-1)%4+4)%4];
+    }
+    function TemperatureForSnapshot(s){
+        if(s&&Number.isFinite(s.currentSeasonTemperatureC)){ return s.currentSeasonTemperatureC; }
+        if(s&&s.world&&Number.isFinite(s.world.currentSeasonTemperatureC)){ return s.world.currentSeasonTemperatureC; }
+        var environment=s&&s.world&&s.world.environment?s.world.environment:null;
+        if(environment&&Number.isFinite(environment.meanAnnualTemperatureC)){
+            var amplitude=Number.isFinite(environment.seasonalTemperatureAmplitudeC)?environment.seasonalTemperatureAmplitudeC:8;
+            var seasonNumber=s&&s.seasonNumber?s.seasonNumber:1;
+            var seasonIndex=((seasonNumber-1)%4+4)%4;
+            var seasonalOffset=[-1,0.15,1,-0.10][seasonIndex]||0;
+            return Math.round((environment.meanAnnualTemperatureC+amplitude*seasonalOffset)*10)/10;
+        }
+        return 12;
     }
     function FormatEndOfRoundStats(s){
         var stats=s.campaignStats||{};
@@ -9511,6 +10176,7 @@ button:hover { background: #ffd768; }
             'Mode: '+mode,
             'Round: '+(s.roundNumber||1)+'  Season: '+s.seasonNumber+' ('+SeasonNameForSnapshot(s)+')',
             'Phase: '+(s.phase||'raid')+'  Paused: '+s.paused,
+            'Temperature: '+FormatFixed(TemperatureForSnapshot(s),1)+' C',
             'Result: '+s.raidResult,
             'Treasure deposits remaining: '+tr+' / '+s.treasures.length,
             'Active adventurers: '+adv,
@@ -9537,7 +10203,7 @@ button:hover { background: #ffd768; }
     function BuildManagementRenderKey(s, monsters){
         var eggs=(s.management&&s.management.eggs)||[];
         return [s.phase||'raid',s.seasonNumber,managementDrawerVisible?1:0].concat(monsters.map(function(monster){
-            return [monster.id,monster.name,monster.alive?1:0,monster.selectedForDeployment?1:0,monster.deployed?1:0,monster.capturedThisRaid?1:0,Math.round(monster.health),Math.round(monster.maxHealth),monster.nutritionState,monster.foodEatenThisSeason||0,monster.foodBoughtThisSeason||0,monster.foodBoughtCostCreditsThisSeason||0,monster.foodNeededThisSeason||0,monster.sex||'',monster.lifeStage||'',monster.ageCategory||'',Math.round((monster.ageFrailtyMultiplier||1)*100),Math.round((monster.seasonalOldAgeMortalityChance||0)*100),monster.canBreed?1:0,monster.canDeploy?1:0,monster.breedingHoldSeasonsRemaining||0,monster.juvenileMaturationSeasonsRemaining||0,(monster.lastSeasonPerformance&&monster.lastSeasonPerformance.timesSeen)||0,(monster.lastSeasonPerformance&&monster.lastSeasonPerformance.kills)||0,(monster.performanceTotals&&monster.performanceTotals.seasonsDeployed)||0].join(':');
+            return [monster.id,monster.name,monster.alive?1:0,monster.selectedForDeployment?1:0,monster.deployed?1:0,monster.capturedThisRaid?1:0,Math.round(monster.health),Math.round(monster.maxHealth),monster.nutritionState,monster.foodEatenThisSeason||0,monster.foodBoughtThisSeason||0,monster.foodBoughtCostCreditsThisSeason||0,monster.foodNeededThisSeason||0,Math.round((monster.fatStorage||0)*100),monster.healingFoodRequirementThisSeason||0,(monster.diseases&&monster.diseases.length)||0,monster.sex||'',monster.lifeStage||'',monster.ageCategory||'',Math.round((monster.ageFrailtyMultiplier||1)*100),Math.round((monster.seasonalOldAgeMortalityChance||0)*100),monster.canBreed?1:0,monster.canDeploy?1:0,monster.breedingHoldSeasonsRemaining||0,monster.juvenileMaturationSeasonsRemaining||0,(monster.lastSeasonPerformance&&monster.lastSeasonPerformance.timesSeen)||0,(monster.lastSeasonPerformance&&monster.lastSeasonPerformance.kills)||0,(monster.performanceTotals&&monster.performanceTotals.seasonsDeployed)||0].join(':');
         })).concat(eggs.map(function(brood){ return ['brood',brood.id,brood.motherId,brood.fatherId,brood.clutchSize,brood.incubationSeasonsRemaining].join(':'); })).join('|');
     }
     function MonsterColourPhenotype(monster){
@@ -9556,6 +10222,29 @@ button:hover { background: #ffd768; }
         var colour=MonsterColourPhenotype(monster);
         return colour.pattern&&colour.pattern.type==='stripes'&&colour.secondaryBodyColour&&colour.secondaryBodyColour!==colour.bodyColour;
     }
+    function MonsterFatMorphology(monster){
+        function LocalClamp(value,min,max){ return Math.max(min,Math.min(max,value)); }
+        var fat=monster&&Number.isFinite(monster.fatStorage)?monster.fatStorage:2.5;
+        // Plumpness is deliberately torso-only. Overall size is a separate future
+        // morphology. Fat therefore makes the body deeper and rounder, with only a
+        // small compensating change in body length; head, limbs, tail and spines
+        // keep their ordinary size and anchor positions.
+        var torsoLengthScale=LocalClamp(1 - Math.max(0,fat - 2.5) * 0.020 + Math.max(0,1.5 - fat) * 0.035,0.88,1.08);
+        var torsoDepthScale=LocalClamp(1 + (fat - 2.5) * 0.15,0.70,1.72);
+        var bellyDepthScale=LocalClamp(1 + (fat - 2.5) * 0.22,0.62,1.95);
+        return {
+            fatStorage: fat,
+            torsoLengthScale: torsoLengthScale,
+            torsoDepthScale: torsoDepthScale,
+            bellyDepthScale: bellyDepthScale,
+            bodyWidthScale: torsoLengthScale,
+            bodyHeightScale: torsoDepthScale,
+            headScale: 1,
+            legScale: 1,
+            spineScale: 1,
+            label: fat<1.2?'thin':(fat>5.2?'fat':'normal')
+        };
+    }
     function MonsterIconSvg(monster){
         var colour=MonsterColourPhenotype(monster);
         var body=monster.alive?colour.bodyColour:'#6b7280';
@@ -9564,17 +10253,23 @@ button:hover { background: #ffd768; }
         var dark=monster.alive?'#1f2730':'#374151';
         var collar=monster.collared?'#f2c14e':'transparent';
         var eye=monster.alive?'white':'#d1d5db';
+        var morphology=MonsterFatMorphology(monster);
+        var bodyTransform='translate(90 62) scale('+morphology.torsoLengthScale.toFixed(2)+' '+morphology.torsoDepthScale.toFixed(2)+') translate(-90 -62)';
         var stripes=MonsterColourIsStriped(monster)?'<path d="M54 48 L72 88 M82 36 L103 96 M112 40 L130 86" stroke="'+secondary+'" stroke-width="8" stroke-linecap="round" opacity="0.62"/>':'';
+        var diseaseTint=(monster.diseases&&monster.diseases.length)?'<circle cx="38" cy="34" r="7" fill="'+((monster.diseases[0].ui&&monster.diseases[0].ui.tint)||'#f87171')+'" opacity="0.75"/>':'';
         return '<svg viewBox="0 0 180 110" role="img" aria-label="Monster icon">'
             + '<ellipse cx="90" cy="82" rx="54" ry="11" fill="rgba(0,0,0,0.18)"/>'
+            + '<g transform="'+bodyTransform+'">'
             + '<path d="M35 66 C44 38 86 29 126 42 C150 50 157 74 139 84 C109 100 58 94 35 66 Z" fill="'+body+'" stroke="'+dark+'" stroke-width="4"/>'
             + stripes
+            + '</g>'
             + '<path d="M39 61 C22 56 16 45 15 37 C32 43 44 49 55 58 Z" fill="'+bodyDark+'" stroke="'+dark+'" stroke-width="3"/>'
             + '<path d="M122 42 C143 30 164 37 169 52 C154 50 141 54 130 64 Z" fill="'+body+'" stroke="'+dark+'" stroke-width="4"/>'
             + '<circle cx="144" cy="46" r="8" fill="'+eye+'"/><circle cx="147" cy="47" r="4" fill="'+dark+'"/>'
             + '<path d="M151 58 Q139 66 126 58" fill="none" stroke="'+dark+'" stroke-width="3" stroke-linecap="round"/>'
             + '<path d="M71 36 L77 18 L84 38 Z M98 35 L106 16 L112 40 Z" fill="#e6d8a9" stroke="'+dark+'" stroke-width="3"/>'
             + '<path d="M128 68 Q145 75 158 70" stroke="'+collar+'" stroke-width="7" stroke-linecap="round" fill="none"/>'
+            + diseaseTint
             + '</svg>';
     }
     function MonsterSexLabel(monster){
@@ -10852,18 +11547,19 @@ button:hover { background: #ffd768; }
     // ============================================================================
     // Draws current monster visuals. Future genotype-driven SVG/canvas appearance
     // should read phenotype data from snapshots rather than calculating gameplay.
-    function DrawMonsterLeg(hipX,hipY,side,phase,colour,outline,facing){
-        var stride=Math.sin(phase)*7;
-        var lift=Math.max(0,Math.cos(phase))*3.5;
+    function DrawMonsterLeg(hipX,hipY,side,phase,colour,outline,facing,scale){
+        scale=scale||1;
+        var stride=Math.sin(phase)*7*scale;
+        var lift=Math.max(0,Math.cos(phase))*3.5*scale;
         var lateralX=facing.lateralX;
         var lateralY=facing.lateralY*0.35;
         var forwardX=facing.facingX;
         var forwardY=facing.facingY*0.35;
         var kneeX=hipX+lateralX*side*2+forwardX*stride*0.35;
-        var kneeY=hipY+10-lift+forwardY*stride*0.2;
-        var footX=hipX+lateralX*side*6+forwardX*stride;
-        var footY=hipY+22-lift*0.2+forwardY*stride*0.35;
-        DrawSegmentedLimb(hipX,hipY,kneeX,kneeY,footX,footY,7,4,colour,outline);
+        var kneeY=hipY+10*scale-lift+forwardY*stride*0.2;
+        var footX=hipX+lateralX*side*6*scale+forwardX*stride;
+        var footY=hipY+22*scale-lift*0.2+forwardY*stride*0.35;
+        DrawSegmentedLimb(hipX,hipY,kneeX,kneeY,footX,footY,7*scale,4*scale,colour,outline);
         DrawClaw(footX,footY,side>=0?1:-1);
     }
     function DrawMonster(m,now){
@@ -10896,6 +11592,10 @@ button:hover { background: #ffd768; }
         var snoutColour=phenotypeColour.snoutColour||'#7d3f98';
         var spineColour=phenotypeColour.spineColour||'#5b216e';
         var showStripes=MonsterColourIsStriped(m);
+        var morphology=MonsterFatMorphology(m);
+        var torsoLengthScale=morphology.torsoLengthScale||1;
+        var torsoDepthScale=morphology.torsoDepthScale||1;
+        var bellyDepthScale=morphology.bellyDepthScale||torsoDepthScale;
         var fx=facing.facingX;
         var fy=facing.facingY*0.45;
         var len=Math.hypot(fx,fy);
@@ -10936,12 +11636,12 @@ button:hover { background: #ffd768; }
         ctx.strokeStyle=dark;
         ctx.lineWidth=2.5;
         ctx.beginPath();
-        ctx.ellipse(0,-34,32+breathe,19+breathe*0.3,rot,0,Math.PI*2);
+        ctx.ellipse(0,-34,(32+breathe)*torsoLengthScale,(19+breathe*0.3)*torsoDepthScale,rot,0,Math.PI*2);
         ctx.fill();
         ctx.stroke();
         ctx.fillStyle=body;
         ctx.beginPath();
-        ctx.ellipse(-fx*4,-38-fy*2,28+breathe,16+breathe*0.25,rot,0,Math.PI*2);
+        ctx.ellipse(-fx*4,-38-fy*2,(28+breathe)*torsoLengthScale,(16+breathe*0.25)*torsoDepthScale,rot,0,Math.PI*2);
         ctx.fill();
         if(showStripes){
             ctx.save();
@@ -10958,7 +11658,7 @@ button:hover { background: #ffd768; }
         }
         ctx.fillStyle=belly;
         ctx.beginPath();
-        ctx.ellipse(-fx*4,-31,15,7,rot,0,Math.PI*2);
+        ctx.ellipse(-fx*4,-31,15*torsoLengthScale,7*bellyDepthScale,rot,0,Math.PI*2);
         ctx.fill();
         DrawMonsterLeg(-fx*8-lx*14,-24-ly*4,-1,walk,body,dark,facing);
         DrawMonsterLeg(fx*16+lx*14,-24+ly*4,1,walk+Math.PI,body,dark,facing);
@@ -11056,8 +11756,16 @@ else {
         if(hurtRatio<0.35){
             ctx.fillStyle='rgba(190,39,39,0.18)';
             ctx.beginPath();
-            ctx.ellipse(0,-34,33,20,rot,0,Math.PI*2);
+            ctx.ellipse(0,-34,33*torsoLengthScale,20*torsoDepthScale,rot,0,Math.PI*2);
             ctx.fill();
+        }
+        if(m.diseases&&m.diseases.length){
+            ctx.fillStyle=(m.diseases[0].ui&&m.diseases[0].ui.tint)||'rgba(248,113,113,0.30)';
+            ctx.globalAlpha*=0.20;
+            ctx.beginPath();
+            ctx.ellipse(0,-34,36*torsoLengthScale,22*torsoDepthScale,rot,0,Math.PI*2);
+            ctx.fill();
+            ctx.globalAlpha=!m.alive?0.25:!m.deployed?0.55:1;
         }
         DrawHealthBar({
             x:0,y:-82
