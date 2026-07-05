@@ -73,6 +73,12 @@ button:hover { background: #ffd768; }
 .breedingPanel button { width: 100%; margin-top: 0.2rem; }
 .breedingStatus { font-size: 0.84rem; color: #526052; }
 .breedingBlocked { color: #9f4211; font-weight: 700; }
+.familyPanel, .performancePanel { margin-top: 0.65rem; border-top: 1px solid #d8d0b8; padding-top: 0.6rem; }
+.familyPanel h4, .performancePanel h4 { margin: 0 0 0.35rem; font-size: 0.95rem; color: #394732; }
+.familyPanel p, .performancePanel p { margin: 0.25rem 0 0.45rem; font-size: 0.88rem; }
+.familyList { margin: 0.2rem 0 0; padding-left: 1.1rem; font-size: 0.87rem; }
+.familyList li { margin: 0.18rem 0; }
+.performanceMuted { color: #687068; }
 
 @media (max-width: 900px) { #managementBody { grid-template-columns: 1fr; } }
 .hint { margin: 0.5rem 0 0; color: #526052; }
@@ -5397,7 +5403,46 @@ button:hover { background: #ffd768; }
             this.adultBaseSpeed = this.speed;
             this.ageFrailtyMultiplier = 1;
             this.ageCategory = 'adult';
+            this.performanceTotals = options && options.performanceTotals ? Monster.clonePerformanceStats(options.performanceTotals) : Monster.emptyPerformanceTotals();
+            this.currentSeasonPerformance = Monster.emptySeasonPerformance(null);
+            this.lastSeasonPerformance = options && options.lastSeasonPerformance ? Monster.clonePerformanceStats(options.lastSeasonPerformance) : null;
             this.applyAgeEffects();
+        }
+
+        static emptySeasonPerformance(seasonNumber) {
+            return {
+                seasonNumber: seasonNumber,
+                deployed: false,
+                timesSeen: 0,
+                firstSeenDistance: null,
+                closestSeenDistance: null,
+                attacksMade: 0,
+                kills: 0,
+                damageDealt: 0,
+                damageTaken: 0,
+                survived: true
+            };
+        }
+
+        static emptyPerformanceTotals() {
+            return {
+                seasonsDeployed: 0,
+                timesSeen: 0,
+                attacksMade: 0,
+                kills: 0,
+                damageDealt: 0,
+                damageTaken: 0,
+                deaths: 0
+            };
+        }
+
+        static clonePerformanceStats(stats) {
+            var clone = {};
+            if (!stats) { return clone; }
+            Object.keys(stats).forEach(function (key) {
+                clone[key] = stats[key];
+            });
+            return clone;
         }
 
         static randomName(rng) {
@@ -5551,6 +5596,62 @@ button:hover { background: #ffd768; }
             this.wildExitTargetY = null;
             return true;
         }
+        beginRaidPerformance(seasonNumber) {
+            this.currentSeasonPerformance = Monster.emptySeasonPerformance(seasonNumber);
+            this.currentSeasonPerformance.deployed = !!this.deployed;
+            this.currentSeasonPerformance.startingHealth = this.health;
+        }
+
+        recordSightedByAdventurer(distance) {
+            if (!this.currentSeasonPerformance) {
+                this.currentSeasonPerformance = Monster.emptySeasonPerformance(null);
+            }
+            this.currentSeasonPerformance.timesSeen += 1;
+            if (!Number.isFinite(this.currentSeasonPerformance.firstSeenDistance)) {
+                this.currentSeasonPerformance.firstSeenDistance = distance;
+            }
+            if (!Number.isFinite(this.currentSeasonPerformance.closestSeenDistance) || distance < this.currentSeasonPerformance.closestSeenDistance) {
+                this.currentSeasonPerformance.closestSeenDistance = distance;
+            }
+        }
+
+        recordAttackPerformance(damageDealt, killed) {
+            if (!this.currentSeasonPerformance) {
+                this.currentSeasonPerformance = Monster.emptySeasonPerformance(null);
+            }
+            this.currentSeasonPerformance.attacksMade += 1;
+            this.currentSeasonPerformance.damageDealt += Math.max(0, damageDealt || 0);
+            if (killed) {
+                this.currentSeasonPerformance.kills += 1;
+            }
+        }
+
+        recordDamageTaken(amount) {
+            if (!this.currentSeasonPerformance) {
+                this.currentSeasonPerformance = Monster.emptySeasonPerformance(null);
+            }
+            this.currentSeasonPerformance.damageTaken += Math.max(0, amount || 0);
+        }
+
+        finishRaidPerformance() {
+            if (!this.currentSeasonPerformance) {
+                return;
+            }
+            this.currentSeasonPerformance.survived = !!this.alive;
+            this.lastSeasonPerformance = Monster.clonePerformanceStats(this.currentSeasonPerformance);
+            if (this.currentSeasonPerformance.deployed) {
+                this.performanceTotals.seasonsDeployed += 1;
+            }
+            this.performanceTotals.timesSeen += this.currentSeasonPerformance.timesSeen || 0;
+            this.performanceTotals.attacksMade += this.currentSeasonPerformance.attacksMade || 0;
+            this.performanceTotals.kills += this.currentSeasonPerformance.kills || 0;
+            this.performanceTotals.damageDealt += this.currentSeasonPerformance.damageDealt || 0;
+            this.performanceTotals.damageTaken += this.currentSeasonPerformance.damageTaken || 0;
+            if (!this.alive) {
+                this.performanceTotals.deaths += 1;
+            }
+        }
+
         getAgeCategory() {
             if (this.lifeStage === MONSTER_LIFE_STAGE.JUVENILE) {
                 return 'juvenile';
@@ -5900,8 +6001,10 @@ button:hover { background: #ffd768; }
         }
 
         applyDamage(amount, rng, raid, attacker) {
+            var healthBeforeDamage = this.health;
             this.bodyHealth.applyGeneralDamage(amount, rng);
             this.health = this.bodyHealth.total();
+            this.recordDamageTaken(Math.max(0, healthBeforeDamage - this.health));
             if (raid) {
                 raid.addSound('monsterInjured', attacker || this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS, {
                     victimId: this.id,
@@ -5967,6 +6070,9 @@ button:hover { background: #ffd768; }
             s.ageCategory = this.ageCategory || this.getAgeCategory();
             s.ageFrailtyMultiplier = this.ageFrailtyMultiplier || this.getAgeFrailtyMultiplier();
             s.seasonalOldAgeMortalityChance = this.getOldAgeMortalityChance();
+            s.performanceTotals = Monster.clonePerformanceStats(this.performanceTotals);
+            s.currentSeasonPerformance = Monster.clonePerformanceStats(this.currentSeasonPerformance);
+            s.lastSeasonPerformance = this.lastSeasonPerformance ? Monster.clonePerformanceStats(this.lastSeasonPerformance) : null;
             return s;
         }
     }
@@ -6524,6 +6630,7 @@ button:hover { background: #ffd768; }
             this.previousRemains = previousRemains ? previousRemains.slice(0) : [];
             this.soundEvents = [];
             this.nextSoundEventId = 1;
+            this.monsterSightedByAdventurerKeys = {};
             this.gameState.getLivingOwnedMonsters().forEach(function (monster) {
                 NutritionSystem.resetSeasonNutrition(monster);
             });
@@ -6534,6 +6641,9 @@ button:hover { background: #ffd768; }
             this.pendingWildMonsters = this.createWildMonsters();
             this.monsters = gameState.ownedMonsters.concat(this.wildMonsters);
             this.deploySelectedOwnedMonsters();
+            this.gameState.getLivingOwnedMonsters().forEach(function (monster) {
+                monster.beginRaidPerformance(this.seasonNumber);
+            }, this);
             this.droppedTreasure = [];
             this.nextDroppedTreasureId = 1;
             this.thrownProjectiles = [];
@@ -7180,6 +7290,24 @@ button:hover { background: #ffd768; }
             return adventurer.canSee(this.world, target);
         }
 
+        recordMonsterSightedByAdventurer(monster, adventurer, distance) {
+            if (!monster || !adventurer || !monster.owned) {
+                return;
+            }
+            var key = adventurer.id + '|' + monster.id;
+            if (this.monsterSightedByAdventurerKeys[key]) {
+                return;
+            }
+            this.monsterSightedByAdventurerKeys[key] = true;
+            monster.recordSightedByAdventurer(distance);
+        }
+
+        finalizeOwnedMonsterPerformance() {
+            this.gameState.ownedMonsters.forEach(function (monster) {
+                monster.finishRaidPerformance();
+            });
+        }
+
         findNearestVisibleMonster(adventurer) {
             var best = null;
             var bestDistance = Infinity;
@@ -7190,6 +7318,7 @@ button:hover { background: #ffd768; }
                 }
                 var distance = adventurer.distanceTo(monster);
                 if (distance < bestDistance && adventurer.canSee(this.world, monster)) {
+                    this.recordMonsterSightedByAdventurer(monster, adventurer, distance);
                     best = monster;
                     bestDistance = distance;
                 }
@@ -7487,7 +7616,10 @@ button:hover { background: #ffd768; }
 
                         if (this.rng.nextFloat() <= 0.82) {
                             this.addSound('monsterAttack', monster, monster.x, monster.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
+                            var adventurerHealthBefore = adventurer.health;
+                            var adventurerWasAlive = adventurer.isActive();
                             var part = adventurer.applyDamage(this.rng.integer(18, 34), this.rng, this, monster);
+                            monster.recordAttackPerformance(Math.max(0, adventurerHealthBefore - adventurer.health), adventurerWasAlive && !adventurer.isActive());
                             adventurer.behaviourState = 'takingDamage';
                             this.addEvent(monster.name + ' hit a ' + adventurer.displayName + ' in the ' + part + '.');
                         }
@@ -7514,7 +7646,10 @@ button:hover { background: #ffd768; }
                         if (monster.attackCooldownTicks <= 0) {
                             monster.attackCooldownTicks = COMBAT_COOLDOWN_TICKS;
                             this.addSound('monsterAttack', monster, monster.x, monster.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
+                            var animalHealthBefore = animal.health;
+                            var animalWasAlive = animal.isActive();
                             animal.applyDamage(this.rng.integer(18, 32), this, monster);
+                            monster.recordAttackPerformance(Math.max(0, animalHealthBefore - animal.health), animalWasAlive && !animal.isActive());
                             this.addEvent(monster.name + ' attacked a ' + animal.displayName + '.');
                             if (!animal.alive) {
                                 this.addEvent('A ' + animal.displayName + ' was killed and became edible carrion.');
@@ -7867,6 +8002,7 @@ button:hover { background: #ffd768; }
             nutritionResult.events.forEach(function (eventText) {
                 this.pendingEvents.push({ tickNumber: finishedTickNumber, text: eventText });
             }, this);
+            this.currentRaid.finalizeOwnedMonsterPerformance();
             var lifecycleResult = this.gameState.advanceLifecycleAfterSeason(this.currentRaid.rng, this.world, this.seasonNumber);
             lifecycleResult.events.forEach(function (eventText) {
                 this.pendingEvents.push({ tickNumber: finishedTickNumber, text: eventText });
@@ -8263,6 +8399,21 @@ button:hover { background: #ffd768; }
         var senescentMonster = new Monster('senescent_regression', RIGHT_EDGE_X, 220, new SeededRng(7111), { owned: true, sex: MONSTER_SEX.FEMALE, world: breedingWorld, name: 'Senescent', ageInSeasons: MONSTER_SENESCENT_START_SEASONS + 8 });
         senescentMonster.applyAgeEffects();
         AddRegressionResult(results, 'Senescent monsters carry a substantial but non-certain old-age mortality risk', senescentMonster.getOldAgeMortalityChance() > 0.35 && senescentMonster.getOldAgeMortalityChance() < 0.60, 'risk=' + senescentMonster.getOldAgeMortalityChance().toFixed(3));
+        var performanceMonster = new Monster('performance_regression', RIGHT_EDGE_X, 260, new SeededRng(7112), { owned: true, sex: MONSTER_SEX.MALE, world: breedingWorld, name: 'Performer' });
+        performanceMonster.deployed = true;
+        performanceMonster.beginRaidPerformance(3);
+        performanceMonster.recordSightedByAdventurer(900);
+        performanceMonster.recordSightedByAdventurer(420);
+        performanceMonster.recordAttackPerformance(21, true);
+        performanceMonster.recordDamageTaken(7);
+        performanceMonster.finishRaidPerformance();
+        AddRegressionResult(results, 'Monster performance stats preserve sightings, combat and lifetime totals', performanceMonster.lastSeasonPerformance.timesSeen === 2 && performanceMonster.lastSeasonPerformance.firstSeenDistance === 900 && performanceMonster.lastSeasonPerformance.closestSeenDistance === 420 && performanceMonster.performanceTotals.kills === 1 && performanceMonster.performanceTotals.damageTaken === 7, 'last=' + JSON.stringify(performanceMonster.lastSeasonPerformance) + ', totals=' + JSON.stringify(performanceMonster.performanceTotals));
+        var familyMother = new Monster('family_mother', RIGHT_EDGE_X, 270, new SeededRng(7113), { owned: true, sex: MONSTER_SEX.FEMALE, world: breedingWorld, name: 'Mother' });
+        var familyFather = new Monster('family_father', RIGHT_EDGE_X, 280, new SeededRng(7114), { owned: true, sex: MONSTER_SEX.MALE, world: breedingWorld, name: 'Father' });
+        var familyChild = new Monster('family_child', RIGHT_EDGE_X, 290, new SeededRng(7115), { owned: true, sex: MONSTER_SEX.FEMALE, world: breedingWorld, name: 'Child', motherId: familyMother.id, fatherId: familyFather.id });
+        var familySnapshots = [familyMother.getSnapshot(), familyFather.getSnapshot(), familyChild.getSnapshot()];
+        var offspringCount = familySnapshots.filter(function (candidate) { return candidate.motherId === familyMother.id || candidate.fatherId === familyMother.id; }).length;
+        AddRegressionResult(results, 'Family data identifies known offspring for base UI', offspringCount === 1, 'offspring=' + offspringCount);
 
         var session = new GameSession(24681012, { mode: 'quick', worldOptions: { mapSizeKey: 'legacy' } });
         session.startSeason();
@@ -9316,7 +9467,7 @@ button:hover { background: #ffd768; }
     function BuildManagementRenderKey(s, monsters){
         var eggs=(s.management&&s.management.eggs)||[];
         return [s.phase||'raid',s.seasonNumber,managementDrawerVisible?1:0].concat(monsters.map(function(monster){
-            return [monster.id,monster.name,monster.alive?1:0,monster.selectedForDeployment?1:0,monster.deployed?1:0,monster.capturedThisRaid?1:0,Math.round(monster.health),Math.round(monster.maxHealth),monster.nutritionState,monster.foodEatenThisSeason||0,monster.foodBoughtThisSeason||0,monster.foodBoughtCostCreditsThisSeason||0,monster.foodNeededThisSeason||0,monster.sex||'',monster.lifeStage||'',monster.ageCategory||'',Math.round((monster.ageFrailtyMultiplier||1)*100),Math.round((monster.seasonalOldAgeMortalityChance||0)*100),monster.canBreed?1:0,monster.canDeploy?1:0,monster.breedingHoldSeasonsRemaining||0,monster.juvenileMaturationSeasonsRemaining||0].join(':');
+            return [monster.id,monster.name,monster.alive?1:0,monster.selectedForDeployment?1:0,monster.deployed?1:0,monster.capturedThisRaid?1:0,Math.round(monster.health),Math.round(monster.maxHealth),monster.nutritionState,monster.foodEatenThisSeason||0,monster.foodBoughtThisSeason||0,monster.foodBoughtCostCreditsThisSeason||0,monster.foodNeededThisSeason||0,monster.sex||'',monster.lifeStage||'',monster.ageCategory||'',Math.round((monster.ageFrailtyMultiplier||1)*100),Math.round((monster.seasonalOldAgeMortalityChance||0)*100),monster.canBreed?1:0,monster.canDeploy?1:0,monster.breedingHoldSeasonsRemaining||0,monster.juvenileMaturationSeasonsRemaining||0,(monster.lastSeasonPerformance&&monster.lastSeasonPerformance.timesSeen)||0,(monster.lastSeasonPerformance&&monster.lastSeasonPerformance.kills)||0,(monster.performanceTotals&&monster.performanceTotals.seasonsDeployed)||0].join(':');
         })).concat(eggs.map(function(brood){ return ['brood',brood.id,brood.motherId,brood.fatherId,brood.clutchSize,brood.incubationSeasonsRemaining].join(':'); })).join('|');
     }
     function MonsterColourPhenotype(monster){
@@ -9398,6 +9549,83 @@ button:hover { background: #ffd768; }
         }
         return 'mother: '+parentLabel(monster.motherId,monster.motherName)+', father: '+parentLabel(monster.fatherId,monster.fatherName);
     }
+    function MonsterPerformanceBrief(monster){
+        if(!monster){ return 'untested'; }
+        var last=monster.lastSeasonPerformance;
+        if(!last||!last.deployed){ return 'untested'; }
+        var parts=[];
+        parts.push('seen '+(last.timesSeen||0));
+        if(Number.isFinite(last.firstSeenDistance)){ parts.push('spotted at distance '+Math.round(last.firstSeenDistance)); }
+        if(last.kills){ parts.push('kills '+last.kills); }
+        if(last.damageTaken){ parts.push('damage '+Math.round(last.damageTaken)); }
+        return parts.join(', ');
+    }
+    function MonsterPerformanceLong(monster){
+        if(!monster){ return ['No monster selected.']; }
+        var lines=[];
+        var last=monster.lastSeasonPerformance;
+        if(last&&last.deployed){
+            var lastLine='Last deployed season: seen by '+(last.timesSeen||0)+' adventurer'+((last.timesSeen||0)===1?'':'s');
+            if(Number.isFinite(last.firstSeenDistance)){ lastLine+=', first spotted at '+Math.round(last.firstSeenDistance); }
+            if(Number.isFinite(last.closestSeenDistance)){ lastLine+=', closest sighting '+Math.round(last.closestSeenDistance); }
+            lastLine+=', attacks '+(last.attacksMade||0)+', kills '+(last.kills||0)+', damage dealt '+Math.round(last.damageDealt||0)+', damage taken '+Math.round(last.damageTaken||0)+'.';
+            lines.push(lastLine);
+        }else{
+            lines.push('Last deployed season: untested.');
+        }
+        var totals=monster.performanceTotals||{};
+        lines.push('Lifetime observed: '+(totals.seasonsDeployed||0)+' deployed season'+((totals.seasonsDeployed||0)===1?'':'s')+', seen '+(totals.timesSeen||0)+', attacks '+(totals.attacksMade||0)+', kills '+(totals.kills||0)+', damage dealt '+Math.round(totals.damageDealt||0)+', damage taken '+Math.round(totals.damageTaken||0)+'.');
+        return lines;
+    }
+    function MonsterFamilyLists(monster, monsters){
+        monsters=monsters||[];
+        var offspring=monsters.filter(function(candidate){ return candidate.motherId===monster.id||candidate.fatherId===monster.id; });
+        var siblings=monsters.filter(function(candidate){
+            if(candidate.id===monster.id){ return false; }
+            if(!monster.motherId&&!monster.fatherId){ return false; }
+            return (monster.motherId&&candidate.motherId===monster.motherId)||(monster.fatherId&&candidate.fatherId===monster.fatherId);
+        });
+        return { offspring: offspring, siblings: siblings };
+    }
+    function RenderMonsterFamilyPanel(monster, monsters){
+        var family=MonsterFamilyLists(monster,monsters);
+        if(family.offspring.length===0&&family.siblings.length===0){ return; }
+        var panel=document.createElement('div');
+        panel.className='familyPanel';
+        var heading=document.createElement('h4');
+        heading.textContent='Known family';
+        panel.appendChild(heading);
+        function addList(title, members){
+            var label=document.createElement('p');
+            label.textContent=title+':';
+            panel.appendChild(label);
+            var list=document.createElement('ul');
+            list.className='familyList';
+            members.forEach(function(member){
+                var item=document.createElement('li');
+                item.textContent=member.name+' - '+MonsterSexLabel(member)+', '+MonsterLifeStageLabel(member)+', '+MonsterAgeLabel(member)+'; '+MonsterPerformanceBrief(member);
+                list.appendChild(item);
+            });
+            panel.appendChild(list);
+        }
+        if(family.offspring.length>0){ addList('Offspring',family.offspring); }
+        if(family.siblings.length>0){ addList('Siblings',family.siblings); }
+        selectedMonsterPanel.appendChild(panel);
+    }
+    function RenderMonsterPerformancePanel(monster){
+        var panel=document.createElement('div');
+        panel.className='performancePanel';
+        var heading=document.createElement('h4');
+        heading.textContent='Observed performance';
+        panel.appendChild(heading);
+        MonsterPerformanceLong(monster).forEach(function(line){
+            var p=document.createElement('p');
+            p.textContent=line;
+            if(line.indexOf('untested')>=0){ p.className='performanceMuted'; }
+            panel.appendChild(p);
+        });
+        selectedMonsterPanel.appendChild(panel);
+    }
     function RenderBreedingPanel(monster){
         var s=currentSnapshot||latestSnapshot;
         if(!s||s.phase==='raid'){
@@ -9451,7 +9679,7 @@ button:hover { background: #ffd768; }
         eligiblePartners.forEach(function(partner){
             var option=document.createElement('option');
             option.value=partner.id;
-            option.textContent=partner.name+' - '+MonsterSexLabel(partner)+', '+MonsterLifeStageLabel(partner)+', '+MonsterAgeLabel(partner);
+            option.textContent=partner.name+' - '+MonsterSexLabel(partner)+', '+MonsterLifeStageLabel(partner)+', '+MonsterAgeLabel(partner)+'; '+MonsterPerformanceBrief(partner);
             select.appendChild(option);
         });
         var button=document.createElement('button');
@@ -9491,7 +9719,7 @@ button:hover { background: #ffd768; }
         var visibleColour=MonsterColourPhenotype(monster);
         var managementSnapshot=currentSnapshot&&currentSnapshot.management?currentSnapshot.management:null;
         var managementMonsters=managementSnapshot&&managementSnapshot.ownedMonsters?managementSnapshot.ownedMonsters:[];
-        detailRows=detailRows.concat([['Visible colour',visibleColour.pattern&&visibleColour.pattern.type==='stripes'?'striped':'solid'],['Sex',MonsterSexLabel(monster)],['Age',MonsterAgeLabel(monster)],['Life stage',MonsterLifeStageLabel(monster)],['Parentage',MonsterParentageLabel(monster,managementMonsters)],['Age effects',MonsterAgeEffectLabel(monster)],['Breeding',monster.canBreed?'available':(monster.breedingBlockReason||'unavailable')],['Collar',monster.collared?'Collared':'Uncollared'],['Raid state',monster.deployed?'Deployed':'In cage'],['Season order',monster.selectedForDeployment?'Deploy at start':'Reserve'],['Origin',monster.capturedThisRaid?'Captured wild monster':'Captive monsters']]);
+        detailRows=detailRows.concat([['Visible colour',visibleColour.pattern&&visibleColour.pattern.type==='stripes'?'striped':'solid'],['Sex',MonsterSexLabel(monster)],['Age',MonsterAgeLabel(monster)],['Life stage',MonsterLifeStageLabel(monster)],['Parentage',MonsterParentageLabel(monster,managementMonsters)],['Observed performance',MonsterPerformanceBrief(monster)],['Age effects',MonsterAgeEffectLabel(monster)],['Breeding',monster.canBreed?'available':(monster.breedingBlockReason||'unavailable')],['Collar',monster.collared?'Collared':'Uncollared'],['Raid state',monster.deployed?'Deployed':'In cage'],['Season order',monster.selectedForDeployment?'Deploy at start':'Reserve'],['Origin',monster.capturedThisRaid?'Captured wild monster':'Captive monsters']]);
         detailRows.forEach(function(row){
             var dt=document.createElement('dt');
             var dd=document.createElement('dd');
@@ -9507,6 +9735,8 @@ button:hover { background: #ffd768; }
         selectedMonsterPanel.appendChild(title);
         selectedMonsterPanel.appendChild(icon);
         selectedMonsterPanel.appendChild(details);
+        RenderMonsterPerformancePanel(monster);
+        RenderMonsterFamilyPanel(monster,managementMonsters);
         RenderBreedingPanel(monster);
     }
     function UpdateManagementDrawer(s){
@@ -11247,6 +11477,7 @@ else DrawGroundRemain(r.obj,r.obj.agentKind||'adventurer');
                 'Monster: '+MonsterDisplayName(o),
                 'Sex: '+MonsterSexLabel(o),
                 'Parentage: '+MonsterParentageLabel(o),
+                'Observed: '+MonsterPerformanceBrief(o),
                 'Health: '+Math.round(o.health)+' / '+Math.round(o.maxHealth),
                 'Nutrition: '+FormatNutritionLine(o),
                 'Season food requirement: '+FormatNumber(GetFoodRequirement(o)),
