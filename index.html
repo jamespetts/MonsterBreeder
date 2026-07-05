@@ -211,6 +211,7 @@ button:hover { background: #ffd768; }
     var WILD_MONSTER_SPAWN_GAP_MAX = 360;
     var OFF_MAP_ESCAPE_MARGIN = 90;
     var SEASONS_WITH_NO_RETURNING_ADVENTURERS_TO_WIN_ROUND = 4;
+    var SEASONS_WITH_NO_RETURNING_TREASURE_TO_WIN_ROUND = 12;
     var DEFAULT_MONSTER_NUTRITION_REQUIREMENT = 10;
     var DEFAULT_FOOD_COST_CREDITS = 1;
     var HUMAN_FOOD_VALUE = 1;
@@ -4312,7 +4313,7 @@ button:hover { background: #ffd768; }
                 this.carryingTreasure = true;
                 this.carryingTreasureType = treasure.treasureType;
                 this.behaviourState = 'pickingUpTreasure';
-                this.currentCourage = Clamp((this.currentCourage === undefined ? this.courage : this.currentCourage) + MORALE_TREASURE_SELF_BONUS, 0, 1.25);
+                this.currentCourage = Clamp((this.currentCourage === undefined ? this.courage : this.currentCourage) + MORALE_TREASURE_SELF_BONUS, 0, 1.75);
                 raid.addEvent('A ' + this.displayName + ' took ' + amount + ' units of ' + TREASURE_TYPES[treasure.treasureType].displayName + '.');
                 raid.addSound('treasureCollected', this, this.x, this.y, SOUND_LOUDNESS.LOUD, SOUND_DEFAULT_DURATION_TICKS);
             }
@@ -4387,7 +4388,7 @@ button:hover { background: #ffd768; }
             this.health = this.bodyHealth.total();
             this.lastDamagePart = part;
             this.lastDamageTick = raid ? raid.tickNumber : -1;
-            this.currentCourage = Clamp((this.currentCourage === undefined ? this.courage : this.currentCourage) - MORALE_INJURY_PENALTY, 0, 1.25);
+            this.currentCourage = Clamp((this.currentCourage === undefined ? this.courage : this.currentCourage) - MORALE_INJURY_PENALTY, 0, 1.75);
             if (raid) {
                 raid.addSound('adventurerInjured', attacker || this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS, {
                     victimId: this.id,
@@ -4812,14 +4813,14 @@ button:hover { background: #ffd768; }
             if (this.wildExitTargetX === null || this.wildExitTargetY === null) {
                 this.chooseWildExitTarget(raid.world, raid.rng);
             }
-            this.behaviourState = 'wanderingOff';
+            this.behaviourState = 'foragingForFauna';
             this.moveWithPath(raid.world, this.wildExitTargetX, this.wildExitTargetY, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT, this.id + '_wild_exit');
             if (this.hasReachedMapExitTarget(raid.world, this.wildExitTargetX, this.wildExitTargetY)) {
                 this.escaped = true;
                 this.deployed = false;
                 this.x = Clamp(this.x, 0, raid.world.width);
                 this.y = Clamp(this.y, 0, raid.world.height);
-                raid.addEvent('An uncollared wild monster wandered away from the map.');
+                raid.addEvent('An uncollared wild monster left the map while foraging.');
             }
         }
 
@@ -4831,7 +4832,7 @@ button:hover { background: #ffd768; }
         }
 
         continueDepartedMacrofaunaChase(raid, trail) {
-            this.behaviourState = 'pursuingFaunaOffMap';
+            this.behaviourState = 'stalking';
             this.moveWithPath(raid.world, trail.exitX, trail.exitY, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT, this.id + '_departed_' + trail.id);
             if (this.hasReachedMapExitTarget(raid.world, trail.exitX, trail.exitY)) {
                 this.escaped = true;
@@ -4858,10 +4859,10 @@ button:hover { background: #ffd768; }
             this.behaviourState = 'roaming';
             return true;
         }
-        enterWild(world, rng) {
-            this.enterWildFromEdge(world, rng);
+        enterWild(world, rng, preferredEdge) {
+            this.enterWildFromEdge(world, rng, preferredEdge);
         }
-        enterWildFromEdge(world, rng) {
+        enterWildFromEdge(world, rng, preferredEdge) {
             var possibleEdges = [];
 
             if (world.edgeHasOpenPoint(this, 'top')) {
@@ -4874,7 +4875,7 @@ button:hover { background: #ffd768; }
                 return false;
             }
 
-            var chosenEdge = rng.pick(possibleEdges);
+            var chosenEdge = preferredEdge && possibleEdges.indexOf(preferredEdge) >= 0 ? preferredEdge : rng.pick(possibleEdges);
             var point = world.findOpenEdgePoint(this, chosenEdge, rng, 120);
             if (!point) {
                 return false;
@@ -4887,8 +4888,9 @@ button:hover { background: #ffd768; }
             this.lastMovementSoundX = point.x;
             this.lastMovementSoundY = point.y;
             this.entryEdge = chosenEdge;
-            this.behaviourState = 'wildRoaming';
-            this.chooseWildExitTarget(world, rng);
+            this.behaviourState = 'foragingForFauna';
+            this.wildExitTargetX = null;
+            this.wildExitTargetY = null;
             return true;
         }
         capture(rng) {
@@ -4974,7 +4976,7 @@ button:hover { background: #ffd768; }
         }
 
         continueRoamingWithoutVisibleTarget(raid) {
-            if (!this.owned || this.recallRequested || this.canLeavePlayableArea()) {
+            if (this.recallRequested) {
                 return false;
             }
 
@@ -5018,10 +5020,10 @@ button:hover { background: #ffd768; }
             if (preyTarget) {
                 this.rememberMacrofaunaTarget(preyTarget, raid);
                 if (this.distanceTo(preyTarget) > MONSTER_ATTACK_RANGE) {
-                    this.behaviourState = 'huntingFauna';
+                    this.behaviourState = 'stalking';
                     this.moveWithPath(raid.world, preyTarget.x, preyTarget.y, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT, this.id + '_hunt_' + preyTarget.id);
                 } else {
-                    this.behaviourState = 'attackingFauna';
+                    this.behaviourState = 'attacking';
                 }
                 return;
             }
@@ -5034,11 +5036,6 @@ button:hover { background: #ffd768; }
                 }
             }
 
-            if (this.canLeavePlayableArea() && (this.behaviourState === 'wanderingOff' || raid.rng.nextFloat() < 0.0025)) {
-                this.moveWildOffMap(raid);
-                return;
-            }
-
             var target = this.chooseTarget(raid);
             if (!target) {
                 var heardSound = this.chooseHeardSoundTarget(raid);
@@ -5049,9 +5046,6 @@ button:hover { background: #ffd768; }
                 }
                 if (this.continueRoamingWithoutVisibleTarget(raid)) {
                     return;
-                }
-                if (this.canLeavePlayableArea()) {
-                    this.moveWildOffMap(raid);
                 }
                 return;
             }
@@ -6028,6 +6022,47 @@ button:hover { background: #ffd768; }
             return null;
         }
 
+        findMacrofaunaNearEntryEdge(edge) {
+            var edgeBand = 260;
+            var best = null;
+            var bestDistance = Infinity;
+            for (var i = 0; i < this.macrofauna.length; i += 1) {
+                var animal = this.macrofauna[i];
+                if (!animal.isActive()) {
+                    continue;
+                }
+                var distanceFromEdge = edge === 'top' ? animal.y : this.world.height - animal.y;
+                if (distanceFromEdge > edgeBand) {
+                    continue;
+                }
+                if (distanceFromEdge < bestDistance) {
+                    best = animal;
+                    bestDistance = distanceFromEdge;
+                }
+            }
+            return best;
+        }
+
+        findWildMonsterEntryContext(monster) {
+            var candidates = [];
+            if (this.world.edgeHasOpenPoint(monster, 'top')) {
+                var topPrey = this.findMacrofaunaNearEntryEdge('top');
+                if (topPrey) {
+                    candidates.push({ edge: 'top', prey: topPrey });
+                }
+            }
+            if (this.world.edgeHasOpenPoint(monster, 'bottom')) {
+                var bottomPrey = this.findMacrofaunaNearEntryEdge('bottom');
+                if (bottomPrey) {
+                    candidates.push({ edge: 'bottom', prey: bottomPrey });
+                }
+            }
+            if (candidates.length === 0) {
+                return null;
+            }
+            return this.rng.pick(candidates);
+        }
+
         spawnDueWildMonsters() {
             for (var i = this.pendingWildMonsters.length - 1; i >= 0; i -= 1) {
                 var monster = this.pendingWildMonsters[i];
@@ -6035,14 +6070,20 @@ button:hover { background: #ffd768; }
                     continue;
                 }
                 this.pendingWildMonsters.splice(i, 1);
-                if (!monster.enterWildFromEdge(this.world, this.rng)) {
+                var entryContext = this.findWildMonsterEntryContext(monster);
+                if (!monster.enterWildFromEdge(this.world, this.rng, entryContext ? entryContext.edge : null)) {
                     this.addEvent('A wild uncollared monster found no dry edge to enter from and stayed away.');
                     continue;
                 }
 
+                if (entryContext && entryContext.prey && monster.entryEdge === entryContext.edge) {
+                    monster.rememberMacrofaunaTarget(entryContext.prey, this);
+                    monster.behaviourState = 'stalking';
+                }
+
                 this.wildMonsters.push(monster);
                 this.monsters.push(monster);
-                this.addEvent('A wild uncollared monster wandered onto the map.');
+                this.addEvent(entryContext && entryContext.prey && monster.entryEdge === entryContext.edge ? 'A wild uncollared monster stalked macrofauna onto the map.' : 'A wild uncollared monster entered the map foraging.');
             }
         }
 
@@ -6215,11 +6256,11 @@ button:hover { background: #ffd768; }
 
 
         adjustAdventurerCourage(adventurer, amount) {
-            if (!adventurer) {
+            if (!adventurer || !Number.isFinite(amount) || amount === 0) {
                 return;
             }
             var base = adventurer.currentCourage === undefined ? adventurer.courage : adventurer.currentCourage;
-            adventurer.currentCourage = Clamp(base + amount, 0, 1.25);
+            adventurer.currentCourage = Clamp(base + amount, 0, 1.75);
         }
 
         adventurerClassRank(className) {
@@ -6835,6 +6876,7 @@ button:hover { background: #ffd768; }
             this.seasonNumber = 1;
             this.phase = 'management';
             this.consecutiveSeasonsWithNoReturningAdventurers = 0;
+            this.consecutiveSeasonsWithNoReturningTreasure = 0;
             this.roundEnded = false;
             this.roundResult = 'Round in progress';
             this.lastRaidSummary = null;
@@ -6971,12 +7013,21 @@ button:hover { background: #ffd768; }
                 this.consecutiveSeasonsWithNoReturningAdventurers = 0;
             }
 
+            if ((summary.adventurersEscapedWithTreasure || 0) <= 0) {
+                this.consecutiveSeasonsWithNoReturningTreasure += 1;
+            } else {
+                this.consecutiveSeasonsWithNoReturningTreasure = 0;
+            }
+
             if ((summary.treasureRemainingAfterFoodValue || 0) <= 0) {
                 this.roundEnded = true;
                 this.roundResult = 'Round lost: remaining treasure value after food costs is zero.';
             } else if (this.consecutiveSeasonsWithNoReturningAdventurers >= SEASONS_WITH_NO_RETURNING_ADVENTURERS_TO_WIN_ROUND) {
                 this.roundEnded = true;
                 this.roundResult = 'Round won: no adventurers returned alive for ' + SEASONS_WITH_NO_RETURNING_ADVENTURERS_TO_WIN_ROUND + ' consecutive seasons, so humans fear this place.';
+            } else if (this.consecutiveSeasonsWithNoReturningTreasure >= SEASONS_WITH_NO_RETURNING_TREASURE_TO_WIN_ROUND) {
+                this.roundEnded = true;
+                this.roundResult = 'Round won: no adventurers returned with treasure for ' + SEASONS_WITH_NO_RETURNING_TREASURE_TO_WIN_ROUND + ' consecutive seasons, so humans have abandoned this place.';
             } else {
                 this.roundEnded = false;
                 this.roundResult = 'Round in progress';
@@ -6988,6 +7039,7 @@ button:hover { background: #ffd768; }
             this.gameState.roundNumber = this.roundNumber;
             this.seasonNumber = 1;
             this.consecutiveSeasonsWithNoReturningAdventurers = 0;
+            this.consecutiveSeasonsWithNoReturningTreasure = 0;
             this.roundEnded = false;
             this.roundResult = 'Round in progress';
             this.lastRaidSummary = null;
@@ -7380,6 +7432,19 @@ button:hover { background: #ffd768; }
         }
         AddRegressionResult(results, 'Four consecutive seasons with no adventurers returning alive wins the round by fear', fearSession.roundEnded && fearSession.roundResult.indexOf('fear') >= 0, 'roundEnded=' + fearSession.roundEnded + ', result=' + fearSession.roundResult);
 
+        var noTreasureSession = new GameSession(24681, { mode: 'campaign', worldOptions: { mapSizeKey: 'legacy' } });
+        for (var noTreasureIndex = 0; noTreasureIndex < SEASONS_WITH_NO_RETURNING_TREASURE_TO_WIN_ROUND; noTreasureIndex += 1) {
+            noTreasureSession.applyRoundProgression({ noAdventurersReturnedAlive: false, adventurersEscapedWithTreasure: 0, treasureRemainingAfterFoodValue: 100 });
+        }
+        AddRegressionResult(results, 'Twelve consecutive seasons with no treasure returning wins the round by abandonment', noTreasureSession.roundEnded && noTreasureSession.roundResult.indexOf('no adventurers returned with treasure') >= 0, 'roundEnded=' + noTreasureSession.roundEnded + ', result=' + noTreasureSession.roundResult);
+
+        var treasureResetSession = new GameSession(24682, { mode: 'campaign', worldOptions: { mapSizeKey: 'legacy' } });
+        for (var noTreasureResetIndex = 0; noTreasureResetIndex < SEASONS_WITH_NO_RETURNING_TREASURE_TO_WIN_ROUND - 1; noTreasureResetIndex += 1) {
+            treasureResetSession.applyRoundProgression({ noAdventurersReturnedAlive: false, adventurersEscapedWithTreasure: 0, treasureRemainingAfterFoodValue: 100 });
+        }
+        treasureResetSession.applyRoundProgression({ noAdventurersReturnedAlive: false, adventurersEscapedWithTreasure: 1, treasureRemainingAfterFoodValue: 100 });
+        AddRegressionResult(results, 'A season with treasure returning resets the no-treasure win counter', !treasureResetSession.roundEnded && treasureResetSession.consecutiveSeasonsWithNoReturningTreasure === 0, 'roundEnded=' + treasureResetSession.roundEnded + ', counter=' + treasureResetSession.consecutiveSeasonsWithNoReturningTreasure);
+
         var lureSession = new GameSession(98765, { mode: 'campaign', worldOptions: { mapSizeKey: 'legacy' } });
         var baselinePressure = lureSession.currentRaid ? lureSession.currentRaid.getClassDeterrencePenalty() : (new Raid(lureSession.world, lureSession.gameState, 98766, 1)).getClassDeterrencePenalty();
         lureSession.gameState.campaignStats.roundHistory.push({
@@ -7681,6 +7746,27 @@ button:hover { background: #ffd768; }
         AddRegressionResult(results, 'Explorer movement is quieter than villager movement', soundRegressionRaid.agentMovementSoundLoudness(quietExplorer) < soundRegressionRaid.agentMovementSoundLoudness(normalVillager), 'explorer=' + soundRegressionRaid.agentMovementSoundLoudness(quietExplorer) + ', villager=' + soundRegressionRaid.agentMovementSoundLoudness(normalVillager));
         var soundTarget = hearingMonster.chooseHeardSoundTarget(soundRegressionRaid);
         AddRegressionResult(results, 'Monster can choose an audible non-visible sound target', soundTarget && soundTarget.kind === 'regressionLoud', 'target=' + (soundTarget ? soundTarget.kind : 'none'));
+        var wildEntryMonster = new Monster('wild_entry_state', 0, 0, new SeededRng(424260), { owned: false, collared: false, wild: true });
+        var wildEntered = wildEntryMonster.enterWildFromEdge(session.world, new SeededRng(424261));
+        AddRegressionResult(results, 'Uncollared wild monsters enter in foraging state unless following macrofauna', wildEntered && wildEntryMonster.behaviourState === 'foragingForFauna', 'entered=' + wildEntered + ', state=' + wildEntryMonster.behaviourState);
+        var wildForageRaid = new Raid(session.world, session.gameState, 424262, 1, []);
+        wildForageRaid.monsters = [wildEntryMonster];
+        wildForageRaid.adventurers = [];
+        wildForageRaid.macrofauna = [];
+        wildEntryMonster.update(wildForageRaid);
+        AddRegressionResult(results, 'Uncollared wild monsters forage rather than wandering off when no target is visible', wildEntryMonster.behaviourState === 'foragingForFauna', 'state=' + wildEntryMonster.behaviourState);
+        var wildStalker = new Monster('wild_stalker_state', 120, 120, new SeededRng(424263), { owned: false, collared: false, wild: true });
+        wildStalker.deployed = true;
+        wildStalker.nutritionStoredThisSeason = 0;
+        wildStalker.scentRange = 2000;
+        var stalkPrey = new Macrofauna('stalk_prey', 'deer', 150, 120, new SeededRng(424264));
+        stalkPrey.chooseWanderTarget(session.world, new SeededRng(424265));
+        var stalkRaid = new Raid(session.world, session.gameState, 424266, 1, []);
+        stalkRaid.monsters = [wildStalker];
+        stalkRaid.adventurers = [];
+        stalkRaid.macrofauna = [stalkPrey];
+        wildStalker.update(stalkRaid);
+        AddRegressionResult(results, 'Macrofauna pursuit uses the normal stalking state', wildStalker.behaviourState === 'stalking' || wildStalker.behaviourState === 'attacking', 'state=' + wildStalker.behaviourState);
 
         var failed = results.filter(function (result) { return !result.passed; });
         return { count: results.length, passed: failed.length === 0, failures: failed.length, results: results };
