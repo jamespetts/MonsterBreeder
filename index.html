@@ -233,6 +233,24 @@ button:hover { background: #ffd768; }
         STARVED: 'Starved'
     };
 
+    var SOUND_LOUDNESS = {
+        EXTREMELY_QUIET: 6000,
+        VERY_QUIET: 12000,
+        QUIET: 42000,
+        MODERATE: 95000,
+        MEDIUM: 180000,
+        LOUD: 650000,
+        VERY_LOUD: 1600000
+    };
+    var SOUND_DEFAULT_DURATION_TICKS = 90;
+    var SOUND_MOVEMENT_DURATION_TICKS = 26;
+    var SOUND_MOVEMENT_INTERVAL_TICKS = 18;
+    var SOUND_MOVEMENT_MIN_DISTANCE = 18;
+    var DEFAULT_HEARING_THRESHOLD = 0.16;
+    var DEFAULT_MONSTER_HEARING_THRESHOLD = 0.11;
+    var DEFAULT_ADVENTURER_HEARING_THRESHOLD = 0.20;
+    var SOUND_PROPAGATION_MULTIPLIER = 4;
+
     var TERRAIN_TYPE = {
         GRASS: 0,
         ROCKY: 1,
@@ -2518,7 +2536,10 @@ button:hover { background: #ffd768; }
                     if (!customPoint) { customPoint = WorldGenerator.findTreasurePoint(rng, grid, occupiedCustom, 100, true, adventurerEntryEdge); }
                     if (!customPoint) { customPoint = WorldGenerator.findTreasurePoint(rng, grid, occupiedCustom, 70, true, adventurerEntryEdge); }
                     if (!customPoint) {
-                        customPoint = WorldGenerator.fallbackTreasurePoint(customIndex, adventurerEntryEdge);
+                        customPoint = WorldGenerator.findValidatedFallbackTreasurePoint(grid, occupiedCustom, customIndex, adventurerEntryEdge);
+                    }
+                    if (!customPoint) {
+                        throw new Error('Could not place validated fallback treasure for ' + customType + '.');
                     }
                     deposits.push(new TreasureDeposit('treasure_' + (customIndex + 1), customPoint.x, customPoint.y, customType, Math.max(0, Math.floor(customAmounts[customType]))));
                 }
@@ -2569,86 +2590,147 @@ button:hover { background: #ffd768; }
                 if (!p) { p = WorldGenerator.findTreasurePoint(rng, grid, occupied, 100, true, adventurerEntryEdge); }
                 if (!p) { p = WorldGenerator.findTreasurePoint(rng, grid, occupied, 70, true, adventurerEntryEdge); }
                 if (!p) {
-                    p = WorldGenerator.fallbackTreasurePoint(i, adventurerEntryEdge);
+                    p = WorldGenerator.findValidatedFallbackTreasurePoint(grid, occupied, i, adventurerEntryEdge);
+                }
+                if (!p) {
+                    throw new Error('Could not place validated fallback treasure for ' + types[i] + '.');
                 }
                 deposits.push(new TreasureDeposit('treasure_' + (i + 1), p.x, p.y, types[i], rng.integer(amountMin, amountMax)));
             }
             return deposits;
         }
 
-        static treasureMinimumDistanceFromAdventurerEntry() {
-            return Math.min(MAP_WIDTH, MAP_HEIGHT) * TREASURE_MINIMUM_DISTANCE_FROM_ADVENTURER_ENTRY_FRACTION;
+        static mapWidthForGrid(grid) {
+            return grid && Number.isFinite(grid.width) ? grid.width : MAP_WIDTH;
         }
 
-        static treasureDeepPlacementBoundary() {
-            return Math.min(MAP_WIDTH, MAP_HEIGHT) * TREASURE_DEEP_PLACEMENT_FRACTION;
+        static mapHeightForGrid(grid) {
+            return grid && Number.isFinite(grid.height) ? grid.height : MAP_HEIGHT;
         }
 
-        static sampleTreasureDepthFromAdventurerEntry(rng, allowEdge) {
+        static treasureMinimumDistanceFromAdventurerEntry(grid) {
+            return Math.min(WorldGenerator.mapWidthForGrid(grid), WorldGenerator.mapHeightForGrid(grid)) * TREASURE_MINIMUM_DISTANCE_FROM_ADVENTURER_ENTRY_FRACTION;
+        }
+
+        static treasureDeepPlacementBoundary(grid) {
+            return Math.min(WorldGenerator.mapWidthForGrid(grid), WorldGenerator.mapHeightForGrid(grid)) * TREASURE_DEEP_PLACEMENT_FRACTION;
+        }
+
+        static sampleTreasureDepthFromAdventurerEntry(rng, allowEdge, grid) {
             var edgeMargin = allowEdge ? 80 : 150;
-            var mapDepth = Math.min(MAP_WIDTH, MAP_HEIGHT);
-            var nearLimit = Math.max(edgeMargin, WorldGenerator.treasureMinimumDistanceFromAdventurerEntry());
+            var mapDepth = Math.min(WorldGenerator.mapWidthForGrid(grid), WorldGenerator.mapHeightForGrid(grid));
+            var nearLimit = Math.max(edgeMargin, WorldGenerator.treasureMinimumDistanceFromAdventurerEntry(grid));
             var farLimit = Math.max(nearLimit, mapDepth - edgeMargin);
-            var deepBoundary = Clamp(WorldGenerator.treasureDeepPlacementBoundary(), nearLimit, farLimit);
+            var deepBoundary = Clamp(WorldGenerator.treasureDeepPlacementBoundary(grid), nearLimit, farLimit);
             if (deepBoundary > nearLimit && rng.nextFloat() < TREASURE_NEAR_HALF_PLACEMENT_CHANCE) {
                 return rng.range(nearLimit, deepBoundary);
             }
             return rng.range(deepBoundary, farLimit);
         }
 
-        static sampleTreasurePointFromAdventurerEntry(rng, allowEdge, adventurerEntryEdge) {
+        static sampleTreasurePointFromAdventurerEntry(rng, allowEdge, adventurerEntryEdge, grid) {
             var margin = allowEdge ? 80 : 150;
+            var width = WorldGenerator.mapWidthForGrid(grid);
+            var height = WorldGenerator.mapHeightForGrid(grid);
             var entryEdge = adventurerEntryEdge || DEFAULT_ADVENTURER_ENTRY_EDGE;
-            var depth = WorldGenerator.sampleTreasureDepthFromAdventurerEntry(rng, allowEdge);
+            var depth = WorldGenerator.sampleTreasureDepthFromAdventurerEntry(rng, allowEdge, grid);
             if (entryEdge === 'right') {
-                return { x: MAP_WIDTH - depth, y: rng.range(margin, MAP_HEIGHT - margin) };
+                return { x: width - depth, y: rng.range(margin, height - margin) };
             }
             if (entryEdge === 'top') {
-                return { x: rng.range(margin, MAP_WIDTH - margin), y: depth };
+                return { x: rng.range(margin, width - margin), y: depth };
             }
             if (entryEdge === 'bottom') {
-                return { x: rng.range(margin, MAP_WIDTH - margin), y: MAP_HEIGHT - depth };
+                return { x: rng.range(margin, width - margin), y: height - depth };
             }
-            return { x: depth, y: rng.range(margin, MAP_HEIGHT - margin) };
+            return { x: depth, y: rng.range(margin, height - margin) };
         }
 
         static sampleTreasureXFromAdventurerEntry(rng, allowEdge) {
             return WorldGenerator.sampleTreasurePointFromAdventurerEntry(rng, allowEdge, DEFAULT_ADVENTURER_ENTRY_EDGE).x;
         }
 
-        static distanceFromAdventurerEntryEdge(x, y, adventurerEntryEdge) {
-            if (adventurerEntryEdge === 'right') { return MAP_WIDTH - x; }
+        static distanceFromAdventurerEntryEdge(x, y, adventurerEntryEdge, grid) {
+            if (adventurerEntryEdge === 'right') { return WorldGenerator.mapWidthForGrid(grid) - x; }
             if (adventurerEntryEdge === 'top') { return y; }
-            if (adventurerEntryEdge === 'bottom') { return MAP_HEIGHT - y; }
+            if (adventurerEntryEdge === 'bottom') { return WorldGenerator.mapHeightForGrid(grid) - y; }
             return x;
         }
 
-        static fallbackTreasurePoint(index, adventurerEntryEdge) {
+        static fallbackTreasurePoint(index, adventurerEntryEdge, grid) {
             var entryEdge = adventurerEntryEdge || DEFAULT_ADVENTURER_ENTRY_EDGE;
-            var depth = WorldGenerator.treasureDeepPlacementBoundary() + 60 + index * 35;
+            var width = WorldGenerator.mapWidthForGrid(grid);
+            var height = WorldGenerator.mapHeightForGrid(grid);
+            var depth = WorldGenerator.treasureDeepPlacementBoundary(grid) + 60 + index * 35;
             var lateralFraction = 0.35 + 0.07 * index;
-            var lateralX = Clamp(MAP_WIDTH * lateralFraction, 150, MAP_WIDTH - 150);
-            var lateralY = Clamp(MAP_HEIGHT * lateralFraction, 150, MAP_HEIGHT - 150);
+            var lateralX = Clamp(width * lateralFraction, 150, width - 150);
+            var lateralY = Clamp(height * lateralFraction, 150, height - 150);
             if (entryEdge === 'right') {
-                return { x: Clamp(MAP_WIDTH - depth, 150, MAP_WIDTH - 150), y: lateralY };
+                return { x: Clamp(width - depth, 150, width - 150), y: lateralY };
             }
             if (entryEdge === 'top') {
-                return { x: lateralX, y: Clamp(depth, 150, MAP_HEIGHT - 150) };
+                return { x: lateralX, y: Clamp(depth, 150, height - 150) };
             }
             if (entryEdge === 'bottom') {
-                return { x: lateralX, y: Clamp(MAP_HEIGHT - depth, 150, MAP_HEIGHT - 150) };
+                return { x: lateralX, y: Clamp(height - depth, 150, height - 150) };
             }
-            return { x: Clamp(depth, 150, MAP_WIDTH - 150), y: lateralY };
+            return { x: Clamp(depth, 150, width - 150), y: lateralY };
+        }
+
+        static treasurePointIsValid(grid, things, point, minDistance, adventurerEntryEdge) {
+            if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+                return false;
+            }
+            var terrainType = grid.getTerrainTypeAtWorld(point.x, point.y);
+            if (terrainType === TERRAIN_TYPE.LAKE || terrainType === TERRAIN_TYPE.STREAM) {
+                return false;
+            }
+            for (var i = 0; i < things.length; i += 1) {
+                if (Distance(point.x, point.y, things[i].x, things[i].y) < minDistance) {
+                    return false;
+                }
+            }
+            return WorldGenerator.pointIsOpenForTreasureProbe(grid, things, point.x, point.y) &&
+                WorldGenerator.treasurePointIsReachableFromEntryEdge(grid, things, point, adventurerEntryEdge);
+        }
+
+        static findValidatedFallbackTreasurePoint(grid, things, index, adventurerEntryEdge) {
+            var minDistance = 70;
+            var width = WorldGenerator.mapWidthForGrid(grid);
+            var height = WorldGenerator.mapHeightForGrid(grid);
+            var margin = 80;
+            var base = WorldGenerator.fallbackTreasurePoint(index, adventurerEntryEdge, grid);
+            if (WorldGenerator.treasurePointIsValid(grid, things, base, minDistance, adventurerEntryEdge)) {
+                return base;
+            }
+            var maxRadius = Math.max(width, height);
+            for (var radius = 60; radius <= maxRadius; radius += 60) {
+                var sampleCount = Math.max(12, Math.ceil(radius / 30));
+                for (var sample = 0; sample < sampleCount; sample += 1) {
+                    var angle = (Math.PI * 2 * sample) / sampleCount;
+                    var candidate = {
+                        x: Clamp(base.x + Math.cos(angle) * radius, margin, width - margin),
+                        y: Clamp(base.y + Math.sin(angle) * radius, margin, height - margin)
+                    };
+                    if (WorldGenerator.distanceFromAdventurerEntryEdge(candidate.x, candidate.y, adventurerEntryEdge, grid) < WorldGenerator.treasureMinimumDistanceFromAdventurerEntry(grid)) {
+                        continue;
+                    }
+                    if (WorldGenerator.treasurePointIsValid(grid, things, candidate, minDistance, adventurerEntryEdge)) {
+                        return candidate;
+                    }
+                }
+            }
+            return null;
         }
 
         static treasureProbeAgent() {
             return { radius: 12, isMounted: false, canEnterDeepWater: false };
         }
 
-        static navCellCentreFor(cx, cy) {
+        static navCellCentreFor(cx, cy, grid) {
             return {
-                x: Clamp(cx * NAV_CELL_SIZE + NAV_CELL_SIZE / 2, 0, MAP_WIDTH),
-                y: Clamp(cy * NAV_CELL_SIZE + NAV_CELL_SIZE / 2, 0, MAP_HEIGHT)
+                x: Clamp(cx * NAV_CELL_SIZE + NAV_CELL_SIZE / 2, 0, WorldGenerator.mapWidthForGrid(grid)),
+                y: Clamp(cy * NAV_CELL_SIZE + NAV_CELL_SIZE / 2, 0, WorldGenerator.mapHeightForGrid(grid))
             };
         }
 
@@ -2672,13 +2754,13 @@ button:hover { background: #ffd768; }
         }
 
         static navCellIsOpenForTreasureProbe(grid, objects, cx, cy) {
-            var centre = WorldGenerator.navCellCentreFor(cx, cy);
+            var centre = WorldGenerator.navCellCentreFor(cx, cy, grid);
             return WorldGenerator.pointIsOpenForTreasureProbe(grid, objects, centre.x, centre.y);
         }
 
         static nearestOpenTreasureProbeCell(grid, objects, point) {
-            var cols = Math.floor(MAP_WIDTH / NAV_CELL_SIZE) + 1;
-            var rows = Math.floor(MAP_HEIGHT / NAV_CELL_SIZE) + 1;
+            var cols = Math.floor(WorldGenerator.mapWidthForGrid(grid) / NAV_CELL_SIZE) + 1;
+            var rows = Math.floor(WorldGenerator.mapHeightForGrid(grid) / NAV_CELL_SIZE) + 1;
             var start = {
                 cx: Clamp(Math.floor(point.x / NAV_CELL_SIZE), 0, cols - 1),
                 cy: Clamp(Math.floor(point.y / NAV_CELL_SIZE), 0, rows - 1)
@@ -2705,8 +2787,8 @@ button:hover { background: #ffd768; }
 
         static treasureProbeMovementCostBetween(grid, fromCell, toCell) {
             var agent = WorldGenerator.treasureProbeAgent();
-            var fromCentre = WorldGenerator.navCellCentreFor(fromCell.cx, fromCell.cy);
-            var toCentre = WorldGenerator.navCellCentreFor(toCell.cx, toCell.cy);
+            var fromCentre = WorldGenerator.navCellCentreFor(fromCell.cx, fromCell.cy, grid);
+            var toCentre = WorldGenerator.navCellCentreFor(toCell.cx, toCell.cy, grid);
             if (grid.isCliffBetween && grid.isCliffBetween(fromCentre.x, fromCentre.y, toCentre.x, toCentre.y)) {
                 return 9999;
             }
@@ -2721,8 +2803,8 @@ button:hover { background: #ffd768; }
         }
 
         static treasureProbePathExists(grid, objects, startPoint, targetPoint) {
-            var cols = Math.floor(MAP_WIDTH / NAV_CELL_SIZE) + 1;
-            var rows = Math.floor(MAP_HEIGHT / NAV_CELL_SIZE) + 1;
+            var cols = Math.floor(WorldGenerator.mapWidthForGrid(grid) / NAV_CELL_SIZE) + 1;
+            var rows = Math.floor(WorldGenerator.mapHeightForGrid(grid) / NAV_CELL_SIZE) + 1;
             var start = WorldGenerator.nearestOpenTreasureProbeCell(grid, objects, startPoint);
             var goal = WorldGenerator.nearestOpenTreasureProbeCell(grid, objects, targetPoint);
             if (!start || !goal) { return false; }
@@ -2766,14 +2848,16 @@ button:hover { background: #ffd768; }
 
         static treasurePointIsReachableFromEntryEdge(grid, objects, point, adventurerEntryEdge) {
             var entryEdge = adventurerEntryEdge || DEFAULT_ADVENTURER_ENTRY_EDGE;
-            var length = entryEdge === 'left' || entryEdge === 'right' ? MAP_HEIGHT : MAP_WIDTH;
+            var width = WorldGenerator.mapWidthForGrid(grid);
+            var height = WorldGenerator.mapHeightForGrid(grid);
+            var length = entryEdge === 'left' || entryEdge === 'right' ? height : width;
             var samples = Math.max(8, Math.ceil(length / TILE_SIZE));
             for (var i = 0; i <= samples; i += 1) {
                 var offset = length * (i / samples);
                 var startPoint;
-                if (entryEdge === 'right') { startPoint = { x: MAP_WIDTH, y: offset }; }
+                if (entryEdge === 'right') { startPoint = { x: width, y: offset }; }
                 else if (entryEdge === 'top') { startPoint = { x: offset, y: 0 }; }
-                else if (entryEdge === 'bottom') { startPoint = { x: offset, y: MAP_HEIGHT }; }
+                else if (entryEdge === 'bottom') { startPoint = { x: offset, y: height }; }
                 else { startPoint = { x: 0, y: offset }; }
                 if (!WorldGenerator.pointIsOpenForTreasureProbe(grid, objects, startPoint.x, startPoint.y)) { continue; }
                 if (WorldGenerator.treasureProbePathExists(grid, objects, startPoint, point)) {
@@ -2785,7 +2869,7 @@ button:hover { background: #ffd768; }
 
         static findTreasurePoint(rng, grid, things, minDistance, allowEdge, adventurerEntryEdge) {
             for (var attempt = 0; attempt < 400; attempt += 1) {
-                var point = WorldGenerator.sampleTreasurePointFromAdventurerEntry(rng, allowEdge, adventurerEntryEdge);
+                var point = WorldGenerator.sampleTreasurePointFromAdventurerEntry(rng, allowEdge, adventurerEntryEdge, grid);
                 var terrainType = grid.getTerrainTypeAtWorld(point.x, point.y);
                 if (terrainType === TERRAIN_TYPE.LAKE || terrainType === TERRAIN_TYPE.STREAM) {
                     continue;
@@ -3407,6 +3491,10 @@ button:hover { background: #ffd768; }
             this.sightRange = 1400;
             this.eyeHeight = 4;
             this.terrainHeight = 0;
+            this.hearingThreshold = DEFAULT_HEARING_THRESHOLD;
+            this.lastMovementSoundTick = -9999;
+            this.lastMovementSoundX = x;
+            this.lastMovementSoundY = y;
         }
 
         isActive() {
@@ -3973,6 +4061,7 @@ button:hover { background: #ffd768; }
             s.behaviourState = this.behaviourState;
             s.attackCooldownTicks = this.attackCooldownTicks;
             s.terrainHeight = this.terrainHeight || 0;
+            s.hearingThreshold = this.hearingThreshold;
             return s;
         }
     }
@@ -4010,6 +4099,7 @@ button:hover { background: #ffd768; }
             this.strength = rng.range(profile.strengthMin, profile.strengthMax);
             this.caution = rng.range(profile.cautionMin, profile.cautionMax);
             this.sightRange = 1250 + this.perception * 900;
+            this.hearingThreshold = DEFAULT_ADVENTURER_HEARING_THRESHOLD;
             this.eyeHeight = 5;
             this.foodValue = HUMAN_FOOD_VALUE;
             this.edibleFoodRemaining = 0;
@@ -4194,6 +4284,7 @@ button:hover { background: #ffd768; }
                 this.carryingTreasureType = treasure.treasureType;
                 this.behaviourState = 'pickingUpTreasure';
                 raid.addEvent('A ' + this.displayName + ' took ' + amount + ' units of ' + TREASURE_TYPES[treasure.treasureType].displayName + '.');
+                raid.addSound('treasureCollected', this, this.x, this.y, SOUND_LOUDNESS.LOUD, SOUND_DEFAULT_DURATION_TICKS);
             }
         }
 
@@ -4245,13 +4336,15 @@ button:hover { background: #ffd768; }
             object.carriedById = null;
             raid.thrownProjectiles.push({ id: 'throw_' + raid.nextThrownProjectileId, objectId: object.id, objectType: object.type, startX: this.x, startY: this.y, endX: endX, endY: endY, startTick: raid.tickNumber, durationTicks: THROWN_PROJECTILE_ANIMATION_TICKS, hit: hit });
             raid.nextThrownProjectileId += 1;
+            raid.addSound('objectThrown', this, this.x, this.y, SOUND_LOUDNESS.LOUD, SOUND_DEFAULT_DURATION_TICKS);
+            raid.addSound('objectImpact', this, endX, endY, hit ? SOUND_LOUDNESS.LOUD : SOUND_LOUDNESS.MEDIUM, SOUND_DEFAULT_DURATION_TICKS);
             this.carriedWorldObjectId = null;
             this.carriedWorldObjectType = null;
             this.carriedWorldObjectDamage = 0;
             this.carriedWorldObjectWeight = 0;
             this.behaviourState = 'throwing';
             if (hit) {
-                target.applyDamage(damage, raid.rng);
+                target.applyDamage(damage, raid.rng, raid);
                 raid.addEvent('A villager hit ' + target.name + ' with a thrown ' + (object.type === 'stick' ? 'stick' : 'rock') + '.');
             } else {
                 raid.addEvent('A villager threw a ' + (object.type === 'stick' ? 'stick' : 'rock') + ' and missed.');
@@ -4264,6 +4357,9 @@ button:hover { background: #ffd768; }
             this.health = this.bodyHealth.total();
             this.lastDamagePart = part;
             this.lastDamageTick = raid ? raid.tickNumber : -1;
+            if (raid) {
+                raid.addSound('adventurerInjured', this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
+            }
 
             if (this.carryingTreasure && !this.bodyHealth.armsCanCarry()) {
                 this.dropTreasure(raid, 'arm injury');
@@ -4273,6 +4369,9 @@ button:hover { background: #ffd768; }
                 this.alive = false;
                 this.corpseState = 'corpse';
                 this.edibleFoodRemaining = Math.max(this.edibleFoodRemaining || 0, this.foodValue || HUMAN_FOOD_VALUE);
+                if (raid) {
+                    raid.addSound('adventurerKilled', this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
+                }
                 this.dropTreasure(raid, 'death');
             } else if (!this.fleeing && this.health < this.maxHealth * 0.35) {
                 this.fleeing = true;
@@ -4292,6 +4391,7 @@ button:hover { background: #ffd768; }
             }
             raid.droppedTreasure.push(dropped);
             raid.nextDroppedTreasureId += 1;
+            raid.addSound('treasureDropped', this, this.x, this.y, SOUND_LOUDNESS.LOUD, SOUND_DEFAULT_DURATION_TICKS);
             this.behaviourState = 'droppingTreasure';
             raid.addEvent('A ' + this.displayName + ' dropped treasure due to ' + reason + '.');
             this.carryingAmount = 0;
@@ -4575,6 +4675,7 @@ button:hover { background: #ffd768; }
             this.perception = options && Number.isFinite(options.perception) ? Clamp(options.perception, 0, 1) : rng.range(0.38, 0.88);
             this.sightRange = options && Number.isFinite(options.sightRange) ? Math.max(120, options.sightRange) : 1400 + this.perception * 1000;
             this.scentRange = options && Number.isFinite(options.scentRange) ? Math.max(60, options.scentRange) : 220 + this.perception * 120;
+            this.hearingThreshold = options && Number.isFinite(options.hearingThreshold) ? Math.max(0, options.hearingThreshold) : DEFAULT_MONSTER_HEARING_THRESHOLD;
             this.eyeHeight = 4.5;
             this.maxHealth = this.bodyHealth.maxTotal();
             this.health = this.bodyHealth.total();
@@ -4711,6 +4812,8 @@ button:hover { background: #ffd768; }
             this.escaped = false;
             this.x = point.x;
             this.y = point.y;
+            this.lastMovementSoundX = point.x;
+            this.lastMovementSoundY = point.y;
             this.entryEdge = 'right';
             this.behaviourState = 'roaming';
             return true;
@@ -4741,6 +4844,8 @@ button:hover { background: #ffd768; }
             this.escaped = false;
             this.x = point.x;
             this.y = point.y;
+            this.lastMovementSoundX = point.x;
+            this.lastMovementSoundY = point.y;
             this.entryEdge = chosenEdge;
             this.behaviourState = 'wildRoaming';
             this.chooseWildExitTarget(world, rng);
@@ -4896,6 +5001,12 @@ button:hover { background: #ffd768; }
 
             var target = this.chooseTarget(raid);
             if (!target) {
+                var heardSound = this.chooseHeardSoundTarget(raid);
+                if (heardSound) {
+                    this.behaviourState = 'investigatingSound';
+                    this.moveWithPath(raid.world, heardSound.x, heardSound.y, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT * 0.82, this.id + '_sound_' + heardSound.id);
+                    return;
+                }
                 if (this.continueRoamingWithoutVisibleTarget(raid)) {
                     return;
                 }
@@ -4991,14 +5102,43 @@ button:hover { background: #ffd768; }
             return candidates[0];
         }
 
-        applyDamage(amount, rng) {
+
+        chooseHeardSoundTarget(raid) {
+            return raid.findBestAudibleSoundFor(this, function (sound) {
+                if (sound.sourceId === this.id) {
+                    return false;
+                }
+                if (sound.sourceKind === 'monster' && sound.kind === 'movement') {
+                    return false;
+                }
+                return sound.sourceKind === 'adventurer' ||
+                    sound.sourceKind === 'macrofauna' ||
+                    sound.kind === 'treasureCollected' ||
+                    sound.kind === 'treasureDropped' ||
+                    sound.kind === 'objectThrown' ||
+                    sound.kind === 'objectImpact' ||
+                    sound.kind === 'monsterAttack' ||
+                    sound.kind === 'adventurerAttack' ||
+                    sound.kind === 'monsterKilled' ||
+                    sound.kind === 'adventurerKilled' ||
+                    sound.kind === 'macrofaunaKilled';
+            }.bind(this));
+        }
+
+        applyDamage(amount, rng, raid) {
             this.bodyHealth.applyGeneralDamage(amount, rng);
             this.health = this.bodyHealth.total();
+            if (raid) {
+                raid.addSound('monsterInjured', this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
+            }
 
             if (this.bodyHealth.isDead()) {
                 this.alive = false;
                 this.corpseState = 'corpse';
                 this.behaviourState = 'dead';
+                if (raid) {
+                    raid.addSound('monsterKilled', this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
+                }
             }
         }
 
@@ -5014,6 +5154,7 @@ button:hover { background: #ffd768; }
             s.perception = this.perception;
             s.sightRange = this.sightRange;
             s.scentRange = this.scentRange;
+            s.hearingThreshold = this.hearingThreshold;
             s.selectedForDeployment = this.selectedForDeployment;
             s.deployed = this.deployed;
             s.health = this.health;
@@ -5112,6 +5253,7 @@ button:hover { background: #ffd768; }
             this.perception = this.species === 'hare' ? 0.72 : (this.species === 'deer' ? 0.62 : 0.48);
             this.eyeHeight = this.species === 'bear' || this.species === 'walrus' ? 4 : 3;
             this.sightRange = 1100 + this.perception * 700;
+            this.hearingThreshold = DEFAULT_HEARING_THRESHOLD;
         }
 
         getMapBoundaryPolicy() {
@@ -5299,16 +5441,22 @@ button:hover { background: #ffd768; }
             this.wanderTargetY = this.y;
         }
 
-        applyDamage(amount) {
+        applyDamage(amount, raid) {
             if (!this.alive) {
                 return;
             }
             this.health = Math.max(0, this.health - amount);
+            if (raid) {
+                raid.addSound('macrofaunaInjured', this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
+            }
             if (this.health <= 0) {
                 this.alive = false;
                 this.corpseState = 'corpse';
                 this.behaviourState = 'dead';
                 this.edibleFoodRemaining = Math.max(this.edibleFoodRemaining || 0, this.foodValue || LARGE_MACROFAUNA_FOOD_VALUE);
+                if (raid) {
+                    raid.addSound('macrofaunaKilled', this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
+                }
             }
         }
 
@@ -5444,6 +5592,8 @@ button:hover { background: #ffd768; }
             this.raidEnded = false;
             this.raidResult = 'Raid in progress';
             this.events = [];
+            this.soundEvents = [];
+            this.nextSoundEventId = 1;
             this.gameState.getLivingOwnedMonsters().forEach(function (monster) {
                 NutritionSystem.resetSeasonNutrition(monster);
             });
@@ -5481,6 +5631,8 @@ button:hover { background: #ffd768; }
                     if (!point) { continue; }
                     adventurer.x = point.x;
                     adventurer.y = point.y;
+                    adventurer.lastMovementSoundX = point.x;
+                    adventurer.lastMovementSoundY = point.y;
                     adventurer.entryEdge = entryEdge;
                     adventurer.entryX = point.x;
                     adventurer.entryY = point.y;
@@ -5862,6 +6014,168 @@ button:hover { background: #ffd768; }
             return result;
         }
 
+
+        addSound(kind, source, x, y, loudness, durationTicks) {
+            if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(loudness) || loudness <= 0) {
+                return null;
+            }
+            var event = {
+                id: 'sound_' + this.nextSoundEventId,
+                kind: kind || 'sound',
+                sourceKind: source && source.agentKind ? source.agentKind : (source && source.type ? source.type : 'world'),
+                sourceId: source && source.id ? source.id : null,
+                x: x,
+                y: y,
+                loudness: loudness,
+                createdTick: this.tickNumber,
+                expiresTick: this.tickNumber + Math.max(1, Math.floor(durationTicks || SOUND_DEFAULT_DURATION_TICKS))
+            };
+            this.nextSoundEventId += 1;
+            this.soundEvents.push(event);
+            return event;
+        }
+
+        purgeExpiredSoundEvents() {
+            this.soundEvents = this.soundEvents.filter(function (sound) {
+                return sound.expiresTick >= this.tickNumber;
+            }, this);
+        }
+
+        soundLoudnessAt(sound, x, y) {
+            if (!sound) {
+                return 0;
+            }
+            var distance = Distance(sound.x, sound.y, x, y);
+            var propagation = Math.max(0.1, SOUND_PROPAGATION_MULTIPLIER || 1);
+            return (sound.loudness * propagation * propagation) / Math.max(1, distance * distance);
+        }
+
+        findBestAudibleSoundFor(listener, predicate) {
+            if (!listener || !Number.isFinite(listener.x) || !Number.isFinite(listener.y)) {
+                return null;
+            }
+            var threshold = Number.isFinite(listener.hearingThreshold) ? listener.hearingThreshold : DEFAULT_HEARING_THRESHOLD;
+            var best = null;
+            var bestPerceived = threshold;
+            for (var i = 0; i < this.soundEvents.length; i += 1) {
+                var sound = this.soundEvents[i];
+                if (sound.expiresTick < this.tickNumber) {
+                    continue;
+                }
+                if (predicate && !predicate(sound)) {
+                    continue;
+                }
+                var perceived = this.soundLoudnessAt(sound, listener.x, listener.y);
+                if (perceived > bestPerceived) {
+                    best = Object.assign({ perceivedLoudness: perceived }, sound);
+                    bestPerceived = perceived;
+                }
+            }
+            return best;
+        }
+
+        agentMovementSoundLoudness(agent) {
+            if (!agent || !agent.isActive || !agent.isActive()) {
+                return 0;
+            }
+            if (agent.agentKind === 'adventurer') {
+                if (agent.className === 'explorer') { return SOUND_LOUDNESS.EXTREMELY_QUIET; }
+                if (agent.className === 'warrior') { return SOUND_LOUDNESS.MODERATE; }
+                if (agent.className === 'knight') { return agent.isMounted ? SOUND_LOUDNESS.MEDIUM : SOUND_LOUDNESS.MODERATE; }
+                if (agent.className === 'doubleVillager') { return SOUND_LOUDNESS.QUIET * 1.25; }
+                return SOUND_LOUDNESS.QUIET;
+            }
+            if (agent.agentKind === 'macrofauna') {
+                if (agent.species === 'hare') { return SOUND_LOUDNESS.EXTREMELY_QUIET; }
+                if (agent.species === 'deer') { return SOUND_LOUDNESS.MODERATE; }
+                if (agent.species === 'boar') { return SOUND_LOUDNESS.MODERATE * 1.25; }
+                if (agent.species === 'bear' || agent.species === 'walrus') { return SOUND_LOUDNESS.MEDIUM; }
+                if (agent.species === 'seal') { return SOUND_LOUDNESS.QUIET; }
+                return SOUND_LOUDNESS.QUIET;
+            }
+            if (agent.agentKind === 'monster') {
+                return SOUND_LOUDNESS.MODERATE;
+            }
+            return SOUND_LOUDNESS.QUIET;
+        }
+
+        agentIsUnderAutumnTree(agent) {
+            if (WorldGenerator.seasonNameForNumber(this.seasonNumber) !== 'autumn') {
+                return false;
+            }
+            var nearby = this.world.getNearbyVisionBlockingTerrainObjects(agent.x, agent.y, agent.radius || 10);
+            for (var i = 0; i < nearby.length; i += 1) {
+                var object = nearby[i];
+                if (object.type === 'tree' && Distance(agent.x, agent.y, object.x, object.y) <= (object.radius || 0)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        movementEnvironmentSoundLoudness(agent) {
+            var terrainType = this.world.terrainGrid.getTerrainTypeAtWorld(agent.x, agent.y);
+            if (terrainType === TERRAIN_TYPE.STREAM) {
+                return SOUND_LOUDNESS.MEDIUM;
+            }
+            if (this.agentIsUnderAutumnTree(agent)) {
+                return SOUND_LOUDNESS.MEDIUM;
+            }
+            return 0;
+        }
+
+        emitAgentMovementSound(agent) {
+            if (!agent || !agent.isActive || !agent.isActive()) {
+                return;
+            }
+            if (agent.deployed === false && agent.agentKind === 'monster') {
+                return;
+            }
+            if (this.tickNumber - (agent.lastMovementSoundTick || -9999) < SOUND_MOVEMENT_INTERVAL_TICKS) {
+                return;
+            }
+            var moved = Distance(agent.x, agent.y, agent.lastMovementSoundX, agent.lastMovementSoundY);
+            if (moved < SOUND_MOVEMENT_MIN_DISTANCE) {
+                return;
+            }
+            var loudness = Math.max(this.agentMovementSoundLoudness(agent), this.movementEnvironmentSoundLoudness(agent));
+            if (loudness > 0) {
+                this.addSound('movement', agent, agent.x, agent.y, loudness, SOUND_MOVEMENT_DURATION_TICKS);
+                agent.lastMovementSoundTick = this.tickNumber;
+                agent.lastMovementSoundX = agent.x;
+                agent.lastMovementSoundY = agent.y;
+            }
+        }
+
+        emitMovementSounds() {
+            this.adventurers.forEach(function (adventurer) { this.emitAgentMovementSound(adventurer); }, this);
+            this.macrofauna.forEach(function (animal) { this.emitAgentMovementSound(animal); }, this);
+            this.monsters.forEach(function (monster) { this.emitAgentMovementSound(monster); }, this);
+        }
+
+        resolveAdventurerSoundFear() {
+            for (var i = 0; i < this.adventurers.length; i += 1) {
+                var adventurer = this.adventurers[i];
+                if (!adventurer.isActive() || adventurer.fleeing || adventurer.carryingTreasure) {
+                    continue;
+                }
+                var heardMonster = this.findBestAudibleSoundFor(adventurer, function (sound) {
+                    return sound.sourceKind === 'monster' && sound.sourceId !== adventurer.id;
+                });
+                if (!heardMonster) {
+                    continue;
+                }
+                var fearPressure = Clamp((heardMonster.perceivedLoudness - (adventurer.hearingThreshold || DEFAULT_ADVENTURER_HEARING_THRESHOLD)) / 1.2, 0, 1);
+                var courageResistance = Clamp((adventurer.courage || 0) * 0.82 + (adventurer.strength || 0) * 0.10 + (adventurer.caution || 0) * 0.08, 0, 1);
+                var fleeChance = Clamp(fearPressure - courageResistance + 0.10, 0, 0.88);
+                if (this.rng.nextFloat() < fleeChance) {
+                    adventurer.fleeing = true;
+                    adventurer.behaviourState = 'fleeingFromHeardMonster';
+                    this.addEvent('A ' + adventurer.displayName + ' heard a monster and fled.');
+                }
+            }
+        }
+
         releaseMonster(monsterId) {
             var monster = this.gameState.ownedMonsters.find(function (m) {
                 if (monsterId && m.id !== monsterId) {
@@ -5937,11 +6251,14 @@ button:hover { background: #ffd768; }
             this.spawnDueWildMonsters();
             this.purgeDepartedMacrofaunaTrails();
             this.purgeExpiredThrownProjectiles();
+            this.purgeExpiredSoundEvents();
             this.tickCooldowns();
             this.resolveHumanMacrofaunaFear();
             this.adventurers.forEach(function (adventurer) { adventurer.update(this); }, this);
             this.macrofauna.forEach(function (animal) { animal.update(this); }, this);
             this.monsters.forEach(function (monster) { monster.update(this); }, this);
+            this.emitMovementSounds();
+            this.resolveAdventurerSoundFear();
             this.resolveCombat();
             this.checkRaidEnd();
         }
@@ -6037,6 +6354,7 @@ button:hover { background: #ffd768; }
                         monster.attackCooldownTicks = COMBAT_COOLDOWN_TICKS;
 
                         if (this.rng.nextFloat() <= 0.82) {
+                            this.addSound('monsterAttack', monster, monster.x, monster.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
                             var part = adventurer.applyDamage(this.rng.integer(18, 34), this.rng, this);
                             adventurer.behaviourState = 'takingDamage';
                             this.addEvent(monster.name + ' hit a ' + adventurer.displayName + ' in the ' + part + '.');
@@ -6048,7 +6366,8 @@ button:hover { background: #ffd768; }
 
                         adventurer.behaviourState = 'meleeAttacking';
                         if (this.rng.nextFloat() <= adventurer.getMeleeHitChance()) {
-                            monster.applyDamage(adventurer.getMeleeDamage(this.rng), this.rng);
+                            this.addSound('adventurerAttack', adventurer, adventurer.x, adventurer.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
+                            monster.applyDamage(adventurer.getMeleeDamage(this.rng), this.rng, this);
                             this.addEvent('A ' + adventurer.displayName + ' wounded ' + monster.name + '.');
                         }
                     }
@@ -6062,7 +6381,8 @@ button:hover { background: #ffd768; }
                         }
                         if (monster.attackCooldownTicks <= 0) {
                             monster.attackCooldownTicks = COMBAT_COOLDOWN_TICKS;
-                            animal.applyDamage(this.rng.integer(18, 32));
+                            this.addSound('monsterAttack', monster, monster.x, monster.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
+                            animal.applyDamage(this.rng.integer(18, 32), this);
                             this.addEvent(monster.name + ' attacked a ' + animal.displayName + '.');
                             if (!animal.alive) {
                                 this.addEvent('A ' + animal.displayName + ' was killed and became edible carrion.');
@@ -6095,6 +6415,7 @@ button:hover { background: #ffd768; }
 
                     animal.attackCooldownTicks = COMBAT_COOLDOWN_TICKS * 2;
                     if (this.rng.nextFloat() <= animal.attackChance) {
+                        this.addSound('macrofaunaAttack', animal, animal.x, animal.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
                         var part = adventurer.applyDamage(this.rng.integer(animal.attackDamageMin, animal.attackDamageMax), this.rng, this);
                         this.addEvent('A ' + animal.displayName + ' attacked an adventurer in the ' + part + '.');
                     }
@@ -6288,6 +6609,7 @@ button:hover { background: #ffd768; }
                 droppedTreasure: this.droppedTreasure.map(function (drop) { return drop.getSnapshot(); }),
                 movableTerrainObjects: this.world.terrainObjects.filter(function (object) { return object.carryable; }).map(function (object) { return object.getSnapshot(); }),
                 thrownProjectiles: this.thrownProjectiles.slice(0),
+                soundEvents: this.soundEvents.slice(0),
                 macrofauna: this.macrofauna.filter(function (animal) { return !animal.escaped; }).map(function (animal) { return animal.getSnapshot(); }),
                 foodExpenditureCredits: this.world.foodExpenditureCredits || 0,
                 monsters: this.monsters.filter(function (monster) { return !monster.escaped && monster.deployed; }).map(function (monster) { return monster.getSnapshot(); }),
@@ -7097,6 +7419,23 @@ button:hover { background: #ffd768; }
         AddRegressionResult(results, 'Hydrology accumulation carries runoff across equal-height flats', flatCollectedFlow > 1, 'maxFlow=' + flatCollectedFlow.toFixed(2));
         AddRegressionResult(results, 'Largest map profiles are not generated in the default suite', profiles.huge.width === 14400 && profiles.vast.width === 21600, 'huge=' + profiles.huge.width + ', vast=' + profiles.vast.width);
         AddRegressionResult(results, 'Terrain architecture has separate base terrain, hydrology, biome and human layers', typeof BaseTerrainGenerator === 'function' && typeof HydrologyLayerGenerator === 'function' && typeof BiomeLayerGenerator === 'function' && typeof HumanLayerGenerator === 'function', 'classes available');
+
+
+        var soundRegressionRaid = new Raid(session.world, session.gameState, 424242, 1);
+        soundRegressionRaid.soundEvents = [];
+        soundRegressionRaid.addSound('regressionLoud', { id: 'regression_adventurer', agentKind: 'adventurer' }, 100, 100, SOUND_LOUDNESS.LOUD, 60);
+        var soundNear = soundRegressionRaid.soundLoudnessAt(soundRegressionRaid.soundEvents[0], 200, 100);
+        var soundFar = soundRegressionRaid.soundLoudnessAt(soundRegressionRaid.soundEvents[0], 300, 100);
+        AddRegressionResult(results, 'Sound loudness follows inverse-square falloff', soundNear > soundFar * 3.6 && soundNear < soundFar * 4.4, 'near=' + soundNear.toFixed(3) + ', far=' + soundFar.toFixed(3));
+        var longRangeHearingMonster = new Monster('long_range_sound_listener', 8100, 100, new SeededRng(424246), { hearingThreshold: DEFAULT_MONSTER_HEARING_THRESHOLD });
+        AddRegressionResult(results, 'Uniform sound propagation multiplier lets loud looting carry across standard maps', !!soundRegressionRaid.findBestAudibleSoundFor(longRangeHearingMonster, function () { return true; }), 'heard=' + !!soundRegressionRaid.findBestAudibleSoundFor(longRangeHearingMonster, function () { return true; }) + ', perceived=' + soundRegressionRaid.soundLoudnessAt(soundRegressionRaid.soundEvents[0], longRangeHearingMonster.x, longRangeHearingMonster.y).toFixed(3));
+        var hearingMonster = new Monster('sound_listener', 450, 100, new SeededRng(424243), { hearingThreshold: 0.10 });
+        AddRegressionResult(results, 'Default sound hearing uses thresholded perceived loudness', !!soundRegressionRaid.findBestAudibleSoundFor(hearingMonster, function () { return true; }), 'heard=' + !!soundRegressionRaid.findBestAudibleSoundFor(hearingMonster, function () { return true; }));
+        var quietExplorer = new Explorer('quiet_explorer', 0, 0, new SeededRng(424244));
+        var normalVillager = new Villager('normal_villager', 0, 0, new SeededRng(424245));
+        AddRegressionResult(results, 'Explorer movement is quieter than villager movement', soundRegressionRaid.agentMovementSoundLoudness(quietExplorer) < soundRegressionRaid.agentMovementSoundLoudness(normalVillager), 'explorer=' + soundRegressionRaid.agentMovementSoundLoudness(quietExplorer) + ', villager=' + soundRegressionRaid.agentMovementSoundLoudness(normalVillager));
+        var soundTarget = hearingMonster.chooseHeardSoundTarget(soundRegressionRaid);
+        AddRegressionResult(results, 'Monster can choose an audible non-visible sound target', soundTarget && soundTarget.kind === 'regressionLoud', 'target=' + (soundTarget ? soundTarget.kind : 'none'));
 
         var failed = results.filter(function (result) { return !result.passed; });
         return { count: results.length, passed: failed.length === 0, failures: failed.length, results: results };
