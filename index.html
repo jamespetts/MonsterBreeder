@@ -3983,6 +3983,10 @@ button:hover { background: #ffd768; }
             }
             return Clamp(scale, 0.45, 1.7);
         }
+
+        getTargetCamouflageVisibilityScale(world, target, distance) {
+            return MonsterCamouflageVisibilityScale(world, this, target, distance);
+        }
         getEffectiveSightRange(world, target) {
             var range = this.sightRange || 300;
             var perception = Clamp(this.perception !== undefined ? this.perception : 0.5, 0, 1);
@@ -3992,6 +3996,7 @@ button:hover { background: #ffd768; }
             var targetSlope = world.terrainGrid.getSlopeAtWorld(target.x, target.y);
             range *= 0.95 + perception * 0.45;
             range *= this.getTargetVisibilityScale(target);
+            range *= this.getTargetCamouflageVisibilityScale(world, target, Distance(this.x, this.y, target.x, target.y));
             var ownMultiplier = TerrainRules.visibilityRangeMultiplierFor(ownTerrain, ownSlope);
             var targetMultiplier = TerrainRules.visibilityRangeMultiplierFor(targetTerrain, targetSlope);
             range *= 0.72 + Math.min(ownMultiplier, targetMultiplier) * 0.28;
@@ -4821,6 +4826,74 @@ button:hover { background: #ffd768; }
         var min = Math.min(r, g, b);
         if (max <= 0.0001) { return 0; }
         return Clamp((max - min) / max, 0, 1);
+    }
+
+    function ColourProfileFromRgb(rgb) {
+        return {
+            hue: ColourHueFromRgb(rgb),
+            luminance: ColourLuminanceFromRgb(rgb),
+            saturation: ColourSaturationFromRgb(rgb)
+        };
+    }
+
+    function ColourProfileMismatch(a, b) {
+        if (!a || !b) { return 1; }
+        var hueDelta = Math.abs((a.hue || 0) - (b.hue || 0));
+        hueDelta = Math.min(hueDelta, 360 - hueDelta) / 180;
+        var luminanceDelta = Math.abs((a.luminance || 0) - (b.luminance || 0));
+        var saturationDelta = Math.abs((a.saturation || 0) - (b.saturation || 0));
+        if ((b.saturation || 0) < 0.18) {
+            return hueDelta * 0.20 + luminanceDelta * 0.25 + saturationDelta * 0.55;
+        }
+        return hueDelta * 0.56 + luminanceDelta * 0.24 + saturationDelta * 0.20;
+    }
+
+    function MonsterPhenotypeColourProfile(monster) {
+        var colour = monster && monster.phenotype && monster.phenotype.colour ? monster.phenotype.colour : null;
+        if (!colour) { return null; }
+        return {
+            hue: colour.camouflageHue || 0,
+            luminance: colour.camouflageLuminance || 0,
+            saturation: colour.camouflageSaturation || 0,
+            patternType: colour.pattern && colour.pattern.type ? colour.pattern.type : 'solid'
+        };
+    }
+
+    function TerrainCamouflageProfileForWorld(world, x, y) {
+        if (!world || !world.terrainGrid || !GenePool || !GenePool.terrainColourForType) { return null; }
+        var terrainType = world.terrainGrid.getTerrainTypeAtWorld(x, y);
+        var profile = ColourProfileFromRgb(GenePool.terrainColourForType(terrainType));
+        profile.terrainType = terrainType;
+        return profile;
+    }
+
+    function MonsterCamouflageVisibilityScale(world, observer, monster, distance) {
+        // First gameplay bridge from genetic colour phenotype to world effects.
+        // This modifies sight range only; terrain elevation, object occlusion and
+        // close-range visibility still use the normal visibility rules.
+        if (!world || !observer || !monster || observer.agentKind !== 'adventurer' || monster.agentKind !== 'monster') { return 1; }
+        var monsterProfile = MonsterPhenotypeColourProfile(monster);
+        var terrainProfile = TerrainCamouflageProfileForWorld(world, monster.x, monster.y);
+        if (!monsterProfile || !terrainProfile) { return 1; }
+        var mismatch = ColourProfileMismatch(monsterProfile, terrainProfile);
+        var benefit = Clamp(1 - mismatch, 0, 1);
+        var scale = 1.16 - benefit * 0.54;
+        if (monsterProfile.patternType === 'stripes') {
+            if (terrainProfile.terrainType === TERRAIN_TYPE.FOREST || terrainProfile.terrainType === TERRAIN_TYPE.MARSH || terrainProfile.terrainType === TERRAIN_TYPE.ROCKY) {
+                scale *= 0.94;
+            } else {
+                scale *= 1.08;
+            }
+        }
+        var state = monster.behaviourState || '';
+        if (state === 'stalking' || state === 'foragingForFauna' || state === 'recalling') {
+            scale = scale + (1 - scale) * 0.38;
+        } else if (state === 'eating' || state === 'captive') {
+            scale *= 0.96;
+        }
+        var distanceFactor = Clamp((distance - VISIBILITY_CLOSE_RANGE) / 850, 0, 1);
+        scale = 1 + (scale - 1) * distanceFactor;
+        return Clamp(scale, 0.58, 1.22);
     }
 
     class SkinProteinState {
@@ -6404,9 +6477,20 @@ button:hover { background: #ffd768; }
             return { events: events };
         }
         getManagementSnapshot() {
+            var ownedById = {};
+            this.ownedMonsters.forEach(function (monster) {
+                ownedById[monster.id] = monster;
+            });
             return {
                 ownedMonsters: this.ownedMonsters.map(function (monster) {
-                    return monster.getSnapshot();
+                    var snapshot = monster.getSnapshot();
+                    if (snapshot.motherId && ownedById[snapshot.motherId]) {
+                        snapshot.motherName = ownedById[snapshot.motherId].name;
+                    }
+                    if (snapshot.fatherId && ownedById[snapshot.fatherId]) {
+                        snapshot.fatherName = ownedById[snapshot.fatherId].name;
+                    }
+                    return snapshot;
                 }),
                 eggs: this.eggs.map(function (brood) {
                     return {
@@ -8405,6 +8489,29 @@ button:hover { background: #ffd768; }
         AddRegressionResult(results, 'Clear unobstructed sight reaches substantially farther than short combat ranges', visionObserver.canSee(visionWorld, longSightTarget), 'distance=' + visionObserver.distanceTo(longSightTarget));
         var veryLongClearTarget = new Villager('very_long_clear_target', 1275, 180, new SeededRng(333016));
         AddRegressionResult(results, 'Large unobstructed targets can be seen at long map distances', visionObserver.canSee(visionWorld, veryLongClearTarget), 'distance=' + visionObserver.distanceTo(veryLongClearTarget) + ', range=' + visionObserver.getEffectiveSightRange(visionWorld, veryLongClearTarget).toFixed(1));
+
+        function makeManualColourPhenotype(hex) {
+            var rgb = ParseHexColour(hex);
+            return { colour: { bodyColour: hex, camouflageHue: ColourHueFromRgb(rgb), camouflageLuminance: ColourLuminanceFromRgb(rgb), camouflageSaturation: ColourSaturationFromRgb(rgb), pattern: { type: 'solid' } } };
+        }
+        var camouflageForestTypes = new Array(24 * 6).fill(TERRAIN_TYPE.GRASS);
+        camouflageForestTypes[3 * 24 + 20] = TERRAIN_TYPE.FOREST;
+        var camouflageForestGrid = new TerrainGrid(1440, 360, 60, camouflageForestTypes, new Array(24 * 6).fill(8), 0);
+        var camouflageForestWorld = new World(333041, 1440, 360, camouflageForestGrid, { vegetationDensity: 0.2 }, 12, [], [], 'left');
+        var camouflageObserver = new Villager('camouflage_observer', 65, 180, new SeededRng(333042));
+        camouflageObserver.perception = 0.6;
+        camouflageObserver.sightRange = 1150;
+        var greenMonster = new Monster('green_camouflage_target', 1200, 180, new SeededRng(333043), { owned: false, collared: false, wild: true, speed: 120, sightRange: 300, world: camouflageForestWorld });
+        greenMonster.deployed = true;
+        greenMonster.behaviourState = 'idle';
+        greenMonster.phenotype = makeManualColourPhenotype('#395c34');
+        var pinkMonster = new Monster('pink_camouflage_target', 1200, 180, new SeededRng(333044), { owned: false, collared: false, wild: true, speed: 120, sightRange: 300, world: camouflageForestWorld });
+        pinkMonster.deployed = true;
+        pinkMonster.behaviourState = 'idle';
+        pinkMonster.phenotype = makeManualColourPhenotype('#d54bb8');
+        AddRegressionResult(results, 'Colour camouflage hides matching forest monsters before mismatched bright monsters', !camouflageObserver.canSee(camouflageForestWorld, greenMonster) && camouflageObserver.canSee(camouflageForestWorld, pinkMonster), 'greenRange=' + camouflageObserver.getEffectiveSightRange(camouflageForestWorld, greenMonster).toFixed(1) + ', pinkRange=' + camouflageObserver.getEffectiveSightRange(camouflageForestWorld, pinkMonster).toFixed(1) + ', distance=' + camouflageObserver.distanceTo(greenMonster));
+        pinkMonster.x = 120;
+        AddRegressionResult(results, 'Close-range visibility still overrides colour camouflage', camouflageObserver.canSee(camouflageForestWorld, pinkMonster), 'distance=' + camouflageObserver.distanceTo(pinkMonster));
         var smallVisionRock = new ThrowableRock('small_vision_rock', 270, 180, new SeededRng(333017));
         var smallVisionStick = new Stick('small_vision_stick', 300, 180, new SeededRng(333018));
         var smallObjectVisionWorld = new World(333019, 540, 360, visionGrid, { vegetationDensity: 0.2 }, 12, [smallVisionRock, smallVisionStick], [], 'left');
@@ -9280,6 +9387,17 @@ button:hover { background: #ffd768; }
         if(mortality>0){ parts.push('old-age risk '+Math.round(mortality*100)+'%/season'); }
         return parts.length>0?parts.join(', '):'none';
     }
+    function MonsterParentageLabel(monster, monsters){
+        if(!monster){ return 'unknown'; }
+        function parentLabel(parentId,parentName){
+            if(!parentId){ return 'unknown'; }
+            if(parentName){ return parentName; }
+            var roster=monsters||((currentSnapshot&&currentSnapshot.management&&currentSnapshot.management.ownedMonsters)||[]);
+            var parent=roster.find(function(candidate){ return candidate.id===parentId; });
+            return parent&&parent.name?parent.name:'unknown/departed';
+        }
+        return 'mother: '+parentLabel(monster.motherId,monster.motherName)+', father: '+parentLabel(monster.fatherId,monster.fatherName);
+    }
     function RenderBreedingPanel(monster){
         var s=currentSnapshot||latestSnapshot;
         if(!s||s.phase==='raid'){
@@ -9371,7 +9489,9 @@ button:hover { background: #ffd768; }
             detailRows.push(['Food shortfall',FormatNumber(shortfall),'nutritionShortfall']);
         }
         var visibleColour=MonsterColourPhenotype(monster);
-        detailRows=detailRows.concat([['Visible colour',visibleColour.pattern&&visibleColour.pattern.type==='stripes'?'striped':'solid'],['Sex',MonsterSexLabel(monster)],['Age',MonsterAgeLabel(monster)],['Life stage',MonsterLifeStageLabel(monster)],['Age effects',MonsterAgeEffectLabel(monster)],['Breeding',monster.canBreed?'available':(monster.breedingBlockReason||'unavailable')],['Collar',monster.collared?'Collared':'Uncollared'],['Raid state',monster.deployed?'Deployed':'In cage'],['Season order',monster.selectedForDeployment?'Deploy at start':'Reserve'],['Origin',monster.capturedThisRaid?'Captured wild monster':'Captive monsters']]);
+        var managementSnapshot=currentSnapshot&&currentSnapshot.management?currentSnapshot.management:null;
+        var managementMonsters=managementSnapshot&&managementSnapshot.ownedMonsters?managementSnapshot.ownedMonsters:[];
+        detailRows=detailRows.concat([['Visible colour',visibleColour.pattern&&visibleColour.pattern.type==='stripes'?'striped':'solid'],['Sex',MonsterSexLabel(monster)],['Age',MonsterAgeLabel(monster)],['Life stage',MonsterLifeStageLabel(monster)],['Parentage',MonsterParentageLabel(monster,managementMonsters)],['Age effects',MonsterAgeEffectLabel(monster)],['Breeding',monster.canBreed?'available':(monster.breedingBlockReason||'unavailable')],['Collar',monster.collared?'Collared':'Uncollared'],['Raid state',monster.deployed?'Deployed':'In cage'],['Season order',monster.selectedForDeployment?'Deploy at start':'Reserve'],['Origin',monster.capturedThisRaid?'Captured wild monster':'Captive monsters']]);
         detailRows.forEach(function(row){
             var dt=document.createElement('dt');
             var dd=document.createElement('dd');
@@ -11126,6 +11246,7 @@ else DrawGroundRemain(r.obj,r.obj.agentKind||'adventurer');
             return [
                 'Monster: '+MonsterDisplayName(o),
                 'Sex: '+MonsterSexLabel(o),
+                'Parentage: '+MonsterParentageLabel(o),
                 'Health: '+Math.round(o.health)+' / '+Math.round(o.maxHealth),
                 'Nutrition: '+FormatNutritionLine(o),
                 'Season food requirement: '+FormatNumber(GetFoodRequirement(o)),
