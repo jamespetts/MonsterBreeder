@@ -4693,13 +4693,556 @@ button:hover { background: #ffd768; }
         }
     };
 
+
+    // ============================================================================
+    // MODULE: GENETICS, GENOMES AND MONSTER PHENOTYPE
+    // ============================================================================
+    // Runtime genetics are deliberately object-oriented. The GenePool owns the
+    // canonical Allele objects, and Genome/ChromosomePair homologue arrays store
+    // direct object references to those Alleles. Do not replace these runtime
+    // references with numeric IDs for ordinary simulation work. If save/load or
+    // import/export later needs serialisation, that should be a separate adapter
+    // that asks allele objects how to serialise themselves and resolves them back
+    // through the GenePool when loading.
+    //
+    // Terminology used here:
+    // - A gene is the fixed slot/locus in a chromosome.
+    // - An allele is the object occupying that slot on one homologue.
+    // - A chromosome pair contains two ordered homologues, not unordered slots.
+    //   This is necessary because recombination copies contiguous chunks along
+    //   the ordered homologue, rather than choosing every locus independently.
+    //
+    // Dominance indices are unsigned 8-bit integers: 0..255. The design default
+    // is 100. Most ordinary alleles should stay near 100 and vary in increments
+    // of about 10; intermediate values are for edge cases. Very strange recessive
+    // alleles may have much lower values. Avoid casually using the whole 0..255
+    // range, because future maintainers need space for exceptional biology.
+    var DOMINANCE_DEFAULT = 100;
+    var COLOUR_CHROMOSOME_INDEX = 0;
+    var COLOUR_CHROMOSOME_SLOT_COUNT = 4;
+
+    function ClampByte(value) {
+        return Clamp(Math.round(Number.isFinite(value) ? value : 0), 0, 255);
+    }
+
+    function HexFromRgb(r, g, b) {
+        function part(value) {
+            var hex = ClampByte(value).toString(16);
+            return hex.length < 2 ? '0' + hex : hex;
+        }
+        return '#' + part(r) + part(g) + part(b);
+    }
+
+    function DarkenHexColour(hex, fraction) {
+        var colour = ParseHexColour(hex, { r: 128, g: 128, b: 128 });
+        var multiplier = Clamp(1 - fraction, 0, 1);
+        return HexFromRgb(colour.r * multiplier, colour.g * multiplier, colour.b * multiplier);
+    }
+
+    function MixHexColour(a, b, fraction) {
+        var colourA = ParseHexColour(a, { r: 128, g: 128, b: 128 });
+        var colourB = ParseHexColour(b, { r: 128, g: 128, b: 128 });
+        var f = Clamp(fraction, 0, 1);
+        return HexFromRgb(colourA.r * (1 - f) + colourB.r * f, colourA.g * (1 - f) + colourB.g * f, colourA.b * (1 - f) + colourB.b * f);
+    }
+
+    function ParseHexColour(hex, fallback) {
+        if (typeof hex !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(hex)) {
+            return fallback || { r: 0, g: 0, b: 0 };
+        }
+        return {
+            r: parseInt(hex.slice(1, 3), 16),
+            g: parseInt(hex.slice(3, 5), 16),
+            b: parseInt(hex.slice(5, 7), 16)
+        };
+    }
+
+    function ColourLuminanceFromRgb(rgb) {
+        return Clamp((0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255, 0, 1);
+    }
+
+    function ColourHueFromRgb(rgb) {
+        var r = rgb.r / 255;
+        var g = rgb.g / 255;
+        var b = rgb.b / 255;
+        var max = Math.max(r, g, b);
+        var min = Math.min(r, g, b);
+        var delta = max - min;
+        if (delta <= 0.0001) {
+            return 0;
+        }
+        var hue;
+        if (max === r) {
+            hue = ((g - b) / delta) % 6;
+        } else if (max === g) {
+            hue = (b - r) / delta + 2;
+        } else {
+            hue = (r - g) / delta + 4;
+        }
+        hue *= 60;
+        if (hue < 0) { hue += 360; }
+        return hue;
+    }
+
+    function ColourSaturationFromRgb(rgb) {
+        var r = rgb.r / 255;
+        var g = rgb.g / 255;
+        var b = rgb.b / 255;
+        var max = Math.max(r, g, b);
+        var min = Math.min(r, g, b);
+        if (max <= 0.0001) { return 0; }
+        return Clamp((max - min) / max, 0, 1);
+    }
+
+    class SkinProteinState {
+        constructor() {
+            this.verdine = 0;
+            this.jaunine = 0;
+            this.orgine = 0;
+            this.cerulene = 0;
+            this.rodine = 0;
+            this.negrine = 0;
+        }
+
+        add(amounts) {
+            if (!amounts) { return; }
+            this.verdine += Number.isFinite(amounts.verdine) ? amounts.verdine : 0;
+            this.jaunine += Number.isFinite(amounts.jaunine) ? amounts.jaunine : 0;
+            this.orgine += Number.isFinite(amounts.orgine) ? amounts.orgine : 0;
+            this.cerulene += Number.isFinite(amounts.cerulene) ? amounts.cerulene : 0;
+            this.rodine += Number.isFinite(amounts.rodine) ? amounts.rodine : 0;
+            this.negrine += Number.isFinite(amounts.negrine) ? amounts.negrine : 0;
+        }
+
+        cloneWith(other) {
+            var result = new SkinProteinState();
+            result.add(this);
+            result.add(other);
+            return result;
+        }
+
+        clamp() {
+            this.verdine = ClampByte(this.verdine);
+            this.jaunine = ClampByte(this.jaunine);
+            this.orgine = ClampByte(this.orgine);
+            this.cerulene = ClampByte(this.cerulene);
+            this.rodine = ClampByte(this.rodine);
+            this.negrine = ClampByte(this.negrine);
+        }
+    }
+
+    class PhenotypeBuildContext {
+        constructor() {
+            this.baseSkinProteins = new SkinProteinState();
+            this.codominantSkinLayers = [new SkinProteinState(), new SkinProteinState()];
+            this.activeCodominantLayerIndex = 0;
+            this.usedCodominantSkinLayers = false;
+        }
+
+        // normalise has no default value by design. Genetic maintainers must pass
+        // it explicitly on every allele phenotype call. When true, both alleles in
+        // a codominant pair are being expressed, and the subsystem decides how to
+        // normalise or layer those effects. For colour, codominant calls write into
+        // separate skin-protein layers so that visible striping can emerge instead
+        // of accidentally doubling all protein production.
+        addSkinProteins(amounts, normalise) {
+            if (normalise === true) {
+                this.usedCodominantSkinLayers = true;
+                this.codominantSkinLayers[this.activeCodominantLayerIndex].add(amounts);
+                return;
+            }
+            if (normalise !== false) {
+                throw new Error('Allele phenotype methods must pass the normalise boolean explicitly.');
+            }
+            this.baseSkinProteins.add(amounts);
+        }
+    }
+
+    class Allele {
+        constructor(dominanceIndex, phenotypeMethod, options) {
+            this.dominanceIndex = ClampByte(Number.isFinite(dominanceIndex) ? dominanceIndex : DOMINANCE_DEFAULT);
+            this.phenotypeMethod = phenotypeMethod;
+            this.commonness = options && Number.isFinite(options.commonness) ? Math.max(0.001, options.commonness) : 1;
+            this.selectionSensitive = !!(options && options.selectionSensitive);
+            this.debugLabel = options && options.debugLabel ? options.debugLabel : 'allele';
+        }
+
+        applyPhenotype(context, normalise) {
+            if (normalise !== true && normalise !== false) {
+                throw new Error('Allele.applyPhenotype requires an explicit normalise boolean.');
+            }
+            if (typeof this.phenotypeMethod === 'function') {
+                this.phenotypeMethod(context, normalise);
+            }
+        }
+    }
+
+    class ChromosomePair {
+        constructor(homologueA, homologueB) {
+            this.homologueA = homologueA.slice(0);
+            this.homologueB = homologueB.slice(0);
+        }
+
+        getSlotCount() {
+            return this.homologueA.length;
+        }
+
+        getAllelePair(slotIndex) {
+            return [this.homologueA[slotIndex], this.homologueB[slotIndex]];
+        }
+
+        expressTo(context) {
+            for (var i = 0; i < this.getSlotCount(); i += 1) {
+                ChromosomePair.expressAllelePair(this.homologueA[i], this.homologueB[i], context);
+            }
+        }
+
+        createGameteHomologue(rng, minCuts, maxCuts) {
+            var length = this.getSlotCount();
+            if (length <= 0) { return []; }
+            var low = Math.max(0, Math.floor(Number.isFinite(minCuts) ? minCuts : 1));
+            var high = Math.max(low, Math.floor(Number.isFinite(maxCuts) ? maxCuts : 2));
+            var cutCount = Math.min(Math.max(0, length - 1), rng.integer(low, high));
+            var cuts = [];
+            var used = {};
+            while (cuts.length < cutCount) {
+                var cut = rng.integer(1, length - 1);
+                if (!used[cut]) {
+                    used[cut] = true;
+                    cuts.push(cut);
+                }
+            }
+            cuts.sort(function (a, b) { return a - b; });
+            var useA = rng.nextFloat() < 0.5;
+            var nextCutIndex = 0;
+            var result = [];
+            for (var i = 0; i < length; i += 1) {
+                while (nextCutIndex < cuts.length && i >= cuts[nextCutIndex]) {
+                    useA = !useA;
+                    nextCutIndex += 1;
+                }
+                result.push(useA ? this.homologueA[i] : this.homologueB[i]);
+            }
+            return result;
+        }
+
+        static expressAllelePair(alleleA, alleleB, context) {
+            if (!alleleA && !alleleB) { return; }
+            if (!alleleA) { alleleB.applyPhenotype(context, false); return; }
+            if (!alleleB) { alleleA.applyPhenotype(context, false); return; }
+            if (alleleA === alleleB) {
+                alleleA.applyPhenotype(context, false);
+                return;
+            }
+            if (alleleA.dominanceIndex > alleleB.dominanceIndex) {
+                alleleA.applyPhenotype(context, false);
+                return;
+            }
+            if (alleleB.dominanceIndex > alleleA.dominanceIndex) {
+                alleleB.applyPhenotype(context, false);
+                return;
+            }
+            context.activeCodominantLayerIndex = 0;
+            alleleA.applyPhenotype(context, true);
+            context.activeCodominantLayerIndex = 1;
+            alleleB.applyPhenotype(context, true);
+            context.activeCodominantLayerIndex = 0;
+        }
+    }
+
+    class Genome {
+        constructor(chromosomes) {
+            this.chromosomes = chromosomes.slice(0);
+        }
+
+        getColourChromosome() {
+            return this.chromosomes[COLOUR_CHROMOSOME_INDEX];
+        }
+    }
+
+    var ColourPhenotypeSystem = {
+        resolve: function (context) {
+            if (context.usedCodominantSkinLayers) {
+                var first = this.resolveLayer(context.baseSkinProteins.cloneWith(context.codominantSkinLayers[0]));
+                var second = this.resolveLayer(context.baseSkinProteins.cloneWith(context.codominantSkinLayers[1]));
+                var body = first.hex;
+                var secondary = second.hex;
+                return this.createSnapshot(body, secondary, 'stripes', first, second);
+            }
+            var solid = this.resolveLayer(context.baseSkinProteins);
+            return this.createSnapshot(solid.hex, solid.hex, 'solid', solid, solid);
+        },
+
+        resolveLayer: function (proteins) {
+            var p = proteins.cloneWith(null);
+            p.clamp();
+            var colourTotal = p.verdine + p.jaunine + p.orgine + p.cerulene + p.rodine;
+            var albinoBase = 220;
+            var r = albinoBase;
+            var g = albinoBase;
+            var b = 214;
+            if (colourTotal > 0) {
+                // The colour proteins are additive with each other, but they must
+                // not be added on top of the albino base. The albino base is the
+                // no-pigment fallback. As colour protein strength rises, the final
+                // colour blends away from pale grey and toward the colour produced
+                // by the expressed skin proteins. Otherwise almost every expressed
+                // allele clips to very light cyan/white.
+                var chromaR = p.verdine * 0.05 + p.jaunine * 0.55 + p.orgine * 1.00 + p.rodine * 1.00;
+                var chromaG = p.verdine * 0.85 + p.jaunine * 0.82 + p.orgine * 0.35 + p.cerulene * 0.72 + p.rodine * 0.05;
+                var chromaB = p.verdine * 0.55 + p.cerulene * 1.00 + p.rodine * 0.32;
+                var maxChroma = Math.max(chromaR, chromaG, chromaB, 255);
+                chromaR = chromaR * 255 / maxChroma;
+                chromaG = chromaG * 255 / maxChroma;
+                chromaB = chromaB * 255 / maxChroma;
+                var pigmentStrength = Clamp(colourTotal / 180, 0, 1);
+                r = albinoBase * (1 - pigmentStrength) + chromaR * pigmentStrength;
+                g = albinoBase * (1 - pigmentStrength) + chromaG * pigmentStrength;
+                b = 214 * (1 - pigmentStrength) + chromaB * pigmentStrength;
+            }
+            var darkFactor = 1 - Clamp(p.negrine / 255, 0, 1);
+            r *= darkFactor;
+            g *= darkFactor;
+            b *= darkFactor;
+            var hex = HexFromRgb(r, g, b);
+            var rgb = ParseHexColour(hex);
+            return {
+                proteins: {
+                    verdine: p.verdine,
+                    jaunine: p.jaunine,
+                    orgine: p.orgine,
+                    cerulene: p.cerulene,
+                    rodine: p.rodine,
+                    negrine: p.negrine
+                },
+                hex: hex,
+                hue: ColourHueFromRgb(rgb),
+                luminance: ColourLuminanceFromRgb(rgb),
+                saturation: ColourSaturationFromRgb(rgb)
+            };
+        },
+
+        createSnapshot: function (body, secondary, patternType, first, second) {
+            return {
+                colourSystem: 'skinProteinsAdditiveV1',
+                bodyColour: body,
+                secondaryBodyColour: secondary,
+                bodyDarkColour: DarkenHexColour(body, 0.30),
+                bellyColour: MixHexColour(body, '#f0e3c0', 0.35),
+                snoutColour: MixHexColour(body, '#d9c6a3', 0.25),
+                spineColour: DarkenHexColour(secondary || body, 0.38),
+                pattern: { type: patternType },
+                camouflageHue: first.hue,
+                camouflageLuminance: first.luminance,
+                camouflageSaturation: first.saturation,
+                primaryProteins: first.proteins,
+                secondaryProteins: second.proteins
+            };
+        }
+    };
+
+    var MonsterPhenotypeSystem = {
+        buildPhenotype: function (genome) {
+            var context = new PhenotypeBuildContext();
+            if (genome && genome.getColourChromosome()) {
+                genome.getColourChromosome().expressTo(context);
+            }
+            return {
+                colour: ColourPhenotypeSystem.resolve(context)
+            };
+        },
+
+        snapshot: function (phenotype) {
+            return JSON.parse(JSON.stringify(phenotype || this.buildPhenotype(null)));
+        }
+    };
+
+    class GenePool {
+        constructor() {
+            this.colourChromosomeSlots = GenePool.createDefaultColourSlots();
+        }
+
+        createGenome(rng, world) {
+            var profile = this.getWorldColourSelectionProfile(world);
+            var a = [];
+            var b = [];
+            for (var i = 0; i < COLOUR_CHROMOSOME_SLOT_COUNT; i += 1) {
+                a.push(this.pickAlleleForColourSlot(i, rng, profile));
+                b.push(this.pickAlleleForColourSlot(i, rng, profile));
+            }
+            return new Genome([new ChromosomePair(a, b)]);
+        }
+
+        createOffspringGenome(motherGenome, fatherGenome, rng) {
+            var motherColour = motherGenome.getColourChromosome().createGameteHomologue(rng, 1, 2);
+            var fatherColour = fatherGenome.getColourChromosome().createGameteHomologue(rng, 1, 2);
+            return new Genome([new ChromosomePair(motherColour, fatherColour)]);
+        }
+
+        pickAlleleForColourSlot(slotIndex, rng, profile) {
+            var pool = this.colourChromosomeSlots[slotIndex] || [];
+            var total = 0;
+            var weights = [];
+            for (var i = 0; i < pool.length; i += 1) {
+                var weight = this.getWildColourWeight(pool[i], profile);
+                weights.push(weight);
+                total += weight;
+            }
+            if (total <= 0) {
+                return pool[0];
+            }
+            var roll = rng.range(0, total);
+            var cumulative = 0;
+            for (i = 0; i < pool.length; i += 1) {
+                cumulative += weights[i];
+                if (roll <= cumulative) {
+                    return pool[i];
+                }
+            }
+            return pool[pool.length - 1];
+        }
+
+        getWildColourWeight(allele, profile) {
+            // Commonness describes background availability in the wild population,
+            // not a licence for one colour family to dominate every biome. Keep it
+            // sub-linear so that dominant-terrain camouflage can overpower a common
+            // but inappropriate allele in desert, tundra and rocky environments.
+            var weight = Math.pow(allele.commonness || 1, 0.55);
+            if (!profile || !allele.selectionSensitive) {
+                return weight;
+            }
+            var context = new PhenotypeBuildContext();
+            allele.applyPhenotype(context, false);
+            var colour = ColourPhenotypeSystem.resolve(context);
+            var hueDelta = Math.abs(colour.camouflageHue - profile.hue);
+            hueDelta = Math.min(hueDelta, 360 - hueDelta) / 180;
+            var luminanceDelta = Math.abs(colour.camouflageLuminance - profile.luminance);
+            var saturationDelta = Math.abs((colour.camouflageSaturation || 0) - (profile.saturation || 0));
+            var mismatch;
+            if ((profile.saturation || 0) < 0.18) {
+                // Grey/tundra/rocky backgrounds are defined mostly by low chroma.
+                // Hue is unstable and misleading when saturation is near zero, so
+                // penalise saturation mismatch heavily for those environments.
+                mismatch = hueDelta * 0.20 + luminanceDelta * 0.25 + saturationDelta * 0.55;
+            } else {
+                mismatch = hueDelta * 0.56 + luminanceDelta * 0.24 + saturationDelta * 0.20;
+            }
+            var dominanceExposure = Clamp(allele.dominanceIndex / DOMINANCE_DEFAULT, 0.05, 1.55);
+            var selectionPressure = profile.selectionPressure || 12.0;
+            return weight * Math.exp(-selectionPressure * mismatch * dominanceExposure);
+        }
+
+        getWorldColourSelectionProfile(world) {
+            if (!world || !world.terrainGrid) {
+                return null;
+            }
+            if (world.colourSelectionProfile) {
+                return world.colourSelectionProfile;
+            }
+            var counts = {};
+            var dominantTerrainType = TERRAIN_TYPE.GRASS;
+            var dominantCount = -1;
+            for (var y = 0; y < world.terrainGrid.rows; y += 1) {
+                for (var x = 0; x < world.terrainGrid.cols; x += 1) {
+                    var terrainType = world.terrainGrid.getTerrainTypeAtTile(x, y);
+                    // Open water should not usually dominate selection for land
+                    // monsters. If the map is mostly water, the remaining land
+                    // still gives the better camouflage premise for this stage.
+                    if (terrainType === TERRAIN_TYPE.STREAM || terrainType === TERRAIN_TYPE.LAKE) { continue; }
+                    counts[terrainType] = (counts[terrainType] || 0) + 1;
+                    if (counts[terrainType] > dominantCount) {
+                        dominantCount = counts[terrainType];
+                        dominantTerrainType = terrainType;
+                    }
+                }
+            }
+            var target = GenePool.terrainColourForType(dominantTerrainType);
+            world.colourSelectionProfile = {
+                rgb: target,
+                hue: ColourHueFromRgb(target),
+                luminance: ColourLuminanceFromRgb(target),
+                saturation: ColourSaturationFromRgb(target),
+                dominantTerrainType: dominantTerrainType,
+                selectionPressure: 12.0
+            };
+            return world.colourSelectionProfile;
+        }
+
+        static terrainColourForType(terrainType) {
+            if (terrainType === TERRAIN_TYPE.FOREST) { return { r: 56, g: 92, b: 52 }; }
+            if (terrainType === TERRAIN_TYPE.MARSH) { return { r: 75, g: 99, b: 64 }; }
+            if (terrainType === TERRAIN_TYPE.ROCKY) { return { r: 114, g: 112, b: 105 }; }
+            if (terrainType === TERRAIN_TYPE.STREAM || terrainType === TERRAIN_TYPE.LAKE) { return { r: 73, g: 128, b: 154 }; }
+            if (terrainType === TERRAIN_TYPE.TUNDRA) { return { r: 166, g: 172, b: 160 }; }
+            if (terrainType === TERRAIN_TYPE.ICE) { return { r: 210, g: 224, b: 230 }; }
+            if (terrainType === TERRAIN_TYPE.DESERT) { return { r: 196, g: 160, b: 94 }; }
+            return { r: 110, g: 144, b: 78 };
+        }
+
+        static createSkinProteinAllele(dominanceIndex, amounts, commonness, debugLabel) {
+            return new Allele(dominanceIndex, function (context, normalise) {
+                context.addSkinProteins(amounts, normalise);
+            }, { commonness: commonness, selectionSensitive: true, debugLabel: debugLabel });
+        }
+
+        static createJunkAllele(dominanceIndex, commonness, debugLabel) {
+            return new Allele(dominanceIndex, function (context, normalise) {
+                if (normalise !== true && normalise !== false) {
+                    throw new Error('Junk allele phenotype received no explicit normalise boolean.');
+                }
+                return;
+            }, { commonness: commonness, selectionSensitive: false, debugLabel: debugLabel });
+        }
+
+        static createInactiveColourAllele(dominanceIndex, commonness, debugLabel) {
+            return new Allele(dominanceIndex, function (context, normalise) {
+                if (normalise !== true && normalise !== false) {
+                    throw new Error('Inactive colour allele phenotype received no explicit normalise boolean.');
+                }
+                return;
+            }, { commonness: commonness, selectionSensitive: true, debugLabel: debugLabel });
+        }
+
+        static createDefaultColourSlots() {
+            var junkCommon = GenePool.createJunkAllele(DOMINANCE_DEFAULT, 12, 'common inactive colour regulator');
+            var junkUncommon = GenePool.createJunkAllele(DOMINANCE_DEFAULT, 2.2, 'uncommon inactive colour regulator');
+            var inactiveMainColour = GenePool.createInactiveColourAllele(95, 2.8, 'inactive main colour regulator');
+            var inactiveNegrine = GenePool.createInactiveColourAllele(95, 2.0, 'inactive negrine regulator');
+            var verdine = GenePool.createSkinProteinAllele(110, { verdine: 150, negrine: 18 }, 2.7, 'verdine main regulator');
+            var jaunine = GenePool.createSkinProteinAllele(100, { jaunine: 145, negrine: 8 }, 3.8, 'jaunine main regulator');
+            var orgine = GenePool.createSkinProteinAllele(100, { orgine: 130, negrine: 10 }, 3.2, 'orgine main regulator');
+            var sandyDun = GenePool.createSkinProteinAllele(100, { jaunine: 88, orgine: 62, negrine: 5 }, 2.8, 'sandy dun main regulator');
+            var stoneGrey = GenePool.createSkinProteinAllele(100, { verdine: 8, cerulene: 6, negrine: 34 }, 2.4, 'stone grey main regulator');
+            var cerulene = GenePool.createSkinProteinAllele(100, { cerulene: 145, negrine: 6 }, 1.8, 'cerulene main regulator');
+            var rodine = GenePool.createSkinProteinAllele(100, { rodine: 145, negrine: 8 }, 1.2, 'rodine main regulator');
+            var recessivePurple = GenePool.createSkinProteinAllele(40, { cerulene: 130, rodine: 150, negrine: 5 }, 0.08, 'deep recessive purple regulator');
+            var commonNegrineLow = GenePool.createSkinProteinAllele(100, { negrine: 24 }, 5.5, 'low negrine regulator');
+            var commonNegrineMid = GenePool.createSkinProteinAllele(110, { negrine: 54 }, 3.0, 'moderate negrine regulator');
+            var paleRecessive = GenePool.createSkinProteinAllele(30, { negrine: -80 }, 0.28, 'deep recessive negrine suppressor');
+            var yellowGreenFine = GenePool.createSkinProteinAllele(100, { verdine: 28, jaunine: 46, negrine: 5 }, 2.3, 'yellow green fine tuner');
+            var blueGreenFine = GenePool.createSkinProteinAllele(100, { verdine: 36, cerulene: 38, negrine: 4 }, 1.8, 'blue green fine tuner');
+            var warmFine = GenePool.createSkinProteinAllele(100, { jaunine: 42, orgine: 36, negrine: 4 }, 2.4, 'warm fine tuner');
+            var stoneFine = GenePool.createSkinProteinAllele(100, { negrine: 20 }, 2.0, 'stone fine tuner');
+            var redFine = GenePool.createSkinProteinAllele(90, { rodine: 42, negrine: 5 }, 0.8, 'red fine tuner');
+            return [
+                [junkCommon, junkUncommon, paleRecessive, GenePool.createSkinProteinAllele(35, { cerulene: 20, rodine: 40, negrine: -35 }, 0.06, 'stray recessive colour suppressor')],
+                [verdine, jaunine, orgine, sandyDun, stoneGrey, cerulene, rodine, recessivePurple, inactiveMainColour],
+                [commonNegrineLow, commonNegrineMid, inactiveNegrine, GenePool.createSkinProteinAllele(100, { negrine: 82 }, 0.9, 'strong negrine regulator'), GenePool.createInactiveColourAllele(75, 0.8, 'rare inactive negrine slot')],
+                [junkCommon, junkUncommon, yellowGreenFine, blueGreenFine, warmFine, stoneFine, redFine, recessivePurple]
+            ];
+        }
+    }
+
+    var MonsterGenePool = new GenePool();
+
     // ============================================================================
     // MODULE: MONSTERS
     // ============================================================================
     // Monsters are one interbreedable species with subspecies-like variation. They
     // should broadly read as dog/crocodile blends: long snout, many teeth, fur,
-    // long in-line tail and agile medium-length legs. Genome/chromosome/gene,
-    // phenotype, age, fertility, diseases and detailed morphology come later.
+    // long in-line tail and agile medium-length legs. Genome, chromosome,
+    // homologue, allele and phenotype state now begin with colour genetics; age,
+    // fertility, diseases and detailed morphology remain future lifecycle layers.
     class Monster extends Agent {
         constructor(id, x, y, rng, options) {
             super(id, x, y, 16, options && options.speed ? options.speed : 165);
@@ -4740,6 +5283,8 @@ button:hover { background: #ffd768; }
             this.roamTargetX = null;
             this.roamTargetY = null;
             this.roamRetargetTick = -1;
+            this.genome = options && options.genome ? options.genome : MonsterGenePool.createGenome(rng, options && options.world ? options.world : null);
+            this.phenotype = MonsterPhenotypeSystem.buildPhenotype(this.genome);
         }
 
         static randomName(rng) {
@@ -5212,6 +5757,7 @@ button:hover { background: #ffd768; }
             s.recallRequested = this.recallRequested;
             s.recallTargetX = this.recallTargetX;
             s.recallTargetY = this.recallTargetY;
+            s.phenotype = MonsterPhenotypeSystem.snapshot(this.phenotype);
             return s;
         }
     }
@@ -5570,11 +6116,11 @@ button:hover { background: #ffd768; }
         }
     }
     class GameState {
-        constructor(rng, mode) {
+        constructor(rng, mode, world) {
             this.mode = mode || 'campaign';
             this.campaignStats = new CampaignStats();
             this.nextMonsterId = 2;
-            this.ownedMonsters = [new Monster('monster_1', RIGHT_EDGE_X, rng.range(120, MAP_HEIGHT - 120), rng, { owned: true, name: 'Gribble', selectedForDeployment: true })];
+            this.ownedMonsters = [new Monster('monster_1', RIGHT_EDGE_X, rng.range(120, MAP_HEIGHT - 120), rng, { owned: true, name: 'Gribble', selectedForDeployment: true, world: world })];
             this.eggs = [];
             this.foodExpenditureCredits = 0;
             this.roundFoodExpenditureCredits = 0;
@@ -5929,7 +6475,8 @@ button:hover { background: #ffd768; }
                     owned: false,
                     collared: false,
                     wild: true,
-                    selectedForDeployment: false
+                    selectedForDeployment: false,
+                    world: this.world
                 });
                 monster.spawnTick = spawnTick;
                 monster.deployed = false;
@@ -6880,9 +7427,9 @@ button:hover { background: #ffd768; }
             this.roundEnded = false;
             this.roundResult = 'Round in progress';
             this.lastRaidSummary = null;
-            this.gameState = new GameState(this.rng, this.mode);
-            this.gameState.roundNumber = this.roundNumber;
             this.world = WorldGenerator.createWorld(this.seed, this.getWorldOptions(this.baseWorldOptions));
+            this.gameState = new GameState(this.rng, this.mode, this.world);
+            this.gameState.roundNumber = this.roundNumber;
             this.currentRaid = null;
             this.roundRemains = [];
             this.pendingEvents = [{ tickNumber: 0, text: (this.mode === 'campaign' ? 'Campaign' : 'Single game') + ' created. Choose monsters for round 1 season 1.' }];
@@ -7286,6 +7833,59 @@ button:hover { background: #ffd768; }
         // behaviour should be covered by separate opt-in diagnostics in a fresh
         // session so that ordinary validation does not time out.
         var results = [];
+
+        var geneticsContext = new PhenotypeBuildContext();
+        var sameCallCount = 0;
+        var countedAllele = new Allele(100, function (context, normalise) {
+            sameCallCount += 1;
+            context.addSkinProteins({ verdine: 80 }, normalise);
+        }, { commonness: 1, selectionSensitive: false, debugLabel: 'counted regression allele' });
+        ChromosomePair.expressAllelePair(countedAllele, countedAllele, geneticsContext);
+        AddRegressionResult(results, 'Identical allele object pair expresses once rather than as codominant double expression', sameCallCount === 1 && !geneticsContext.usedCodominantSkinLayers, 'calls=' + sameCallCount + ', codominant=' + geneticsContext.usedCodominantSkinLayers);
+
+        var codominantContext = new PhenotypeBuildContext();
+        var codominantA = GenePool.createSkinProteinAllele(100, { verdine: 140 }, 1, 'regression green codominant');
+        var codominantB = GenePool.createSkinProteinAllele(100, { rodine: 140, cerulene: 120 }, 1, 'regression purple codominant');
+        ChromosomePair.expressAllelePair(codominantA, codominantB, codominantContext);
+        var codominantColour = ColourPhenotypeSystem.resolve(codominantContext);
+        AddRegressionResult(results, 'Different equal-dominance colour alleles create codominant stripe phenotype', codominantContext.usedCodominantSkinLayers && codominantColour.pattern.type === 'stripes' && codominantColour.bodyColour !== codominantColour.secondaryBodyColour, 'pattern=' + codominantColour.pattern.type + ', primary=' + codominantColour.bodyColour + ', secondary=' + codominantColour.secondaryBodyColour);
+
+        var clampContext = new PhenotypeBuildContext();
+        GenePool.createSkinProteinAllele(100, { negrine: -500 }, 1, 'regression negrine suppressor').applyPhenotype(clampContext, false);
+        var clampedColour = ColourPhenotypeSystem.resolve(clampContext);
+        AddRegressionResult(results, 'Negative protein contributions are clamped after phenotype expression', clampedColour.primaryProteins.negrine === 0, 'negrine=' + clampedColour.primaryProteins.negrine);
+
+        var recombinationAllelesA = [codominantA, codominantA, codominantA, countedAllele];
+        var recombinationAllelesB = [codominantB, countedAllele, codominantB, codominantB];
+        var recombinationChromosome = new ChromosomePair(recombinationAllelesA, recombinationAllelesB);
+        var gamete = recombinationChromosome.createGameteHomologue(new SeededRng(7001), 1, 2);
+        var objectReferencesPreserved = gamete.length === 4 && gamete.every(function (allele, index) { return allele === recombinationAllelesA[index] || allele === recombinationAllelesB[index]; });
+        AddRegressionResult(results, 'Chunked crossover gamete preserves allele object references from homologues', objectReferencesPreserved, 'slots=' + gamete.length);
+
+        function makeColourRegressionWorld(terrainType) {
+            return { terrainGrid: { rows: 9, cols: 9, getTerrainTypeAtTile: function () { return terrainType; } } };
+        }
+        function sampleColourPopulation(terrainType, seed) {
+            var rng = new SeededRng(seed);
+            var world = makeColourRegressionWorld(terrainType);
+            var totalR = 0;
+            var totalG = 0;
+            var totalB = 0;
+            var count = 240;
+            for (var sampleIndex = 0; sampleIndex < count; sampleIndex += 1) {
+                var phenotype = MonsterPhenotypeSystem.buildPhenotype(MonsterGenePool.createGenome(rng, world));
+                var rgb = ParseHexColour(phenotype.colour.bodyColour);
+                totalR += rgb.r;
+                totalG += rgb.g;
+                totalB += rgb.b;
+            }
+            return { r: totalR / count, g: totalG / count, b: totalB / count };
+        }
+        var forestColourStats = sampleColourPopulation(TERRAIN_TYPE.FOREST, 7101);
+        var desertColourStats = sampleColourPopulation(TERRAIN_TYPE.DESERT, 7102);
+        var rockyColourStats = sampleColourPopulation(TERRAIN_TYPE.ROCKY, 7103);
+        AddRegressionResult(results, 'Wild colour selection favours green populations in forest but not in desert', forestColourStats.g > forestColourStats.r + 18 && forestColourStats.g > forestColourStats.b + 18 && desertColourStats.r > desertColourStats.g - 8 && desertColourStats.r > desertColourStats.b + 35, 'forest=' + JSON.stringify(forestColourStats) + ', desert=' + JSON.stringify(desertColourStats));
+        AddRegressionResult(results, 'Wild colour selection makes rocky populations greyer than forest populations', Math.max(rockyColourStats.r, rockyColourStats.g, rockyColourStats.b) - Math.min(rockyColourStats.r, rockyColourStats.g, rockyColourStats.b) < 65, 'rocky=' + JSON.stringify(rockyColourStats));
 
         var session = new GameSession(24681012, { mode: 'quick', worldOptions: { mapSizeKey: 'legacy' } });
         session.startSeason();
@@ -8311,15 +8911,36 @@ button:hover { background: #ffd768; }
             return [monster.id,monster.name,monster.alive?1:0,monster.selectedForDeployment?1:0,monster.deployed?1:0,monster.capturedThisRaid?1:0,Math.round(monster.health),Math.round(monster.maxHealth),monster.nutritionState,monster.foodEatenThisSeason||0,monster.foodBoughtThisSeason||0,monster.foodBoughtCostCreditsThisSeason||0,monster.foodNeededThisSeason||0].join(':');
         })).join('|');
     }
+    function MonsterColourPhenotype(monster){
+        var colour = monster && monster.phenotype && monster.phenotype.colour ? monster.phenotype.colour : null;
+        return colour || {
+            bodyColour: '#6b2d83',
+            secondaryBodyColour: '#6b2d83',
+            bodyDarkColour: '#4a1f5d',
+            bellyColour: '#8b5fb0',
+            snoutColour: '#7d3f98',
+            spineColour: '#5b216e',
+            pattern: { type: 'solid' }
+        };
+    }
+    function MonsterColourIsStriped(monster){
+        var colour=MonsterColourPhenotype(monster);
+        return colour.pattern&&colour.pattern.type==='stripes'&&colour.secondaryBodyColour&&colour.secondaryBodyColour!==colour.bodyColour;
+    }
     function MonsterIconSvg(monster){
-        var body=monster.alive?'#6b2d83':'#6b7280';
+        var colour=MonsterColourPhenotype(monster);
+        var body=monster.alive?colour.bodyColour:'#6b7280';
+        var secondary=monster.alive?(colour.secondaryBodyColour||colour.bodyColour):'#6b7280';
+        var bodyDark=monster.alive?(colour.bodyDarkColour||'#4a1f5d'):'#4b5563';
         var dark=monster.alive?'#1f2730':'#374151';
         var collar=monster.collared?'#f2c14e':'transparent';
         var eye=monster.alive?'white':'#d1d5db';
+        var stripes=MonsterColourIsStriped(monster)?'<path d="M54 48 L72 88 M82 36 L103 96 M112 40 L130 86" stroke="'+secondary+'" stroke-width="8" stroke-linecap="round" opacity="0.62"/>':'';
         return '<svg viewBox="0 0 180 110" role="img" aria-label="Monster icon">'
             + '<ellipse cx="90" cy="82" rx="54" ry="11" fill="rgba(0,0,0,0.18)"/>'
             + '<path d="M35 66 C44 38 86 29 126 42 C150 50 157 74 139 84 C109 100 58 94 35 66 Z" fill="'+body+'" stroke="'+dark+'" stroke-width="4"/>'
-            + '<path d="M39 61 C22 56 16 45 15 37 C32 43 44 49 55 58 Z" fill="#4a1f5d" stroke="'+dark+'" stroke-width="3"/>'
+            + stripes
+            + '<path d="M39 61 C22 56 16 45 15 37 C32 43 44 49 55 58 Z" fill="'+bodyDark+'" stroke="'+dark+'" stroke-width="3"/>'
             + '<path d="M122 42 C143 30 164 37 169 52 C154 50 141 54 130 64 Z" fill="'+body+'" stroke="'+dark+'" stroke-width="4"/>'
             + '<circle cx="144" cy="46" r="8" fill="'+eye+'"/><circle cx="147" cy="47" r="4" fill="'+dark+'"/>'
             + '<path d="M151 58 Q139 66 126 58" fill="none" stroke="'+dark+'" stroke-width="3" stroke-linecap="round"/>'
@@ -8349,7 +8970,8 @@ button:hover { background: #ffd768; }
         if(shortfall>0){
             detailRows.push(['Food shortfall',FormatNumber(shortfall),'nutritionShortfall']);
         }
-        detailRows=detailRows.concat([['Collar',monster.collared?'Collared':'Uncollared'],['Raid state',monster.deployed?'Deployed':'In cage'],['Season order',monster.selectedForDeployment?'Deploy at start':'Reserve'],['Origin',monster.capturedThisRaid?'Captured wild monster':'Captive monsters']]);
+        var visibleColour=MonsterColourPhenotype(monster);
+        detailRows=detailRows.concat([['Visible colour',visibleColour.pattern&&visibleColour.pattern.type==='stripes'?'striped':'solid'],['Collar',monster.collared?'Collared':'Uncollared'],['Raid state',monster.deployed?'Deployed':'In cage'],['Season order',monster.selectedForDeployment?'Deploy at start':'Reserve'],['Origin',monster.capturedThisRaid?'Captured wild monster':'Captive monsters']]);
         detailRows.forEach(function(row){
             var dt=document.createElement('dt');
             var dd=document.createElement('dd');
@@ -9211,7 +9833,7 @@ button:hover { background: #ffd768; }
             ctx.lineTo(-radius*1.19,-3);
             ctx.stroke();
         } else {
-            var colour=kind==='adventurer'?'#6b7280':(kind==='macrofauna'?(entity.colour||'#8b5a2b'):'#6b2d83');
+            var colour=kind==='adventurer'?'#6b7280':(kind==='macrofauna'?(entity.colour||'#8b5a2b'):(MonsterColourPhenotype(entity).bodyColour||'#6b2d83'));
             ctx.fillStyle=colour;
             ctx.strokeStyle='#1f2730';
             ctx.lineWidth=2;
@@ -9442,10 +10064,15 @@ button:hover { background: #ffd768; }
         // - Head, snout, tail, legs and dorsal plates follow the renderer-only facing octant.
         // - The monster must not appear to walk backward or sideways when pathing changes direction.
         // - Dorsal plates are anchored inside the body silhouette in every direction.
+        var phenotypeColour=MonsterColourPhenotype(m);
         var dark='#1f2730';
-        var body='#6b2d83';
-        var bodyDark='#4a1f5d';
-        var belly='#8b5fb0';
+        var body=phenotypeColour.bodyColour||'#6b2d83';
+        var bodySecondary=phenotypeColour.secondaryBodyColour||body;
+        var bodyDark=phenotypeColour.bodyDarkColour||'#4a1f5d';
+        var belly=phenotypeColour.bellyColour||'#8b5fb0';
+        var snoutColour=phenotypeColour.snoutColour||'#7d3f98';
+        var spineColour=phenotypeColour.spineColour||'#5b216e';
+        var showStripes=MonsterColourIsStriped(m);
         var fx=facing.facingX;
         var fy=facing.facingY*0.45;
         var len=Math.hypot(fx,fy);
@@ -9493,6 +10120,19 @@ button:hover { background: #ffd768; }
         ctx.beginPath();
         ctx.ellipse(-fx*4,-38-fy*2,28+breathe,16+breathe*0.25,rot,0,Math.PI*2);
         ctx.fill();
+        if(showStripes){
+            ctx.save();
+            ctx.globalAlpha=0.58;
+            ctx.strokeStyle=bodySecondary;
+            ctx.lineWidth=5;
+            for(var stripe=-24;stripe<=24;stripe+=12){
+                ctx.beginPath();
+                ctx.moveTo(stripe*0.75-lx*10,-54+ly*stripe*0.06);
+                ctx.lineTo(stripe*0.75+lx*10,-23+ly*stripe*0.06);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
         ctx.fillStyle=belly;
         ctx.beginPath();
         ctx.ellipse(-fx*4,-31,15,7,rot,0,Math.PI*2);
@@ -9510,7 +10150,7 @@ button:hover { background: #ffd768; }
         ctx.ellipse(headX,headY,18,15,rot*0.35,0,Math.PI*2);
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle='#7d3f98';
+        ctx.fillStyle=snoutColour;
         ctx.beginPath();
         ctx.ellipse(snoutX,snoutY,10,7,rot*0.35,0,Math.PI*2);
         ctx.fill();
@@ -9558,12 +10198,12 @@ button:hover { background: #ffd768; }
             ctx.fill();
         }
 else {
-            ctx.fillStyle='#5b216e';
+            ctx.fillStyle=spineColour;
             ctx.beginPath();
             ctx.ellipse(headX,headY-4,12,7,rot,0,Math.PI*2);
             ctx.fill();
         }
-        ctx.fillStyle='#5b216e';
+        ctx.fillStyle=spineColour;
         ctx.strokeStyle=dark;
         ctx.lineWidth=1.5;
         var spineOffsets=[-18,-6,7,19];
