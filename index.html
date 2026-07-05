@@ -250,6 +250,16 @@ button:hover { background: #ffd768; }
     var DEFAULT_MONSTER_HEARING_THRESHOLD = 0.11;
     var DEFAULT_ADVENTURER_HEARING_THRESHOLD = 0.20;
     var SOUND_PROPAGATION_MULTIPLIER = 4;
+    var MORALE_SKELETON_PENALTY = 0.035;
+    var MORALE_INJURY_PENALTY = 0.18;
+    var MORALE_ATTACK_WITNESS_PENALTY = 0.16;
+    var MORALE_KILL_WITNESS_PENALTY = 0.34;
+    var MORALE_TREASURE_SELF_BONUS = 0.18;
+    var MORALE_TREASURE_WITNESS_BONUS = 0.07;
+    var MORALE_MONSTER_KILL_WITNESS_BONUS = 0.20;
+    var MORALE_NEAR_TREASURE_BONUS = 0.004;
+    var MORALE_TREASURE_ENCOURAGEMENT_INTERVAL_TICKS = 30;
+    var MORALE_VISIBLE_MONSTER_INTERVAL_TICKS = 35;
 
     var TERRAIN_TYPE = {
         GRASS: 0,
@@ -292,8 +302,8 @@ button:hover { background: #ffd768; }
             speedMax: 108,
             bodyPartHealth: 12,
             carryCapacity: 15,
-            courageMin: 0.18,
-            courageMax: 0.55,
+            courageMin: 0.68,
+            courageMax: 1.18,
             greedMin: 0.15,
             greedMax: 0.55,
             intelligenceMin: 0.12,
@@ -320,8 +330,8 @@ button:hover { background: #ffd768; }
             speedMax: 74,
             bodyPartHealth: 13,
             carryCapacity: 45,
-            courageMin: 0.12,
-            courageMax: 0.42,
+            courageMin: 0.48,
+            courageMax: 0.98,
             greedMin: 0.45,
             greedMax: 0.8,
             intelligenceMin: 0.1,
@@ -349,8 +359,8 @@ button:hover { background: #ffd768; }
             speedMax: 126,
             bodyPartHealth: 15,
             carryCapacity: 20,
-            courageMin: 0.38,
-            courageMax: 0.72,
+            courageMin: 0.88,
+            courageMax: 1.35,
             greedMin: 0.42,
             greedMax: 0.82,
             intelligenceMin: 0.48,
@@ -378,8 +388,8 @@ button:hover { background: #ffd768; }
             speedMax: 112,
             bodyPartHealth: 21,
             carryCapacity: 24,
-            courageMin: 0.62,
-            courageMax: 0.92,
+            courageMin: 1.08,
+            courageMax: 1.48,
             greedMin: 0.48,
             greedMax: 0.9,
             intelligenceMin: 0.42,
@@ -409,8 +419,8 @@ button:hover { background: #ffd768; }
             mountedSpeedMax: 168,
             bodyPartHealth: 27,
             carryCapacity: 30,
-            courageMin: 0.72,
-            courageMax: 0.98,
+            courageMin: 1.18,
+            courageMax: 1.58,
             greedMin: 0.55,
             greedMax: 0.95,
             intelligenceMin: 0.48,
@@ -3072,6 +3082,19 @@ button:hover { background: #ffd768; }
             }
             return result;
         }
+
+        getNearbyTerrainObjects(x, y, queryRadius) {
+            var radius = Math.max(0, queryRadius || 0);
+            var objects = this.terrainObjects || [];
+            var result = [];
+            for (var i = 0; i < objects.length; i += 1) {
+                var object = objects[i];
+                if (Distance(x, y, object.x, object.y) <= radius + (object.radius || 0)) {
+                    result.push(object);
+                }
+            }
+            return result;
+        }
         getNearbyBlockingTerrainObjects(x, y, agentRadius) {
             var queryRadius = this.maxBlockingObstacleRadius + agentRadius + MOVEMENT_CLEARANCE_MARGIN;
             var minCx = Math.floor((x - queryRadius) / this.obstacleSpatialCellSize);
@@ -4093,6 +4116,12 @@ button:hover { background: #ffd768; }
             this.exitY = y;
             this.fleeing = false;
             this.courage = rng.range(profile.courageMin, profile.courageMax);
+            this.currentCourage = this.courage;
+            this.knownSkeletonFearIds = {};
+            this.processedMoraleSoundIds = {};
+            this.processedFearSoundIds = {};
+            this.lastVisibleMonsterFearTick = -9999;
+            this.lastTreasureEncouragementTick = -9999;
             this.greed = rng.range(profile.greedMin, profile.greedMax);
             this.intelligence = rng.range(profile.intelligenceMin, profile.intelligenceMax);
             this.perception = rng.range(profile.perceptionMin, profile.perceptionMax);
@@ -4283,6 +4312,7 @@ button:hover { background: #ffd768; }
                 this.carryingTreasure = true;
                 this.carryingTreasureType = treasure.treasureType;
                 this.behaviourState = 'pickingUpTreasure';
+                this.currentCourage = Clamp((this.currentCourage === undefined ? this.courage : this.currentCourage) + MORALE_TREASURE_SELF_BONUS, 0, 1.25);
                 raid.addEvent('A ' + this.displayName + ' took ' + amount + ' units of ' + TREASURE_TYPES[treasure.treasureType].displayName + '.');
                 raid.addSound('treasureCollected', this, this.x, this.y, SOUND_LOUDNESS.LOUD, SOUND_DEFAULT_DURATION_TICKS);
             }
@@ -4352,13 +4382,18 @@ button:hover { background: #ffd768; }
             return true;
         }
 
-        applyDamage(amount, rng, raid) {
+        applyDamage(amount, rng, raid, attacker) {
             var part = this.bodyHealth.applyGeneralDamage(this.receiveArmouredDamage(amount), rng);
             this.health = this.bodyHealth.total();
             this.lastDamagePart = part;
             this.lastDamageTick = raid ? raid.tickNumber : -1;
+            this.currentCourage = Clamp((this.currentCourage === undefined ? this.courage : this.currentCourage) - MORALE_INJURY_PENALTY, 0, 1.25);
             if (raid) {
-                raid.addSound('adventurerInjured', this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
+                raid.addSound('adventurerInjured', attacker || this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS, {
+                    victimId: this.id,
+                    victimKind: this.agentKind,
+                    victimClassName: this.className
+                });
             }
 
             if (this.carryingTreasure && !this.bodyHealth.armsCanCarry()) {
@@ -4370,7 +4405,11 @@ button:hover { background: #ffd768; }
                 this.corpseState = 'corpse';
                 this.edibleFoodRemaining = Math.max(this.edibleFoodRemaining || 0, this.foodValue || HUMAN_FOOD_VALUE);
                 if (raid) {
-                    raid.addSound('adventurerKilled', this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
+                    raid.addSound('adventurerKilled', attacker || this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS, {
+                        victimId: this.id,
+                        victimKind: this.agentKind,
+                        victimClassName: this.className
+                    });
                 }
                 this.dropTreasure(raid, 'death');
             } else if (!this.fleeing && this.health < this.maxHealth * 0.35) {
@@ -4424,6 +4463,7 @@ button:hover { background: #ffd768; }
             s.exitX = this.exitX;
             s.exitY = this.exitY;
             s.fleeing = this.fleeing;
+            s.currentCourage = this.currentCourage;
             s.foodValue = this.foodValue;
             s.perception = this.perception;
             s.sightRange = this.sightRange;
@@ -5125,11 +5165,14 @@ button:hover { background: #ffd768; }
             }.bind(this));
         }
 
-        applyDamage(amount, rng, raid) {
+        applyDamage(amount, rng, raid, attacker) {
             this.bodyHealth.applyGeneralDamage(amount, rng);
             this.health = this.bodyHealth.total();
             if (raid) {
-                raid.addSound('monsterInjured', this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
+                raid.addSound('monsterInjured', attacker || this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS, {
+                    victimId: this.id,
+                    victimKind: this.agentKind
+                });
             }
 
             if (this.bodyHealth.isDead()) {
@@ -5137,7 +5180,10 @@ button:hover { background: #ffd768; }
                 this.corpseState = 'corpse';
                 this.behaviourState = 'dead';
                 if (raid) {
-                    raid.addSound('monsterKilled', this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
+                    raid.addSound('monsterKilled', attacker || this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS, {
+                        victimId: this.id,
+                        victimKind: this.agentKind
+                    });
                 }
             }
         }
@@ -5441,13 +5487,17 @@ button:hover { background: #ffd768; }
             this.wanderTargetY = this.y;
         }
 
-        applyDamage(amount, raid) {
+        applyDamage(amount, raid, attacker) {
             if (!this.alive) {
                 return;
             }
             this.health = Math.max(0, this.health - amount);
             if (raid) {
-                raid.addSound('macrofaunaInjured', this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
+                raid.addSound('macrofaunaInjured', attacker || this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS, {
+                    victimId: this.id,
+                    victimKind: this.agentKind,
+                    victimSpecies: this.species
+                });
             }
             if (this.health <= 0) {
                 this.alive = false;
@@ -5455,7 +5505,11 @@ button:hover { background: #ffd768; }
                 this.behaviourState = 'dead';
                 this.edibleFoodRemaining = Math.max(this.edibleFoodRemaining || 0, this.foodValue || LARGE_MACROFAUNA_FOOD_VALUE);
                 if (raid) {
-                    raid.addSound('macrofaunaKilled', this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
+                    raid.addSound('macrofaunaKilled', attacker || this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS, {
+                        victimId: this.id,
+                        victimKind: this.agentKind,
+                        victimSpecies: this.species
+                    });
                 }
             }
         }
@@ -5582,7 +5636,7 @@ button:hover { background: #ffd768; }
     }
 
     class Raid {
-        constructor(world, gameState, seed, seasonNumber) {
+        constructor(world, gameState, seed, seasonNumber, previousRemains) {
             this.world = world;
             this.gameState = gameState;
             this.seed = seed >>> 0;
@@ -5592,6 +5646,7 @@ button:hover { background: #ffd768; }
             this.raidEnded = false;
             this.raidResult = 'Raid in progress';
             this.events = [];
+            this.previousRemains = previousRemains ? previousRemains.slice(0) : [];
             this.soundEvents = [];
             this.nextSoundEventId = 1;
             this.gameState.getLivingOwnedMonsters().forEach(function (monster) {
@@ -6015,7 +6070,7 @@ button:hover { background: #ffd768; }
         }
 
 
-        addSound(kind, source, x, y, loudness, durationTicks) {
+        addSound(kind, source, x, y, loudness, durationTicks, details) {
             if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(loudness) || loudness <= 0) {
                 return null;
             }
@@ -6024,12 +6079,17 @@ button:hover { background: #ffd768; }
                 kind: kind || 'sound',
                 sourceKind: source && source.agentKind ? source.agentKind : (source && source.type ? source.type : 'world'),
                 sourceId: source && source.id ? source.id : null,
+                sourceClassName: source && source.className ? source.className : null,
+                sourceDisplayName: source && source.displayName ? source.displayName : null,
                 x: x,
                 y: y,
                 loudness: loudness,
                 createdTick: this.tickNumber,
                 expiresTick: this.tickNumber + Math.max(1, Math.floor(durationTicks || SOUND_DEFAULT_DURATION_TICKS))
             };
+            if (details) {
+                Object.keys(details).forEach(function (key) { event[key] = details[key]; });
+            }
             this.nextSoundEventId += 1;
             this.soundEvents.push(event);
             return event;
@@ -6103,7 +6163,7 @@ button:hover { background: #ffd768; }
             if (WorldGenerator.seasonNameForNumber(this.seasonNumber) !== 'autumn') {
                 return false;
             }
-            var nearby = this.world.getNearbyVisionBlockingTerrainObjects(agent.x, agent.y, agent.radius || 10);
+            var nearby = this.world.getNearbyTerrainObjects(agent.x, agent.y, agent.radius || 10);
             for (var i = 0; i < nearby.length; i += 1) {
                 var object = nearby[i];
                 if (object.type === 'tree' && Distance(agent.x, agent.y, object.x, object.y) <= (object.radius || 0)) {
@@ -6153,6 +6213,148 @@ button:hover { background: #ffd768; }
             this.monsters.forEach(function (monster) { this.emitAgentMovementSound(monster); }, this);
         }
 
+
+        adjustAdventurerCourage(adventurer, amount) {
+            if (!adventurer) {
+                return;
+            }
+            var base = adventurer.currentCourage === undefined ? adventurer.courage : adventurer.currentCourage;
+            adventurer.currentCourage = Clamp(base + amount, 0, 1.25);
+        }
+
+        adventurerClassRank(className) {
+            if (className === 'explorer') { return 1; }
+            if (className === 'warrior') { return 2; }
+            if (className === 'knight') { return 3; }
+            return 0;
+        }
+
+        classMoraleScale(observer, otherClassName, negative) {
+            var observerRank = this.adventurerClassRank(observer.className);
+            var otherRank = this.adventurerClassRank(otherClassName);
+            if (negative && observer.className === 'knight' && otherRank < observerRank) {
+                return 0;
+            }
+            var diff = otherRank - observerRank;
+            if (diff > 0) {
+                return 1 + diff * 0.35;
+            }
+            if (diff < 0) {
+                return Math.max(0.25, 1 + diff * 0.25);
+            }
+            return 1;
+        }
+
+        pointVisibleToAdventurer(adventurer, x, y) {
+            if (!adventurer || !Number.isFinite(x) || !Number.isFinite(y)) {
+                return false;
+            }
+            var target = { x: x, y: y, radius: 12, terrainHeight: this.world.terrainGrid.getHeightAtWorld(x, y) };
+            return adventurer.canSee(this.world, target);
+        }
+
+        findNearestVisibleMonster(adventurer) {
+            var best = null;
+            var bestDistance = Infinity;
+            for (var i = 0; i < this.monsters.length; i += 1) {
+                var monster = this.monsters[i];
+                if (!monster.isActive() || !monster.deployed) {
+                    continue;
+                }
+                var distance = adventurer.distanceTo(monster);
+                if (distance < bestDistance && adventurer.canSee(this.world, monster)) {
+                    best = monster;
+                    bestDistance = distance;
+                }
+            }
+            return best ? { monster: best, distance: bestDistance } : null;
+        }
+
+        nearestTreasureDistance(adventurer) {
+            var deposits = this.world.treasureDeposits.filter(function (deposit) { return !deposit.isEmpty(); });
+            var drops = this.droppedTreasure.filter(function (drop) { return (drop.amountRemaining || 0) > 0; });
+            var all = deposits.concat(drops);
+            var bestDistance = Infinity;
+            for (var i = 0; i < all.length; i += 1) {
+                bestDistance = Math.min(bestDistance, adventurer.distanceTo(all[i]));
+            }
+            return bestDistance;
+        }
+
+        applyVisibleSkeletonMorale(adventurer) {
+            for (var i = 0; i < this.previousRemains.length; i += 1) {
+                var remain = this.previousRemains[i];
+                if (!remain || remain.agentKind !== 'adventurer' || adventurer.knownSkeletonFearIds[remain.id]) {
+                    continue;
+                }
+                if (this.pointVisibleToAdventurer(adventurer, remain.x, remain.y)) {
+                    adventurer.knownSkeletonFearIds[remain.id] = true;
+                    this.adjustAdventurerCourage(adventurer, -MORALE_SKELETON_PENALTY * this.classMoraleScale(adventurer, remain.className, true));
+                }
+            }
+        }
+
+        applyVisibleMonsterMorale(adventurer) {
+            var visible = this.findNearestVisibleMonster(adventurer);
+            if (!visible || visible.distance > 850) {
+                return;
+            }
+            if (!adventurer.fleeing && !adventurer.carryingTreasure) {
+                var courage = adventurer.currentCourage === undefined ? adventurer.courage : adventurer.currentCourage;
+                var fleeChance = Clamp((1 - visible.distance / 850) * 0.62 - courage + 0.02, 0, 0.74);
+                if (this.rng.nextFloat() < fleeChance) {
+                    adventurer.fleeing = true;
+                    adventurer.behaviourState = 'fleeingFromSeenMonster';
+                    this.addEvent('A ' + adventurer.displayName + ' saw a monster and fled.');
+                }
+            }
+        }
+
+        applyTreasureProximityMorale(adventurer) {
+            if (this.tickNumber - adventurer.lastTreasureEncouragementTick < MORALE_TREASURE_ENCOURAGEMENT_INTERVAL_TICKS) {
+                return;
+            }
+            var distance = this.nearestTreasureDistance(adventurer);
+            if (distance <= 140) {
+                this.adjustAdventurerCourage(adventurer, MORALE_NEAR_TREASURE_BONUS * (1 - distance / 140));
+                adventurer.lastTreasureEncouragementTick = this.tickNumber;
+            }
+        }
+
+        applyMoraleSoundToAdventurer(adventurer, sound) {
+            if (!sound || adventurer.processedMoraleSoundIds[sound.id] || sound.sourceId === adventurer.id) {
+                return;
+            }
+            if (!this.pointVisibleToAdventurer(adventurer, sound.x, sound.y)) {
+                return;
+            }
+            adventurer.processedMoraleSoundIds[sound.id] = true;
+            if (sound.kind === 'adventurerInjured') {
+                this.adjustAdventurerCourage(adventurer, -MORALE_ATTACK_WITNESS_PENALTY * this.classMoraleScale(adventurer, sound.victimClassName, true));
+            } else if (sound.kind === 'adventurerKilled') {
+                this.adjustAdventurerCourage(adventurer, -MORALE_KILL_WITNESS_PENALTY * this.classMoraleScale(adventurer, sound.victimClassName, true));
+            } else if (sound.kind === 'monsterKilled' && sound.sourceKind === 'adventurer') {
+                this.adjustAdventurerCourage(adventurer, MORALE_MONSTER_KILL_WITNESS_BONUS * this.classMoraleScale(adventurer, sound.sourceClassName, false));
+            } else if (sound.kind === 'treasureCollected' && sound.sourceKind === 'adventurer') {
+                this.adjustAdventurerCourage(adventurer, MORALE_TREASURE_WITNESS_BONUS * this.classMoraleScale(adventurer, sound.sourceClassName, false));
+            }
+        }
+
+        resolveAdventurerMorale() {
+            for (var i = 0; i < this.adventurers.length; i += 1) {
+                var adventurer = this.adventurers[i];
+                if (!adventurer.isActive()) {
+                    continue;
+                }
+                this.applyVisibleSkeletonMorale(adventurer);
+                this.applyVisibleMonsterMorale(adventurer);
+                this.applyTreasureProximityMorale(adventurer);
+                for (var s = 0; s < this.soundEvents.length; s += 1) {
+                    this.applyMoraleSoundToAdventurer(adventurer, this.soundEvents[s]);
+                }
+            }
+        }
+
         resolveAdventurerSoundFear() {
             for (var i = 0; i < this.adventurers.length; i += 1) {
                 var adventurer = this.adventurers[i];
@@ -6160,14 +6362,16 @@ button:hover { background: #ffd768; }
                     continue;
                 }
                 var heardMonster = this.findBestAudibleSoundFor(adventurer, function (sound) {
-                    return sound.sourceKind === 'monster' && sound.sourceId !== adventurer.id;
+                    return sound.sourceKind === 'monster' && sound.sourceId !== adventurer.id && !adventurer.processedFearSoundIds[sound.id];
                 });
                 if (!heardMonster) {
                     continue;
                 }
+                adventurer.processedFearSoundIds[heardMonster.id] = true;
                 var fearPressure = Clamp((heardMonster.perceivedLoudness - (adventurer.hearingThreshold || DEFAULT_ADVENTURER_HEARING_THRESHOLD)) / 1.2, 0, 1);
-                var courageResistance = Clamp((adventurer.courage || 0) * 0.82 + (adventurer.strength || 0) * 0.10 + (adventurer.caution || 0) * 0.08, 0, 1);
-                var fleeChance = Clamp(fearPressure - courageResistance + 0.10, 0, 0.88);
+                var courageValue = adventurer.currentCourage === undefined ? adventurer.courage : adventurer.currentCourage;
+                var courageResistance = Clamp((courageValue || 0) * 0.95 + (adventurer.strength || 0) * 0.09 + (adventurer.caution || 0) * 0.08, 0, 1.6);
+                var fleeChance = Clamp(fearPressure - courageResistance - 0.25, 0, 0.75);
                 if (this.rng.nextFloat() < fleeChance) {
                     adventurer.fleeing = true;
                     adventurer.behaviourState = 'fleeingFromHeardMonster';
@@ -6258,6 +6462,7 @@ button:hover { background: #ffd768; }
             this.macrofauna.forEach(function (animal) { animal.update(this); }, this);
             this.monsters.forEach(function (monster) { monster.update(this); }, this);
             this.emitMovementSounds();
+            this.resolveAdventurerMorale();
             this.resolveAdventurerSoundFear();
             this.resolveCombat();
             this.checkRaidEnd();
@@ -6355,7 +6560,7 @@ button:hover { background: #ffd768; }
 
                         if (this.rng.nextFloat() <= 0.82) {
                             this.addSound('monsterAttack', monster, monster.x, monster.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
-                            var part = adventurer.applyDamage(this.rng.integer(18, 34), this.rng, this);
+                            var part = adventurer.applyDamage(this.rng.integer(18, 34), this.rng, this, monster);
                             adventurer.behaviourState = 'takingDamage';
                             this.addEvent(monster.name + ' hit a ' + adventurer.displayName + ' in the ' + part + '.');
                         }
@@ -6367,7 +6572,7 @@ button:hover { background: #ffd768; }
                         adventurer.behaviourState = 'meleeAttacking';
                         if (this.rng.nextFloat() <= adventurer.getMeleeHitChance()) {
                             this.addSound('adventurerAttack', adventurer, adventurer.x, adventurer.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
-                            monster.applyDamage(adventurer.getMeleeDamage(this.rng), this.rng, this);
+                            monster.applyDamage(adventurer.getMeleeDamage(this.rng), this.rng, this, adventurer);
                             this.addEvent('A ' + adventurer.displayName + ' wounded ' + monster.name + '.');
                         }
                     }
@@ -6382,7 +6587,7 @@ button:hover { background: #ffd768; }
                         if (monster.attackCooldownTicks <= 0) {
                             monster.attackCooldownTicks = COMBAT_COOLDOWN_TICKS;
                             this.addSound('monsterAttack', monster, monster.x, monster.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
-                            animal.applyDamage(this.rng.integer(18, 32), this);
+                            animal.applyDamage(this.rng.integer(18, 32), this, monster);
                             this.addEvent(monster.name + ' attacked a ' + animal.displayName + '.');
                             if (!animal.alive) {
                                 this.addEvent('A ' + animal.displayName + ' was killed and became edible carrion.');
@@ -6416,7 +6621,7 @@ button:hover { background: #ffd768; }
                     animal.attackCooldownTicks = COMBAT_COOLDOWN_TICKS * 2;
                     if (this.rng.nextFloat() <= animal.attackChance) {
                         this.addSound('macrofaunaAttack', animal, animal.x, animal.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
-                        var part = adventurer.applyDamage(this.rng.integer(animal.attackDamageMin, animal.attackDamageMax), this.rng, this);
+                        var part = adventurer.applyDamage(this.rng.integer(animal.attackDamageMin, animal.attackDamageMax), this.rng, this, animal);
                         this.addEvent('A ' + animal.displayName + ' attacked an adventurer in the ' + part + '.');
                     }
                     break;
@@ -6804,7 +7009,7 @@ button:hover { background: #ffd768; }
                 this.startNewRound();
             }
 
-            this.currentRaid = new Raid(this.world, this.gameState, this.rng.integer(1, 0x7fffffff), this.seasonNumber);
+            this.currentRaid = new Raid(this.world, this.gameState, this.rng.integer(1, 0x7fffffff), this.seasonNumber, this.roundRemains);
             this.phase = 'raid';
             this.paused = false;
             return { ok: true };
@@ -7429,6 +7634,46 @@ button:hover { background: #ffd768; }
         AddRegressionResult(results, 'Sound loudness follows inverse-square falloff', soundNear > soundFar * 3.6 && soundNear < soundFar * 4.4, 'near=' + soundNear.toFixed(3) + ', far=' + soundFar.toFixed(3));
         var longRangeHearingMonster = new Monster('long_range_sound_listener', 8100, 100, new SeededRng(424246), { hearingThreshold: DEFAULT_MONSTER_HEARING_THRESHOLD });
         AddRegressionResult(results, 'Uniform sound propagation multiplier lets loud looting carry across standard maps', !!soundRegressionRaid.findBestAudibleSoundFor(longRangeHearingMonster, function () { return true; }), 'heard=' + !!soundRegressionRaid.findBestAudibleSoundFor(longRangeHearingMonster, function () { return true; }) + ', perceived=' + soundRegressionRaid.soundLoudnessAt(soundRegressionRaid.soundEvents[0], longRangeHearingMonster.x, longRangeHearingMonster.y).toFixed(3));
+        AddRegressionResult(results, 'Autumn movement sound uses generic terrain-object lookup rather than vision lookup', typeof soundRegressionRaid.world.getNearbyTerrainObjects === 'function' && typeof soundRegressionRaid.world.getNearbyVisionBlockingTerrainObjects === 'undefined' && soundRegressionRaid.agentIsUnderAutumnTree(normalVillager) === false, 'terrainLookup=' + typeof soundRegressionRaid.world.getNearbyTerrainObjects + ', visionLookup=' + typeof soundRegressionRaid.world.getNearbyVisionBlockingTerrainObjects);
+        var moraleVillager = new Villager('morale_villager', 300, 300, new SeededRng(424247));
+        var moraleRaid = new Raid(session.world, session.gameState, 424248, 1, [{ id: 'old_skeleton', agentKind: 'adventurer', className: 'warrior', x: 302, y: 300, radius: 12, corpseState: 'skeleton' }]);
+        moraleRaid.adventurers = [moraleVillager];
+        moraleRaid.resolveAdventurerMorale();
+        AddRegressionResult(results, 'Visible adventurer skeletons reduce current courage through phase-2 morale', moraleVillager.currentCourage < moraleVillager.courage, 'base=' + moraleVillager.courage.toFixed(3) + ', current=' + moraleVillager.currentCourage.toFixed(3));
+        var knightMorale = new Knight('morale_knight', 300, 300, new SeededRng(424249));
+        var knightRaid = new Raid(session.world, session.gameState, 424250, 1, []);
+        knightRaid.adventurers = [knightMorale];
+        knightRaid.addSound('adventurerKilled', { id: 'monster_source', agentKind: 'monster' }, 302, 300, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS, { victimClassName: 'villager' });
+        knightRaid.resolveAdventurerMorale();
+        AddRegressionResult(results, 'Knights ignore lower-class adventurer deaths in phase-2 morale', Math.abs(knightMorale.currentCourage - knightMorale.courage) < 0.0001, 'base=' + knightMorale.courage.toFixed(3) + ', current=' + knightMorale.currentCourage.toFixed(3));
+        AddRegressionResult(results, 'Adventurer morale ranges strongly favour brave single-monster sightings after courage rebalance', ADVENTURER_PROFILE.villager.courageMin >= 0.68 && ADVENTURER_PROFILE.villager.courageMax >= 1.18 && ADVENTURER_PROFILE.doubleVillager.courageMin < ADVENTURER_PROFILE.villager.courageMin && ADVENTURER_PROFILE.warrior.courageMin >= 1.08 && ADVENTURER_PROFILE.knight.courageMax >= 1.58, 'villager=' + ADVENTURER_PROFILE.villager.courageMin + '-' + ADVENTURER_PROFILE.villager.courageMax + ', doubleVillager=' + ADVENTURER_PROFILE.doubleVillager.courageMin + '-' + ADVENTURER_PROFILE.doubleVillager.courageMax + ', warrior=' + ADVENTURER_PROFILE.warrior.courageMin + '-' + ADVENTURER_PROFILE.warrior.courageMax + ', knightMax=' + ADVENTURER_PROFILE.knight.courageMax);
+        var closeMonsterFearForMinimumVillager = Clamp(0.62 - ADVENTURER_PROFILE.villager.courageMin + 0.02, 0, 0.74);
+        var closeMonsterFearForMinimumDoubleVillager = Clamp(0.62 - ADVENTURER_PROFILE.doubleVillager.courageMin + 0.02, 0, 0.74);
+        AddRegressionResult(results, 'Single monster sighting alone rarely breaks ordinary villagers but can still break low-courage double villagers', closeMonsterFearForMinimumVillager <= 0.02 && closeMonsterFearForMinimumDoubleVillager > closeMonsterFearForMinimumVillager, 'villagerChance=' + closeMonsterFearForMinimumVillager.toFixed(3) + ', doubleVillagerChance=' + closeMonsterFearForMinimumDoubleVillager.toFixed(3));
+        var minimumWarriorSoundResistance = Clamp(ADVENTURER_PROFILE.warrior.courageMin * 0.95, 0, 1.6);
+        var closeMonsterSoundFearForMinimumWarrior = Clamp(1 - minimumWarriorSoundResistance - 0.25, 0, 0.75);
+        AddRegressionResult(results, 'Single heard monster sound alone does not break a minimum-courage warrior', closeMonsterSoundFearForMinimumWarrior === 0, 'chance=' + closeMonsterSoundFearForMinimumWarrior.toFixed(3));
+        var soundFearWarrior = new Warrior('sound_fear_warrior', 450, 100, new SeededRng(424251));
+        soundFearWarrior.currentCourage = ADVENTURER_PROFILE.warrior.courageMin;
+        var soundFearRaid = new Raid(session.world, session.gameState, 424252, 1, []);
+        soundFearRaid.adventurers = [soundFearWarrior];
+        soundFearRaid.addSound('movement', { id: 'sound_fear_monster', agentKind: 'monster' }, 452, 100, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
+        for (var soundFearAttempt = 0; soundFearAttempt < 12; soundFearAttempt += 1) {
+            soundFearRaid.resolveAdventurerSoundFear();
+        }
+        AddRegressionResult(results, 'Repeated processing of the same monster sound does not make a courageous warrior flee', !soundFearWarrior.fleeing && Object.keys(soundFearWarrior.processedFearSoundIds).length === 1, 'fleeing=' + soundFearWarrior.fleeing + ', processed=' + Object.keys(soundFearWarrior.processedFearSoundIds).length);
+        var visibleFearWarrior = new Warrior('visible_fear_warrior', 450, 100, new SeededRng(424253));
+        visibleFearWarrior.currentCourage = ADVENTURER_PROFILE.warrior.courageMin;
+        var visibleFearMonster = new Monster('visible_fear_monster', 452, 100, new SeededRng(424254), {});
+        visibleFearMonster.deployed = true;
+        var visibleFearRaid = new Raid(session.world, session.gameState, 424255, 1, []);
+        visibleFearRaid.adventurers = [visibleFearWarrior];
+        visibleFearRaid.monsters = [visibleFearMonster];
+        for (var visibleFearAttempt = 0; visibleFearAttempt < 40; visibleFearAttempt += 1) {
+            visibleFearRaid.resolveAdventurerMorale();
+            visibleFearRaid.tickNumber += MORALE_VISIBLE_MONSTER_INTERVAL_TICKS;
+        }
+        AddRegressionResult(results, 'Repeated sight of a single non-attacking monster does not erode a minimum-courage warrior into fleeing', !visibleFearWarrior.fleeing && Math.abs(visibleFearWarrior.currentCourage - ADVENTURER_PROFILE.warrior.courageMin) < 0.0001, 'fleeing=' + visibleFearWarrior.fleeing + ', courage=' + visibleFearWarrior.currentCourage.toFixed(3));
         var hearingMonster = new Monster('sound_listener', 450, 100, new SeededRng(424243), { hearingThreshold: 0.10 });
         AddRegressionResult(results, 'Default sound hearing uses thresholded perceived loudness', !!soundRegressionRaid.findBestAudibleSoundFor(hearingMonster, function () { return true; }), 'heard=' + !!soundRegressionRaid.findBestAudibleSoundFor(hearingMonster, function () { return true; }));
         var quietExplorer = new Explorer('quiet_explorer', 0, 0, new SeededRng(424244));
