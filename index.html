@@ -6678,16 +6678,66 @@ button:hover {
     }
     class PhenotypeBuildContext{
         constructor(){
-            this.baseSkinProteins = new SkinProteinState();
-            this.codominantSkinLayers = [new SkinProteinState(),
-            new SkinProteinState()];
+            // Trait systems keep their accumulated phenotype inputs in named effect
+            // bags. This preserves a shared build context while avoiding a future
+            // god context with every possible biological subsystem as a direct
+            // constructor field. New genetic systems should register or retrieve
+            // their own bag through getEffectBag() rather than adding top-level
+            // state here.
+            this.effectBags = {
+            } ;
             this.activeCodominantLayerIndex = 0;
-            this.usedCodominantSkinLayers = false;
-            this.baseMetabolicFactors = new MetabolicFactorState();
-            this.codominantMetabolicLayers = [new MetabolicFactorState(),
-            new MetabolicFactorState()];
-            this.usedCodominantMetabolicLayers = false;
+            this.getEffectBag(GENETIC_TRAIT.COLOUR, PhenotypeBuildContext.createColourEffectBag);
+            this.getEffectBag(GENETIC_TRAIT.METABOLISM, PhenotypeBuildContext.createMetabolismEffectBag);
         }
+
+        static createColourEffectBag(){
+            return {
+                baseSkinProteins : new SkinProteinState(),
+                codominantSkinLayers : [new SkinProteinState(),
+                new SkinProteinState()],
+                usedCodominantSkinLayers : false
+            } ;
+        }
+
+        static createMetabolismEffectBag(){
+            return {
+                baseMetabolicFactors : new MetabolicFactorState(),
+                codominantMetabolicLayers : [new MetabolicFactorState(),
+                new MetabolicFactorState()],
+                usedCodominantMetabolicLayers : false
+            } ;
+        }
+
+        getEffectBag(traitKey, factory){
+            if (!traitKey){
+                throw new Error('PhenotypeBuildContext.getEffectBag requires a trait key.');
+            }
+            if (!this.effectBags[traitKey]){
+                if (typeof factory!=='function'){
+                    throw new Error('Missing phenotype effect bag for trait: '+traitKey);
+                }
+                this.effectBags[traitKey] = factory();
+            }
+            return this.effectBags[traitKey];
+        }
+
+        getColourEffectBag(){
+            return this.getEffectBag(GENETIC_TRAIT.COLOUR, PhenotypeBuildContext.createColourEffectBag);
+        }
+
+        getMetabolismEffectBag(){
+            return this.getEffectBag(GENETIC_TRAIT.METABOLISM, PhenotypeBuildContext.createMetabolismEffectBag);
+        }
+
+        get usedCodominantSkinLayers(){
+            return this.getColourEffectBag().usedCodominantSkinLayers;
+        }
+
+        get usedCodominantMetabolicLayers(){
+            return this.getMetabolismEffectBag().usedCodominantMetabolicLayers;
+        }
+
         // normalise has no default value by design. Genetic maintainers must pass
         // it explicitly on every allele phenotype call. When true, both alleles in
         // a codominant pair are being expressed, and the subsystem decides how to
@@ -6695,26 +6745,28 @@ button:hover {
         // separate skin-protein layers so that visible striping can emerge instead
         // of accidentally doubling all protein production.
         addMetabolicFactors(amounts, normalise){
+            var bag = this.getMetabolismEffectBag();
             if (normalise===true){
-                this.usedCodominantMetabolicLayers = true;
-                this.codominantMetabolicLayers[this.activeCodominantLayerIndex].add(amounts);
+                bag.usedCodominantMetabolicLayers = true;
+                bag.codominantMetabolicLayers[this.activeCodominantLayerIndex].add(amounts);
                 return;
             }
             if (normalise!==false){
                 throw new Error('Metabolic allele phenotype methods must pass the normalise boolean explicitly.');
             }
-            this.baseMetabolicFactors.add(amounts);
+            bag.baseMetabolicFactors.add(amounts);
         }
         addSkinProteins(amounts, normalise){
+            var bag = this.getColourEffectBag();
             if (normalise===true){
-                this.usedCodominantSkinLayers = true;
-                this.codominantSkinLayers[this.activeCodominantLayerIndex].add(amounts);
+                bag.usedCodominantSkinLayers = true;
+                bag.codominantSkinLayers[this.activeCodominantLayerIndex].add(amounts);
                 return;
             }
             if (normalise!==false){
                 throw new Error('Allele phenotype methods must pass the normalise boolean explicitly.');
             }
-            this.baseSkinProteins.add(amounts);
+            bag.baseSkinProteins.add(amounts);
         }
     }
     class Allele{
@@ -6838,14 +6890,15 @@ button:hover {
     }
     var ColourPhenotypeSystem = {
         resolve : function (context){
-            if (context.usedCodominantSkinLayers){
-                var first = this.resolveLayer(context.baseSkinProteins.cloneWith(context.codominantSkinLayers[0]));
-                var second = this.resolveLayer(context.baseSkinProteins.cloneWith(context.codominantSkinLayers[1]));
+            var bag = context.getColourEffectBag();
+            if (bag.usedCodominantSkinLayers){
+                var first = this.resolveLayer(bag.baseSkinProteins.cloneWith(bag.codominantSkinLayers[0]));
+                var second = this.resolveLayer(bag.baseSkinProteins.cloneWith(bag.codominantSkinLayers[1]));
                 var body = first.hex;
                 var secondary = second.hex;
                 return this.createSnapshot(body, secondary, 'stripes', first, second);
             }
-            var solid = this.resolveLayer(context.baseSkinProteins);
+            var solid = this.resolveLayer(bag.baseSkinProteins);
             return this.createSnapshot(solid.hex, solid.hex, 'solid', solid, solid);
         } ,
         resolveLayer : function (proteins){
@@ -6918,10 +6971,11 @@ button:hover {
     } ;
     var MetabolismPhenotypeSystem = {
         combineLayers : function (context){
-            if (context.usedCodominantMetabolicLayers){
-                return context.baseMetabolicFactors.cloneWith(context.codominantMetabolicLayers[0]).cloneWith(context.codominantMetabolicLayers[1]);
+            var bag = context.getMetabolismEffectBag();
+            if (bag.usedCodominantMetabolicLayers){
+                return bag.baseMetabolicFactors.cloneWith(bag.codominantMetabolicLayers[0]).cloneWith(bag.codominantMetabolicLayers[1]);
             }
-            return context.baseMetabolicFactors.cloneWith(null);
+            return bag.baseMetabolicFactors.cloneWith(null);
         } ,
         resolve : function (context){
             var f = this.combineLayers(context);
@@ -6994,10 +7048,14 @@ button:hover {
         }
     } ;
     class GeneticTraitDefinition{
-        constructor(key, chromosomeIndex, slotCount){
+        constructor(key, chromosomeIndex, slotCount, options){
+            var settings = options || {
+            } ;
             this.key = key;
             this.chromosomeIndex = chromosomeIndex;
             this.slotCount = slotCount;
+            this.minCrossoverCuts = Number.isFinite(settings.minCrossoverCuts) ? Math.max(0, Math.floor(settings.minCrossoverCuts)) : 1;
+            this.maxCrossoverCuts = Number.isFinite(settings.maxCrossoverCuts) ? Math.max(this.minCrossoverCuts, Math.floor(settings.maxCrossoverCuts)) : Math.max(this.minCrossoverCuts, 2);
         }
         createRandomChromosomePair(rng, genePool, world){
             throw new Error('GeneticTraitDefinition.createRandomChromosomePair must be implemented by the trait definition.');
@@ -7008,8 +7066,8 @@ button:hover {
             if (!motherChromosome || !fatherChromosome){
                 throw new Error('Cannot create offspring chromosome for missing trait: '+this.key);
             }
-            var motherHomologue = motherChromosome.createGameteHomologue(rng, 1, 2);
-            var fatherHomologue = fatherChromosome.createGameteHomologue(rng, 1, 2);
+            var motherHomologue = motherChromosome.createGameteHomologue(rng, this.minCrossoverCuts, this.maxCrossoverCuts);
+            var fatherHomologue = fatherChromosome.createGameteHomologue(rng, this.minCrossoverCuts, this.maxCrossoverCuts);
             return new ChromosomePair(motherHomologue, fatherHomologue);
         }
         expressToPhenotype(genome, context){
@@ -10987,6 +11045,21 @@ button:hover {
         var traitOffspringGenome = MonsterGenePool.createOffspringGenome(traitGenome, traitGenome, new SeededRng(7003));
         var traitOffspringChromosome = traitOffspringGenome.getChromosome(MonsterColourTraitDefinition);
         AddRegressionResult(results, 'GenePool creates offspring chromosomes through trait definitions', traitOffspringChromosome && traitOffspringChromosome.getSlotCount()===COLOUR_CHROMOSOME_SLOT_COUNT, 'slots='+(traitOffspringChromosome ? traitOffspringChromosome.getSlotCount() : 'missing'));
+        var noCrossoverTrait = new GeneticTraitDefinition('regressionNoCrossover', 0, 4, {
+            minCrossoverCuts : 0,
+            maxCrossoverCuts : 0
+        } );
+        var noCrossoverMotherGenome = new Genome([new ChromosomePair(recombinationAllelesA, recombinationAllelesB)]);
+        var noCrossoverFatherGenome = new Genome([new ChromosomePair(recombinationAllelesB, recombinationAllelesA)]);
+        var noCrossoverChild = noCrossoverTrait.createOffspringChromosomePair(noCrossoverMotherGenome, noCrossoverFatherGenome, new SeededRng(7004));
+        var noCrossoverMotherSideA = noCrossoverChild.homologueA.every(function (allele, index){
+            return allele===recombinationAllelesA[index];
+        } );
+        var noCrossoverMotherSideB = noCrossoverChild.homologueA.every(function (allele, index){
+            return allele===recombinationAllelesB[index];
+        } );
+        AddRegressionResult(results, 'Trait definitions control crossover cut counts for offspring chromosomes', noCrossoverMotherSideA || noCrossoverMotherSideB, 'minCuts='+noCrossoverTrait.minCrossoverCuts+', maxCuts='+noCrossoverTrait.maxCrossoverCuts);
+        AddRegressionResult(results, 'Phenotype context stores trait effects in registered effect bags', geneticsContext.getColourEffectBag().baseSkinProteins instanceof SkinProteinState && geneticsContext.effectBags[GENETIC_TRAIT.COLOUR]===geneticsContext.getColourEffectBag(), 'bags='+Object.keys(geneticsContext.effectBags).join(','));
         var metabolismChromosome = traitGenome.getChromosome(MonsterMetabolismTraitDefinition);
         AddRegressionResult(results, 'Genome contains a metabolism chromosome built through trait definitions', metabolismChromosome && metabolismChromosome.getSlotCount()===METABOLISM_CHROMOSOME_SLOT_COUNT, 'slots='+(metabolismChromosome ? metabolismChromosome.getSlotCount() : 'missing'));
         var hotMetabolismWorld = WorldGenerator.createWorld(7004, {
