@@ -7071,11 +7071,63 @@ button:hover {
     } ;
     class GenePool{
         constructor(){
-            this.colourChromosomeSlots = GenePool.createDefaultColourSlots();
-            this.metabolismChromosomeSlots = GenePool.createDefaultMetabolismSlots();
-            this.traitDefinitions = [MonsterColourTraitDefinition,
-            MonsterMetabolismTraitDefinition];
+            this.traitDefinitions = [
+                MonsterColourTraitDefinition,
+                MonsterMetabolismTraitDefinition
+            ];
+            this.chromosomeSlots = [];
+            this.createChromosomeSlots(COLOUR_CHROMOSOME_INDEX, COLOUR_CHROMOSOME_SLOT_COUNT);
+            this.createChromosomeSlots(METABOLISM_CHROMOSOME_INDEX, METABOLISM_CHROMOSOME_SLOT_COUNT);
+            this.colourChromosomeSlots = this.chromosomeSlots[COLOUR_CHROMOSOME_INDEX];
+            this.metabolismChromosomeSlots = this.chromosomeSlots[METABOLISM_CHROMOSOME_INDEX];
+            this.addDefaultColourAlleles();
+            this.addDefaultMetabolismAlleles();
         }
+
+        createChromosomeSlots(chromosomeIndex, slotCount){
+            this.chromosomeSlots[chromosomeIndex] = [];
+            for (var i = 0;
+            i<slotCount;
+            i+=1){
+                this.chromosomeSlots[chromosomeIndex].push([]);
+            }
+        }
+
+        traitKeyForChromosome(chromosomeIndex){
+            if (chromosomeIndex===COLOUR_CHROMOSOME_INDEX){
+                return GENETIC_TRAIT.COLOUR;
+            }
+            if (chromosomeIndex===METABOLISM_CHROMOSOME_INDEX){
+                return GENETIC_TRAIT.METABOLISM;
+            }
+            throw new Error('Unknown gene pool chromosome index: '+chromosomeIndex);
+        }
+
+        createDebugLabel(chromosomeIndex, slotIndex){
+            var traitKey = this.traitKeyForChromosome(chromosomeIndex);
+            var chromosome = this.chromosomeSlots[chromosomeIndex];
+            if (!chromosome || !chromosome[slotIndex]){
+                throw new Error('Cannot create allele debug label for missing chromosome slot: '+chromosomeIndex+', '+slotIndex);
+            }
+            return traitKey+'.slot.'+slotIndex+'.allele.'+chromosome[slotIndex].length;
+        }
+
+        addAllele(chromosomeIndex, slotIndex, allele){
+            var chromosome = this.chromosomeSlots[chromosomeIndex];
+            var traitKey = this.traitKeyForChromosome(chromosomeIndex);
+            if (!chromosome){
+                throw new Error('Allele chromosome index out of range: '+chromosomeIndex);
+            }
+            if (!Number.isFinite(slotIndex) || slotIndex<0 || slotIndex>=chromosome.length){
+                throw new Error('Allele slot index out of range for '+traitKey+': '+slotIndex);
+            }
+            if (!(allele instanceof Allele)){
+                throw new Error('GenePool.addAllele requires an Allele object.');
+            }
+            chromosome[slotIndex].push(allele);
+            return allele;
+        }
+
         createGenome(rng, world){
             var chromosomes = [];
             for (var i = 0;
@@ -7086,6 +7138,7 @@ button:hover {
             }
             return new Genome(chromosomes);
         }
+
         createOffspringGenome(motherGenome, fatherGenome, rng){
             var chromosomes = [];
             for (var i = 0;
@@ -7096,6 +7149,7 @@ button:hover {
             }
             return new Genome(chromosomes);
         }
+
         pickAlleleForColourSlot(slotIndex, rng, profile){
             var pool = this.colourChromosomeSlots[slotIndex] || [];
             var total = 0;
@@ -7122,6 +7176,7 @@ button:hover {
             }
             return pool[pool.length-1];
         }
+
         pickAlleleForMetabolismSlot(slotIndex, rng, profile){
             var pool = this.metabolismChromosomeSlots[slotIndex] || [];
             var total = 0;
@@ -7148,6 +7203,7 @@ button:hover {
             }
             return pool[pool.length-1];
         }
+
         getWildMetabolismWeight(allele, profile){
             var weight = Math.pow(allele.commonness || 1, 0.55);
             if (!profile || !allele.selectionSensitive){
@@ -7158,15 +7214,16 @@ button:hover {
             var phenotype = MetabolismPhenotypeSystem.resolve(context);
             var thermalMismatch = 0;
             if (profile.currentTemperatureC<phenotype.coldLimitC){
-                thermalMismatch =(phenotype.coldLimitC-profile.currentTemperatureC) / 22;
+                thermalMismatch = (phenotype.coldLimitC-profile.currentTemperatureC) / 22;
             }
             if (profile.currentTemperatureC>phenotype.heatLimitC){
-                thermalMismatch =(profile.currentTemperatureC-phenotype.heatLimitC) / 22;
+                thermalMismatch = (profile.currentTemperatureC-phenotype.heatLimitC) / 22;
             }
             var foodMismatch = Math.max(0, phenotype.baseMetabolicFood-(8.5+profile.macrofaunaAvailability * 4.0)) / 10;
             var fatTemperatureMismatch = profile.currentTemperatureC>20 ? phenotype.targetFatStorage / 12 : Math.max(0, 2.0-phenotype.targetFatStorage) / 8;
             return weight * Math.exp(-7.5 * thermalMismatch-2.5 * foodMismatch-2.0 * fatTemperatureMismatch);
         }
+
         getWildColourWeight(allele, profile){
             // Commonness describes background availability in the wild population,
             // not a licence for one colour family to dominate every biome. Keep it
@@ -7196,6 +7253,7 @@ button:hover {
             var selectionPressure = profile.selectionPressure || 12.0;
             return weight * Math.exp(-selectionPressure * mismatch * dominanceExposure);
         }
+
         getWorldColourSelectionProfile(world){
             if (!world || !world.terrainGrid){
                 return null;
@@ -7203,8 +7261,7 @@ button:hover {
             if (world.colourSelectionProfile){
                 return world.colourSelectionProfile;
             }
-            var counts = {
-            } ;
+            var counts = {};
             var dominantTerrainType = TERRAIN_TYPE.GRASS;
             var dominantCount = -1;
             for (var y = 0;
@@ -7220,7 +7277,7 @@ button:hover {
                     if (terrainType===TERRAIN_TYPE.STREAM || terrainType===TERRAIN_TYPE.LAKE){
                         continue;
                     }
-                    counts[terrainType] =(counts[terrainType] || 0)+1;
+                    counts[terrainType] = (counts[terrainType] || 0)+1;
                     if (counts[terrainType]>dominantCount){
                         dominantCount = counts[terrainType];
                         dominantTerrainType = terrainType;
@@ -7235,98 +7292,103 @@ button:hover {
                 saturation : ColourSaturationFromRgb(target),
                 dominantTerrainType : dominantTerrainType,
                 selectionPressure : 12.0
-            } ;
+            };
             return world.colourSelectionProfile;
         }
+
         static terrainColourForType(terrainType){
             if (terrainType===TERRAIN_TYPE.FOREST){
                 return {
                     r : 56,
                     g : 92,
                     b : 52
-                } ;
+                };
             }
             if (terrainType===TERRAIN_TYPE.MARSH){
                 return {
                     r : 75,
                     g : 99,
                     b : 64
-                } ;
+                };
             }
             if (terrainType===TERRAIN_TYPE.ROCKY){
                 return {
                     r : 114,
                     g : 112,
                     b : 105
-                } ;
+                };
             }
             if (terrainType===TERRAIN_TYPE.STREAM || terrainType===TERRAIN_TYPE.LAKE){
                 return {
                     r : 73,
                     g : 128,
                     b : 154
-                } ;
+                };
             }
             if (terrainType===TERRAIN_TYPE.TUNDRA){
                 return {
                     r : 166,
                     g : 172,
                     b : 160
-                } ;
+                };
             }
             if (terrainType===TERRAIN_TYPE.ICE){
                 return {
                     r : 210,
                     g : 224,
                     b : 230
-                } ;
+                };
             }
             if (terrainType===TERRAIN_TYPE.DESERT){
                 return {
                     r : 196,
                     g : 160,
                     b : 94
-                } ;
+                };
             }
             return {
                 r : 110,
                 g : 144,
                 b : 78
-            } ;
+            };
         }
-        static createSkinProteinAllele(dominanceIndex, amounts, commonness, debugLabel){
+
+        static createSkinProteinAllele(dominanceIndex, effects, commonness, debugLabel){
             return new Allele(dominanceIndex, function (context, normalise){
-                context.addSkinProteins(amounts, normalise);
-            } , {
+                context.addSkinProteins(effects, normalise);
+            }, {
                 commonness : commonness,
                 selectionSensitive : true,
                 debugLabel : debugLabel
-            } );
+            });
         }
+
         static createJunkAllele(dominanceIndex, commonness, debugLabel){
             return new Allele(dominanceIndex, function (context, normalise){
                 if (normalise!==true && normalise!==false){
                     throw new Error('Junk allele phenotype received no explicit normalise boolean.');
                 }
                 return;
-            } , {
+            }, {
                 commonness : commonness,
                 selectionSensitive : false,
                 debugLabel : debugLabel
-            } );
+            });
         }
+
         static createInactiveColourAllele(dominanceIndex, commonness, debugLabel){
             return new Allele(dominanceIndex, function (context, normalise){
                 if (normalise!==true && normalise!==false){
                     throw new Error('Inactive colour allele phenotype received no explicit normalise boolean.');
                 }
                 return;
-            } , {
+            }, {
                 commonness : commonness,
                 selectionSensitive : true,
                 debugLabel : debugLabel
-            } );
+            });
         }
+
         getWorldMetabolismSelectionProfile(world){
             if (!world){
                 return null;
@@ -7337,196 +7399,167 @@ button:hover {
             world.metabolismSelectionProfile = {
                 currentTemperatureC : MonsterMetabolismSystem.currentTemperatureC(world, 2),
                 macrofaunaAvailability : MonsterMetabolismSystem.macrofaunaAvailability(world)
-            } ;
+            };
             return world.metabolismSelectionProfile;
         }
-        static createMetabolicAllele(dominanceIndex, amounts, commonness, debugLabel){
+
+        static createMetabolicAllele(dominanceIndex, effects, commonness, debugLabel){
             return new Allele(dominanceIndex, function (context, normalise){
-                context.addMetabolicFactors(amounts, normalise);
-            } , {
+                context.addMetabolicFactors(effects, normalise);
+            }, {
                 commonness : commonness,
                 selectionSensitive : true,
                 debugLabel : debugLabel
-            } );
+            });
         }
-        static createDefaultMetabolismSlots(){
-            var lowBurn = GenePool.createMetabolicAllele(100, {
+
+        addDefaultMetabolismAlleles(){
+            this.addAllele(METABOLISM_CHROMOSOME_INDEX, 0, GenePool.createMetabolicAllele(100, {
                 baseMetabolicRate : -55,
                 coldTolerance : 24,
                 heatTolerance : -8
-            } , 2.8, 'low burn cold thrift regulator');
-            var balancedBurn = GenePool.createMetabolicAllele(100, {
+            }, 2.8, this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 0)));
+            this.addAllele(METABOLISM_CHROMOSOME_INDEX, 0, GenePool.createMetabolicAllele(100, {
                 baseMetabolicRate : 0,
                 coldTolerance : 8,
                 heatTolerance : 8
-            } , 5.0, 'balanced metabolic regulator');
-            var hotBurn = GenePool.createMetabolicAllele(105, {
+            }, 5.0, this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 0)));
+            this.addAllele(METABOLISM_CHROMOSOME_INDEX, 0, GenePool.createMetabolicAllele(105, {
                 baseMetabolicRate : 42,
                 coldTolerance : 18,
                 heatTolerance : 16
-            } , 2.0, 'hot burn active regulator');
-            var heatShedding = GenePool.createMetabolicAllele(100, {
+            }, 2.0, this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 0)));
+            this.addAllele(METABOLISM_CHROMOSOME_INDEX, 0, GenePool.createMetabolicAllele(100, {
                 baseMetabolicRate : -8,
                 coldTolerance : -18,
                 heatTolerance : 50
-            } , 1.7, 'heat shedding desert regulator');
-            var plumptinLow = GenePool.createMetabolicAllele(100, {
+            }, 1.7, this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 0)));
+            this.addAllele(METABOLISM_CHROMOSOME_INDEX, 1, GenePool.createMetabolicAllele(100, {
                 plumptin : -58
-            } , 2.4, 'low plumptin regulator');
-            var plumptinMedium = GenePool.createMetabolicAllele(100, {
+            }, 2.4, this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 1)));
+            this.addAllele(METABOLISM_CHROMOSOME_INDEX, 1, GenePool.createMetabolicAllele(100, {
                 plumptin : 0
-            } , 4.6, 'ordinary plumptin regulator');
-            var plumptinHigh = GenePool.createMetabolicAllele(105, {
+            }, 4.6, this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 1)));
+            this.addAllele(METABOLISM_CHROMOSOME_INDEX, 1, GenePool.createMetabolicAllele(105, {
                 plumptin : 66
-            } , 2.1, 'high plumptin regulator');
-            var plumptinExtreme = GenePool.createMetabolicAllele(120, {
+            }, 2.1, this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 1)));
+            this.addAllele(METABOLISM_CHROMOSOME_INDEX, 1, GenePool.createMetabolicAllele(120, {
                 plumptin : 155
-            } , 0.05, 'extreme plumptin disease regulator');
-            var conservationLow = GenePool.createMetabolicAllele(100, {
+            }, 0.05, this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 1)));
+            this.addAllele(METABOLISM_CHROMOSOME_INDEX, 2, GenePool.createMetabolicAllele(100, {
                 energyConservation : -70
-            } , 1.5, 'restless energy regulator');
-            var conservationMedium = GenePool.createMetabolicAllele(100, {
+            }, 1.5, this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 2)));
+            this.addAllele(METABOLISM_CHROMOSOME_INDEX, 2, GenePool.createMetabolicAllele(100, {
                 energyConservation : 16
-            } , 4.3, 'balanced energy conservation regulator');
-            var conservationHigh = GenePool.createMetabolicAllele(105, {
+            }, 4.3, this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 2)));
+            this.addAllele(METABOLISM_CHROMOSOME_INDEX, 2, GenePool.createMetabolicAllele(105, {
                 energyConservation : 78
-            } , 2.7, 'high conservation regulator');
-            var conservationExtreme = GenePool.createMetabolicAllele(120, {
+            }, 2.7, this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 2)));
+            this.addAllele(METABOLISM_CHROMOSOME_INDEX, 2, GenePool.createMetabolicAllele(120, {
                 energyConservation : 135
-            } , 0.15, 'extreme conservation regulator');
-            var satietyLow = GenePool.createMetabolicAllele(100, {
+            }, 0.15, this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 2)));
+            this.addAllele(METABOLISM_CHROMOSOME_INDEX, 3, GenePool.createMetabolicAllele(100, {
                 satietyConservationEffect : -20
-            } , 2.2, 'weak satiety conservation regulator');
-            var satietyMedium = GenePool.createMetabolicAllele(100, {
+            }, 2.2, this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 3)));
+            this.addAllele(METABOLISM_CHROMOSOME_INDEX, 3, GenePool.createMetabolicAllele(100, {
                 satietyConservationEffect : 35
-            } , 4.0, 'ordinary satiety conservation regulator');
-            var satietyHigh = GenePool.createMetabolicAllele(105, {
+            }, 4.0, this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 3)));
+            this.addAllele(METABOLISM_CHROMOSOME_INDEX, 3, GenePool.createMetabolicAllele(105, {
                 satietyConservationEffect : 86
-            } , 2.0, 'strong satiety conservation regulator');
-            var zoomies = GenePool.createMetabolicAllele(120, {
+            }, 2.0, this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 3)));
+            this.addAllele(METABOLISM_CHROMOSOME_INDEX, 3, GenePool.createMetabolicAllele(120, {
                 satietyConservationEffect : 160,
                 energyConservation : -40
-            } , 0.08, 'well fed zoomies regulator');
-            return [[lowBurn,
-            balancedBurn,
-            hotBurn,
-            heatShedding],
-            [plumptinLow,
-            plumptinMedium,
-            plumptinHigh,
-            plumptinExtreme],
-            [conservationLow,
-            conservationMedium,
-            conservationHigh,
-            conservationExtreme],
-            [satietyLow,
-            satietyMedium,
-            satietyHigh,
-            zoomies]];
+            }, 0.08, this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 3)));
         }
-        static createDefaultColourSlots(){
-            var junkCommon = GenePool.createJunkAllele(DOMINANCE_DEFAULT, 12, 'common inactive colour regulator');
-            var junkUncommon = GenePool.createJunkAllele(DOMINANCE_DEFAULT, 2.2, 'uncommon inactive colour regulator');
-            var inactiveMainColour = GenePool.createInactiveColourAllele(95, 2.8, 'inactive main colour regulator');
-            var inactiveNegrine = GenePool.createInactiveColourAllele(95, 2.0, 'inactive negrine regulator');
-            var verdine = GenePool.createSkinProteinAllele(110, {
-                verdine : 150,
-                negrine : 18
-            } , 2.7, 'verdine main regulator');
-            var jaunine = GenePool.createSkinProteinAllele(100, {
-                jaunine : 145,
-                negrine : 8
-            } , 3.8, 'jaunine main regulator');
-            var orgine = GenePool.createSkinProteinAllele(100, {
-                orgine : 130,
-                negrine : 10
-            } , 3.2, 'orgine main regulator');
-            var sandyDun = GenePool.createSkinProteinAllele(100, {
-                jaunine : 88,
-                orgine : 62,
-                negrine : 5
-            } , 2.8, 'sandy dun main regulator');
-            var stoneGrey = GenePool.createSkinProteinAllele(100, {
-                verdine : 8,
-                cerulene : 6,
-                negrine : 34
-            } , 2.4, 'stone grey main regulator');
-            var cerulene = GenePool.createSkinProteinAllele(100, {
-                cerulene : 145,
-                negrine : 6
-            } , 1.8, 'cerulene main regulator');
-            var rodine = GenePool.createSkinProteinAllele(100, {
-                rodine : 145,
-                negrine : 8
-            } , 1.2, 'rodine main regulator');
-            var recessivePurple = GenePool.createSkinProteinAllele(40, {
-                cerulene : 130,
-                rodine : 150,
-                negrine : 5
-            } , 0.08, 'deep recessive purple regulator');
-            var commonNegrineLow = GenePool.createSkinProteinAllele(100, {
-                negrine : 24
-            } , 5.5, 'low negrine regulator');
-            var commonNegrineMid = GenePool.createSkinProteinAllele(110, {
-                negrine : 54
-            } , 3.0, 'moderate negrine regulator');
-            var paleRecessive = GenePool.createSkinProteinAllele(30, {
+
+        addDefaultColourAlleles(){
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 0, GenePool.createJunkAllele(DOMINANCE_DEFAULT, 12, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 0)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 0, GenePool.createJunkAllele(DOMINANCE_DEFAULT, 2.2, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 0)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 0, GenePool.createSkinProteinAllele(30, {
                 negrine : -80
-            } , 0.28, 'deep recessive negrine suppressor');
-            var yellowGreenFine = GenePool.createSkinProteinAllele(100, {
-                verdine : 28,
-                jaunine : 46,
-                negrine : 5
-            } , 2.3, 'yellow green fine tuner');
-            var blueGreenFine = GenePool.createSkinProteinAllele(100, {
-                verdine : 36,
-                cerulene : 38,
-                negrine : 4
-            } , 1.8, 'blue green fine tuner');
-            var warmFine = GenePool.createSkinProteinAllele(100, {
-                jaunine : 42,
-                orgine : 36,
-                negrine : 4
-            } , 2.4, 'warm fine tuner');
-            var stoneFine = GenePool.createSkinProteinAllele(100, {
-                negrine : 20
-            } , 2.0, 'stone fine tuner');
-            var redFine = GenePool.createSkinProteinAllele(90, {
-                rodine : 42,
-                negrine : 5
-            } , 0.8, 'red fine tuner');
-            return [[junkCommon,
-            junkUncommon,
-            paleRecessive,
-            GenePool.createSkinProteinAllele(35, {
+            }, 0.28, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 0)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 0, GenePool.createSkinProteinAllele(35, {
                 cerulene : 20,
                 rodine : 40,
                 negrine : -35
-            } , 0.06, 'stray recessive colour suppressor')],
-            [verdine,
-            jaunine,
-            orgine,
-            sandyDun,
-            stoneGrey,
-            cerulene,
-            rodine,
-            recessivePurple,
-            inactiveMainColour],
-            [commonNegrineLow,
-            commonNegrineMid,
-            inactiveNegrine,
-            GenePool.createSkinProteinAllele(100, {
+            }, 0.06, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 0)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 1, GenePool.createSkinProteinAllele(110, {
+                verdine : 150,
+                negrine : 18
+            }, 2.7, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 1, GenePool.createSkinProteinAllele(100, {
+                jaunine : 145,
+                negrine : 8
+            }, 3.8, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 1, GenePool.createSkinProteinAllele(100, {
+                orgine : 130,
+                negrine : 10
+            }, 3.2, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 1, GenePool.createSkinProteinAllele(100, {
+                jaunine : 88,
+                orgine : 62,
+                negrine : 5
+            }, 2.8, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 1, GenePool.createSkinProteinAllele(100, {
+                verdine : 8,
+                cerulene : 6,
+                negrine : 34
+            }, 2.4, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 1, GenePool.createSkinProteinAllele(100, {
+                cerulene : 145,
+                negrine : 6
+            }, 1.8, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 1, GenePool.createSkinProteinAllele(100, {
+                rodine : 145,
+                negrine : 8
+            }, 1.2, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 1, GenePool.createSkinProteinAllele(40, {
+                cerulene : 130,
+                rodine : 150,
+                negrine : 5
+            }, 0.08, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 1, GenePool.createInactiveColourAllele(95, 2.8, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 2, GenePool.createSkinProteinAllele(100, {
+                negrine : 24
+            }, 5.5, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 2)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 2, GenePool.createSkinProteinAllele(110, {
+                negrine : 54
+            }, 3.0, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 2)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 2, GenePool.createInactiveColourAllele(95, 2.0, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 2)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 2, GenePool.createSkinProteinAllele(100, {
                 negrine : 82
-            } , 0.9, 'strong negrine regulator'),
-            GenePool.createInactiveColourAllele(75, 0.8, 'rare inactive negrine slot')],
-            [junkCommon,
-            junkUncommon,
-            yellowGreenFine,
-            blueGreenFine,
-            warmFine,
-            stoneFine,
-            redFine,
-            recessivePurple]];
+            }, 0.9, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 2)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 2, GenePool.createInactiveColourAllele(75, 0.8, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 2)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 3, GenePool.createJunkAllele(DOMINANCE_DEFAULT, 12, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 3, GenePool.createJunkAllele(DOMINANCE_DEFAULT, 2.2, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 3, GenePool.createSkinProteinAllele(100, {
+                verdine : 28,
+                jaunine : 46,
+                negrine : 5
+            }, 2.3, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 3, GenePool.createSkinProteinAllele(100, {
+                verdine : 36,
+                cerulene : 38,
+                negrine : 4
+            }, 1.8, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 3, GenePool.createSkinProteinAllele(100, {
+                jaunine : 42,
+                orgine : 36,
+                negrine : 4
+            }, 2.4, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 3, GenePool.createSkinProteinAllele(100, {
+                negrine : 20
+            }, 2.0, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 3, GenePool.createSkinProteinAllele(90, {
+                rodine : 42,
+                negrine : 5
+            }, 0.8, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)));
+            this.addAllele(COLOUR_CHROMOSOME_INDEX, 3, GenePool.createSkinProteinAllele(40, {
+                cerulene : 130,
+                rodine : 150,
+                negrine : 5
+            }, 0.08, this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)));
         }
     }
     var MonsterGenePool = new GenePool();
