@@ -3440,7 +3440,6 @@ button:hover { background: #ffd768; }
                 width: this.width,
                 height: this.height,
                 environment: Object.assign({}, this.environment),
-                currentSeasonTemperatureC: this.getCurrentTemperatureC(1),
                 distanceToSettlementMiles: this.distanceToSettlementMiles,
                 seasonNames: SEASON_NAMES.slice(0),
                 adventurerEntryEdge: this.adventurerEntryEdge,
@@ -5965,7 +5964,6 @@ button:hover { background: #ffd768; }
             this.activityFoodThisSeason = 0;
             this.thermalState = 'comfortable';
             this.thermalStress = 0;
-            this.currentSeasonTemperatureC = DEFAULT_COMFORTABLE_TEMPERATURE_C;
             this.currentSprintEnduranceTicks = 0;
             this.sprinting = false;
             this.healingFoodRequirementThisSeason = 0;
@@ -6415,7 +6413,6 @@ button:hover { background: #ffd768; }
             var status = MonsterMetabolismSystem.thermalStatus(this, raid.world, raid.seasonNumber);
             this.thermalState = status.state;
             this.thermalStress = status.stress;
-            this.currentSeasonTemperatureC = status.temperatureC;
             if (status.stress > 2.5) {
                 this.recallRequested = true;
                 if (this.thermalState === 'tooHot') {
@@ -6681,7 +6678,6 @@ button:hover { background: #ffd768; }
             s.activityFoodThisSeason = this.activityFoodThisSeason || 0;
             s.thermalState = this.thermalState || 'comfortable';
             s.thermalStress = this.thermalStress || 0;
-            s.currentSeasonTemperatureC = this.currentSeasonTemperatureC;
             s.sprinting = !!this.sprinting;
             s.healingFoodRequirementThisSeason = this.healingFoodRequirementThisSeason || 0;
             s.plannedHealingThisSeason = this.plannedHealingThisSeason || 0;
@@ -7281,7 +7277,6 @@ button:hover { background: #ffd768; }
             this.monsterSightedByAdventurerKeys = {};
             this.gameState.getLivingOwnedMonsters().forEach(function (monster) {
                 NutritionSystem.resetSeasonNutrition(monster);
-                monster.currentSeasonTemperatureC = this.world.getCurrentTemperatureC(this.seasonNumber);
                 var thermal = MonsterMetabolismSystem.thermalStatus(monster, this.world, this.seasonNumber);
                 monster.thermalState = thermal.state;
                 monster.thermalStress = thermal.stress;
@@ -9055,6 +9050,13 @@ button:hover { background: #ffd768; }
         temperatureSnapshotSession.startSeason();
         var temperatureRaidSnapshot = temperatureSnapshotSession.getSnapshot();
         AddRegressionResult(results, 'Raid snapshots expose top-level numeric temperature for UI display', Number.isFinite(temperatureRaidSnapshot.currentSeasonTemperatureC), 'raid=' + temperatureRaidSnapshot.currentSeasonTemperatureC);
+        AddRegressionResult(results, 'Static nested world snapshot does not duplicate current season temperature', temperatureStaticSnapshot.world && temperatureStaticSnapshot.world.currentSeasonTemperatureC === undefined, 'nested=' + (temperatureStaticSnapshot.world ? temperatureStaticSnapshot.world.currentSeasonTemperatureC : 'missing'));
+        var temperatureSummerSession = new GameSession(7021, { mapSizeKey: 'legacy', customTreasureAmounts: { bronze: 2 } }, 'single');
+        temperatureSummerSession.seasonNumber = 3;
+        var temperatureSummerSnapshot = temperatureSummerSession.getSnapshot();
+        AddRegressionResult(results, 'Displayed temperature follows the session season from the single top-level snapshot field', temperatureSummerSnapshot.currentSeasonTemperatureC === temperatureSummerSession.world.getCurrentTemperatureC(3), 'snapshot=' + temperatureSummerSnapshot.currentSeasonTemperatureC + ', world=' + temperatureSummerSession.world.getCurrentTemperatureC(3));
+        var duplicatedMonsterTemperatureFields = (temperatureDynamicSnapshot.monsters || []).filter(function (monster) { return monster.currentSeasonTemperatureC !== undefined; }).length;
+        AddRegressionResult(results, 'Monster snapshots do not duplicate ambient temperature display value', duplicatedMonsterTemperatureFields === 0, 'duplicate fields=' + duplicatedMonsterTemperatureFields);
 
         var injuredMonster = new Monster('healing_regression', RIGHT_EDGE_X, 300, new SeededRng(7010), { owned: true, world: hotMetabolismWorld, name: 'Healer' });
         injuredMonster.bodyHealth.torso -= 12;
@@ -10104,17 +10106,18 @@ button:hover { background: #ffd768; }
         return names[((n-1)%4+4)%4];
     }
     function TemperatureForSnapshot(s){
+        // The UI must display only the authoritative top-level value supplied by
+        // the worker snapshot. Do not recalculate temperature from environment
+        // data here, and do not read a nested static world copy: either would
+        // create a second UI source of truth that can drift across seasons.
         if(s&&Number.isFinite(s.currentSeasonTemperatureC)){ return s.currentSeasonTemperatureC; }
-        if(s&&s.world&&Number.isFinite(s.world.currentSeasonTemperatureC)){ return s.world.currentSeasonTemperatureC; }
-        var environment=s&&s.world&&s.world.environment?s.world.environment:null;
-        if(environment&&Number.isFinite(environment.meanAnnualTemperatureC)){
-            var amplitude=Number.isFinite(environment.seasonalTemperatureAmplitudeC)?environment.seasonalTemperatureAmplitudeC:8;
-            var seasonNumber=s&&s.seasonNumber?s.seasonNumber:1;
-            var seasonIndex=((seasonNumber-1)%4+4)%4;
-            var seasonalOffset=[-1,0.15,1,-0.10][seasonIndex]||0;
-            return Math.round((environment.meanAnnualTemperatureC+amplitude*seasonalOffset)*10)/10;
-        }
-        return 12;
+        console.error('Missing authoritative currentSeasonTemperatureC in snapshot.', s);
+        return NaN;
+    }
+    function FormatTemperatureForSnapshot(s){
+        var temperature=TemperatureForSnapshot(s);
+        if(Number.isFinite(temperature)){ return FormatFixed(temperature,1)+' C'; }
+        return 'ERROR: missing authoritative temperature';
     }
     function FormatEndOfRoundStats(s){
         var stats=s.campaignStats||{};
@@ -10176,7 +10179,7 @@ button:hover { background: #ffd768; }
             'Mode: '+mode,
             'Round: '+(s.roundNumber||1)+'  Season: '+s.seasonNumber+' ('+SeasonNameForSnapshot(s)+')',
             'Phase: '+(s.phase||'raid')+'  Paused: '+s.paused,
-            'Temperature: '+FormatFixed(TemperatureForSnapshot(s),1)+' C',
+            'Temperature: '+FormatTemperatureForSnapshot(s),
             'Result: '+s.raidResult,
             'Treasure deposits remaining: '+tr+' / '+s.treasures.length,
             'Active adventurers: '+adv,
