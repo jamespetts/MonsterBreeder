@@ -849,6 +849,7 @@ button:hover {
         ADULT : 'adult'
     } ;
     var MONSTER_JUVENILE_MATURATION_SEASONS = 1;
+    var MONSTER_GROWTH_TO_FULL_SIZE_SEASONS = 4;
     var MONSTER_MOTHER_BREEDING_HOLD_SEASONS = 1;
     var MONSTER_CLUTCH_SIZE_MIN = 2;
     var MONSTER_CLUTCH_SIZE_MAX = 4;
@@ -4887,30 +4888,61 @@ button:hover {
     // MODULE: BODY HEALTH
     // ============================================================================
     class BodyHealth{
-        constructor(maxEach){
+        constructor(maxEach, bodyPlan){
             this.maxEach = maxEach;
+            this.bodyPlan = bodyPlan || 'humanoid';
             this.head = maxEach;
-            this.torso = maxEach;
-            this.leftArm = maxEach;
-            this.rightArm = maxEach;
-            this.leftLeg = maxEach;
-            this.rightLeg = maxEach;
+            if (this.bodyPlan==='quadrupedMonster'){
+                this.body = maxEach;
+                this.frontLeftLeg = maxEach;
+                this.frontRightLeg = maxEach;
+                this.rearLeftLeg = maxEach;
+                this.rearRightLeg = maxEach;
+            } else{
+                this.torso = maxEach;
+                this.leftArm = maxEach;
+                this.rightArm = maxEach;
+                this.leftLeg = maxEach;
+                this.rightLeg = maxEach;
+            }
+        }
+        getParts(){
+            if (this.bodyPlan==='quadrupedMonster'){
+                return ['head', 'body', 'frontLeftLeg', 'frontRightLeg', 'rearLeftLeg', 'rearRightLeg'];
+            }
+            return ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'];
+        }
+        mainBodyPartName(){
+            return this.bodyPlan==='quadrupedMonster' ? 'body' : 'torso';
+        }
+        legPartNames(){
+            if (this.bodyPlan==='quadrupedMonster'){
+                return ['frontLeftLeg', 'frontRightLeg', 'rearLeftLeg', 'rearRightLeg'];
+            }
+            return ['leftLeg', 'rightLeg'];
         }
         total(){
-            return this.head+this.torso+this.leftArm+this.rightArm+this.leftLeg+this.rightLeg;
+            var total = 0;
+            var parts = this.getParts();
+            for (var i = 0; i<parts.length; i+=1){
+                total+=this[parts[i]] || 0;
+            }
+            return total;
         }
         maxTotal(){
-            return this.maxEach * 6;
+            return this.maxEach * this.getParts().length;
         }
         applyGeneralDamage(amount, rng){
-            var parts = ['head',
-            'torso',
-            'leftArm',
-            'rightArm',
-            'leftLeg',
-            'rightLeg'];
+            var parts = this.getParts();
             var part = rng.pick(parts);
-            this[part] = Math.max(0, this[part]-amount);
+            this[part] = Math.max(0, (this[part] || 0)-amount);
+            return part;
+        }
+        applyDamageToPart(part, amount){
+            if (this.getParts().indexOf(part)<0){
+                part = this.mainBodyPartName();
+            }
+            this[part] = Math.max(0, (this[part] || 0)-Math.max(0, amount || 0));
             return part;
         }
         missingHealth(){
@@ -4918,21 +4950,14 @@ button:hover {
         }
         healGeneral(amount){
             var remaining = Math.max(0, amount || 0);
-            var parts = ['head',
-            'torso',
-            'leftArm',
-            'rightArm',
-            'leftLeg',
-            'rightLeg'];
+            var parts = this.getParts();
             var healed = 0;
             while (remaining>0.0001){
                 var mostDamagedPart = null;
                 var mostMissing = 0;
-                for (var i = 0;
-                i<parts.length;
-                i+=1){
+                for (var i = 0; i<parts.length; i+=1){
                     var part = parts[i];
-                    var missing = this.maxEach-this[part];
+                    var missing = this.maxEach-(this[part] || 0);
                     if (missing>mostMissing){
                         mostMissing = missing;
                         mostDamagedPart = part;
@@ -4949,24 +4974,33 @@ button:hover {
             return healed;
         }
         isDead(){
-            return this.head<=0 || this.torso<=0 || this.total()<=this.maxEach * 1.35;
+            var mainBody = this[this.mainBodyPartName()] || 0;
+            return this.head<=0 || mainBody<=0 || this.total()<=this.maxEach * 1.35;
         }
         movementMultiplier(){
-            return Clamp(0.35+((this.leftLeg+this.rightLeg) /(this.maxEach * 2)) * 0.65, 0.35, 1);
+            var legs = this.legPartNames();
+            var legTotal = 0;
+            for (var i = 0; i<legs.length; i+=1){
+                legTotal+=this[legs[i]] || 0;
+            }
+            return Clamp(0.35+(legTotal /(this.maxEach * legs.length)) * 0.65, 0.35, 1);
         }
         armsCanCarry(){
+            if (this.bodyPlan==='quadrupedMonster'){
+                return false;
+            }
             return this.leftArm>this.maxEach * 0.25 || this.rightArm>this.maxEach * 0.25;
         }
         getSnapshot(){
-            return {
-                head : this.head,
-                torso : this.torso,
-                leftArm : this.leftArm,
-                rightArm : this.rightArm,
-                leftLeg : this.leftLeg,
-                rightLeg : this.rightLeg,
-                maxEach : this.maxEach
-            } ;
+            var snapshot = {
+                maxEach : this.maxEach,
+                bodyPlan : this.bodyPlan
+            };
+            var parts = this.getParts();
+            for (var i = 0; i<parts.length; i+=1){
+                snapshot[parts[i]] = this[parts[i]] || 0;
+            }
+            return snapshot;
         }
     }
     // ============================================================================
@@ -6229,7 +6263,7 @@ button:hover {
             var metabolism = monster.phenotype && monster.phenotype.metabolism ? monster.phenotype.metabolism : null;
             var raw = metabolism && metabolism.rawFactors ? metabolism.rawFactors : {
             } ;
-            var fat = Number.isFinite(monster.fatStorage) ? monster.fatStorage : 0;
+            var fat = (monster.currentFatMass || 0) / Math.max(1, monster.currentBodyMass || 1);
             var thermal = MonsterMetabolismSystem.thermalStatus(monster, world, 1);
             var injury = monster.bodyHealth && monster.bodyHealth.maxTotal ? monster.bodyHealth.missingHealth() / monster.bodyHealth.maxTotal() : 0;
             var ageFactor = this.ageDiseaseRiskFactor(monster);
@@ -6256,13 +6290,13 @@ button:hover {
             } );
             var risk = this.marginalMetabolicRiskFor(monster, world);
             if (rng.nextFloat()<risk.adiposeFever){
-                var disease = this.addOrIntensify(monster, 'adiposeFever', Clamp(0.30+(monster.fatStorage || 0) * 0.075, 0.30, 0.96), rng.integer(2, 4));
+                var disease = this.addOrIntensify(monster, 'adiposeFever', Clamp(0.30+Math.max(0, ((monster.currentFatMass || 0) / Math.max(1, monster.currentBodyMass || 1))-0.18) * 2.0, 0.30, 0.96), rng.integer(2, 4));
                 if (disease && events){
                     events.push(monster.name+' developed '+disease.displayName+'.');
                 }
             }
             if (rng.nextFloat()<risk.wastingChill){
-                var wasting = this.addOrIntensify(monster, 'wastingChill', Clamp(0.36+Math.max(0, 0.6-(monster.fatStorage || 0)) * 0.45, 0.30, 0.96), rng.integer(2, 4));
+                var wasting = this.addOrIntensify(monster, 'wastingChill', Clamp(0.36+Math.max(0, 0.05-((monster.currentFatMass || 0) / Math.max(1, monster.currentBodyMass || 1))) * 5.0, 0.30, 0.96), rng.integer(2, 4));
                 if (wasting && events){
                     events.push(monster.name+' developed '+wasting.displayName+'.');
                 }
@@ -6303,23 +6337,10 @@ button:hover {
             if (!monster){
                 return DEFAULT_MONSTER_NUTRITION_REQUIREMENT;
             }
-            var metabolism = monster.phenotype && monster.phenotype.metabolism ? monster.phenotype.metabolism : null;
-            if (!metabolism){
-                return Number.isFinite(monster.nutritionRequirement) ? Math.max(0, monster.nutritionRequirement) : DEFAULT_MONSTER_NUTRITION_REQUIREMENT;
+            if (monster.calculateSeasonFoodRequirement){
+                return monster.calculateSeasonFoodRequirement();
             }
-            var baseFood = metabolism.baseMetabolicFood * this.getAgeMetabolicMultiplier(monster);
-            var baseMultiplier = monster.deployed ? 1.0 : 0.74;
-            var thermalStress = monster.thermalStress || 0;
-            var thermalCost = Math.min(4.0, thermalStress * 0.28);
-            var fat = Number.isFinite(monster.fatStorage) ? Math.max(0, monster.fatStorage) : 0;
-            var fatMaintenance = fat * 0.32;
-            var plumptinFatGainFood = Math.max(0, (metabolism.targetFatStorage || 0)-fat) * Math.max(0.05, metabolism.plumptinLevel || 0) * 0.42;
-            var activityFood = monster.activityFoodThisSeason || 0;
-            var reproductionFood =(monster.breedingHoldSeasonsRemaining || 0)>0 ? 4.0 : 0;
-            var healingFood = this.getHealingFoodRequirement(monster);
-            var diseaseEffects = MonsterDiseaseSystem.combinedEffects(monster);
-            var requirement =(baseFood * baseMultiplier+thermalCost+fatMaintenance+plumptinFatGainFood+activityFood+reproductionFood+healingFood) * diseaseEffects.foodMultiplier;
-            return Math.max(1, Math.ceil(requirement));
+            return Number.isFinite(monster.nutritionRequirement) ? Math.max(0, monster.nutritionRequirement) : DEFAULT_MONSTER_NUTRITION_REQUIREMENT;
         } ,
         getAgeMetabolicMultiplier : function (monster){
             if (!monster){
@@ -6365,6 +6386,10 @@ button:hover {
             monster.eatingTargetId = null;
             monster.eatingTicksRemaining = 0;
             monster.activityFoodThisSeason = 0;
+            monster.seasonDistanceMoved = 0;
+            monster.seasonTerrainEffort = 0;
+            monster.movementFoodRequired = 0;
+            monster.combatFoodRequired = 0;
             monster.healingFoodRequirementThisSeason = 0;
             monster.plannedHealingThisSeason = 0;
         } ,
@@ -6402,11 +6427,12 @@ button:hover {
             if (monster.nutritionState===NUTRITION_STATE.STARVED){
                 return 0;
             }
-            var fat = Number.isFinite(monster.fatStorage) ? Math.max(0, monster.fatStorage) : 0;
-            var fatPenalty = Clamp(1-Math.max(0, fat-1.8) * 0.045, 0.58, 1);
+            var fatFraction = (monster.currentFatMass || 0) / Math.max(1, monster.currentBodyMass || 1);
+            var fatPenalty = Clamp(1-Math.max(0, fatFraction-0.16) * 1.1, 0.58, 1);
+            var legPenalty = monster.bodyHealth && monster.bodyHealth.movementMultiplier ? monster.bodyHealth.movementMultiplier() : 1;
             var thermalPenalty = Clamp(1-(monster.thermalStress || 0) * 0.055, 0.55, 1);
             var diseaseSpeed = MonsterDiseaseSystem.combinedEffects(monster).speedMultiplier;
-            return fatPenalty * thermalPenalty * diseaseSpeed;
+            return fatPenalty * legPenalty * thermalPenalty * diseaseSpeed;
         } ,
         recordActivityTick : function (monster, intensity){
             if (!monster || !monster.deployed || !monster.alive){
@@ -6414,8 +6440,9 @@ button:hover {
             }
             var metabolism = monster.phenotype && monster.phenotype.metabolism ? monster.phenotype.metabolism : null;
             var conservation = metabolism ? metabolism.energyConservation : 0.5;
-            var fat = Number.isFinite(monster.fatStorage) ? Math.max(0, monster.fatStorage) : 0;
-            var cost = Math.max(0, intensity || 0) *(1.12-conservation * 0.32) *(1+fat * 0.035) * 0.00062;
+            var fatFraction = (monster.currentFatMass || 0) / Math.max(1, monster.currentBodyMass || 1);
+            var massMultiplier = Clamp((monster.currentBodyMass || 100) / 100, 0.35, 2.2);
+            var cost = Math.max(0, intensity || 0) *(1.12-conservation * 0.32) *(1+fatFraction * 0.85) * massMultiplier * 0.00062;
             monster.activityFoodThisSeason =(monster.activityFoodThisSeason || 0)+cost;
         } ,
         applyNutritionStateFromSeason : function (monster, rng){
@@ -6427,10 +6454,13 @@ button:hover {
             if (ratio>=1){
                 monster.nutritionState = NUTRITION_STATE.NOURISHED;
                 if (metabolism){
-                    var targetFat = metabolism.targetFatStorage;
                     var surplus = Math.max(0, totalFood-requirement);
-                    var plumptinGain = Math.min(1.2, surplus * 0.30+metabolism.plumptinLevel * 0.18);
-                    monster.fatStorage = Clamp((monster.fatStorage || 0)+plumptinGain, 0, targetFat);
+                    monster.foodSurplusThisSeason = surplus;
+                    monster.currentFatMass = Clamp((monster.currentFatMass || 0)+surplus * 0.42+metabolism.plumptinLevel * 0.22, 0, Math.max(monster.targetFatMass || 1, (monster.targetFatMass || 1) * 1.85));
+                    if ((monster.currentMuscleMass || 0)<44 * Math.pow(monster.bodyScale || 1, 3)){
+                        monster.currentMuscleMass+=Math.min(0.8, surplus * 0.08);
+                    }
+                    monster.recalculateBodyMassAndDerivedFields();
                 }
                 return {
                     state : monster.nutritionState,
@@ -6438,8 +6468,9 @@ button:hover {
                 } ;
             }
             var shortfall = Math.max(0, requirement-totalFood);
-            if ((monster.fatStorage || 0)>=shortfall){
-                monster.fatStorage = Math.max(0, (monster.fatStorage || 0)-shortfall);
+            if ((monster.currentFatMass || 0)>=shortfall){
+                monster.currentFatMass = Math.max(0, (monster.currentFatMass || 0)-shortfall);
+                monster.recalculateBodyMassAndDerivedFields();
                 monster.foodBoughtThisSeason =(monster.foodBoughtThisSeason || 0)+shortfall;
                 monster.nutritionShortfallThisSeason = 0;
                 monster.nutritionState = NUTRITION_STATE.NOURISHED;
@@ -6449,19 +6480,22 @@ button:hover {
                     usedFatReserve : true
                 } ;
             }
-            if ((monster.fatStorage || 0)>0){
-                shortfall-=monster.fatStorage;
-                monster.fatStorage = 0;
+            if ((monster.currentFatMass || 0)>0){
+                shortfall-=monster.currentFatMass;
+                monster.currentFatMass = 0;
+                monster.recalculateBodyMassAndDerivedFields();
                 totalFood = requirement-shortfall;
                 ratio = requirement>0 ? totalFood / requirement : 1;
                 monster.nutritionShortfallThisSeason = shortfall;
             }
-            if ((monster.fatStorage || 0)>7.0){
-                monster.health = Math.max(1, monster.health-Math.round(monster.maxHealth * 0.04));
+            if ((monster.currentFatMass || 0)>Math.max(1, (monster.targetFatMass || 1) * 1.75)){
+                monster.applyNutritionBodyDamage(monster.bodyHealth.maxEach * 0.04, rng);
             }
             if (ratio>=0.5){
                 monster.nutritionState = NUTRITION_STATE.MALNOURISHED;
-                monster.health = Math.max(1, monster.health-Math.round(monster.maxHealth * 0.06));
+                monster.currentMuscleMass = Math.max(1, (monster.currentMuscleMass || 1)-shortfall * 0.08);
+                monster.recalculateBodyMassAndDerivedFields();
+                monster.applyNutritionBodyDamage(monster.bodyHealth.maxEach * 0.06, rng);
                 return {
                     state : monster.nutritionState,
                     died : false
@@ -6469,7 +6503,9 @@ button:hover {
             }
             if (ratio>=0.25){
                 monster.nutritionState = NUTRITION_STATE.SEVERELY_MALNOURISHED;
-                monster.health = Math.max(1, monster.health-Math.round(monster.maxHealth * 0.18));
+                monster.currentMuscleMass = Math.max(1, (monster.currentMuscleMass || 1)-shortfall * 0.18);
+                monster.recalculateBodyMassAndDerivedFields();
+                monster.applyNutritionBodyDamage(monster.bodyHealth.maxEach * 0.18, rng);
                 if (rng.nextFloat()<0.18){
                     monster.alive = false;
                     monster.behaviourState = 'dead';
@@ -6485,7 +6521,9 @@ button:hover {
             }
             monster.nutritionState = NUTRITION_STATE.STARVED;
             monster.alive = false;
-            monster.health = 0;
+            if (monster.bodyHealth){
+                monster.bodyHealth.head = 0;
+            }
             monster.behaviourState = 'dead';
             return {
                 state : monster.nutritionState,
@@ -7200,7 +7238,7 @@ button:hover {
         } ,
         thermalStatus : function (monster, world, seasonNumber){
             var m = monster && monster.phenotype && monster.phenotype.metabolism ? monster.phenotype.metabolism : MetabolismPhenotypeSystem.resolve(new MonsterPhenotypeExpressionContext());
-            var fat = Number.isFinite(monster && monster.fatStorage) ? Math.max(0, monster.fatStorage) : m.targetFatStorage * 0.70;
+            var fat = Number.isFinite(monster && monster.currentFatMass) ? Math.max(0, monster.currentFatMass) : m.targetFatStorage * 0.70;
             var temperatureC = this.currentTemperatureC(world, seasonNumber);
             var coldLimit = m.coldLimitC-fat * 1.35;
             var heatLimit = m.heatLimitC-fat * 1.10;
@@ -8389,14 +8427,12 @@ button:hover {
             this.capturedThisRaid = false;
             this.selectedForDeployment = options && options.selectedForDeployment!==undefined ? options.selectedForDeployment : this.owned;
             this.deployed = false;
-            this.bodyHealth = new BodyHealth(20);
+            this.bodyHealth = new BodyHealth(20, 'quadrupedMonster');
             this.perception = options && Number.isFinite(options.perception) ? Clamp(options.perception, 0, 1) : rng.range(0.38, 0.88);
             this.sightRange = options && Number.isFinite(options.sightRange) ? Math.max(120, options.sightRange) : 1400+this.perception * 1000;
             this.scentRange = options && Number.isFinite(options.scentRange) ? Math.max(60, options.scentRange) : 220+this.perception * 120;
             this.hearingThreshold = options && Number.isFinite(options.hearingThreshold) ? Math.max(0, options.hearingThreshold) : DEFAULT_MONSTER_HEARING_THRESHOLD;
             this.eyeHeight = 4.5;
-            this.maxHealth = this.bodyHealth.maxTotal();
-            this.health = this.bodyHealth.total();
             this.nutritionRequirement = options && Number.isFinite(options.nutritionRequirement) ? Math.max(0, options.nutritionRequirement) : DEFAULT_MONSTER_NUTRITION_REQUIREMENT;
             this.nutritionState = options && options.nutritionState ? options.nutritionState : NUTRITION_STATE.NOURISHED;
             this.foodEatenThisSeason = 0;
@@ -8420,7 +8456,7 @@ button:hover {
             this.genome = options && options.genome ? options.genome : MonsterGenePool.createGenome(rng, options && options.world ? options.world : null);
             this.phenotype = null;
             this.expressGenomeToPhenotype();
-            this.applyPhenotypeToRuntimeTraits(options || {});
+            this.applyPhenotypeToRuntimeTraits(options || {}, rng);
             this.activityFoodThisSeason = 0;
             this.thermalState = 'comfortable';
             this.thermalStress = 0;
@@ -8435,9 +8471,11 @@ button:hover {
             this.ageInSeasons = options && Number.isFinite(options.ageInSeasons) ? Math.max(0, Math.floor(options.ageInSeasons)) : (options && options.lifeStage===MONSTER_LIFE_STAGE.JUVENILE ? 0 : rng.integer(8, 24));
             this.lifeStage = options && options.lifeStage ? options.lifeStage : MONSTER_LIFE_STAGE.ADULT;
             this.juvenileMaturationSeasonsRemaining = options && Number.isFinite(options.juvenileMaturationSeasonsRemaining) ? Math.max(0, Math.floor(options.juvenileMaturationSeasonsRemaining)) : 0;
+            this.juvenileGrowthSeasonsRemaining = options && Number.isFinite(options.juvenileGrowthSeasonsRemaining) ? Math.max(0, Math.floor(options.juvenileGrowthSeasonsRemaining)) : (options && options.lifeStage===MONSTER_LIFE_STAGE.JUVENILE ? MONSTER_GROWTH_TO_FULL_SIZE_SEASONS : 0);
             this.breedingHoldSeasonsRemaining = options && Number.isFinite(options.breedingHoldSeasonsRemaining) ? Math.max(0, Math.floor(options.breedingHoldSeasonsRemaining)) : 0;
             this.motherId = options && options.motherId ? options.motherId : null;
             this.fatherId = options && options.fatherId ? options.fatherId : null;
+            this.initialiseBodyAndNutritionFields(options || {}, rng);
             this.adultBaseSpeed = this.speed;
             this.ageFrailtyMultiplier = 1;
             this.ageCategory = 'adult';
@@ -8477,10 +8515,153 @@ button:hover {
             }
             this.phenotype = phenotype;
         }
-        applyPhenotypeToRuntimeTraits(options){
-            var settings = options || {
-            } ;
-            this.fatStorage = Number.isFinite(settings.fatStorage) ? Math.max(0, settings.fatStorage) : ((this.phenotype && this.phenotype.metabolism ? this.phenotype.metabolism.targetFatStorage : 2.5) * 0.70);
+        applyPhenotypeToRuntimeTraits(options, rng){
+            this.initialiseBodyAndNutritionFields(options || {}, rng);
+        }
+        initialiseBodyAndNutritionFields(options, rng){
+            var settings = options || {};
+            var random = rng || new SeededRng(1);
+            var metabolism = this.phenotype && this.phenotype.metabolism ? this.phenotype.metabolism : null;
+            var targetFatIndex = metabolism ? metabolism.targetFatStorage : 2.5;
+            this.adultBodyScale = Number.isFinite(settings.adultBodyScale) ? Clamp(settings.adultBodyScale, 0.62, 1.24) : (Number.isFinite(settings.bodyScale) ? Clamp(settings.bodyScale, 0.62, 1.24) : random.range(0.72, 1.14));
+            this.unstuntedAdultBodyScale = Number.isFinite(settings.unstuntedAdultBodyScale) ? Clamp(settings.unstuntedAdultBodyScale, 0.62, 1.24) : this.adultBodyScale;
+            var remainingGrowthSeasons = Number.isFinite(settings.juvenileGrowthSeasonsRemaining) ? Math.max(0, Math.floor(settings.juvenileGrowthSeasonsRemaining)) : (Number.isFinite(this.juvenileGrowthSeasonsRemaining) ? Math.max(0, Math.floor(this.juvenileGrowthSeasonsRemaining)) : 0);
+            this.currentGrowthScale = Number.isFinite(settings.currentGrowthScale) ? Clamp(settings.currentGrowthScale, 0.40, 1.0) : this.getGrowthScaleForRemainingSeasons(remainingGrowthSeasons);
+            this.bodyScale = this.adultBodyScale * this.currentGrowthScale;
+            this.matureBodyMass = Math.round(100 * Math.pow(this.adultBodyScale, 3) * 10) / 10;
+            this.baseOrganMass = Math.max(4, 22 * Math.pow(this.bodyScale, 3));
+            this.currentBoneMass = Number.isFinite(settings.currentBoneMass) ? Math.max(1, settings.currentBoneMass) : Math.max(3, 16 * Math.pow(this.bodyScale, 3));
+            this.boneDensity = Number.isFinite(settings.boneDensity) ? Clamp(settings.boneDensity, 0.65, 1.45) : random.range(0.86, 1.16);
+            this.currentMuscleMass = Number.isFinite(settings.currentMuscleMass) ? Math.max(1, settings.currentMuscleMass) : Math.max(4, 44 * Math.pow(this.bodyScale, 3) * random.range(0.86, 1.16));
+            this.muscleDensity = Number.isFinite(settings.muscleDensity) ? Clamp(settings.muscleDensity, 0.65, 1.45) : random.range(0.86, 1.18);
+            this.targetFatMass = Number.isFinite(settings.targetFatMass) ? Math.max(0, settings.targetFatMass) : Math.max(1, 14 * Math.pow(this.bodyScale, 3) * Clamp(targetFatIndex / 2.5, 0.32, 2.8));
+            this.currentFatMass = Number.isFinite(settings.currentFatMass) ? Math.max(0, settings.currentFatMass) : this.targetFatMass * 0.70;
+            this.seasonDistanceMoved = 0;
+            this.seasonTerrainEffort = 0;
+            this.seasonSprintingTicks = 0;
+            this.movementFoodRequired = 0;
+            this.combatFoodRequired = 0;
+            this.bodyMassFoodRequired = 0;
+            this.tissueMaintenanceFoodRequired = 0;
+            this.thermalFoodRequired = 0;
+            this.foodSurplusThisSeason = 0;
+            this.recalculateBodyMassAndDerivedFields();
+            this.bodyHealth = new BodyHealth(this.getBodyPartMaxCondition(), 'quadrupedMonster');
+            if (settings.bodyHealth){
+                this.restoreMonsterBodyHealth(settings.bodyHealth);
+            }
+        }
+        restoreMonsterBodyHealth(snapshot){
+            var parts = this.bodyHealth.getParts();
+            for (var i = 0; i<parts.length; i+=1){
+                var part = parts[i];
+                if (Number.isFinite(snapshot[part])){
+                    this.bodyHealth[part] = Clamp(snapshot[part], 0, this.bodyHealth.maxEach);
+                }
+            }
+            if (Number.isFinite(snapshot.torso) && !Number.isFinite(snapshot.body)){
+                this.bodyHealth.body = Clamp(snapshot.torso, 0, this.bodyHealth.maxEach);
+            }
+        }
+        getGrowthScaleForRemainingSeasons(remainingGrowthSeasons){
+            var remaining = Clamp(Number.isFinite(remainingGrowthSeasons) ? Math.floor(remainingGrowthSeasons) : 0, 0, MONSTER_GROWTH_TO_FULL_SIZE_SEASONS);
+            if (remaining<=0){
+                return 1;
+            }
+            var progress = (MONSTER_GROWTH_TO_FULL_SIZE_SEASONS-remaining) / MONSTER_GROWTH_TO_FULL_SIZE_SEASONS;
+            return Clamp(0.52+0.48 * progress, 0.52, 1);
+        }
+        getBodyHealthRatios(){
+            if (!this.bodyHealth || !this.bodyHealth.getSnapshot){
+                return null;
+            }
+            var snapshot = this.bodyHealth.getSnapshot();
+            var max = snapshot && Number.isFinite(snapshot.maxEach) ? Math.max(1, snapshot.maxEach) : 1;
+            return {
+                head : (snapshot.head || 0) / max,
+                body : (snapshot.body || snapshot.torso || 0) / max,
+                frontLeftLeg : (snapshot.frontLeftLeg || snapshot.leftLeg || 0) / max,
+                frontRightLeg : (snapshot.frontRightLeg || snapshot.rightLeg || 0) / max,
+                rearLeftLeg : (snapshot.rearLeftLeg || snapshot.leftLeg || 0) / max,
+                rearRightLeg : (snapshot.rearRightLeg || snapshot.rightLeg || 0) / max
+            };
+        }
+        restoreBodyHealthRatios(ratios){
+            if (!ratios || !this.bodyHealth){
+                return;
+            }
+            this.bodyHealth.head = Clamp(ratios.head * this.bodyHealth.maxEach, 0, this.bodyHealth.maxEach);
+            this.bodyHealth.body = Clamp(ratios.body * this.bodyHealth.maxEach, 0, this.bodyHealth.maxEach);
+            this.bodyHealth.frontLeftLeg = Clamp(ratios.frontLeftLeg * this.bodyHealth.maxEach, 0, this.bodyHealth.maxEach);
+            this.bodyHealth.frontRightLeg = Clamp(ratios.frontRightLeg * this.bodyHealth.maxEach, 0, this.bodyHealth.maxEach);
+            this.bodyHealth.rearLeftLeg = Clamp(ratios.rearLeftLeg * this.bodyHealth.maxEach, 0, this.bodyHealth.maxEach);
+            this.bodyHealth.rearRightLeg = Clamp(ratios.rearRightLeg * this.bodyHealth.maxEach, 0, this.bodyHealth.maxEach);
+        }
+        applyJuvenileGrowthAfterSeason(rng, events){
+            if ((this.juvenileGrowthSeasonsRemaining || 0)<=0){
+                return;
+            }
+            if (this.nutritionState!==NUTRITION_STATE.NOURISHED){
+                var stunt = this.nutritionState===NUTRITION_STATE.SEVERELY_MALNOURISHED ? 0.92 : 0.97;
+                this.adultBodyScale = Clamp((this.adultBodyScale || 1) * stunt, 0.58, 1.24);
+            }
+            this.juvenileGrowthSeasonsRemaining = Math.max(0, (this.juvenileGrowthSeasonsRemaining || 0)-1);
+            var ratios = this.getBodyHealthRatios();
+            this.initialiseBodyAndNutritionFields({
+                lifeStage : this.lifeStage,
+                adultBodyScale : this.adultBodyScale,
+                unstuntedAdultBodyScale : this.unstuntedAdultBodyScale,
+                juvenileGrowthSeasonsRemaining : this.juvenileGrowthSeasonsRemaining,
+                sex : this.sex
+            }, rng);
+            this.restoreBodyHealthRatios(ratios);
+            if (events){
+                if (this.juvenileGrowthSeasonsRemaining>0){
+                    events.push(this.name+' grew larger and has '+this.juvenileGrowthSeasonsRemaining+' season'+(this.juvenileGrowthSeasonsRemaining===1 ? '' : 's')+' until full size.');
+                } else{
+                    events.push(this.name+' has reached full adult size.');
+                }
+            }
+        }
+        recalculateBodyMassAndDerivedFields(){
+            this.currentLeanMass = Math.max(1, (this.baseOrganMass || 0)+(this.currentBoneMass || 0)+(this.currentMuscleMass || 0));
+            this.currentBodyMass = Math.max(1, this.currentLeanMass+(this.currentFatMass || 0));
+            this.bodyScale = Clamp(Math.cbrt(this.currentBodyMass / 100), 0.42, 1.28);
+            this.radius = 16 * this.bodyScale;
+            this.eyeHeight = 4.5 * this.bodyScale;
+            this.bodyCondition = this.getBodyConditionLabel();
+            this.muscleCondition = this.getMuscleConditionLabel();
+            this.boneCondition = this.getBoneConditionLabel();
+            return this.currentBodyMass;
+        }
+        getBodyPartMaxCondition(){
+            return Math.max(8, Math.round(20 * Math.pow(this.adultBodyScale || 1, 1.2) * Clamp(this.boneDensity || 1, 0.75, 1.35)));
+        }
+        getOverallConditionRatio(){
+            if (!this.bodyHealth || !this.bodyHealth.maxTotal){
+                return 1;
+            }
+            return Clamp(this.bodyHealth.total() / Math.max(1, this.bodyHealth.maxTotal()), 0, 1);
+        }
+        getBodyConditionLabel(){
+            var fatRatio = (this.targetFatMass || 1)>0 ? (this.currentFatMass || 0) / this.targetFatMass : 1;
+            if (fatRatio<0.35){ return 'wasted'; }
+            if (fatRatio<0.70){ return 'lean'; }
+            if (fatRatio>1.75){ return 'obese'; }
+            if (fatRatio>1.22){ return 'fat'; }
+            return 'fit';
+        }
+        getMuscleConditionLabel(){
+            var expected = Math.max(1, 44 * Math.pow(this.bodyScale || 1, 3));
+            var ratio = (this.currentMuscleMass || 0) / expected;
+            if (ratio<0.68){ return 'under-muscled'; }
+            if (ratio>1.24){ return 'muscular'; }
+            return 'normal';
+        }
+        getBoneConditionLabel(){
+            if ((this.boneDensity || 1)<0.82){ return 'light-boned'; }
+            if ((this.boneDensity || 1)>1.18){ return 'dense-boned'; }
+            return 'normal';
         }
         getPhenotypeSnapshot(){
             if (!this.phenotype){
@@ -8728,6 +8909,9 @@ button:hover {
             if (this.lifeStage===MONSTER_LIFE_STAGE.JUVENILE){
                 return 'juvenile';
             }
+            if ((this.juvenileGrowthSeasonsRemaining || 0)>0){
+                return 'adolescent';
+            }
             var age = this.ageInSeasons || 0;
             if (age>=MONSTER_SENESCENT_START_SEASONS){
                 return 'senescent';
@@ -8918,6 +9102,58 @@ button:hover {
             this.moveWithPath(raid.world, target.x, target.y, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT * 0.52, this.id+'_forage_'+target.key);
             return true;
         }
+        calculateSeasonFoodRequirement(world){
+            var metabolism = this.phenotype && this.phenotype.metabolism ? this.phenotype.metabolism : null;
+            var baseMetabolicFood = metabolism ? metabolism.baseMetabolicFood : DEFAULT_MONSTER_NUTRITION_REQUIREMENT;
+            var growthFood = (this.juvenileGrowthSeasonsRemaining || 0)>0 ? Math.max(0.8, this.matureBodyMass * 0.012) : 0;
+            var ageMultiplier = NutritionSystem.getAgeMetabolicMultiplier(this);
+            var reserveMultiplier = this.deployed ? 1.0 : 0.74;
+            this.bodyMassFoodRequired = Math.max(0.5, baseMetabolicFood * Math.pow(Math.max(0.35, this.currentBodyMass || 100) / 100, 0.72) * ageMultiplier * reserveMultiplier);
+            this.tissueMaintenanceFoodRequired = Math.max(0, (this.currentMuscleMass || 0) * 0.018+(this.currentBoneMass || 0) * 0.006+(this.currentFatMass || 0) * 0.010);
+            var coldStress = Math.max(0, this.thermalState==='tooCold' ? (this.thermalStress || 0) : 0);
+            var heatStress = Math.max(0, this.thermalState==='tooHot' ? (this.thermalStress || 0) : 0);
+            var surfaceMassPenalty = Clamp(1 / Math.max(0.55, this.bodyScale || 1), 0.78, 1.55);
+            var fatInsulation = Clamp(1-((this.currentFatMass || 0) / Math.max(1, this.currentBodyMass || 1)) * 1.8, 0.45, 1.10);
+            this.thermalFoodRequired = coldStress * 0.85 * surfaceMassPenalty * fatInsulation+heatStress * 0.12;
+            this.movementFoodRequired = this.activityFoodThisSeason || 0;
+            var reproductionFood =(this.breedingHoldSeasonsRemaining || 0)>0 ? 4.0 : 0;
+            var healingFood = NutritionSystem.getHealingFoodRequirement(this);
+            var diseaseEffects = MonsterDiseaseSystem.combinedEffects(this);
+            var total = (this.bodyMassFoodRequired+this.tissueMaintenanceFoodRequired+this.thermalFoodRequired+this.movementFoodRequired+this.combatFoodRequired+reproductionFood+healingFood+growthFood) * diseaseEffects.foodMultiplier;
+            this.nutritionRequirement = Math.max(1, Math.ceil(total));
+            return this.nutritionRequirement;
+        }
+        getFoodNeededThisSeason(){
+            return Math.max(0, this.calculateSeasonFoodRequirement()-((this.foodEatenThisSeason || 0)+(this.foodBoughtThisSeason || 0)));
+        }
+        recordMovementActivity(world, beforeX, beforeY, afterX, afterY, requestedDistance){
+            var actualDistance = Distance(beforeX, beforeY, afterX, afterY);
+            if (actualDistance<=0.0001){
+                return;
+            }
+            this.seasonDistanceMoved =(this.seasonDistanceMoved || 0)+actualDistance;
+            var terrainCost = world && world.terrainGrid ? TerrainRules.movementCostFor(this, world.terrainGrid.getTerrainTypeAtWorld(afterX, afterY), world.terrainGrid.getSlopeAtWorld(afterX, afterY)) : 1;
+            var massMultiplier = Clamp((this.currentBodyMass || 100) / 100, 0.32, 2.15);
+            var muscleEfficiency = Clamp(1.12-((this.currentMuscleMass || 40) / Math.max(1, this.currentBodyMass || 100)) * 0.75, 0.62, 1.18);
+            var effort = actualDistance * Math.max(0.25, terrainCost) * massMultiplier * muscleEfficiency / 1650;
+            this.seasonTerrainEffort =(this.seasonTerrainEffort || 0)+effort;
+            this.activityFoodThisSeason =(this.activityFoodThisSeason || 0)+effort;
+        }
+        moveToward(world, tx, ty, distance){
+            var beforeX = this.x;
+            var beforeY = this.y;
+            super.moveToward(world, tx, ty, distance);
+            this.recordMovementActivity(world, beforeX, beforeY, this.x, this.y, distance);
+        }
+        applyNutritionBodyDamage(amount, rng){
+            var part = this.bodyHealth.applyGeneralDamage(amount, rng);
+            if (this.bodyHealth.isDead()){
+                this.alive = false;
+                this.corpseState = 'corpse';
+                this.behaviourState = 'dead';
+            }
+            return part;
+        }
         updateThermalState(raid){
             var status = MonsterMetabolismSystem.thermalStatus(this, raid.world, raid.seasonNumber);
             this.thermalState = status.state;
@@ -8934,8 +9170,8 @@ button:hover {
         getSprintSpeedMultiplier(raid, target){
             var metabolism = this.phenotype && this.phenotype.metabolism ? this.phenotype.metabolism : null;
             var conservation = metabolism ? metabolism.energyConservation : 0.5;
-            var fat = Number.isFinite(this.fatStorage) ? Math.max(0, this.fatStorage) : 0;
-            var maxTicks = Math.max(18, Math.round(150 * Clamp(1-fat * 0.08, 0.32, 1.05)));
+            var fatFraction = (this.currentFatMass || 0) / Math.max(1, this.currentBodyMass || 1);
+            var maxTicks = Math.max(18, Math.round(150 * Clamp(1-fatFraction * 1.8, 0.32, 1.05)));
             if (!Number.isFinite(this.currentSprintEnduranceTicks) || this.currentSprintEnduranceTicks<=0){
                 this.currentSprintEnduranceTicks = maxTicks;
             }
@@ -9097,17 +9333,16 @@ button:hover {
             } .bind(this));
         }
         applyDamage(amount, rng, raid, attacker){
-            var fat = Number.isFinite(this.fatStorage) ? Math.max(0, this.fatStorage) : 0;
-            if (fat<0.35){
+            var fatFraction = (this.currentFatMass || 0) / Math.max(1, this.currentBodyMass || 1);
+            if (fatFraction<0.04){
                 amount = Math.round(amount * 1.22);
-            } else if (fat>6.0){
-                amount = Math.round(amount * Clamp(1+(fat-6.0) * 0.055, 1.05, 1.38));
+            } else if (fatFraction>0.24){
+                amount = Math.round(amount * Clamp(1+(fatFraction-0.24) * 1.8, 1.05, 1.38));
             }
             amount = Math.round(amount * MonsterDiseaseSystem.combinedEffects(this).damageMultiplier);
-            var healthBeforeDamage = this.health;
+            var conditionBeforeDamage = this.getOverallConditionRatio();
             this.bodyHealth.applyGeneralDamage(amount, rng);
-            this.health = this.bodyHealth.total();
-            this.recordDamageTaken(Math.max(0, healthBeforeDamage-this.health));
+            this.recordDamageTaken(Math.max(0, conditionBeforeDamage-this.getOverallConditionRatio()) * this.bodyHealth.maxTotal());
             if (raid){
                 raid.addSound('monsterInjured', attacker || this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS, {
                     victimId : this.id,
@@ -9141,9 +9376,22 @@ button:hover {
             s.hearingThreshold = this.hearingThreshold;
             s.selectedForDeployment = this.selectedForDeployment;
             s.deployed = this.deployed;
-            s.health = this.health;
-            s.maxHealth = this.maxHealth;
+            s.overallConditionPercent = Math.round(this.getOverallConditionRatio() * 100);
             s.bodyHealth = this.bodyHealth.getSnapshot();
+            s.bodyScale = this.bodyScale || 1;
+            s.adultBodyScale = this.adultBodyScale || 1;
+            s.currentGrowthScale = this.currentGrowthScale || 1;
+            s.currentBodyMass = this.currentBodyMass || 0;
+            s.currentLeanMass = this.currentLeanMass || 0;
+            s.currentFatMass = this.currentFatMass || 0;
+            s.targetFatMass = this.targetFatMass || 0;
+            s.currentMuscleMass = this.currentMuscleMass || 0;
+            s.currentBoneMass = this.currentBoneMass || 0;
+            s.muscleDensity = this.muscleDensity || 1;
+            s.boneDensity = this.boneDensity || 1;
+            s.bodyCondition = this.bodyCondition || this.getBodyConditionLabel();
+            s.muscleCondition = this.muscleCondition || this.getMuscleConditionLabel();
+            s.boneCondition = this.boneCondition || this.getBoneConditionLabel();
             s.nutritionRequirement = NutritionSystem.getMonsterRequirement(this);
             s.nutritionState = this.nutritionState;
             s.foodEatenThisSeason = this.foodEatenThisSeason;
@@ -9151,7 +9399,6 @@ button:hover {
             s.foodBoughtCostCreditsThisSeason = this.foodBoughtCostCreditsThisSeason || 0;
             s.nutritionShortfallThisSeason = this.nutritionShortfallThisSeason;
             s.foodNeededThisSeason = NutritionSystem.getFoodNeeded(this);
-            s.fatStorage = this.fatStorage || 0;
             s.activityFoodThisSeason = this.activityFoodThisSeason || 0;
             s.thermalState = this.thermalState || 'comfortable';
             s.thermalStress = this.thermalStress || 0;
@@ -9172,6 +9419,7 @@ button:hover {
             s.ageInSeasons = this.ageInSeasons || 0;
             s.lifeStage = this.lifeStage || MONSTER_LIFE_STAGE.ADULT;
             s.juvenileMaturationSeasonsRemaining = this.juvenileMaturationSeasonsRemaining || 0;
+            s.juvenileGrowthSeasonsRemaining = this.juvenileGrowthSeasonsRemaining || 0;
             s.breedingHoldSeasonsRemaining = this.breedingHoldSeasonsRemaining || 0;
             s.motherId = this.motherId;
             s.fatherId = this.fatherId;
@@ -9841,9 +10089,10 @@ button:hover {
                     if (monster.juvenileMaturationSeasonsRemaining<=0){
                         monster.lifeStage = MONSTER_LIFE_STAGE.ADULT;
                         monster.selectedForDeployment = false;
-                        events.push(monster.name+' has matured and can be bred or deployed from next season.');
+                        events.push(monster.name+' is now mature enough to be bred or deployed, but is still growing.');
                     }
                 }
+                monster.applyJuvenileGrowthAfterSeason(rng, events);
                 monster.applyAgeEffects();
                 var healed = 0;
                 if (monster.bodyHealth && monster.bodyHealth.healGeneral){
@@ -9887,6 +10136,7 @@ button:hover {
                         ageInSeasons : 0,
                         lifeStage : MONSTER_LIFE_STAGE.JUVENILE,
                         juvenileMaturationSeasonsRemaining : MONSTER_JUVENILE_MATURATION_SEASONS,
+                        juvenileGrowthSeasonsRemaining : MONSTER_GROWTH_TO_FULL_SIZE_SEASONS,
                         motherId : brood.motherId,
                         fatherId : brood.fatherId
                     } );
@@ -11930,9 +12180,9 @@ button:hover {
         metabolismMonster.deployed = true;
         var baseMetabolicRequirement = NutritionSystem.getMonsterRequirement(metabolismMonster);
         metabolismMonster.activityFoodThisSeason = 2.4;
-        metabolismMonster.fatStorage+=3.0;
+        metabolismMonster.currentFatMass+=3.0;
         var activeMetabolicRequirement = NutritionSystem.getMonsterRequirement(metabolismMonster);
-        AddRegressionResult(results, 'Metabolic food requirement rises with activity and fat storage', activeMetabolicRequirement>baseMetabolicRequirement, 'base='+baseMetabolicRequirement+', active='+activeMetabolicRequirement);
+        AddRegressionResult(results, 'Metabolic food requirement rises with activity and actual fat mass', activeMetabolicRequirement>baseMetabolicRequirement, 'base='+baseMetabolicRequirement+', active='+activeMetabolicRequirement);
         var thermalStatus = MonsterMetabolismSystem.thermalStatus(metabolismMonster, hotMetabolismWorld, 3);
         AddRegressionResult(results, 'Metabolic thermal status reports temperature and stress data', Number.isFinite(thermalStatus.temperatureC) && thermalStatus.state, 'state='+thermalStatus.state+', temp='+thermalStatus.temperatureC);
         var temperatureSnapshotSession = new GameSession(7020, {
@@ -11966,11 +12216,10 @@ button:hover {
             world : hotMetabolismWorld,
             name : 'Healer'
         } );
-        injuredMonster.bodyHealth.torso-=12;
-        injuredMonster.health = injuredMonster.bodyHealth.total();
-        var healingFood = NutritionSystem.getHealingFoodRequirement(injuredMonster);
+        injuredMonster.bodyHealth.body-=12;
+                var healingFood = NutritionSystem.getHealingFoodRequirement(injuredMonster);
         var healedAmount = injuredMonster.bodyHealth.healGeneral(18 * NutritionSystem.getAgeHealingMultiplier(injuredMonster));
-        AddRegressionResult(results, 'Between-season healing has a food cost and restores partial injury', healingFood>0 && healedAmount>0 && injuredMonster.bodyHealth.torso>injuredMonster.bodyHealth.maxEach-12, 'healingFood='+healingFood+', healed='+healedAmount);
+        AddRegressionResult(results, 'Between-season healing has a food cost and restores partial injury', healingFood>0 && healedAmount>0 && injuredMonster.bodyHealth.body>injuredMonster.bodyHealth.maxEach-12, 'healingFood='+healingFood+', healed='+healedAmount);
         var oldHealingMonster = new Monster('old_healing_regression', RIGHT_EDGE_X, 300, new SeededRng(7011), {
             owned : true,
             world : hotMetabolismWorld,
@@ -12162,6 +12411,9 @@ button:hover {
         } ), 'mature='+juveniles.filter(function (monster){
             return monster.lifeStage===MONSTER_LIFE_STAGE.ADULT;
         } ).length);
+        AddRegressionResult(results, 'Mature but still-growing monsters are described as adolescent', juveniles.every(function (monster){
+            return monster.lifeStage===MONSTER_LIFE_STAGE.ADULT && (monster.juvenileGrowthSeasonsRemaining || 0)>0 && monster.getAgeCategory()==='adolescent';
+        } ), 'category='+(juveniles[0] ? juveniles[0].getAgeCategory() : 'none')+', growthRemaining='+(juveniles[0] ? juveniles[0].juvenileGrowthSeasonsRemaining : 'none'));
         var ageingMonster = new Monster('ageing_regression', RIGHT_EDGE_X, 180, new SeededRng(7110), {
             owned : true,
             sex : MONSTER_SEX.MALE,
@@ -13752,7 +14004,7 @@ button:hover {
         var bought = monster.foodBoughtThisSeason || 0;
         var baseCost = monster.foodBoughtCostCreditsThisSeason || 0;
         var requirement = monster.nutritionRequirement || 10;
-        var fat = monster.fatStorage!==undefined ? ' | fat '+FormatFixed(monster.fatStorage, 1) : '';
+        var fat = monster.currentFatMass!==undefined ? ' | fat mass '+FormatFixed(monster.currentFatMass, 1) : '';
         var heat = monster.thermalState && monster.thermalState!=='comfortable' ? ' | '+monster.thermalState+' '+FormatFixed(monster.thermalStress || 0, 1) : '';
         var healing = monster.healingFoodRequirementThisSeason ? ' | healing food '+FormatNumber(monster.healingFoodRequirementThisSeason) : '';
         var disease =(monster.diseases && monster.diseases.length) ? ' | disease '+monster.diseases.map(function (d){
@@ -13961,14 +14213,14 @@ button:hover {
             monster.selectedForDeployment ? 1 : 0,
             monster.deployed ? 1 : 0,
             monster.capturedThisRaid ? 1 : 0,
-            Math.round(monster.health),
-            Math.round(monster.maxHealth),
+            Math.round(monster.overallConditionPercent || 100),
+            Math.round(monster.currentBodyMass || 0),
             monster.nutritionState,
             monster.foodEatenThisSeason || 0,
             monster.foodBoughtThisSeason || 0,
             monster.foodBoughtCostCreditsThisSeason || 0,
             monster.foodNeededThisSeason || 0,
-            Math.round((monster.fatStorage || 0) * 100),
+            Math.round((monster.currentFatMass || 0) * 100),
             monster.healingFoodRequirementThisSeason || 0,
             (monster.diseases && monster.diseases.length) || 0,
             monster.sex || '',
@@ -14014,25 +14266,29 @@ button:hover {
         function LocalClamp(value, min, max){
             return Math.max(min, Math.min(max, value));
         }
-        var fat = monster && Number.isFinite(monster.fatStorage) ? monster.fatStorage : 2.5;
-        // Plumpness is deliberately torso-only. Overall size is a separate future
-        // morphology. Fat therefore makes the body deeper and rounder, with only a
-        // small compensating change in body length; head, limbs, tail and spines
-        // keep their ordinary size and anchor positions.
-        var torsoLengthScale = LocalClamp(1-Math.max(0, fat-2.5) * 0.020+Math.max(0, 1.5-fat) * 0.035, 0.88, 1.08);
-        var torsoDepthScale = LocalClamp(1+(fat-2.5) * 0.15, 0.70, 1.72);
-        var bellyDepthScale = LocalClamp(1+(fat-2.5) * 0.22, 0.62, 1.95);
+        var bodyMass = monster && Number.isFinite(monster.currentBodyMass) ? Math.max(1, monster.currentBodyMass) : 100;
+        var fatMass = monster && Number.isFinite(monster.currentFatMass) ? Math.max(0, monster.currentFatMass) : bodyMass * 0.12;
+        var muscleMass = monster && Number.isFinite(monster.currentMuscleMass) ? Math.max(1, monster.currentMuscleMass) : bodyMass * 0.42;
+        var targetFat = monster && Number.isFinite(monster.targetFatMass) ? Math.max(1, monster.targetFatMass) : bodyMass * 0.14;
+        var bodyScale = monster && Number.isFinite(monster.bodyScale) ? monster.bodyScale : LocalClamp(Math.cbrt(bodyMass / 100), 0.45, 1.28);
+        var fatRatio = fatMass / targetFat;
+        var muscleRatio = muscleMass / Math.max(1, bodyMass * 0.42);
+        var torsoLengthScale = LocalClamp(1-Math.max(0, fatRatio-1) * 0.030+Math.max(0, 0.7-fatRatio) * 0.040, 0.88, 1.08);
+        var torsoDepthScale = LocalClamp(1+(fatRatio-1) * 0.24, 0.66, 1.72);
+        var bellyDepthScale = LocalClamp(1+(fatRatio-1) * 0.34, 0.58, 1.95);
         return {
-            fatStorage : fat,
+            bodyScale : bodyScale,
+            currentFatMass : fatMass,
+            currentMuscleMass : muscleMass,
             torsoLengthScale : torsoLengthScale,
             torsoDepthScale : torsoDepthScale,
             bellyDepthScale : bellyDepthScale,
             bodyWidthScale : torsoLengthScale,
             bodyHeightScale : torsoDepthScale,
-            headScale : 1,
-            legScale : 1,
+            headScale : LocalClamp(0.92+bodyScale * 0.08, 0.85, 1.05),
+            legScale : LocalClamp(0.72+muscleRatio * 0.30, 0.62, 1.28),
             spineScale : 1,
-            label : fat<1.2 ? 'thin' : (fat>5.2 ? 'fat' : 'normal')
+            label : fatRatio<0.55 ? 'wasted' : (fatRatio<0.82 ? 'lean' : (fatRatio>1.55 ? 'fat' : 'fit'))
         } ;
     }
     function MonsterIconSvg(monster){
@@ -14045,9 +14301,10 @@ button:hover {
         var eye = monster.alive ? 'white' : '#d1d5db';
         var morphology = MonsterFatMorphology(monster);
         var bodyTransform = 'translate(90 62) scale('+morphology.torsoLengthScale.toFixed(2)+' '+morphology.torsoDepthScale.toFixed(2)+') translate(-90 -62)';
+        var wholeScale = morphology.bodyScale || 1;
         var stripes = MonsterColourIsStriped(monster) ? '<path d="M54 48 L72 88 M82 36 L103 96 M112 40 L130 86" stroke="'+secondary+'" stroke-width="8" stroke-linecap="round" opacity="0.62"/>' : '';
         var diseaseTint =(monster.diseases && monster.diseases.length) ? '<circle cx="38" cy="34" r="7" fill="'+((monster.diseases[0].ui && monster.diseases[0].ui.tint) || '#f87171')+'" opacity="0.75"/>' : '';
-        return '<svg viewBox="0 0 180 110" role="img" aria-label="Monster icon">'+'<ellipse cx="90" cy="82" rx="54" ry="11" fill="rgba(0,0,0,0.18)"/>'+'<g transform="'+bodyTransform+'">'+'<path d="M35 66 C44 38 86 29 126 42 C150 50 157 74 139 84 C109 100 58 94 35 66 Z" fill="'+body+'" stroke="'+dark+'" stroke-width="4"/>'+stripes+'</g>'+'<path d="M39 61 C22 56 16 45 15 37 C32 43 44 49 55 58 Z" fill="'+bodyDark+'" stroke="'+dark+'" stroke-width="3"/>'+'<path d="M122 42 C143 30 164 37 169 52 C154 50 141 54 130 64 Z" fill="'+body+'" stroke="'+dark+'" stroke-width="4"/>'+'<circle cx="144" cy="46" r="8" fill="'+eye+'"/><circle cx="147" cy="47" r="4" fill="'+dark+'"/>'+'<path d="M151 58 Q139 66 126 58" fill="none" stroke="'+dark+'" stroke-width="3" stroke-linecap="round"/>'+'<path d="M71 36 L77 18 L84 38 Z M98 35 L106 16 L112 40 Z" fill="#e6d8a9" stroke="'+dark+'" stroke-width="3"/>'+'<path d="M128 68 Q145 75 158 70" stroke="'+collar+'" stroke-width="7" stroke-linecap="round" fill="none"/>'+diseaseTint+'</svg>';
+        return '<svg viewBox="0 0 180 110" role="img" aria-label="Monster icon">'+'<ellipse cx="90" cy="82" rx="54" ry="11" fill="rgba(0,0,0,0.18)"/>'+'<g transform="translate(90 62) scale('+wholeScale.toFixed(2)+' '+wholeScale.toFixed(2)+') translate(-90 -62)"><g transform="'+bodyTransform+'">'+'<path d="M35 66 C44 38 86 29 126 42 C150 50 157 74 139 84 C109 100 58 94 35 66 Z" fill="'+body+'" stroke="'+dark+'" stroke-width="4"/>'+stripes+'</g></g>'+'<path d="M39 61 C22 56 16 45 15 37 C32 43 44 49 55 58 Z" fill="'+bodyDark+'" stroke="'+dark+'" stroke-width="3"/>'+'<path d="M122 42 C143 30 164 37 169 52 C154 50 141 54 130 64 Z" fill="'+body+'" stroke="'+dark+'" stroke-width="4"/>'+'<circle cx="144" cy="46" r="8" fill="'+eye+'"/><circle cx="147" cy="47" r="4" fill="'+dark+'"/>'+'<path d="M151 58 Q139 66 126 58" fill="none" stroke="'+dark+'" stroke-width="3" stroke-linecap="round"/>'+'<path d="M71 36 L77 18 L84 38 Z M98 35 L106 16 L112 40 Z" fill="#e6d8a9" stroke="'+dark+'" stroke-width="3"/>'+'<path d="M128 68 Q145 75 158 70" stroke="'+collar+'" stroke-width="7" stroke-linecap="round" fill="none"/>'+diseaseTint+'</svg>';
     }
     function MonsterSexLabel(monster){
         if (!monster || !monster.sex){
@@ -14068,8 +14325,15 @@ button:hover {
         if (monster.lifeStage==='juvenile'){
             return 'juvenile'+((monster.juvenileMaturationSeasonsRemaining || 0)>0 ? ' - matures after '+monster.juvenileMaturationSeasonsRemaining+' season'+(monster.juvenileMaturationSeasonsRemaining===1 ? '' : 's') : '');
         }
+        if ((monster.juvenileGrowthSeasonsRemaining || 0)>0){
+            var growthText = 'adolescent - full size after '+monster.juvenileGrowthSeasonsRemaining+' season'+(monster.juvenileGrowthSeasonsRemaining===1 ? '' : 's');
+            if ((monster.breedingHoldSeasonsRemaining || 0)>0){
+                return growthText+' - incubating brood';
+            }
+            return growthText;
+        }
         var category = monster.ageCategory || 'adult';
-        var prefix = category==='senescent' ? 'senescent' : (category==='old' ? 'old' : (category==='mature' ? 'mature adult' : 'adult'));
+        var prefix = category==='senescent' ? 'senescent' : (category==='old' ? 'old' : (category==='mature' ? 'mature adult' : (category==='adolescent' ? 'adolescent' : 'adult')));
         if ((monster.breedingHoldSeasonsRemaining || 0)>0){
             return prefix+' - incubating brood';
         }
@@ -14321,8 +14585,8 @@ button:hover {
         details.className = 'monsterDetailGrid';
         var detailRows = [['Status',
         monster.alive ? 'Alive' : 'Dead'],
-        ['Health',
-        Math.round(monster.health)+' / '+Math.round(monster.maxHealth)],
+        ['Overall condition',
+        (monster.overallConditionPercent || 100)+'%'],
         ['Nutrition',
         FormatNutritionLine(monster)],
         ['Season food requirement',
@@ -14496,7 +14760,7 @@ button:hover {
             }
             var icon = document.createElement('div');
             icon.innerHTML = MonsterIconSvg(monster);
-            var hpRatio = monster.maxHealth>0 ? Math.max(0, Math.min(1, monster.health / monster.maxHealth)) : 0;
+            var hpRatio = Math.max(0, Math.min(1, (monster.overallConditionPercent || 100) / 100));
             var hpBar = document.createElement('div');
             hpBar.className = 'monsterHpBar';
             var hpFill = document.createElement('div');
@@ -14506,7 +14770,7 @@ button:hover {
             var meta = document.createElement('div');
             meta.className = 'monsterCardMeta';
             var status = document.createElement('span');
-            status.textContent = monster.alive ? 'HP '+Math.round(monster.health)+'/'+Math.round(monster.maxHealth) : 'dead';
+            status.textContent = monster.alive ? 'Condition '+(monster.overallConditionPercent || 100)+'%' : 'dead';
             var state = document.createElement('span');
             state.textContent = MonsterSexLabel(monster)+' | '+MonsterAgeLabel(monster)+' | '+MonsterLifeStageLabel(monster)+' | '+(monster.nutritionState || 'Nourished')+' | '+(phase==='raid' ?(monster.deployed ? 'deployed' : 'in cage') : (monster.capturedThisRaid ? 'new capture' : (monster.selectedForDeployment ? 'deploy' : 'reserve')));
             var shortfall = GetFoodShortfall(monster);
@@ -15625,7 +15889,11 @@ button:hover {
         if (!a.bodyHealth || !a.bodyHealth.maxEach){
             return 0;
         }
-        return Clamp01(1-(a.bodyHealth[part] / a.bodyHealth.maxEach));
+        var value = a.bodyHealth[part];
+        if (value===undefined && part==='torso'){ value = a.bodyHealth.body; }
+        if (value===undefined && part==='leftLeg'){ value = ((a.bodyHealth.frontLeftLeg || 0)+(a.bodyHealth.rearLeftLeg || 0)) / 2; }
+        if (value===undefined && part==='rightLeg'){ value = ((a.bodyHealth.frontRightLeg || 0)+(a.bodyHealth.rearRightLeg || 0)) / 2; }
+        return Clamp01(1-(value / a.bodyHealth.maxEach));
     }
     function DrawWeaponShape(kind, profile, facing, side){
         var dark = '#1f2730';
@@ -15971,11 +16239,12 @@ button:hover {
         var walk = moving ? phaseBase : StablePhase(m.id) * 0.3;
         var breathe = Math.sin(now * 0.003+StablePhase(m.id)) * 1.1;
         var bob = moving ? Math.sin(walk * 2) * 1.7 : breathe * 0.55;
-        var hurtRatio = m.maxHealth>0 ? m.health / m.maxHealth : 1;
+        var hurtRatio = Number.isFinite(m.overallConditionPercent) ? m.overallConditionPercent / 100 : 1;
         ctx.globalAlpha = !m.alive ? 0.25 : !m.deployed ? 0.55 : 1;
         ctx.save();
         ctx.translate(p.x, p.y+bob);
-        ctx.scale(0.66, 0.66);
+        var renderBodyScale = m.bodyScale || 1;
+        ctx.scale(0.66 * renderBodyScale, 0.66 * renderBodyScale);
         // 8-direction monster commitment:
         // - Head, snout, tail, legs and dorsal plates follow the renderer-only facing octant.
         // - The monster must not appear to walk backward or sideways when pathing changes direction.
@@ -15990,6 +16259,7 @@ button:hover {
         var spineColour = phenotypeColour.spineColour || '#5b216e';
         var showStripes = MonsterColourIsStriped(m);
         var morphology = MonsterFatMorphology(m);
+        var legThicknessScale = morphology.legScale || 1;
         var torsoLengthScale = morphology.torsoLengthScale || 1;
         var torsoDepthScale = morphology.torsoDepthScale || 1;
         var bellyDepthScale = morphology.bellyDepthScale || torsoDepthScale;
@@ -16171,7 +16441,7 @@ button:hover {
         DrawHealthBar({
             x : 0,
             y : -82
-        } , 44, 5, m.health, m.maxHealth);
+        } , 44, 5, m.overallConditionPercent || 100, 100);
         ctx.restore();
         ctx.globalAlpha = 1;
     }
