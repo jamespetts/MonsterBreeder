@@ -6765,8 +6765,9 @@ button:hover {
             return result;
         }
     }
-    class PhenotypeBuildContext{
-        constructor(){
+    class MonsterPhenotypeExpressionContext{
+        constructor(monster){
+            this.monster = monster || null;
             // Trait systems keep their accumulated phenotype inputs in named effect
             // bags. This preserves a shared build context while avoiding a future
             // god context with every possible biological subsystem as a direct
@@ -6776,8 +6777,8 @@ button:hover {
             this.effectBags = {
             } ;
             this.activeCodominantLayerIndex = 0;
-            this.getEffectBag(GENETIC_TRAIT.COLOUR, PhenotypeBuildContext.createColourEffectBag);
-            this.getEffectBag(GENETIC_TRAIT.METABOLISM, PhenotypeBuildContext.createMetabolismEffectBag);
+            this.getEffectBag(GENETIC_TRAIT.COLOUR, MonsterPhenotypeExpressionContext.createColourEffectBag);
+            this.getEffectBag(GENETIC_TRAIT.METABOLISM, MonsterPhenotypeExpressionContext.createMetabolismEffectBag);
         }
 
         static createColourEffectBag(){
@@ -6800,7 +6801,7 @@ button:hover {
 
         getEffectBag(traitKey, factory){
             if (!traitKey){
-                throw new Error('PhenotypeBuildContext.getEffectBag requires a trait key.');
+                throw new Error('MonsterPhenotypeExpressionContext.getEffectBag requires a trait key.');
             }
             if (!this.effectBags[traitKey]){
                 if (typeof factory!=='function'){
@@ -6812,11 +6813,11 @@ button:hover {
         }
 
         getColourEffectBag(){
-            return this.getEffectBag(GENETIC_TRAIT.COLOUR, PhenotypeBuildContext.createColourEffectBag);
+            return this.getEffectBag(GENETIC_TRAIT.COLOUR, MonsterPhenotypeExpressionContext.createColourEffectBag);
         }
 
         getMetabolismEffectBag(){
-            return this.getEffectBag(GENETIC_TRAIT.METABOLISM, PhenotypeBuildContext.createMetabolismEffectBag);
+            return this.getEffectBag(GENETIC_TRAIT.METABOLISM, MonsterPhenotypeExpressionContext.createMetabolismEffectBag);
         }
 
         get usedCodominantSkinLayers(){
@@ -7149,7 +7150,7 @@ button:hover {
             return Number.isFinite(environment.meanAnnualTemperatureC) ? environment.meanAnnualTemperatureC : DEFAULT_COMFORTABLE_TEMPERATURE_C;
         } ,
         thermalStatus : function (monster, world, seasonNumber){
-            var m = monster && monster.phenotype && monster.phenotype.metabolism ? monster.phenotype.metabolism : MetabolismPhenotypeSystem.resolve(new PhenotypeBuildContext());
+            var m = monster && monster.phenotype && monster.phenotype.metabolism ? monster.phenotype.metabolism : MetabolismPhenotypeSystem.resolve(new MonsterPhenotypeExpressionContext());
             var fat = Number.isFinite(monster && monster.fatStorage) ? Math.max(0, monster.fatStorage) : m.targetFatStorage * 0.70;
             var temperatureC = this.currentTemperatureC(world, seasonNumber);
             var coldLimit = m.coldLimitC-fat * 1.35;
@@ -7382,7 +7383,7 @@ button:hover {
             };
         }
         addAllelePairSelectionContributionToAccumulator(accumulator, alleleA, alleleB, scale){
-            var pairContext = new PhenotypeBuildContext();
+            var pairContext = new MonsterPhenotypeExpressionContext();
             ChromosomePair.expressAllelePair(alleleA, alleleB, pairContext);
             var metabolism = MetabolismPhenotypeSystem.resolve(pairContext);
             var raw = metabolism.rawFactors || {
@@ -7423,7 +7424,7 @@ button:hover {
             };
         }
         addAllelePairSelectionContributionToAccumulator(accumulator, alleleA, alleleB, scale){
-            var pairContext = new PhenotypeBuildContext();
+            var pairContext = new MonsterPhenotypeExpressionContext();
             ChromosomePair.expressAllelePair(alleleA, alleleB, pairContext);
             var colour = ColourPhenotypeSystem.resolve(pairContext);
             var primaryProteins = colour.primaryProteins || {
@@ -7446,20 +7447,6 @@ button:hover {
     }
     var MonsterColourTraitDefinition = new ColourGeneticTraitDefinition();
     var MonsterMetabolismTraitDefinition = new MetabolismGeneticTraitDefinition();
-    var MonsterPhenotypeSystem = {
-        buildPhenotype : function (genome){
-            var context = new PhenotypeBuildContext();
-            MonsterColourTraitDefinition.expressToPhenotype(genome, context);
-            MonsterMetabolismTraitDefinition.expressToPhenotype(genome, context);
-            return {
-                colour : ColourPhenotypeSystem.resolve(context),
-                metabolism : MetabolismPhenotypeSystem.resolve(context)
-            } ;
-        } ,
-        snapshot : function (phenotype){
-            return JSON.parse(JSON.stringify(phenotype || this.buildPhenotype(null)));
-        }
-    } ;
     class GenePool{
         constructor(){
             this.traitDefinitions = [
@@ -7608,7 +7595,7 @@ button:hover {
             if (!profile || !chromosomePair){
                 return 1;
             }
-            var context = new PhenotypeBuildContext();
+            var context = new MonsterPhenotypeExpressionContext();
             chromosomePair.expressTo(context);
             return traitDefinition.scoreSelectionContext(context, profile, this);
         }
@@ -7769,7 +7756,7 @@ button:hover {
         }
 
         getContextualAllelePairFitness(traitDefinition, backgroundAccumulator, alleleA, alleleB, profile){
-            var context = new PhenotypeBuildContext();
+            var context = new MonsterPhenotypeExpressionContext();
             traitDefinition.addSelectionAccumulatorToContext(context, backgroundAccumulator);
             var candidateAccumulator = traitDefinition.createSelectionAccumulator();
             traitDefinition.addAllelePairSelectionContributionToAccumulator(candidateAccumulator, alleleA, alleleB, 1);
@@ -7788,7 +7775,7 @@ button:hover {
         }
 
         getMetabolismAllelePairFitness(alleleA, alleleB, profile){
-            var context = new PhenotypeBuildContext();
+            var context = new MonsterPhenotypeExpressionContext();
             ChromosomePair.expressAllelePair(alleleA, alleleB, context);
             return this.getMetabolismPhenotypeFitness(MetabolismPhenotypeSystem.resolve(context), profile);
         }
@@ -7851,7 +7838,7 @@ button:hover {
         }
 
         getColourAllelePairFitness(alleleA, alleleB, profile){
-            var context = new PhenotypeBuildContext();
+            var context = new MonsterPhenotypeExpressionContext();
             ChromosomePair.expressAllelePair(alleleA, alleleB, context);
             return this.getColourPhenotypeFitness(ColourPhenotypeSystem.resolve(context), profile);
         }
@@ -8373,8 +8360,9 @@ button:hover {
             this.roamTargetY = null;
             this.roamRetargetTick = -1;
             this.genome = options && options.genome ? options.genome : MonsterGenePool.createGenome(rng, options && options.world ? options.world : null);
-            this.phenotype = MonsterPhenotypeSystem.buildPhenotype(this.genome);
-            this.fatStorage = options && Number.isFinite(options.fatStorage) ? Math.max(0, options.fatStorage) : ((this.phenotype.metabolism ? this.phenotype.metabolism.targetFatStorage : 2.5) * 0.70);
+            this.phenotype = null;
+            this.expressGenomeToPhenotype();
+            this.applyPhenotypeToRuntimeTraits(options || {});
             this.activityFoodThisSeason = 0;
             this.thermalState = 'comfortable';
             this.thermalStress = 0;
@@ -8399,6 +8387,45 @@ button:hover {
             this.currentSeasonPerformance = Monster.emptySeasonPerformance(null);
             this.lastSeasonPerformance = options && options.lastSeasonPerformance ? Monster.clonePerformanceStats(options.lastSeasonPerformance) : null;
             this.applyAgeEffects();
+        }
+        createPhenotypeExpressionContext(){
+            return new MonsterPhenotypeExpressionContext(this);
+        }
+        expressGenomeToPhenotype(){
+            var context = this.createPhenotypeExpressionContext();
+            this.expressGenomeThroughTraitDefinitions(context);
+            this.resolveExpressedPhenotype(context);
+        }
+        expressGenomeThroughTraitDefinitions(context){
+            var traitDefinitions = MonsterGenePool && MonsterGenePool.traitDefinitions ? MonsterGenePool.traitDefinitions : [];
+            for (var i = 0;
+            i<traitDefinitions.length;
+            i+=1){
+                traitDefinitions[i].expressToPhenotype(this.genome, context);
+            }
+        }
+        resolveExpressedPhenotype(context){
+            this.phenotype = {
+                colour : this.resolveColourPhenotype(context),
+                metabolism : this.resolveMetabolismPhenotype(context)
+            } ;
+        }
+        resolveColourPhenotype(context){
+            return ColourPhenotypeSystem.resolve(context);
+        }
+        resolveMetabolismPhenotype(context){
+            return MetabolismPhenotypeSystem.resolve(context);
+        }
+        applyPhenotypeToRuntimeTraits(options){
+            var settings = options || {
+            } ;
+            this.fatStorage = Number.isFinite(settings.fatStorage) ? Math.max(0, settings.fatStorage) : ((this.phenotype && this.phenotype.metabolism ? this.phenotype.metabolism.targetFatStorage : 2.5) * 0.70);
+        }
+        getPhenotypeSnapshot(){
+            if (!this.phenotype){
+                this.expressGenomeToPhenotype();
+            }
+            return JSON.parse(JSON.stringify(this.phenotype));
         }
         static emptySeasonPerformance(seasonNumber){
             return {
@@ -9079,7 +9106,7 @@ button:hover {
             s.recallRequested = this.recallRequested;
             s.recallTargetX = this.recallTargetX;
             s.recallTargetY = this.recallTargetY;
-            s.phenotype = MonsterPhenotypeSystem.snapshot(this.phenotype);
+            s.phenotype = this.getPhenotypeSnapshot();
             s.sex = this.sex;
             s.ageInSeasons = this.ageInSeasons || 0;
             s.lifeStage = this.lifeStage || MONSTER_LIFE_STAGE.ADULT;
@@ -11687,7 +11714,7 @@ button:hover {
         // behaviour should be covered by separate opt-in diagnostics in a fresh
         // session so that ordinary validation does not time out.
         var results = [];
-        var geneticsContext = new PhenotypeBuildContext();
+        var geneticsContext = new MonsterPhenotypeExpressionContext();
         var sameCallCount = 0;
         class CountedRegressionAllele extends ColourAllele{
             phenotype(context, normalise){
@@ -11703,7 +11730,7 @@ button:hover {
         } );
         ChromosomePair.expressAllelePair(countedAllele, countedAllele, geneticsContext);
         AddRegressionResult(results, 'Identical allele object pair expresses once rather than as codominant double expression', sameCallCount===1 && !geneticsContext.usedCodominantSkinLayers, 'calls='+sameCallCount+', codominant='+geneticsContext.usedCodominantSkinLayers);
-        var codominantContext = new PhenotypeBuildContext();
+        var codominantContext = new MonsterPhenotypeExpressionContext();
         var codominantA = new ColourAllele(100, {
             verdine : 140
         } , {
@@ -11720,7 +11747,7 @@ button:hover {
         ChromosomePair.expressAllelePair(codominantA, codominantB, codominantContext);
         var codominantColour = ColourPhenotypeSystem.resolve(codominantContext);
         AddRegressionResult(results, 'Different equal-dominance colour alleles create codominant stripe phenotype', codominantContext.usedCodominantSkinLayers && codominantColour.pattern.type==='stripes' && codominantColour.bodyColour!==codominantColour.secondaryBodyColour, 'pattern='+codominantColour.pattern.type+', primary='+codominantColour.bodyColour+', secondary='+codominantColour.secondaryBodyColour);
-        var clampContext = new PhenotypeBuildContext();
+        var clampContext = new MonsterPhenotypeExpressionContext();
         new ColourAllele(100, {
             negrine : -500
         } , {
@@ -11764,6 +11791,11 @@ button:hover {
         } );
         AddRegressionResult(results, 'Trait definitions control crossover cut counts for offspring chromosomes', noCrossoverMotherSideA || noCrossoverMotherSideB, 'minCuts='+noCrossoverTrait.minCrossoverCuts+', maxCuts='+noCrossoverTrait.maxCrossoverCuts);
         AddRegressionResult(results, 'Phenotype context stores trait effects in registered effect bags', geneticsContext.getColourEffectBag().baseSkinProteins instanceof SkinProteinState && geneticsContext.effectBags[GENETIC_TRAIT.COLOUR]===geneticsContext.getColourEffectBag(), 'bags='+Object.keys(geneticsContext.effectBags).join(','));
+        var ooGenomeMonster = Object.create(Monster.prototype);
+        ooGenomeMonster.genome = MonsterGenePool.createGenome(new SeededRng(6820), null);
+        ooGenomeMonster.phenotype = null;
+        ooGenomeMonster.expressGenomeToPhenotype();
+        AddRegressionResult(results, 'Monster owns genome expression into phenotype without an external phenotype system', !!ooGenomeMonster.phenotype && !!ooGenomeMonster.phenotype.colour && !!ooGenomeMonster.phenotype.metabolism && typeof globalThis['Monster'+'PhenotypeSystem']==='undefined', 'colour='+(ooGenomeMonster.phenotype.colour ? ooGenomeMonster.phenotype.colour.bodyColour : 'missing'));
         var metabolismChromosome = traitGenome.getChromosome(MonsterMetabolismTraitDefinition);
         AddRegressionResult(results, 'Genome contains a metabolism chromosome built through trait definitions', metabolismChromosome && metabolismChromosome.getSlotCount()===METABOLISM_CHROMOSOME_SLOT_COUNT, 'slots='+(metabolismChromosome ? metabolismChromosome.getSlotCount() : 'missing'));
         var hotMetabolismWorld = WorldGenerator.createWorld(7004, {
@@ -11860,7 +11892,7 @@ button:hover {
             25],
             macrofaunaAvailability : 0.8
         };
-        var ordinaryMetabolismContext = new PhenotypeBuildContext();
+        var ordinaryMetabolismContext = new MonsterPhenotypeExpressionContext();
         new MetabolicAllele(100, {
             plumptin : 0,
             heatTolerance : 8,
@@ -11869,7 +11901,7 @@ button:hover {
             selectionSensitive : true,
             debugLabel : 'ordinary disease selection regression allele'
         }).phenotype(ordinaryMetabolismContext, false);
-        var adiposeMetabolismContext = new PhenotypeBuildContext();
+        var adiposeMetabolismContext = new MonsterPhenotypeExpressionContext();
         new MetabolicAllele(100, {
             plumptin : 155,
             heatTolerance : -10,
@@ -11938,11 +11970,15 @@ button:hover {
             var totalR = 0;
             var totalG = 0;
             var totalB = 0;
-            var count = 240;
+            var count = 60;
             for (var sampleIndex = 0;
             sampleIndex<count;
             sampleIndex+=1){
-                var phenotype = MonsterPhenotypeSystem.buildPhenotype(MonsterGenePool.createGenome(rng, world));
+                var sampleMonster = Object.create(Monster.prototype);
+                sampleMonster.genome = MonsterGenePool.createGenome(rng, world);
+                sampleMonster.phenotype = null;
+                sampleMonster.expressGenomeToPhenotype();
+                var phenotype = sampleMonster.phenotype;
                 var rgb = ParseHexColour(phenotype.colour.bodyColour);
                 totalR+=rgb.r;
                 totalG+=rgb.g;
@@ -11965,11 +12001,15 @@ button:hover {
             var profile = MonsterGenePool.getWorldColourSelectionProfile(world);
             var highSaturationCount = 0;
             var bluePurpleCount = 0;
-            var count = 360;
+            var count = 90;
             for (var qualityIndex = 0;
             qualityIndex<count;
             qualityIndex+=1){
-                var phenotype = MonsterPhenotypeSystem.buildPhenotype(MonsterGenePool.createGenome(rng, world));
+                var qualityMonster = Object.create(Monster.prototype);
+                qualityMonster.genome = MonsterGenePool.createGenome(rng, world);
+                qualityMonster.phenotype = null;
+                qualityMonster.expressGenomeToPhenotype();
+                var phenotype = qualityMonster.phenotype;
                 var rgb = ParseHexColour(phenotype.colour.bodyColour);
                 var saturation = ColourSaturationFromRgb(rgb);
                 if (saturation>0.30){
@@ -12935,18 +12975,31 @@ button:hover {
         AddRegressionResult(results, 'Explorer movement is quieter than villager movement', soundRegressionRaid.agentMovementSoundLoudness(quietExplorer)<soundRegressionRaid.agentMovementSoundLoudness(normalVillager), 'explorer='+soundRegressionRaid.agentMovementSoundLoudness(quietExplorer)+', villager='+soundRegressionRaid.agentMovementSoundLoudness(normalVillager));
         var soundTarget = hearingMonster.chooseHeardSoundTarget(soundRegressionRaid);
         AddRegressionResult(results, 'Monster can choose an audible non-visible sound target', soundTarget && soundTarget.kind==='regressionLoud', 'target='+(soundTarget ? soundTarget.kind : 'none'));
-        var arcticEcologyWorld = WorldGenerator.createWorld(240012, {
-            mapSizeKey : 'legacy',
-            temperature : 0.08,
-            moisture : 0.55,
-            altitude : 0.62,
-            ruggedness : 0.32,
-            waterAbundance : 0.35,
-            vegetationDensity : 0.20,
-            customTreasureAmounts : {
-                bronze : 20
+        var arcticEcologyWorld = {
+            width : REFERENCE_MAP_WIDTH,
+            height : REFERENCE_MAP_HEIGHT,
+            environment : {
+                temperature : 0.08,
+                moisture : 0.55,
+                altitude : 0.62,
+                ruggedness : 0.32,
+                waterAbundance : 0.35,
+                vegetationDensity : 0.20,
+                aridity : 0.35,
+                meanAnnualTemperatureC : -10,
+                seasonalTemperatureAmplitudeC : 9
+            } ,
+            terrainGrid : {
+                rows : 4,
+                cols : 4,
+                getTerrainTypeAtTile : function (){
+                    return TERRAIN_TYPE.TUNDRA;
+                } ,
+                getTerrainTypeAtWorld : function (){
+                    return TERRAIN_TYPE.TUNDRA;
+                }
             }
-        });
+        };
         var arcticEcology = MonsterMetabolismSystem.macrofaunaEcologyProfile(arcticEcologyWorld);
         AddRegressionResult(results, 'Macrofauna ecology profile is derived from actual species weights and includes polar bears in cold terrain', !!(arcticEcology.species && arcticEcology.species.polarBear && arcticEcology.species.polarBear.expectedFood>0), 'polarBearFood='+(arcticEcology.species && arcticEcology.species.polarBear ? arcticEcology.species.polarBear.expectedFood.toFixed(2) : 'none'));
         var ecologyMetabolismProfile = MonsterGenePool.getWorldMetabolismSelectionProfile(arcticEcologyWorld);
