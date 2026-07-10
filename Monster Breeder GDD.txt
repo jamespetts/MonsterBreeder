@@ -242,6 +242,37 @@ Examples:
 - knight-killing ability may require strength, armour penetration, courage and survival under heavy damage;
 - villager interception may require speed, perception and target prioritisation.
 
+10.1 Emergent and Indirect Trait Simulation
+Genes should not encode final gameplay roles, explicit tactics, fixed prey preferences, or direct top-level traits. A monster should not have a gene for being a deer hunter, a knight killer, a coward, a guardian, or a sprinter. Those outcomes should emerge from the interaction of lower-level heritable mechanisms with the current environment.
+
+The preferred design chain is:
+- allele;
+- expressed phenotype or physiological/regulatory effect;
+- subsystem response;
+- observable trait or behavioural outcome.
+
+For example, a monster's tendency to attack a dangerous animal should emerge from size, injury, hunger, perception, hormones/regulators, threat assessment, prior fatigue, terrain and the animal's own size/aggression, not from a species-specific attack preference. A monster's effectiveness against humans should emerge from morphology, senses, movement, behaviour, injury state, terrain and the adventurer's class/equipment, not from a human-killer gene.
+
+Where gene category names in this document refer to apparent traits such as aggression, fear, speed, disease resistance or fertility, these are shorthand for underlying mechanisms. Implementation should express those genes through simulated biological or fantastical biological systems such as morphology, metabolism, sensory capability, hormonal regulation, immune response, reproductive physiology and age-dependent development.
+
+Emergent behaviour is especially important. Monsters must act autonomously according to what they can perceive and their current internal state. They should not receive hidden knowledge, scripted roles, or direct target preferences that bypass perception, morphology, hunger, injury, fatigue, fear and aggression modelling.
+
+10.2 Gene Tradeoff Principle
+With the exception of rare, strongly recessive harmful alleles and deliberately minor aesthetic variation, every gene should have live tradeoffs. There should be very few universally good alleles. A gene that improves one performance dimension should normally impose a cost, vulnerability, opportunity cost, context dependence or interaction risk elsewhere.
+
+Examples:
+- increased muscle may improve damage and intimidation but raise food demand, heat stress, injury risk or growth cost;
+- longer limbs may improve speed but reduce stability, turning, durability or performance in dense terrain;
+- stronger aggression-regulating hormones may improve interception and dangerous-prey hunting but increase injury, exhaustion and poor retreat decisions;
+- stronger fear/risk response may improve survival but allow adventurers or prey to escape;
+- high reactivity may improve response time but waste energy and produce false positives;
+- heavy egg investment may improve hatchling quality but reduce clutch size and parental recovery;
+- strong immune clearance may reduce disease severity but increase fever, food use, inflammatory damage or fertility penalties.
+
+Tradeoffs should be hooked into the dry-run natural selection simulator wherever the trait can plausibly affect survival, feeding, reproduction, injury, disease, terrain performance or treasure defence. Natural selection should score whole expressed genotypes in environmental context rather than selecting isolated desirable-looking numbers.
+
+The goal is for the player to breed situationally adapted bloodlines rather than simply maximising a list of stats. Different biomes, prey profiles, adventurer threats, terrain layouts, food availability and breeding strategies should favour different combinations of alleles.
+
 11. Inbreeding
 Inbreeding must create problems.
 
