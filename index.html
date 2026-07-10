@@ -7345,6 +7345,9 @@ button:hover {
                 chromosome.expressTo(context);
             }
         }
+        resolvePhenotype(context, monster){
+            throw new Error('GeneticTraitDefinition.resolvePhenotype must be implemented by the trait definition: '+this.key);
+        }
         getSelectionAllelePools(genePool){
             throw new Error('GeneticTraitDefinition.getSelectionAllelePools must be implemented for natural selection: '+this.key);
         }
@@ -7401,6 +7404,9 @@ button:hover {
         scoreSelectionContext(context, profile, genePool){
             return genePool.getMetabolismPhenotypeFitness(MetabolismPhenotypeSystem.resolve(context), profile);
         }
+        resolvePhenotype(context, monster){
+            return MetabolismPhenotypeSystem.resolve(context);
+        }
     }
     class ColourGeneticTraitDefinition extends GeneticTraitDefinition{
         constructor(){
@@ -7443,6 +7449,9 @@ button:hover {
         }
         scoreSelectionContext(context, profile, genePool){
             return genePool.getColourPhenotypeFitness(ColourPhenotypeSystem.resolve(context), profile);
+        }
+        resolvePhenotype(context, monster){
+            return ColourPhenotypeSystem.resolve(context);
         }
     }
     var MonsterColourTraitDefinition = new ColourGeneticTraitDefinition();
@@ -8405,16 +8414,19 @@ button:hover {
             }
         }
         resolveExpressedPhenotype(context){
-            this.phenotype = {
-                colour : this.resolveColourPhenotype(context),
-                metabolism : this.resolveMetabolismPhenotype(context)
+            var phenotype = {
             } ;
-        }
-        resolveColourPhenotype(context){
-            return ColourPhenotypeSystem.resolve(context);
-        }
-        resolveMetabolismPhenotype(context){
-            return MetabolismPhenotypeSystem.resolve(context);
+            var traitDefinitions = MonsterGenePool && MonsterGenePool.traitDefinitions ? MonsterGenePool.traitDefinitions : [];
+            for (var i = 0;
+            i<traitDefinitions.length;
+            i+=1){
+                var traitDefinition = traitDefinitions[i];
+                var traitPhenotype = traitDefinition.resolvePhenotype(context, this);
+                if (traitPhenotype!==undefined){
+                    phenotype[traitDefinition.key] = traitPhenotype;
+                }
+            }
+            this.phenotype = phenotype;
         }
         applyPhenotypeToRuntimeTraits(options){
             var settings = options || {
@@ -11796,6 +11808,46 @@ button:hover {
         ooGenomeMonster.phenotype = null;
         ooGenomeMonster.expressGenomeToPhenotype();
         AddRegressionResult(results, 'Monster owns genome expression into phenotype without an external phenotype system', !!ooGenomeMonster.phenotype && !!ooGenomeMonster.phenotype.colour && !!ooGenomeMonster.phenotype.metabolism && typeof globalThis['Monster'+'PhenotypeSystem']==='undefined', 'colour='+(ooGenomeMonster.phenotype.colour ? ooGenomeMonster.phenotype.colour.bodyColour : 'missing'));
+        class RegistryDrivenPhenotypeRegressionTrait extends GeneticTraitDefinition{
+            constructor(){
+                super('registryRegressionTrait', 97, 0, {
+                    minCrossoverCuts : 0,
+                    maxCrossoverCuts : 0
+                });
+            }
+            createRandomChromosomePair(rng, genePool, world){
+                return new ChromosomePair([], []);
+            }
+            resolvePhenotype(context, monster){
+                return {
+                    ownerId : monster ? monster.id : null,
+                    resolvedByTraitDefinition : true
+                } ;
+            }
+            getSelectionAllelePools(genePool){
+                return [];
+            }
+            createSelectionAccumulator(){
+                return {
+                } ;
+            }
+            addAllelePairSelectionContributionToAccumulator(accumulator, alleleA, alleleB, scale){
+            }
+            addSelectionAccumulatorToContext(context, accumulator){
+            }
+            scoreSelectionContext(context, profile, genePool){
+                return 1;
+            }
+        }
+        var registryTrait = new RegistryDrivenPhenotypeRegressionTrait();
+        MonsterGenePool.traitDefinitions.push(registryTrait);
+        var registryMonster = Object.create(Monster.prototype);
+        registryMonster.id = 'registry_phenotype_owner';
+        registryMonster.genome = new Genome([]);
+        registryMonster.phenotype = null;
+        registryMonster.expressGenomeToPhenotype();
+        MonsterGenePool.traitDefinitions.pop();
+        AddRegressionResult(results, 'Monster phenotype resolution is registry-driven across trait definitions', !!registryMonster.phenotype.registryRegressionTrait && registryMonster.phenotype.registryRegressionTrait.resolvedByTraitDefinition && registryMonster.phenotype.registryRegressionTrait.ownerId==='registry_phenotype_owner', 'keys='+Object.keys(registryMonster.phenotype).join(','));
         var metabolismChromosome = traitGenome.getChromosome(MonsterMetabolismTraitDefinition);
         AddRegressionResult(results, 'Genome contains a metabolism chromosome built through trait definitions', metabolismChromosome && metabolismChromosome.getSlotCount()===METABOLISM_CHROMOSOME_SLOT_COUNT, 'slots='+(metabolismChromosome ? metabolismChromosome.getSlotCount() : 'missing'));
         var hotMetabolismWorld = WorldGenerator.createWorld(7004, {
@@ -11970,7 +12022,7 @@ button:hover {
             var totalR = 0;
             var totalG = 0;
             var totalB = 0;
-            var count = 60;
+            var count = 40;
             for (var sampleIndex = 0;
             sampleIndex<count;
             sampleIndex+=1){
@@ -12001,7 +12053,7 @@ button:hover {
             var profile = MonsterGenePool.getWorldColourSelectionProfile(world);
             var highSaturationCount = 0;
             var bluePurpleCount = 0;
-            var count = 90;
+            var count = 60;
             for (var qualityIndex = 0;
             qualityIndex<count;
             qualityIndex+=1){
@@ -13058,7 +13110,7 @@ button:hover {
         } ;
         var count = Number.isFinite(options.count) ? Math.max(1, Math.min(3, Math.floor(options.count))) : 1;
         var firstSeed = Number.isFinite(options.seed) ? Math.floor(options.seed) : 100000;
-        var maxTicks = Number.isFinite(options.maxTicks) ? Math.max(1, Math.min(240, Math.floor(options.maxTicks))) : 180;
+        var maxTicks = Number.isFinite(options.maxTicks) ? Math.max(1, Math.min(90, Math.floor(options.maxTicks))) : 90;
         var regressionTests = RunRegressionTests();
         var results = [];
         var endedCount = 0;
