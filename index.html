@@ -705,6 +705,24 @@ button:hover {
     // projects unreliable. Do not split this into separate source files unless the
     // human maintainer explicitly asks for that.
     //
+    // Pure traditional OO rule:
+    // - Classes must represent actual classes of things in the game world or
+    //   durable conceptual entities in the simulation domain, not merely bundles
+    //   of data or functions.
+    // - Never create a separate class just to perform a function if that separate
+    //   class does not represent an actual separate class of things in the world
+    //   being simulated.
+    // - If a class would be instantiated with exactly one object and that object
+    //   would always belong to exactly one parent object, that is not valid OO
+    //   design for this project. Put the fields and behaviour on the parent
+    //   class instead.
+    // - A monster's body, nutrition state, activity history and thermal condition
+    //   are parts or states of the monster and should normally be Monster fields
+    //   and Monster behaviour, unless they represent independently existing world
+    //   objects.
+    // - Avoid detached service classes and one-child component classes; prefer
+    //   methods on the relevant domain object.
+    //
     // Committees > gods architectural rule:
     // - GameSession is a high-level coordinator only, not a god object.
     // - World owns persistent physical place data.
