@@ -1261,7 +1261,8 @@ button:hover {
             if (slope>=TERRAIN_CLIFF_SLOPE){
                 return 9999;
             }
-            return base+Math.max(0, slope) * 0.18;
+            var morphologyMultiplier = agent && typeof agent.terrainMovementCostMultiplier==='function' ? agent.terrainMovementCostMultiplier(terrainType, slope) : 1;
+            return (base+Math.max(0, slope) * 0.18) * morphologyMultiplier;
         } ,
         movementCostBetween : function (agent, fromTerrainType, toTerrainType, fromHeight, toHeight, toSlope){
             var base = this.movementCostFor(agent, toTerrainType, toSlope);
@@ -5397,7 +5398,8 @@ button:hover {
                         continue;
                     }
                     var newDistance = Distance(nx, ny, tx, ty);
-                    var turnPenalty = Math.abs(angleOffsets[i]) * 2.5;
+                    var agility = typeof this.getAgility==='function' ? this.getAgility() : 1;
+                    var turnPenalty = Math.abs(angleOffsets[i]) * 2.5 / Math.max(0.35, agility);
                     var shortStepPenalty =(1-distanceMultipliers[d]) * 8;
                     var score = newDistance+turnPenalty+shortStepPenalty;
                     if (score<bestScore){
@@ -6120,6 +6122,38 @@ button:hover {
                     riskModel : 'wastingChillMetabolic',
                     selectionPressure : 5.0
                 }
+            } ,
+            congenitalMuscleWasting : {
+                id : 'congenitalMuscleWasting',
+                displayName : 'Congenital muscle wasting',
+                description : 'A juvenile wasting disorder in monsters whose morphology cannot sustain enough muscle for their frame.',
+                ui : { morphology : 'wasted', tint : '#fca5a5' },
+                effects : { speedMultiplier : 0.62, foodMultiplier : 1.08, infertileAt : 0.50, incapacitatedAt : 0.70, deathAt : 0.82, deathChance : 0.34, juvenileDeathChance : 0.55, damageMultiplier : 1.30 },
+                geneticSelection : { riskModel : 'congenitalMuscleWastingMorphology', selectionPressure : 7.0 }
+            } ,
+            brittleBoneSyndrome : {
+                id : 'brittleBoneSyndrome',
+                displayName : 'Brittle bone syndrome',
+                description : 'A skeletal mineralisation disorder causing severe injury vulnerability; only the most extreme juvenile cases are often fatal directly.',
+                ui : { morphology : 'fragile', tint : '#dbeafe' },
+                effects : { speedMultiplier : 0.82, foodMultiplier : 1.04, infertileAt : 0.70, incapacitatedAt : 0.86, deathAt : 0.96, deathChance : 0.08, juvenileDeathChance : 0.18, damageMultiplier : 1.65 },
+                geneticSelection : { riskModel : 'brittleBoneMorphology', selectionPressure : 6.6 }
+            } ,
+            overmuscleStrain : {
+                id : 'overmuscleStrain',
+                displayName : 'Over-muscle strain',
+                description : 'Excessive muscle on an under-built skeleton, causing sprains, tears and injury vulnerability.',
+                ui : { morphology : 'strained', tint : '#f97316' },
+                effects : { speedMultiplier : 0.78, foodMultiplier : 1.14, infertileAt : 0.72, incapacitatedAt : 0.88, deathAt : 0.98, deathChance : 0.04, damageMultiplier : 1.42 },
+                geneticSelection : { riskModel : 'overmuscleStrainMorphology', selectionPressure : 5.8 }
+            } ,
+            giantGrowthFailure : {
+                id : 'giantGrowthFailure',
+                displayName : 'Giant growth failure',
+                description : 'A juvenile failure-to-thrive syndrome in very large, fast-growing monsters where food supply and skeletal growth cannot keep pace.',
+                ui : { morphology : 'stunted giant', tint : '#c084fc' },
+                effects : { speedMultiplier : 0.64, foodMultiplier : 1.24, infertileAt : 0.52, incapacitatedAt : 0.76, deathAt : 0.88, deathChance : 0.18, juvenileDeathChance : 0.45, damageMultiplier : 1.24 },
+                geneticSelection : { riskModel : 'giantGrowthFailureMorphology', selectionPressure : 6.8 }
             }
         } ,
         // Genetic disease selection is the bridge from inherited phenotype to the
@@ -6163,6 +6197,32 @@ button:hover {
                 }
                 var meanColdStress = coldStressTotal / Math.max(1, temperatures.length);
                 return Clamp(Math.max(0, 1.1-metabolism.targetFatStorage) * 0.070+Math.max(0, -75-(raw.plumptin || 0)) * 0.00075+meanColdStress * 0.010, 0, 0.75);
+            } ,
+            congenitalMuscleWastingMorphology : function (phenotype, profile){
+                var m = phenotype && phenotype.morphology ? phenotype.morphology : null;
+                if (!m){ return 0; }
+                return Clamp(Math.max(0, 0.72-(m.muscleGrowthBias || 1)) * 0.55+Math.max(0, (m.frameScale || 1)-1.15) * 0.12, 0, 0.82);
+            } ,
+            brittleBoneMorphology : function (phenotype, profile){
+                var m = phenotype && phenotype.morphology ? phenotype.morphology : null;
+                if (!m){ return 0; }
+                var skeletal = (m.boneGrowthBias || 1) * (m.boneMineralisation || 1);
+                var load = Math.pow(m.frameScale || 1, 3) *(0.72+0.18 *(m.muscleGrowthBias || 1)+0.08 *(m.spineSize || 0));
+                return Clamp(Math.max(0, 0.74-skeletal) * 0.55+Math.max(0, load-skeletal * 1.42) * 0.08, 0, 0.86);
+            } ,
+            overmuscleStrainMorphology : function (phenotype, profile){
+                var m = phenotype && phenotype.morphology ? phenotype.morphology : null;
+                if (!m){ return 0; }
+                var skeletal = (m.boneGrowthBias || 1) * (m.boneMineralisation || 1);
+                var muscleLoad = (m.muscleGrowthBias || 1) * Math.max(m.forelimbMuscleBias || 1, m.hindlimbMuscleBias || 1) * Math.sqrt(m.frameScale || 1);
+                return Clamp(Math.max(0, muscleLoad-skeletal * 1.42) * 0.25, 0, 0.78);
+            } ,
+            giantGrowthFailureMorphology : function (phenotype, profile){
+                var m = phenotype && phenotype.morphology ? phenotype.morphology : null;
+                if (!m){ return 0; }
+                var foodAllowance = profile && Number.isFinite(profile.metabolicFoodAllowance) ? profile.metabolicFoodAllowance : 3;
+                var growthDemand = Math.max(0, (m.frameScale || 1)-1.18) * Math.max(0, (m.growthRate || 1)-1.08);
+                return Clamp(growthDemand * Math.max(0.25, 1-foodAllowance / 8) * 1.25, 0, 0.82);
             }
         } ,
         geneticDiseaseSelectionLogFitness : function (phenotype, profile){
@@ -6270,9 +6330,31 @@ button:hover {
             var obesityRisk = Math.max(0, fat-6.0) * 0.018+Math.max(0, (raw.plumptin || 0)-120) * 0.00055+Math.max(0, thermal.heatStress || 0) * 0.010;
             var wastingRisk = Math.max(0, 0.45-fat) * 0.045+Math.max(0, -80-(raw.plumptin || 0)) * 0.00060+Math.max(0, thermal.coldStress || 0) * 0.010;
             var commonRisk = ageFactor * 0.006+injury * 0.018;
+            var morphologyRisk = this.marginalMorphologyRiskFor(monster, world);
             return {
                 adiposeFever : obesityRisk+commonRisk,
-                wastingChill : wastingRisk+commonRisk
+                wastingChill : wastingRisk+commonRisk,
+                congenitalMuscleWasting : (morphologyRisk.congenitalMuscleWasting || 0)+commonRisk,
+                brittleBoneSyndrome : (morphologyRisk.brittleBoneSyndrome || 0)+commonRisk,
+                overmuscleStrain : (morphologyRisk.overmuscleStrain || 0)+commonRisk,
+                giantGrowthFailure : (morphologyRisk.giantGrowthFailure || 0)+commonRisk
+            } ;
+        } ,
+        marginalMorphologyRiskFor : function (monster, world){
+            var m = monster && monster.phenotype && monster.phenotype.morphology ? monster.phenotype.morphology : null;
+            if (!m){
+                return {};
+            }
+            var skeletal = Math.max(0.05, (m.boneGrowthBias || 1) * (m.boneMineralisation || 1));
+            var muscleLoad = Math.max(0.05, (m.muscleGrowthBias || 1) * Math.max(m.forelimbMuscleBias || 1, m.hindlimbMuscleBias || 1) * Math.sqrt(m.frameScale || 1));
+            var ecology = world ? MonsterMetabolismSystem.macrofaunaEcologyProfile(world) : null;
+            var foodAllowance = ecology ? (ecology.metabolicFoodAllowance || 0) : 3;
+            var juvenile = monster.lifeStage===MONSTER_LIFE_STAGE.JUVENILE || (monster.juvenileGrowthSeasonsRemaining || 0)>0;
+            return {
+                congenitalMuscleWasting : Clamp(Math.max(0, 0.72-(m.muscleGrowthBias || 1)) * (juvenile ? 0.12 : 0.035), 0, 0.45),
+                brittleBoneSyndrome : Clamp(Math.max(0, 0.76-skeletal) * 0.11+Math.max(0, (monster.currentBodyMass || 100) / 100-skeletal * 1.55) * 0.018, 0, 0.48),
+                overmuscleStrain : Clamp(Math.max(0, muscleLoad-skeletal * 1.38) * 0.070, 0, 0.42),
+                giantGrowthFailure : Clamp(Math.max(0, (m.frameScale || 1)-1.18) * Math.max(0, (m.growthRate || 1)-1.08) * Math.max(0.25, 1-foodAllowance / 8) *(juvenile ? 0.16 : 0.035), 0, 0.55)
             } ;
         } ,
         ageDiseaseRiskFactor : function (monster){
@@ -6301,10 +6383,20 @@ button:hover {
                     events.push(monster.name+' developed '+wasting.displayName+'.');
                 }
             }
+            ['congenitalMuscleWasting', 'brittleBoneSyndrome', 'overmuscleStrain', 'giantGrowthFailure'].forEach(function (diseaseId){
+                var riskValue = risk[diseaseId] || 0;
+                if (rng.nextFloat()<riskValue){
+                    var morphologyDisease = MonsterDiseaseSystem.addOrIntensify(monster, diseaseId, Clamp(0.32+riskValue * 2.2, 0.30, 0.98), rng.integer(2, 5));
+                    if (morphologyDisease && events){
+                        events.push(monster.name+' developed '+morphologyDisease.displayName+'.');
+                    }
+                }
+            });
             this.activeDiseases(monster).forEach(function (disease){
                 var e = disease.effects || {
                 } ;
-                if (Number.isFinite(e.deathAt) && disease.severity>=e.deathAt && rng.nextFloat()<(e.deathChance || 0)){
+                var juvenileDeathBonus = (monster.lifeStage===MONSTER_LIFE_STAGE.JUVENILE || (monster.juvenileGrowthSeasonsRemaining || 0)>0) ? (e.juvenileDeathChance || 0) : 0;
+                if (Number.isFinite(e.deathAt) && disease.severity>=e.deathAt && rng.nextFloat()<Math.max(e.deathChance || 0, juvenileDeathBonus)){
                     monster.alive = false;
                     monster.deployed = false;
                     monster.selectedForDeployment = false;
@@ -6427,12 +6519,10 @@ button:hover {
             if (monster.nutritionState===NUTRITION_STATE.STARVED){
                 return 0;
             }
-            var fatFraction = (monster.currentFatMass || 0) / Math.max(1, monster.currentBodyMass || 1);
-            var fatPenalty = Clamp(1-Math.max(0, fatFraction-0.16) * 1.1, 0.58, 1);
             var legPenalty = monster.bodyHealth && monster.bodyHealth.movementMultiplier ? monster.bodyHealth.movementMultiplier() : 1;
             var thermalPenalty = Clamp(1-(monster.thermalStress || 0) * 0.055, 0.55, 1);
             var diseaseSpeed = MonsterDiseaseSystem.combinedEffects(monster).speedMultiplier;
-            return fatPenalty * legPenalty * thermalPenalty * diseaseSpeed;
+            return legPenalty * thermalPenalty * diseaseSpeed;
         } ,
         recordActivityTick : function (monster, intensity){
             if (!monster || !monster.deployed || !monster.alive){
@@ -6623,12 +6713,16 @@ button:hover {
     var DOMINANCE_DEFAULT = 100;
     var GENETIC_TRAIT = {
         COLOUR : 'colour',
-        METABOLISM : 'metabolism'
+        METABOLISM : 'metabolism',
+        MORPHOLOGY : 'morphology'
     } ;
     var COLOUR_CHROMOSOME_INDEX = 0;
     var COLOUR_CHROMOSOME_SLOT_COUNT = 4;
     var METABOLISM_CHROMOSOME_INDEX = 1;
     var METABOLISM_CHROMOSOME_SLOT_COUNT = 4;
+    var MORPHOLOGY_CHROMOSOME_INDEX = 2;
+    var MORPHOLOGY_CHROMOSOME_SLOT_COUNT = 6;
+    var IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR = 9.0;
     var DEFAULT_COMFORTABLE_TEMPERATURE_C = 12;
     var DEFAULT_BASE_THERMAL_LOW_C = -4;
     var DEFAULT_BASE_THERMAL_HIGH_C = 29;
@@ -6852,6 +6946,45 @@ button:hover {
             return result;
         }
     }
+    class MorphologyFactorState{
+        constructor(){
+            this.frameScale = 0;
+            this.vertebralLength = 0;
+            this.torsoDepth = 0;
+            this.limbLength = 0;
+            this.forelimbMuscle = 0;
+            this.hindlimbMuscle = 0;
+            this.muscleGrowth = 0;
+            this.boneGrowth = 0;
+            this.boneMineralisation = 0;
+            this.spineSize = 0;
+            this.toothSize = 0;
+            this.growthRate = 0;
+        }
+        add(amounts){
+            if (!amounts){
+                return;
+            }
+            this.frameScale+=Number.isFinite(amounts.frameScale) ? amounts.frameScale : 0;
+            this.vertebralLength+=Number.isFinite(amounts.vertebralLength) ? amounts.vertebralLength : 0;
+            this.torsoDepth+=Number.isFinite(amounts.torsoDepth) ? amounts.torsoDepth : 0;
+            this.limbLength+=Number.isFinite(amounts.limbLength) ? amounts.limbLength : 0;
+            this.forelimbMuscle+=Number.isFinite(amounts.forelimbMuscle) ? amounts.forelimbMuscle : 0;
+            this.hindlimbMuscle+=Number.isFinite(amounts.hindlimbMuscle) ? amounts.hindlimbMuscle : 0;
+            this.muscleGrowth+=Number.isFinite(amounts.muscleGrowth) ? amounts.muscleGrowth : 0;
+            this.boneGrowth+=Number.isFinite(amounts.boneGrowth) ? amounts.boneGrowth : 0;
+            this.boneMineralisation+=Number.isFinite(amounts.boneMineralisation) ? amounts.boneMineralisation : 0;
+            this.spineSize+=Number.isFinite(amounts.spineSize) ? amounts.spineSize : 0;
+            this.toothSize+=Number.isFinite(amounts.toothSize) ? amounts.toothSize : 0;
+            this.growthRate+=Number.isFinite(amounts.growthRate) ? amounts.growthRate : 0;
+        }
+        cloneWith(other){
+            var result = new MorphologyFactorState();
+            result.add(this);
+            result.add(other);
+            return result;
+        }
+    }
     class MonsterPhenotypeExpressionContext{
         constructor(monster){
             this.monster = monster || null;
@@ -6866,6 +6999,7 @@ button:hover {
             this.activeCodominantLayerIndex = 0;
             this.getEffectBag(GENETIC_TRAIT.COLOUR, MonsterPhenotypeExpressionContext.createColourEffectBag);
             this.getEffectBag(GENETIC_TRAIT.METABOLISM, MonsterPhenotypeExpressionContext.createMetabolismEffectBag);
+            this.getEffectBag(GENETIC_TRAIT.MORPHOLOGY, MonsterPhenotypeExpressionContext.createMorphologyEffectBag);
         }
 
         static createColourEffectBag(){
@@ -6883,6 +7017,15 @@ button:hover {
                 codominantMetabolicLayers : [new MetabolicFactorState(),
                 new MetabolicFactorState()],
                 usedCodominantMetabolicLayers : false
+            } ;
+        }
+
+        static createMorphologyEffectBag(){
+            return {
+                baseMorphologyFactors : new MorphologyFactorState(),
+                codominantMorphologyLayers : [new MorphologyFactorState(),
+                new MorphologyFactorState()],
+                usedCodominantMorphologyLayers : false
             } ;
         }
 
@@ -6907,12 +7050,20 @@ button:hover {
             return this.getEffectBag(GENETIC_TRAIT.METABOLISM, MonsterPhenotypeExpressionContext.createMetabolismEffectBag);
         }
 
+        getMorphologyEffectBag(){
+            return this.getEffectBag(GENETIC_TRAIT.MORPHOLOGY, MonsterPhenotypeExpressionContext.createMorphologyEffectBag);
+        }
+
         get usedCodominantSkinLayers(){
             return this.getColourEffectBag().usedCodominantSkinLayers;
         }
 
         get usedCodominantMetabolicLayers(){
             return this.getMetabolismEffectBag().usedCodominantMetabolicLayers;
+        }
+
+        get usedCodominantMorphologyLayers(){
+            return this.getMorphologyEffectBag().usedCodominantMorphologyLayers;
         }
 
         // normalise has no default value by design. Genetic maintainers must pass
@@ -6932,6 +7083,18 @@ button:hover {
                 throw new Error('Metabolic allele phenotype methods must pass the normalise boolean explicitly.');
             }
             bag.baseMetabolicFactors.add(amounts);
+        }
+        addMorphologyFactors(amounts, normalise){
+            var bag = this.getMorphologyEffectBag();
+            if (normalise===true){
+                bag.usedCodominantMorphologyLayers = true;
+                bag.codominantMorphologyLayers[this.activeCodominantLayerIndex].add(amounts);
+                return;
+            }
+            if (normalise!==false){
+                throw new Error('Morphology allele phenotype methods must pass the normalise boolean explicitly.');
+            }
+            bag.baseMorphologyFactors.add(amounts);
         }
         addSkinProteins(amounts, normalise){
             var bag = this.getColourEffectBag();
@@ -7001,6 +7164,34 @@ button:hover {
                 throw new Error('MetabolicAllele.phenotype requires an explicit normalise boolean.');
             }
             context.addMetabolicFactors(this.metabolicFactors, normalise);
+        }
+    }
+    class MorphologyAllele extends Allele{
+        constructor(dominanceIndex, morphologyFactors, options){
+            super(dominanceIndex, {
+                selectionSensitive : options && options.selectionSensitive!==undefined ? !!options.selectionSensitive : true,
+                debugLabel : options && options.debugLabel ? options.debugLabel : 'morphology allele'
+            });
+            this.morphologyFactors = Object.assign({
+                frameScale : 0,
+                vertebralLength : 0,
+                torsoDepth : 0,
+                limbLength : 0,
+                forelimbMuscle : 0,
+                hindlimbMuscle : 0,
+                muscleGrowth : 0,
+                boneGrowth : 0,
+                boneMineralisation : 0,
+                spineSize : 0,
+                toothSize : 0,
+                growthRate : 0
+            }, morphologyFactors || {});
+        }
+        phenotype(context, normalise){
+            if (normalise!==true && normalise!==false){
+                throw new Error('MorphologyAllele.phenotype requires an explicit normalise boolean.');
+            }
+            context.addMorphologyFactors(this.morphologyFactors, normalise);
         }
     }
     class ChromosomePair{
@@ -7223,6 +7414,68 @@ button:hover {
                     plumptin : f.plumptin,
                     energyConservation : f.energyConservation,
                     satietyConservationEffect : f.satietyConservationEffect
+                }
+            } ;
+        }
+    } ;
+    var MorphologyPhenotypeSystem = {
+        combineLayers : function (context){
+            var bag = context.getMorphologyEffectBag();
+            if (bag.usedCodominantMorphologyLayers){
+                return bag.baseMorphologyFactors.cloneWith(bag.codominantMorphologyLayers[0]).cloneWith(bag.codominantMorphologyLayers[1]);
+            }
+            return bag.baseMorphologyFactors.cloneWith(null);
+        } ,
+        resolve : function (context){
+            var f = this.combineLayers(context);
+            var frameScale = Clamp(0.94+f.frameScale / 160, 0.58, 1.42);
+            var vertebralLength = Clamp(1+f.vertebralLength / 210, 0.78, 1.26);
+            var torsoDepth = Clamp(1+f.torsoDepth / 210, 0.72, 1.34);
+            var limbLength = Clamp(1+f.limbLength / 190, 0.66, 1.42);
+            var forelimbMuscleBias = Clamp(1+f.forelimbMuscle / 180, 0.55, 1.55);
+            var hindlimbMuscleBias = Clamp(1+f.hindlimbMuscle / 180, 0.55, 1.55);
+            var muscleGrowthBias = Clamp(1+f.muscleGrowth / 170, 0.50, 1.70);
+            var boneGrowthBias = Clamp(1+f.boneGrowth / 175, 0.50, 1.70);
+            var boneMineralisation = Clamp(1+f.boneMineralisation / 190, 0.55, 1.60);
+            var spineSize = f.spineSize>18 ? Clamp(f.spineSize / 120, 0.15, 1.75) : 0;
+            var toothSize = Clamp(1+f.toothSize / 190, 0.55, 1.65);
+            var growthRate = Clamp(1+f.growthRate / 220, 0.70, 1.45);
+            return {
+                morphologySystem : 'constructionTradeoffsV1',
+                frameScale : frameScale,
+                vertebralLength : vertebralLength,
+                torsoDepth : torsoDepth,
+                limbLength : limbLength,
+                forelimbMuscleBias : forelimbMuscleBias,
+                hindlimbMuscleBias : hindlimbMuscleBias,
+                muscleGrowthBias : muscleGrowthBias,
+                boneGrowthBias : boneGrowthBias,
+                boneMineralisation : boneMineralisation,
+                spineSize : spineSize,
+                hasSpines : spineSize>0,
+                toothSize : toothSize,
+                growthRate : growthRate,
+                labels : {
+                    frame : frameScale<0.82 ? 'small-framed' : (frameScale>1.16 ? 'large-framed' : 'medium-framed'),
+                    limbs : limbLength<0.86 ? 'short-limbed' : (limbLength>1.14 ? 'long-limbed' : 'balanced limbs'),
+                    muscle : muscleGrowthBias<0.82 ? 'low muscle growth' : (muscleGrowthBias>1.22 ? 'high muscle growth' : 'ordinary muscle growth'),
+                    bone : boneGrowthBias * boneMineralisation<0.78 ? 'light skeletal growth' : (boneGrowthBias * boneMineralisation>1.32 ? 'heavy skeletal growth' : 'ordinary skeletal growth'),
+                    spines : spineSize<=0 ? 'spineless' : (spineSize>1.05 ? 'large spines' : 'small spines'),
+                    teeth : toothSize<0.84 ? 'small teeth' : (toothSize>1.18 ? 'large teeth' : 'ordinary teeth')
+                } ,
+                rawFactors : {
+                    frameScale : f.frameScale,
+                    vertebralLength : f.vertebralLength,
+                    torsoDepth : f.torsoDepth,
+                    limbLength : f.limbLength,
+                    forelimbMuscle : f.forelimbMuscle,
+                    hindlimbMuscle : f.hindlimbMuscle,
+                    muscleGrowth : f.muscleGrowth,
+                    boneGrowth : f.boneGrowth,
+                    boneMineralisation : f.boneMineralisation,
+                    spineSize : f.spineSize,
+                    toothSize : f.toothSize,
+                    growthRate : f.growthRate
                 }
             } ;
         }
@@ -7541,21 +7794,59 @@ button:hover {
             return ColourPhenotypeSystem.resolve(context);
         }
     }
+    class MorphologyGeneticTraitDefinition extends GeneticTraitDefinition{
+        constructor(){
+            super(GENETIC_TRAIT.MORPHOLOGY, MORPHOLOGY_CHROMOSOME_INDEX, MORPHOLOGY_CHROMOSOME_SLOT_COUNT);
+        }
+        createRandomChromosomePair(rng, genePool, world){
+            var profile = genePool.getWorldMorphologySelectionProfile(world);
+            return genePool.createNaturallySelectedChromosomePair(this, rng, profile);
+        }
+        getSelectionAllelePools(genePool){
+            return genePool.morphologyChromosomeSlots;
+        }
+        createSelectionAccumulator(){
+            return { frameScale : 0, vertebralLength : 0, torsoDepth : 0, limbLength : 0, forelimbMuscle : 0, hindlimbMuscle : 0, muscleGrowth : 0, boneGrowth : 0, boneMineralisation : 0, spineSize : 0, toothSize : 0, growthRate : 0 };
+        }
+        addAllelePairSelectionContributionToAccumulator(accumulator, alleleA, alleleB, scale){
+            var pairContext = new MonsterPhenotypeExpressionContext();
+            ChromosomePair.expressAllelePair(alleleA, alleleB, pairContext);
+            var morphology = MorphologyPhenotypeSystem.resolve(pairContext);
+            var raw = morphology.rawFactors || {};
+            Object.keys(accumulator).forEach(function (key){
+                accumulator[key]+=(raw[key] || 0) * scale;
+            });
+        }
+        addSelectionAccumulatorToContext(context, accumulator){
+            context.addMorphologyFactors(accumulator, false);
+        }
+        scoreSelectionContext(context, profile, genePool){
+            return genePool.getMorphologyPhenotypeFitness(MorphologyPhenotypeSystem.resolve(context), profile);
+        }
+        resolvePhenotype(context, monster){
+            return MorphologyPhenotypeSystem.resolve(context);
+        }
+    }
+    var MonsterMorphologyTraitDefinition = new MorphologyGeneticTraitDefinition();
     var MonsterColourTraitDefinition = new ColourGeneticTraitDefinition();
     var MonsterMetabolismTraitDefinition = new MetabolismGeneticTraitDefinition();
     class GenePool{
         constructor(){
             this.traitDefinitions = [
                 MonsterColourTraitDefinition,
-                MonsterMetabolismTraitDefinition
+                MonsterMetabolismTraitDefinition,
+                MonsterMorphologyTraitDefinition
             ];
             this.chromosomeSlots = [];
             this.createChromosomeSlots(COLOUR_CHROMOSOME_INDEX, COLOUR_CHROMOSOME_SLOT_COUNT);
             this.createChromosomeSlots(METABOLISM_CHROMOSOME_INDEX, METABOLISM_CHROMOSOME_SLOT_COUNT);
+            this.createChromosomeSlots(MORPHOLOGY_CHROMOSOME_INDEX, MORPHOLOGY_CHROMOSOME_SLOT_COUNT);
             this.colourChromosomeSlots = this.chromosomeSlots[COLOUR_CHROMOSOME_INDEX];
             this.metabolismChromosomeSlots = this.chromosomeSlots[METABOLISM_CHROMOSOME_INDEX];
+            this.morphologyChromosomeSlots = this.chromosomeSlots[MORPHOLOGY_CHROMOSOME_INDEX];
             this.addDefaultColourAlleles();
             this.addDefaultMetabolismAlleles();
+            this.addDefaultMorphologyAlleles();
         }
 
         createChromosomeSlots(chromosomeIndex, slotCount){
@@ -7573,6 +7864,9 @@ button:hover {
             }
             if (chromosomeIndex===METABOLISM_CHROMOSOME_INDEX){
                 return GENETIC_TRAIT.METABOLISM;
+            }
+            if (chromosomeIndex===MORPHOLOGY_CHROMOSOME_INDEX){
+                return GENETIC_TRAIT.MORPHOLOGY;
             }
             throw new Error('Unknown gene pool chromosome index: '+chromosomeIndex);
         }
@@ -7709,6 +8003,10 @@ button:hover {
 
         pickAlleleForMetabolismSlot(slotIndex, rng, profile){
             return this.pickAlleleForTraitSlot(MonsterMetabolismTraitDefinition, slotIndex, rng, profile);
+        }
+
+        pickAlleleForMorphologySlot(slotIndex, rng, profile){
+            return this.pickAlleleForTraitSlot(MonsterMorphologyTraitDefinition, slotIndex, rng, profile);
         }
 
         pickAlleleFromWeights(pool, weights, rng){
@@ -7867,6 +8165,9 @@ button:hover {
             if (traitKey===GENETIC_TRAIT.METABOLISM){
                 return this.getMetabolismAllelePairFitness(alleleA, alleleB, profile);
             }
+            if (traitKey===GENETIC_TRAIT.MORPHOLOGY){
+                return this.getMorphologyAllelePairFitness(alleleA, alleleB, profile);
+            }
             return 1;
         }
 
@@ -7927,6 +8228,20 @@ button:hover {
             }
             var foodMismatch = Math.max(0, phenotype.baseMetabolicFood-(8.5+macrofaunaFoodAllowance)) / 10;
             logFitness+=-2.5 * foodMismatch;
+            var activeNiche = profile.macrofaunaNiche || null;
+            if (activeNiche){
+                var preySpeed = activeNiche.preySpeed || 100;
+                var fastPreyPressure = Clamp((preySpeed-105) / 90, 0, 1);
+                var dangerousPreyPressure = Clamp((activeNiche.danger || 0) / 12, 0, 1);
+                // Fast or dangerous prey select against strongly conservative
+                // metabolisms because they delay and limit high-output pursuit.
+                // This is still indirect: metabolism does not make a monster fast;
+                // it changes whether the cost of using a fast body plan is viable.
+                logFitness+=-1.15 * fastPreyPressure * Math.max(0, phenotype.energyConservation-0.78);
+                // Extremely low basal output is also a poor match for repeated high-output
+                // hunts, but the existing food mismatch still penalises excessive baseline cost.
+                logFitness+=-0.55 * Math.max(fastPreyPressure, dangerousPreyPressure * 0.65) * Math.max(0, 8.5-phenotype.baseMetabolicFood) / 3.5;
+            }
             logFitness+=MonsterDiseaseSystem.geneticDiseaseSelectionLogFitness({
                 metabolism : phenotype
             } , profile);
@@ -8129,6 +8444,254 @@ button:hover {
                 macrofaunaEcology : macrofaunaEcology
             };
             return world.metabolismSelectionProfile;
+        }
+
+        getWorldMorphologySelectionProfile(world){
+            if (!world){
+                return null;
+            }
+            if (world.morphologySelectionProfile){
+                return world.morphologySelectionProfile;
+            }
+            var ecology = MonsterMetabolismSystem.macrofaunaEcologyProfile(world);
+            var environment = world.environment || {};
+            world.morphologySelectionProfile = {
+                macrofaunaAvailability : ecology.availability || 0,
+                macrofaunaEcology : ecology,
+                preyNiches : ecology.preyNiches || [],
+                expectedFood : ecology.expectedFood || 0,
+                metabolicFoodAllowance : ecology.metabolicFoodAllowance || 0,
+                aridity : Number.isFinite(environment.aridity) ? environment.aridity : 0.5,
+                vegetationDensity : Number.isFinite(environment.vegetationDensity) ? environment.vegetationDensity : 0.45,
+                moisture : Number.isFinite(environment.moisture) ? environment.moisture : 0.45,
+                temperature : Number.isFinite(environment.temperature) ? environment.temperature : 0.50,
+                naturalSelectionCandidateCount : 36,
+                naturalSelectionCandidatePower : 2.3
+            } ;
+            return world.morphologySelectionProfile;
+        }
+
+        getMorphologyAllelePairFitness(alleleA, alleleB, profile){
+            var context = new MonsterPhenotypeExpressionContext();
+            ChromosomePair.expressAllelePair(alleleA, alleleB, context);
+            return this.getMorphologyPhenotypeFitness(MorphologyPhenotypeSystem.resolve(context), profile);
+        }
+
+        estimateMorphologyBodyComposition(morphology){
+            if (morphology && morphology._selectionComposition){
+                return morphology._selectionComposition;
+            }
+            var frame = morphology ? (morphology.frameScale || 1) : 1;
+            var sizeCubed = Math.pow(frame, 3);
+            var vertebralLength = morphology ? (morphology.vertebralLength || 1) : 1;
+            var torsoDepth = morphology ? (morphology.torsoDepth || 1) : 1;
+            var muscleGrowth = morphology ? (morphology.muscleGrowthBias || 1) : 1;
+            var boneGrowth = morphology ? (morphology.boneGrowthBias || 1) : 1;
+            var boneMineralisation = morphology ? (morphology.boneMineralisation || 1) : 1;
+            var spineSize = morphology ? (morphology.spineSize || 0) : 0;
+            var organMass = Math.max(4, 22 * sizeCubed * Clamp((vertebralLength+torsoDepth) / 2, 0.72, 1.35));
+            var boneMass = Math.max(3, 16 * sizeCubed * boneGrowth);
+            var muscleMass = Math.max(4, 44 * sizeCubed * muscleGrowth);
+            var fatMass = Math.max(1, 9.8 * sizeCubed * Clamp(torsoDepth, 0.72, 1.36));
+            var spineMass = Math.max(0, 5.4 * Math.pow(frame, 2.15) * spineSize);
+            var bodyMass = Math.max(1, organMass+boneMass+muscleMass+fatMass+spineMass);
+            var composition = {
+                frameScale : frame,
+                organMass : organMass,
+                boneMass : boneMass,
+                muscleMass : muscleMass,
+                fatMass : fatMass,
+                spineMass : spineMass,
+                bodyMass : bodyMass,
+                boneDensity : boneMineralisation
+            } ;
+            if (morphology){
+                morphology._selectionComposition = composition;
+            }
+            return composition;
+        }
+
+        estimateMorphologyRunSpeed(morphology){
+            if (morphology && Number.isFinite(morphology._selectionRunSpeed)){
+                return morphology._selectionRunSpeed;
+            }
+            var composition = this.estimateMorphologyBodyComposition(morphology);
+            var limbLength = morphology ? (morphology.limbLength || 1) : 1;
+            var hindlimb = morphology ? (morphology.hindlimbMuscleBias || 1) : 1;
+            var power = Math.max(1, composition.muscleMass * (0.55+hindlimb * 0.45));
+            var load = Math.max(1, composition.bodyMass);
+            var skeletal = Math.max(0.25, (composition.boneMass / Math.max(1, 16 * Math.pow(composition.frameScale || 1, 3))) * composition.boneDensity);
+            var legLoadPenalty = Clamp(skeletal / Math.max(0.35, load / 100) * Clamp(1.35 / Math.max(0.5, limbLength), 0.65, 1.45), 0.62, 1.22);
+            var powerToWeight = Math.sqrt(power / load);
+            var runSpeed = Clamp(390 * limbLength * powerToWeight * legLoadPenalty, 260, 680);
+            if (morphology){
+                morphology._selectionRunSpeed = runSpeed;
+            }
+            return runSpeed;
+        }
+
+        estimateMorphologySeasonFoodDemand(morphology, profile){
+            if (morphology && Number.isFinite(morphology._selectionSeasonFoodDemand)){
+                return morphology._selectionSeasonFoodDemand;
+            }
+            var composition = this.estimateMorphologyBodyComposition(morphology);
+            var baseMetabolicFood = 10;
+            var bodyMassFood = Math.max(0.5, baseMetabolicFood * Math.pow(Math.max(0.35, composition.bodyMass) / 100, 0.72));
+            var tissueFood = Math.max(0, composition.muscleMass * 0.018+composition.boneMass * 0.006+composition.fatMass * 0.010+composition.spineMass * 0.007);
+            var seasonalTemperature = profile && Number.isFinite(profile.temperature) ? profile.temperature : 0.5;
+            var thermalFood = Math.max(0, (0.32-seasonalTemperature) * 1.7 / Math.max(0.55, morphology.frameScale || 1))+Math.max(0, seasonalTemperature-0.72) * 0.7 * Math.max(0.55, morphology.frameScale || 1);
+            var growthFood = Math.max(0, ((morphology.growthRate || 1)-1.0) * Math.pow(morphology.frameScale || 1, 3) * 1.6);
+            var demand = bodyMassFood+tissueFood+thermalFood+growthFood;
+            if (morphology){
+                morphology._selectionSeasonFoodDemand = demand;
+            }
+            return demand;
+        }
+
+        estimateMorphologyPursuitFoodCost(morphology, niche, profile){
+            var cacheKey = niche && niche.species ? niche.species : 'generic';
+            if (morphology && morphology._selectionPursuitCosts && Number.isFinite(morphology._selectionPursuitCosts[cacheKey])){
+                return morphology._selectionPursuitCosts[cacheKey];
+            }
+            var composition = this.estimateMorphologyBodyComposition(morphology);
+            var runSpeed = this.estimateMorphologyRunSpeed(morphology);
+            var preyRunSpeed = niche && Number.isFinite(niche.preySpeed) ? niche.preySpeed : 100;
+            var preyFleeSpeed = preyRunSpeed * 1.26;
+            var sprintSpeed = runSpeed * 2.0;
+            var speedMargin = sprintSpeed / Math.max(1, preyFleeSpeed);
+            var catchDifficulty = Clamp(1.45-speedMargin, 0.18, 2.8);
+            var terrainBurden = 1+(profile ? ((profile.vegetationDensity || 0) * Math.max(0, (morphology.limbLength || 1)-1.02) * 0.28+(profile.moisture || 0) * Math.max(0, (morphology.frameScale || 1)-1.0) * 0.18) : 0);
+            var massMultiplier = Clamp(composition.bodyMass / 100, 0.32, 2.15);
+            var muscleShare = composition.muscleMass / Math.max(1, composition.bodyMass);
+            var muscleEfficiency = Clamp(1.12-muscleShare * 0.75, 0.62, 1.18);
+            var sprintGaitCost = Clamp(1.55+Math.max(0, (morphology.limbLength || 1)-1.0) * 0.18+Math.max(0, massMultiplier-1.0) * 0.22, 1.45, 2.35);
+            var expectedPursuitDistance = 420+Math.max(0, preyFleeSpeed-runSpeed) * 3.2+Math.max(0, 1-speedMargin) * 620;
+            var pursuitCost = expectedPursuitDistance * terrainBurden * massMultiplier * muscleEfficiency * sprintGaitCost * catchDifficulty / 1650;
+            if (morphology){
+                if (!morphology._selectionPursuitCosts){
+                    morphology._selectionPursuitCosts = {};
+                }
+                morphology._selectionPursuitCosts[cacheKey] = pursuitCost;
+            }
+            return pursuitCost;
+        }
+
+        morphologyNicheFitness(morphology, niche, profile){
+            var preySpeed = niche.preySpeed || 100;
+            var preyRadius = niche.preyRadius || 10;
+            var foodValue = niche.foodValue || 2;
+            var danger = niche.danger || 0;
+            var targetFrame = Clamp(0.66+preyRadius / 24+danger * 0.025, 0.62, 1.34);
+            if (niche.species==='hare'){
+                targetFrame = 0.70;
+            }
+            if (niche.species==='polarBear'){
+                targetFrame = 1.28;
+            }
+            var targetLimb = Clamp(0.82+(preySpeed-80) / 140, 0.82, 1.33);
+            var targetMuscle = Clamp(0.82+danger * 0.035+foodValue / 32, 0.78, 1.42);
+            var targetBone = Clamp(0.82+danger * 0.040+preyRadius / 32, 0.78, 1.45);
+            var targetTooth = Clamp(0.84+preyRadius / 42+danger * 0.018, 0.82, 1.32);
+            function closeness(value, target, width){
+                var d = Math.abs(value-target) / Math.max(0.01, width);
+                return Math.exp(-d * d);
+            }
+            var locomotor = (morphology.limbLength || 1) * Math.sqrt(Math.max(0.25, morphology.hindlimbMuscleBias || 1) * Math.max(0.25, morphology.muscleGrowthBias || 1)) / Math.sqrt(Math.max(0.35, morphology.frameScale || 1));
+            var catchFitness = closeness(locomotor, targetLimb, niche.species==='hare' ? 0.18 : 0.26);
+            var runSpeed = this.estimateMorphologyRunSpeed(morphology);
+            var preyFleeSpeed = preySpeed * 1.26;
+            var sprintMargin = (runSpeed * 2.0) / Math.max(1, preyFleeSpeed);
+            var pursuitViability = Clamp((sprintMargin-0.82) / 0.48, 0.05, 1.18);
+            catchFitness*=pursuitViability;
+            var frameFitness = closeness(morphology.frameScale || 1, targetFrame, 0.24);
+            var muscleFitness = closeness(morphology.muscleGrowthBias || 1, targetMuscle, 0.28);
+            var boneFitness = closeness((morphology.boneGrowthBias || 1) * (morphology.boneMineralisation || 1), targetBone, 0.32);
+            var toothFitness = closeness(morphology.toothSize || 1, targetTooth, 0.32);
+            var spineBenefit = 1;
+            if ((morphology.spineSize || 0)>0){
+                if (niche.species==='polarBear'){
+                    spineBenefit = 1+Clamp((morphology.spineSize || 0) * 0.22, 0, 0.24);
+                } else{
+                    spineBenefit = 1-Clamp((morphology.spineSize || 0) * (niche.species==='hare' ? 0.30 : 0.16), 0, 0.42);
+                }
+            }
+            return Clamp(catchFitness * 0.35+frameFitness * 0.18+muscleFitness * 0.18+boneFitness * 0.18+toothFitness * 0.11, 0.0001, 1.3) * spineBenefit;
+        }
+
+        getMorphologyPhenotypeFitness(morphology, profile){
+            if (!profile || !morphology){
+                return 1;
+            }
+            var niches = profile.preyNiches || [];
+            var totalWeight = 0;
+            var powered = 0;
+            for (var i = 0; i<niches.length; i+=1){
+                var niche = niches[i];
+                var weight = Math.max(0, niche.expectedFood || niche.share || 0);
+                if (weight<=0){
+                    continue;
+                }
+                var fit = this.morphologyNicheFitness(morphology, niche, profile);
+                powered+=weight * Math.pow(Math.max(0.0001, fit), 2.4);
+                totalWeight+=weight;
+            }
+            var fitness = totalWeight>0 ? Math.pow(powered / totalWeight, 1 / 2.4) : 0.7;
+            var composition = this.estimateMorphologyBodyComposition(morphology);
+            var maintenanceDemand = this.estimateMorphologySeasonFoodDemand(morphology, profile);
+            var weightedPursuitCost = 0;
+            var pursuitWeight = 0;
+            for (var pursuitIndex = 0; pursuitIndex<niches.length; pursuitIndex+=1){
+                var pursuitNiche = niches[pursuitIndex];
+                var pursuitNicheWeight = Math.max(0, pursuitNiche.expectedFood || pursuitNiche.share || 0);
+                if (pursuitNicheWeight<=0){
+                    continue;
+                }
+                weightedPursuitCost+=pursuitNicheWeight * this.estimateMorphologyPursuitFoodCost(morphology, pursuitNiche, profile);
+                pursuitWeight+=pursuitNicheWeight;
+            }
+            var meanPursuitCost = pursuitWeight>0 ? weightedPursuitCost / pursuitWeight : 0;
+            var availableFood = Math.max(0.1, profile.expectedFood || (profile.macrofaunaAvailability || 0) * 10);
+            var metabolicBurden = (maintenanceDemand+meanPursuitCost * 2.6) / Math.max(0.1, 8.5+availableFood);
+            var foodPressure = Math.max(0, metabolicBurden-1.0);
+            fitness*=Math.exp(-2.2 * foodPressure);
+            var severeScarcityPressure = Math.max(0, composition.bodyMass / 100-1.0) * Math.max(0, 0.70-(profile.macrofaunaAvailability || 0));
+            fitness*=Math.exp(-1.1 * severeScarcityPressure);
+            var denseTerrain = Clamp((profile.vegetationDensity || 0) * 0.55+(profile.moisture || 0) * 0.35, 0, 1);
+            var terrainPenalty = Math.max(0, (morphology.limbLength || 1)-1.15) * denseTerrain * 0.45+Math.max(0, (morphology.frameScale || 1)-1.18) * denseTerrain * 0.32;
+            fitness*=Math.exp(-terrainPenalty);
+            if ((morphology.spineSize || 0)>0){
+                var polarBearFood = profile.macrofaunaEcology && profile.macrofaunaEcology.species && profile.macrofaunaEcology.species.polarBear ? profile.macrofaunaEcology.species.polarBear.expectedFood || 0 : 0;
+                var polarShare = profile.expectedFood>0 ? polarBearFood / profile.expectedFood : 0;
+                fitness*=Math.exp(-Math.max(0, (morphology.spineSize || 0) * (0.85-polarShare * 1.7)));
+            }
+            fitness*=MonsterDiseaseSystem.geneticDiseaseSelectionFitnessMultiplier({ morphology : morphology }, profile);
+            return Math.max(0.0001, fitness);
+        }
+
+        addDefaultMorphologyAlleles(){
+            var junk = (slot) => new Allele(DOMINANCE_DEFAULT, { selectionSensitive : false, debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, slot) });
+            for (var slot = 0; slot<MORPHOLOGY_CHROMOSOME_SLOT_COUNT; slot+=1){
+                this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, slot, junk(slot));
+                this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, slot, junk(slot));
+            }
+            this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 0, new MorphologyAllele(100, { frameScale : -42, growthRate : 12 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 0) }));
+            this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 0, new MorphologyAllele(100, { frameScale : 32, growthRate : -6 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 0) }));
+            this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 0, new MorphologyAllele(35, { frameScale : 86, growthRate : 52 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 0) }));
+            this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 1, new MorphologyAllele(100, { vertebralLength : 38, torsoDepth : -16 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 1) }));
+            this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 1, new MorphologyAllele(100, { vertebralLength : -18, torsoDepth : 42 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 1) }));
+            this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 2, new MorphologyAllele(100, { limbLength : 42, hindlimbMuscle : 22, forelimbMuscle : -10 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 2) }));
+            this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 2, new MorphologyAllele(100, { limbLength : -30, forelimbMuscle : 20 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 2) }));
+            this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 3, new MorphologyAllele(100, { muscleGrowth : 36, hindlimbMuscle : 24, boneGrowth : 8 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 3) }));
+            this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 3, new MorphologyAllele(100, { muscleGrowth : 28, forelimbMuscle : 30, boneGrowth : 18 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 3) }));
+            this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 3, new MorphologyAllele(28, { muscleGrowth : -92, boneGrowth : -18 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 3) }));
+            this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(100, { boneGrowth : 42, boneMineralisation : 25 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
+            this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(100, { boneGrowth : -26, boneMineralisation : -18 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
+            this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(24, { boneGrowth : -105, boneMineralisation : -92 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
+            this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(30, { muscleGrowth : 118, boneGrowth : -50 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
+            this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(85, { spineSize : 70 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
+            this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(55, { spineSize : 138 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
+            this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(100, { toothSize : 38 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
+            this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(100, { toothSize : -28 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
         }
 
         addDefaultMetabolismAlleles(){
@@ -8456,7 +9019,6 @@ button:hover {
             this.genome = options && options.genome ? options.genome : MonsterGenePool.createGenome(rng, options && options.world ? options.world : null);
             this.phenotype = null;
             this.expressGenomeToPhenotype();
-            this.applyPhenotypeToRuntimeTraits(options || {}, rng);
             this.activityFoodThisSeason = 0;
             this.thermalState = 'comfortable';
             this.thermalStress = 0;
@@ -8516,25 +9078,36 @@ button:hover {
             this.phenotype = phenotype;
         }
         applyPhenotypeToRuntimeTraits(options, rng){
-            this.initialiseBodyAndNutritionFields(options || {}, rng);
+            // Kept as a compatibility hook for future phenotype refreshes.
+            // Construction initialises body state only after age/life-stage state exists.
         }
         initialiseBodyAndNutritionFields(options, rng){
             var settings = options || {};
             var random = rng || new SeededRng(1);
             var metabolism = this.phenotype && this.phenotype.metabolism ? this.phenotype.metabolism : null;
+            var morphology = this.phenotype && this.phenotype.morphology ? this.phenotype.morphology : null;
             var targetFatIndex = metabolism ? metabolism.targetFatStorage : 2.5;
-            this.adultBodyScale = Number.isFinite(settings.adultBodyScale) ? Clamp(settings.adultBodyScale, 0.62, 1.24) : (Number.isFinite(settings.bodyScale) ? Clamp(settings.bodyScale, 0.62, 1.24) : random.range(0.72, 1.14));
-            this.unstuntedAdultBodyScale = Number.isFinite(settings.unstuntedAdultBodyScale) ? Clamp(settings.unstuntedAdultBodyScale, 0.62, 1.24) : this.adultBodyScale;
+            var phenotypeFrameScale = morphology ? morphology.frameScale : random.range(0.72, 1.14);
+            this.adultBodyScale = Number.isFinite(settings.adultBodyScale) ? Clamp(settings.adultBodyScale, 0.58, 1.42) : (Number.isFinite(settings.bodyScale) ? Clamp(settings.bodyScale, 0.58, 1.42) : Clamp(phenotypeFrameScale * random.range(0.96, 1.04), 0.58, 1.42));
+            this.unstuntedAdultBodyScale = Number.isFinite(settings.unstuntedAdultBodyScale) ? Clamp(settings.unstuntedAdultBodyScale, 0.58, 1.42) : this.adultBodyScale;
             var remainingGrowthSeasons = Number.isFinite(settings.juvenileGrowthSeasonsRemaining) ? Math.max(0, Math.floor(settings.juvenileGrowthSeasonsRemaining)) : (Number.isFinite(this.juvenileGrowthSeasonsRemaining) ? Math.max(0, Math.floor(this.juvenileGrowthSeasonsRemaining)) : 0);
             this.currentGrowthScale = Number.isFinite(settings.currentGrowthScale) ? Clamp(settings.currentGrowthScale, 0.40, 1.0) : this.getGrowthScaleForRemainingSeasons(remainingGrowthSeasons);
             this.bodyScale = this.adultBodyScale * this.currentGrowthScale;
             this.matureBodyMass = Math.round(100 * Math.pow(this.adultBodyScale, 3) * 10) / 10;
-            this.baseOrganMass = Math.max(4, 22 * Math.pow(this.bodyScale, 3));
-            this.currentBoneMass = Number.isFinite(settings.currentBoneMass) ? Math.max(1, settings.currentBoneMass) : Math.max(3, 16 * Math.pow(this.bodyScale, 3));
-            this.boneDensity = Number.isFinite(settings.boneDensity) ? Clamp(settings.boneDensity, 0.65, 1.45) : random.range(0.86, 1.16);
-            this.currentMuscleMass = Number.isFinite(settings.currentMuscleMass) ? Math.max(1, settings.currentMuscleMass) : Math.max(4, 44 * Math.pow(this.bodyScale, 3) * random.range(0.86, 1.16));
+            var vertebralLength = morphology ? morphology.vertebralLength : 1;
+            var torsoDepth = morphology ? morphology.torsoDepth : 1;
+            this.limbLength = morphology ? morphology.limbLength : 1;
+            this.forelimbMuscleBias = morphology ? morphology.forelimbMuscleBias : 1;
+            this.hindlimbMuscleBias = morphology ? morphology.hindlimbMuscleBias : 1;
+            this.toothSize = morphology ? morphology.toothSize : 1;
+            this.spineSize = morphology ? morphology.spineSize : 0;
+            this.spineMass = Math.max(0, 5.4 * Math.pow(this.bodyScale, 2.15) * this.spineSize);
+            this.baseOrganMass = Math.max(4, 22 * Math.pow(this.bodyScale, 3) * Clamp((vertebralLength+torsoDepth) / 2, 0.72, 1.35));
+            this.currentBoneMass = Number.isFinite(settings.currentBoneMass) ? Math.max(1, settings.currentBoneMass) : Math.max(3, 16 * Math.pow(this.bodyScale, 3) * (morphology ? morphology.boneGrowthBias : 1));
+            this.boneDensity = Number.isFinite(settings.boneDensity) ? Clamp(settings.boneDensity, 0.55, 1.60) : Clamp((morphology ? morphology.boneMineralisation : 1) * random.range(0.96, 1.04), 0.55, 1.60);
+            this.currentMuscleMass = Number.isFinite(settings.currentMuscleMass) ? Math.max(1, settings.currentMuscleMass) : Math.max(4, 44 * Math.pow(this.bodyScale, 3) * (morphology ? morphology.muscleGrowthBias : 1) * random.range(0.96, 1.04));
             this.muscleDensity = Number.isFinite(settings.muscleDensity) ? Clamp(settings.muscleDensity, 0.65, 1.45) : random.range(0.86, 1.18);
-            this.targetFatMass = Number.isFinite(settings.targetFatMass) ? Math.max(0, settings.targetFatMass) : Math.max(1, 14 * Math.pow(this.bodyScale, 3) * Clamp(targetFatIndex / 2.5, 0.32, 2.8));
+            this.targetFatMass = Number.isFinite(settings.targetFatMass) ? Math.max(0, settings.targetFatMass) : Math.max(1, 14 * Math.pow(this.bodyScale, 3) * Clamp(targetFatIndex / 2.5, 0.32, 2.8) * Clamp(torsoDepth, 0.72, 1.36));
             this.currentFatMass = Number.isFinite(settings.currentFatMass) ? Math.max(0, settings.currentFatMass) : this.targetFatMass * 0.70;
             this.seasonDistanceMoved = 0;
             this.seasonTerrainEffort = 0;
@@ -8550,6 +9123,8 @@ button:hover {
             if (settings.bodyHealth){
                 this.restoreMonsterBodyHealth(settings.bodyHealth);
             }
+            this.maxHealth = this.bodyHealth.maxTotal();
+            this.health = this.bodyHealth.total();
         }
         restoreMonsterBodyHealth(snapshot){
             var parts = this.bodyHealth.getParts();
@@ -8624,14 +9199,23 @@ button:hover {
             }
         }
         recalculateBodyMassAndDerivedFields(){
-            this.currentLeanMass = Math.max(1, (this.baseOrganMass || 0)+(this.currentBoneMass || 0)+(this.currentMuscleMass || 0));
+            this.currentLeanMass = Math.max(1, (this.baseOrganMass || 0)+(this.currentBoneMass || 0)+(this.currentMuscleMass || 0)+(this.spineMass || 0));
             this.currentBodyMass = Math.max(1, this.currentLeanMass+(this.currentFatMass || 0));
             this.bodyScale = Clamp(Math.cbrt(this.currentBodyMass / 100), 0.42, 1.28);
-            this.radius = 16 * this.bodyScale;
+            this.radius = 16 * this.bodyScale * Clamp(this.phenotype && this.phenotype.morphology ? this.phenotype.morphology.vertebralLength : 1, 0.85, 1.22);
             this.eyeHeight = 4.5 * this.bodyScale;
             this.bodyCondition = this.getBodyConditionLabel();
             this.muscleCondition = this.getMuscleConditionLabel();
             this.boneCondition = this.getBoneConditionLabel();
+            // Current body mass is part of the morphology power-to-weight system.
+            // Whenever nutrition or growth changes fat, muscle, bone, or spine mass,
+            // refresh the derived movement figures here so fat and other load are not
+            // ignored until the next age recalculation.
+            if (typeof this.recalculateMorphologyPerformance==='function'){
+                this.recalculateMorphologyPerformance();
+                var ageMultiplier = Number.isFinite(this.ageFrailtyMultiplier) ? this.ageFrailtyMultiplier : 1;
+                this.speed = Math.max(50, (Number.isFinite(this.adultBaseSpeed) ? this.adultBaseSpeed : this.speed) * ageMultiplier);
+            }
             return this.currentBodyMass;
         }
         getBodyPartMaxCondition(){
@@ -8956,8 +9540,84 @@ button:hover {
         applyAgeEffects(){
             this.ageCategory = this.getAgeCategory();
             this.ageFrailtyMultiplier = this.getAgeFrailtyMultiplier();
+            this.recalculateMorphologyPerformance();
             var baseSpeed = Number.isFinite(this.adultBaseSpeed) ? this.adultBaseSpeed : this.speed;
             this.speed = Math.max(50, baseSpeed * this.ageFrailtyMultiplier);
+        }
+        getMeleeDamageAgainst(target, rng){
+            var base = rng ? rng.integer(18, 34) : 25;
+            var morphology = this.phenotype && this.phenotype.morphology ? this.phenotype.morphology : null;
+            var sizeFactor = Math.pow(Math.max(0.45, this.bodyScale || 1), 0.55);
+            var muscleFactor = Clamp(((this.currentMuscleMass || 44) / Math.max(1, 44 * Math.pow(this.bodyScale || 1, 3))) * (morphology ? morphology.muscleGrowthBias : 1), 0.55, 1.85);
+            var forelimbFactor = Clamp(morphology ? morphology.forelimbMuscleBias : (this.forelimbMuscleBias || 1), 0.58, 1.55);
+            var toothFactor = Clamp(0.88+((this.toothSize || 1)-1) * 0.30, 0.72, 1.32);
+            var spineContact = (this.spineSize || 0)>0 && target && target.agentKind==='adventurer' ? Clamp((this.spineSize || 0) * 0.10, 0, 0.18) : 0;
+            return Math.max(1, Math.round(base * sizeFactor * Clamp(0.65+muscleFactor * 0.35, 0.70, 1.45) * Clamp(0.72+forelimbFactor * 0.28, 0.72, 1.32) * toothFactor * (1+spineContact)));
+        }
+        getMorphologyDamageMultiplier(){
+            var skeletal = Math.max(0.15, ((this.currentBoneMass || 16) / Math.max(1, 16 * Math.pow(this.bodyScale || 1, 3))) * (this.boneDensity || 1));
+            var musclePadding = Clamp((this.currentMuscleMass || 44) / Math.max(1, 44 * Math.pow(this.bodyScale || 1, 3)), 0.35, 1.75);
+            var sizeProtection = Clamp(1 / Math.pow(Math.max(0.55, this.bodyScale || 1), 0.28), 0.82, 1.18);
+            var boneProtection = Clamp(1.12-skeletal * 0.18, 0.72, 1.32);
+            var muscleProtection = Clamp(1.05-musclePadding * 0.055, 0.90, 1.10);
+            var spineProtection = Clamp(1-(this.spineSize || 0) * 0.045, 0.90, 1);
+            return Clamp(sizeProtection * boneProtection * muscleProtection * spineProtection, 0.55, 1.65);
+        }
+        recalculateMorphologyPerformance(){
+            var morphology = this.phenotype && this.phenotype.morphology ? this.phenotype.morphology : null;
+            var limbLength = morphology ? morphology.limbLength : (this.limbLength || 1);
+            var forelimb = morphology ? morphology.forelimbMuscleBias : (this.forelimbMuscleBias || 1);
+            var hindlimb = morphology ? morphology.hindlimbMuscleBias : (this.hindlimbMuscleBias || 1);
+            var power = Math.max(1, (this.currentMuscleMass || 44) * (0.55+hindlimb * 0.45));
+            var load = Math.max(1, this.currentBodyMass || 100);
+            var skeletal = Math.max(0.25, ((this.currentBoneMass || 16) / Math.max(1, 16 * Math.pow(this.bodyScale || 1, 3))) * (this.boneDensity || 1));
+            var legLoadPenalty = Clamp(skeletal / Math.max(0.35, load / 100) * Clamp(1.35 / Math.max(0.5, limbLength), 0.65, 1.45), 0.62, 1.22);
+            var powerToWeight = Math.sqrt(power / load);
+            this.powerToWeightRatio = powerToWeight;
+            this.agility = Clamp(0.70+forelimb * 0.22+Math.max(0, 1.12-(this.bodyScale || 1)) * 0.35-Math.max(0, limbLength-1.12) * 0.22-Math.max(0, (this.spineSize || 0)) * 0.12, 0.42, 1.65);
+            // Adult running speed is calibrated in the same post-agent-multiplier
+            // movement units as humans and macrofauna. Relatively slow adult monsters
+            // should still outrun ordinary unmounted humans; extreme morphologies,
+            // injury, disease, terrain and nutrition can still reduce realised speed.
+            this.adultBaseSpeed = Clamp(390 * limbLength * powerToWeight * legLoadPenalty, 260, 680);
+        }
+        getAgility(){
+            return Number.isFinite(this.agility) ? this.agility : 1;
+        }
+        terrainMovementCostMultiplier(terrainType, slope){
+            var morphology = this.phenotype && this.phenotype.morphology ? this.phenotype.morphology : null;
+            if (!morphology){
+                return 1;
+            }
+            var limbLength = morphology.limbLength || 1;
+            var frameScale = morphology.frameScale || 1;
+            var forelimb = morphology.forelimbMuscleBias || 1;
+            var penalty = 1;
+            if (terrainType===TERRAIN_TYPE.FOREST){
+                penalty+=Math.max(0, limbLength-1.05) * 0.34+Math.max(0, frameScale-1.10) * 0.22;
+            } else if (terrainType===TERRAIN_TYPE.MARSH){
+                penalty+=Math.max(0, limbLength-1.00) * 0.42+Math.max(0, frameScale-1.00) * 0.18;
+            } else if (terrainType===TERRAIN_TYPE.ROCKY){
+                penalty+=Math.max(0, limbLength-1.00) * 0.25+Math.max(0, 1.0-forelimb) * 0.18;
+                penalty-=Math.max(0, 1.0-limbLength) * 0.08;
+            } else if (terrainType===TERRAIN_TYPE.DESERT || terrainType===TERRAIN_TYPE.GRASS){
+                penalty-=Math.max(0, limbLength-1.02) * 0.08;
+            }
+            penalty+=Math.max(0, this.spineSize || 0) * (terrainType===TERRAIN_TYPE.FOREST ? 0.12 : 0.035);
+            return Clamp(penalty, 0.82, 1.65);
+        }
+        apparentThreatForAdventurer(adventurer){
+            var colour = this.phenotype && this.phenotype.colour ? this.phenotype.colour : null;
+            var morphology = this.phenotype && this.phenotype.morphology ? this.phenotype.morphology : null;
+            var sizeThreat = Math.max(0, (this.bodyScale || 1)-0.70) * 0.42;
+            var spineThreat = morphology && morphology.hasSpines ? (morphology.spineSize || 0) * 0.34 : 0;
+            var toothThreat = Math.max(0, (this.toothSize || 1)-1.0) * 0.10;
+            var brightThreat = 0;
+            if (colour && Number.isFinite(colour.camouflageSaturation) && Number.isFinite(colour.camouflageLuminance)){
+                brightThreat = Math.max(0, colour.camouflageSaturation-0.50) * Math.max(0, colour.camouflageLuminance-0.38) * Math.max(0, (this.bodyScale || 1)-0.92) * 0.28;
+            }
+            var classScale = adventurer && adventurer.className==='knight' ? 0.42 : (adventurer && adventurer.className==='warrior' ? 0.62 : (adventurer && adventurer.className==='explorer' ? 0.82 : 1.10));
+            return Clamp((sizeThreat+spineThreat+toothThreat+brightThreat) * classScale, 0, 1.3);
         }
         getBreedingBlockReason(requiredSex){
             if (!this.alive){
@@ -9109,7 +9769,7 @@ button:hover {
             var ageMultiplier = NutritionSystem.getAgeMetabolicMultiplier(this);
             var reserveMultiplier = this.deployed ? 1.0 : 0.74;
             this.bodyMassFoodRequired = Math.max(0.5, baseMetabolicFood * Math.pow(Math.max(0.35, this.currentBodyMass || 100) / 100, 0.72) * ageMultiplier * reserveMultiplier);
-            this.tissueMaintenanceFoodRequired = Math.max(0, (this.currentMuscleMass || 0) * 0.018+(this.currentBoneMass || 0) * 0.006+(this.currentFatMass || 0) * 0.010);
+            this.tissueMaintenanceFoodRequired = Math.max(0, (this.currentMuscleMass || 0) * 0.018+(this.currentBoneMass || 0) * 0.006+(this.currentFatMass || 0) * 0.010+(this.spineMass || 0) * 0.007);
             var coldStress = Math.max(0, this.thermalState==='tooCold' ? (this.thermalStress || 0) : 0);
             var heatStress = Math.max(0, this.thermalState==='tooHot' ? (this.thermalStress || 0) : 0);
             var surfaceMassPenalty = Clamp(1 / Math.max(0.55, this.bodyScale || 1), 0.78, 1.55);
@@ -9134,8 +9794,20 @@ button:hover {
             this.seasonDistanceMoved =(this.seasonDistanceMoved || 0)+actualDistance;
             var terrainCost = world && world.terrainGrid ? TerrainRules.movementCostFor(this, world.terrainGrid.getTerrainTypeAtWorld(afterX, afterY), world.terrainGrid.getSlopeAtWorld(afterX, afterY)) : 1;
             var massMultiplier = Clamp((this.currentBodyMass || 100) / 100, 0.32, 2.15);
-            var muscleEfficiency = Clamp(1.12-((this.currentMuscleMass || 40) / Math.max(1, this.currentBodyMass || 100)) * 0.75, 0.62, 1.18);
-            var effort = actualDistance * Math.max(0.25, terrainCost) * massMultiplier * muscleEfficiency / 1650;
+            var muscleShare = (this.currentMuscleMass || 40) / Math.max(1, this.currentBodyMass || 100);
+            var muscleEfficiency = Clamp(1.12-muscleShare * 0.75, 0.62, 1.18);
+            var morphology = this.phenotype && this.phenotype.morphology ? this.phenotype.morphology : null;
+            var limbLength = morphology ? morphology.limbLength : (this.limbLength || 1);
+            var gaitCostMultiplier = 1;
+            if (this.sprinting){
+                // Sprinting now costs extra only through actual movement achieved.
+                // This keeps metabolism simulation-emergent: a blocked or stationary
+                // monster does not pay an arbitrary sprint tick cost, while a fast,
+                // heavy monster covering real ground pays substantially more.
+                gaitCostMultiplier = Clamp(1.55+Math.max(0, limbLength-1.0) * 0.18+Math.max(0, massMultiplier-1.0) * 0.22, 1.45, 2.35);
+                this.seasonSprintingTicks =(this.seasonSprintingTicks || 0)+1;
+            }
+            var effort = actualDistance * Math.max(0.25, terrainCost) * massMultiplier * muscleEfficiency * gaitCostMultiplier / 1650;
             this.seasonTerrainEffort =(this.seasonTerrainEffort || 0)+effort;
             this.activityFoodThisSeason =(this.activityFoodThisSeason || 0)+effort;
         }
@@ -9176,11 +9848,14 @@ button:hover {
                 this.currentSprintEnduranceTicks = maxTicks;
             }
             var distance = target ? this.distanceTo(target) : 9999;
-            var lateSprintDistance = 145-conservation * 55;
+            // Sprinting is a generic close-pursuit gait, not target-specific.
+            // The old threshold was below ordinary wildlife flight distance, so a monster
+            // could keep merely running while already in an active chase. This calibrates
+            // the underlying gait transition instead of special-casing prey species.
+            var lateSprintDistance = 260-conservation * 55;
             if (distance<=lateSprintDistance && this.currentSprintEnduranceTicks>0 && this.thermalStress<1.5){
                 this.currentSprintEnduranceTicks-=1;
                 this.sprinting = true;
-                NutritionSystem.recordActivityTick(this, 1.8);
                 return 2;
             }
             this.sprinting = false;
@@ -9339,9 +10014,11 @@ button:hover {
             } else if (fatFraction>0.24){
                 amount = Math.round(amount * Clamp(1+(fatFraction-0.24) * 1.8, 1.05, 1.38));
             }
-            amount = Math.round(amount * MonsterDiseaseSystem.combinedEffects(this).damageMultiplier);
+            amount = Math.round(amount * this.getMorphologyDamageMultiplier() * MonsterDiseaseSystem.combinedEffects(this).damageMultiplier);
             var conditionBeforeDamage = this.getOverallConditionRatio();
             this.bodyHealth.applyGeneralDamage(amount, rng);
+            this.health = this.bodyHealth.total();
+            this.maxHealth = this.bodyHealth.maxTotal();
             this.recordDamageTaken(Math.max(0, conditionBeforeDamage-this.getOverallConditionRatio()) * this.bodyHealth.maxTotal());
             if (raid){
                 raid.addSound('monsterInjured', attacker || this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS, {
@@ -9364,6 +10041,9 @@ button:hover {
         getSnapshot(){
             var s = super.getSnapshot();
             s.agentKind = this.agentKind;
+            s.alive = !!this.alive;
+            s.health = Number.isFinite(this.health) ? this.health : (this.bodyHealth ? this.bodyHealth.total() : 0);
+            s.maxHealth = Number.isFinite(this.maxHealth) ? this.maxHealth : (this.bodyHealth ? this.bodyHealth.maxTotal() : 1);
             s.name = this.collared || this.owned ? this.name : '';
             s.owned = this.owned;
             s.collared = this.collared;
@@ -9387,6 +10067,14 @@ button:hover {
             s.targetFatMass = this.targetFatMass || 0;
             s.currentMuscleMass = this.currentMuscleMass || 0;
             s.currentBoneMass = this.currentBoneMass || 0;
+            s.spineMass = this.spineMass || 0;
+            s.spineSize = this.spineSize || 0;
+            s.toothSize = this.toothSize || 1;
+            s.limbLength = this.limbLength || 1;
+            s.forelimbMuscleBias = this.forelimbMuscleBias || 1;
+            s.hindlimbMuscleBias = this.hindlimbMuscleBias || 1;
+            s.agility = this.agility || 1;
+            s.powerToWeightRatio = this.powerToWeightRatio || 1;
             s.muscleDensity = this.muscleDensity || 1;
             s.boneDensity = this.boneDensity || 1;
             s.bodyCondition = this.bodyCondition || this.getBodyConditionLabel();
@@ -9491,8 +10179,8 @@ button:hover {
         boar : {
             displayName : 'boar',
             radius : 13,
-            speedMin : 88,
-            speedMax : 120,
+            speedMin : 78,
+            speedMax : 106,
             health : 56,
             foodValue : 8,
             colour : '#4b3528',
@@ -9525,8 +10213,8 @@ button:hover {
         bear : {
             displayName : 'bear',
             radius : 18,
-            speedMin : 92,
-            speedMax : 126,
+            speedMin : 70,
+            speedMax : 96,
             health : 112,
             foodValue : 16,
             colour : '#3b2f2a',
@@ -9562,8 +10250,8 @@ button:hover {
         walrus : {
             displayName : 'walrus',
             radius : 19,
-            speedMin : 74,
-            speedMax : 104,
+            speedMin : 42,
+            speedMax : 66,
             health : 128,
             foodValue : 18,
             colour : '#8b7355',
@@ -9581,8 +10269,8 @@ button:hover {
         polarBear : {
             displayName : 'polar bear',
             radius : 20,
-            speedMin : 92,
-            speedMax : 122,
+            speedMin : 76,
+            speedMax : 104,
             health : 138,
             foodValue : 20,
             colour : '#f3f4e8',
@@ -9947,6 +10635,7 @@ button:hover {
             this.nextBroodId = 1;
             this.foodExpenditureCredits = 0;
             this.roundFoodExpenditureCredits = 0;
+            this.wildMonsterHarvestByBiome = {};
         }
         createMonsterId(prefix){
             var id =(prefix || 'monster')+'_'+this.nextMonsterId;
@@ -9977,6 +10666,32 @@ button:hover {
             if (this.ownedMonsters.indexOf(monster)<0){
                 this.ownedMonsters.push(monster);
             }
+            this.recordWildMonsterHarvest(monster);
+        }
+        biomeKeyForPoint(world, x, y){
+            if (!world || !world.terrainGrid){
+                return 'unknown';
+            }
+            return TERRAIN_NAMES[world.terrainGrid.getTerrainTypeAtWorld(x, y)] || 'unknown';
+        }
+        recordWildMonsterHarvest(monster){
+            if (!monster || !monster.wildOriginBiome){
+                return;
+            }
+            this.wildMonsterHarvestByBiome[monster.wildOriginBiome] =(this.wildMonsterHarvestByBiome[monster.wildOriginBiome] || 0)+1;
+        }
+        getWildMonsterHarvestPressureForBiome(biome){
+            var harvested = this.wildMonsterHarvestByBiome[biome] || 0;
+            return Clamp(harvested / Math.max(1, IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR), 0, 0.85);
+        }
+        recoverWildMonsterEcosystem(){
+            var self = this;
+            Object.keys(this.wildMonsterHarvestByBiome).forEach(function (biome){
+                self.wildMonsterHarvestByBiome[biome] = Math.max(0, self.wildMonsterHarvestByBiome[biome] * 0.72-0.15);
+                if (self.wildMonsterHarvestByBiome[biome]<0.05){
+                    delete self.wildMonsterHarvestByBiome[biome];
+                }
+            });
         }
         resetAllOwnedForManagement(){
             this.ownedMonsters = this.ownedMonsters.filter(function (monster){
@@ -10491,9 +11206,26 @@ button:hover {
             }
             return animals;
         }
+        estimateWildMonsterCapacity(){
+            var ecology = MonsterMetabolismSystem.macrofaunaEcologyProfile(this.world);
+            var expectedFood = ecology.expectedFood || 0;
+            var meanMonsterFood = 11.5;
+            var ecosystemFood = expectedFood * IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR;
+            var sustainableMonsters = ecosystemFood / Math.max(1, meanMonsterFood * 4.2);
+            var visibleFraction = Clamp(0.12+Math.sqrt(Math.max(0, ecology.availability || 0)) * 0.20, 0.06, 0.42);
+            var gross = sustainableMonsters * visibleFraction;
+            var depletion = 0;
+            var keys = Object.keys(this.gameState.wildMonsterHarvestByBiome || {});
+            for (var d = 0; d<keys.length; d+=1){
+                depletion+=this.gameState.getWildMonsterHarvestPressureForBiome(keys[d]);
+            }
+            var net = gross * Clamp(1-depletion / Math.max(1, keys.length || 1), 0.15, 1);
+            return Clamp(Math.round(net), 0, Math.max(WILD_MONSTER_COUNT_MAX, Math.round(WILD_MONSTER_COUNT_MAX * IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR)));
+        }
         createWildMonsters(){
             var wildMonsters = [];
-            var count = this.rng.integer(WILD_MONSTER_COUNT_MIN, WILD_MONSTER_COUNT_MAX);
+            var capacity = this.estimateWildMonsterCapacity();
+            var count = capacity<=0 ? 0 : this.rng.integer(WILD_MONSTER_COUNT_MIN, Math.max(WILD_MONSTER_COUNT_MIN, capacity));
             var spawnTick = this.rng.integer(WILD_MONSTER_FIRST_SPAWN_TICK_MIN, WILD_MONSTER_FIRST_SPAWN_TICK_MAX);
             for (var i = 0;
             i<count;
@@ -10505,6 +11237,7 @@ button:hover {
                     selectedForDeployment : false,
                     world : this.world
                 } );
+                monster.wildOriginBiome = 'unknown';
                 monster.spawnTick = spawnTick;
                 monster.deployed = false;
                 monster.behaviourState = 'offMapWild';
@@ -10654,6 +11387,9 @@ button:hover {
                 if (!monster.enterWildFromEdge(this.world, this.rng, entryContext ? entryContext.edge : null)){
                     this.addEvent('A wild uncollared monster found no dry edge to enter from and stayed away.');
                     continue;
+                }
+                if (this.world && this.world.terrainGrid){
+                    monster.wildOriginBiome = this.gameState.biomeKeyForPoint(this.world, monster.x, monster.y);
                 }
                 if (entryContext && entryContext.prey && monster.entryEdge===entryContext.edge){
                     monster.rememberMacrofaunaTarget(entryContext.prey, this);
@@ -11153,6 +11889,7 @@ button:hover {
             this.purgeExpiredSoundEvents();
             this.tickCooldowns();
             this.resolveHumanMacrofaunaFear();
+            this.resolveHumanMonsterFear();
             this.adventurers.forEach(function (adventurer){
                 adventurer.update(this);
             } , this);
@@ -11210,6 +11947,42 @@ button:hover {
                 }
             }
         }
+        resolveHumanMonsterFear(){
+            for (var i = 0; i<this.adventurers.length; i+=1){
+                var adventurer = this.adventurers[i];
+                if (!adventurer.isActive() || adventurer.fleeing || adventurer.carryingTreasure){
+                    continue;
+                }
+                var bestMonster = null;
+                var bestPressure = 0;
+                for (var j = 0; j<this.monsters.length; j+=1){
+                    var monster = this.monsters[j];
+                    if (!monster.isActive() || !monster.deployed || !adventurer.canSee(this.world, monster)){
+                        continue;
+                    }
+                    var distance = adventurer.distanceTo(monster);
+                    var range = 220+Math.max(0, monster.bodyScale || 1) * 170+Math.max(0, monster.spineSize || 0) * 120;
+                    if (distance>range){
+                        continue;
+                    }
+                    var pressure = monster.apparentThreatForAdventurer(adventurer) *(1-distance / Math.max(1, range));
+                    if (pressure>bestPressure){
+                        bestPressure = pressure;
+                        bestMonster = monster;
+                    }
+                }
+                if (!bestMonster){
+                    continue;
+                }
+                var courageResistance = Clamp((adventurer.courage || 0) * 0.88+(adventurer.strength || 0) * 0.12, 0, 1.75);
+                var fleeChance = Clamp(bestPressure-courageResistance * 0.35+0.08, 0, 0.88);
+                if (this.rng.nextFloat()<fleeChance){
+                    adventurer.fleeing = true;
+                    adventurer.behaviourState = 'fleeingFromMonster';
+                    this.addEvent('A '+adventurer.displayName+' fled from '+(bestMonster.name || 'a monster')+'.');
+                }
+            }
+        }
         findNearestIntimidatingMacrofauna(adventurer){
             var best = null;
             var bestDistance = Infinity;
@@ -11259,7 +12032,7 @@ button:hover {
                             this.addSound('monsterAttack', monster, monster.x, monster.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
                             var adventurerHealthBefore = adventurer.health;
                             var adventurerWasAlive = adventurer.isActive();
-                            var part = adventurer.applyDamage(this.rng.integer(18, 34), this.rng, this, monster);
+                            var part = adventurer.applyDamage(monster.getMeleeDamageAgainst(adventurer, this.rng), this.rng, this, monster);
                             monster.recordAttackPerformance(Math.max(0, adventurerHealthBefore-adventurer.health), adventurerWasAlive && !adventurer.isActive());
                             adventurer.behaviourState = 'takingDamage';
                             this.addEvent(monster.name+' hit a '+adventurer.displayName+' in the '+part+'.');
@@ -11292,7 +12065,7 @@ button:hover {
                             this.addSound('monsterAttack', monster, monster.x, monster.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
                             var animalHealthBefore = animal.health;
                             var animalWasAlive = animal.isActive();
-                            animal.applyDamage(this.rng.integer(18, 32), this, monster);
+                            animal.applyDamage(monster.getMeleeDamageAgainst(animal, this.rng), this, monster);
                             monster.recordAttackPerformance(Math.max(0, animalHealthBefore-animal.health), animalWasAlive && !animal.isActive());
                             this.addEvent(monster.name+' attacked a '+animal.displayName+'.');
                             if (!animal.alive){
@@ -11681,6 +12454,7 @@ button:hover {
                     text : eventText
                 } );
             } , this);
+            this.gameState.recoverWildMonsterEcosystem();
             this.gameState.resetAllOwnedForManagement();
             this.currentRaid = null;
             if (this.roundEnded){
@@ -14273,8 +15047,14 @@ button:hover {
         var bodyScale = monster && Number.isFinite(monster.bodyScale) ? monster.bodyScale : LocalClamp(Math.cbrt(bodyMass / 100), 0.45, 1.28);
         var fatRatio = fatMass / targetFat;
         var muscleRatio = muscleMass / Math.max(1, bodyMass * 0.42);
-        var torsoLengthScale = LocalClamp(1-Math.max(0, fatRatio-1) * 0.030+Math.max(0, 0.7-fatRatio) * 0.040, 0.88, 1.08);
-        var torsoDepthScale = LocalClamp(1+(fatRatio-1) * 0.24, 0.66, 1.72);
+        var geneticMorphology = monster && monster.phenotype && monster.phenotype.morphology ? monster.phenotype.morphology : null;
+        var geneticLength = geneticMorphology ? geneticMorphology.vertebralLength : 1;
+        var geneticDepth = geneticMorphology ? geneticMorphology.torsoDepth : 1;
+        var limbLength = geneticMorphology ? geneticMorphology.limbLength : (monster && monster.limbLength ? monster.limbLength : 1);
+        var spineSize = geneticMorphology ? geneticMorphology.spineSize : (monster && monster.spineSize ? monster.spineSize : 0);
+        var toothSize = geneticMorphology ? geneticMorphology.toothSize : (monster && monster.toothSize ? monster.toothSize : 1);
+        var torsoLengthScale = LocalClamp((1-Math.max(0, fatRatio-1) * 0.030+Math.max(0, 0.7-fatRatio) * 0.040) * geneticLength, 0.74, 1.34);
+        var torsoDepthScale = LocalClamp((1+(fatRatio-1) * 0.24) * geneticDepth, 0.58, 1.90);
         var bellyDepthScale = LocalClamp(1+(fatRatio-1) * 0.34, 0.58, 1.95);
         return {
             bodyScale : bodyScale,
@@ -14286,8 +15066,9 @@ button:hover {
             bodyWidthScale : torsoLengthScale,
             bodyHeightScale : torsoDepthScale,
             headScale : LocalClamp(0.92+bodyScale * 0.08, 0.85, 1.05),
-            legScale : LocalClamp(0.72+muscleRatio * 0.30, 0.62, 1.28),
-            spineScale : 1,
+            legScale : LocalClamp((0.72+muscleRatio * 0.30) * limbLength, 0.50, 1.65),
+            spineScale : spineSize,
+            toothScale : toothSize,
             label : fatRatio<0.55 ? 'wasted' : (fatRatio<0.82 ? 'lean' : (fatRatio>1.55 ? 'fat' : 'fit'))
         } ;
     }
@@ -14302,9 +15083,19 @@ button:hover {
         var morphology = MonsterFatMorphology(monster);
         var bodyTransform = 'translate(90 62) scale('+morphology.torsoLengthScale.toFixed(2)+' '+morphology.torsoDepthScale.toFixed(2)+') translate(-90 -62)';
         var wholeScale = morphology.bodyScale || 1;
+        var bodyLeft = 90-54 * morphology.torsoLengthScale;
+        var bodyRight = 90+54 * morphology.torsoLengthScale;
+        var tailPath = '<path d="M'+(bodyLeft+18).toFixed(1)+' 61 C'+(bodyLeft-10).toFixed(1)+' 56 '+(bodyLeft-22).toFixed(1)+' 45 '+(bodyLeft-24).toFixed(1)+' 37 C'+(bodyLeft-8).toFixed(1)+' 43 '+(bodyLeft+7).toFixed(1)+' 50 '+(bodyLeft+28).toFixed(1)+' 58 Z" fill="'+bodyDark+'" stroke="'+dark+'" stroke-width="3"/>';
+        var headPath = '<path d="M'+(bodyRight-8).toFixed(1)+' 42 C'+(bodyRight+16).toFixed(1)+' 30 '+(bodyRight+38).toFixed(1)+' 37 '+(bodyRight+44).toFixed(1)+' 52 C'+(bodyRight+28).toFixed(1)+' 50 '+(bodyRight+15).toFixed(1)+' 54 '+(bodyRight+2).toFixed(1)+' 64 Z" fill="'+body+'" stroke="'+dark+'" stroke-width="4"/>';
+        var eyeX = bodyRight+20;
+        var pupilX = bodyRight+23;
+        var mouthX1 = bodyRight+27;
+        var mouthX2 = bodyRight+2;
+        var collarPath = '<path d="M'+(bodyRight+2).toFixed(1)+' 68 Q'+(bodyRight+19).toFixed(1)+' 75 '+(bodyRight+32).toFixed(1)+' 70" stroke="'+collar+'" stroke-width="7" stroke-linecap="round" fill="none"/>';
         var stripes = MonsterColourIsStriped(monster) ? '<path d="M54 48 L72 88 M82 36 L103 96 M112 40 L130 86" stroke="'+secondary+'" stroke-width="8" stroke-linecap="round" opacity="0.62"/>' : '';
         var diseaseTint =(monster.diseases && monster.diseases.length) ? '<circle cx="38" cy="34" r="7" fill="'+((monster.diseases[0].ui && monster.diseases[0].ui.tint) || '#f87171')+'" opacity="0.75"/>' : '';
-        return '<svg viewBox="0 0 180 110" role="img" aria-label="Monster icon">'+'<ellipse cx="90" cy="82" rx="54" ry="11" fill="rgba(0,0,0,0.18)"/>'+'<g transform="translate(90 62) scale('+wholeScale.toFixed(2)+' '+wholeScale.toFixed(2)+') translate(-90 -62)"><g transform="'+bodyTransform+'">'+'<path d="M35 66 C44 38 86 29 126 42 C150 50 157 74 139 84 C109 100 58 94 35 66 Z" fill="'+body+'" stroke="'+dark+'" stroke-width="4"/>'+stripes+'</g></g>'+'<path d="M39 61 C22 56 16 45 15 37 C32 43 44 49 55 58 Z" fill="'+bodyDark+'" stroke="'+dark+'" stroke-width="3"/>'+'<path d="M122 42 C143 30 164 37 169 52 C154 50 141 54 130 64 Z" fill="'+body+'" stroke="'+dark+'" stroke-width="4"/>'+'<circle cx="144" cy="46" r="8" fill="'+eye+'"/><circle cx="147" cy="47" r="4" fill="'+dark+'"/>'+'<path d="M151 58 Q139 66 126 58" fill="none" stroke="'+dark+'" stroke-width="3" stroke-linecap="round"/>'+'<path d="M71 36 L77 18 L84 38 Z M98 35 L106 16 L112 40 Z" fill="#e6d8a9" stroke="'+dark+'" stroke-width="3"/>'+'<path d="M128 68 Q145 75 158 70" stroke="'+collar+'" stroke-width="7" stroke-linecap="round" fill="none"/>'+diseaseTint+'</svg>';
+        var spines = morphology.spineScale>0 ? '<path d="M69 42 L76 '+(30-Math.round(morphology.spineScale * 10))+' L84 43 Z M94 39 L103 '+(25-Math.round(morphology.spineScale * 12))+' L113 43 Z" fill="'+colour.spineColour+'" stroke="'+dark+'" stroke-width="3"/>' : '';
+        return '<svg viewBox="0 0 180 110" role="img" aria-label="Monster icon">'+'<ellipse cx="90" cy="82" rx="54" ry="11" fill="rgba(0,0,0,0.18)"/>'+'<g transform="translate(90 62) scale('+wholeScale.toFixed(2)+' '+wholeScale.toFixed(2)+') translate(-90 -62)">'+tailPath+'<g transform="'+bodyTransform+'">'+'<path d="M35 66 C44 38 86 29 126 42 C150 50 157 74 139 84 C109 100 58 94 35 66 Z" fill="'+body+'" stroke="'+dark+'" stroke-width="4"/>'+stripes+spines+'</g>'+headPath+'<circle cx="'+eyeX.toFixed(1)+'" cy="46" r="8" fill="'+eye+'"/><circle cx="'+pupilX.toFixed(1)+'" cy="47" r="4" fill="'+dark+'"/>'+'<path d="M'+mouthX1.toFixed(1)+' 58 Q'+(bodyRight+15).toFixed(1)+' 66 '+mouthX2.toFixed(1)+' 58" fill="none" stroke="'+dark+'" stroke-width="3" stroke-linecap="round"/>'+collarPath+'</g>'+diseaseTint+'</svg>';
     }
     function MonsterSexLabel(monster){
         if (!monster || !monster.sex){
@@ -16235,7 +17026,8 @@ button:hover {
         var p = EntityScreenPoint(m.x, m.y);
         var facing = FacingForEntity(m, 4);
         var moving = !!m.renderMoving && m.alive && m.deployed;
-        var phaseBase = now * 0.013+StablePhase(m.id);
+        var gaitRate = moving ? Math.max(0.55, Math.min(2.6, 0.55+(m.renderSpeed || 0) / 5.5)) : 1;
+        var phaseBase = now * 0.013 * gaitRate+StablePhase(m.id);
         var walk = moving ? phaseBase : StablePhase(m.id) * 0.3;
         var breathe = Math.sin(now * 0.003+StablePhase(m.id)) * 1.1;
         var bob = moving ? Math.sin(walk * 2) * 1.7 : breathe * 0.55;
@@ -16280,25 +17072,25 @@ button:hover {
         ctx.beginPath();
         ctx.ellipse(0, 2, 30, 9, 0, 0, Math.PI * 2);
         ctx.fill();
-        var tailBaseX = -fx * 25;
-        var tailBaseY = -32-fy * 10;
-        var tailTipX = -fx * 48+lx * Math.sin(walk) * 6;
-        var tailTipY = -30-fy * 14+ly * Math.sin(walk) * 4;
+        var tailBaseX = -fx * (25 * torsoLengthScale);
+        var tailBaseY = -32-fy * (10 * torsoDepthScale);
+        var tailTipX = -fx * (48 * torsoLengthScale)+lx * Math.sin(walk) * 6;
+        var tailTipY = -30-fy * (14 * torsoDepthScale)+ly * Math.sin(walk) * 4;
         ctx.strokeStyle = dark;
         ctx.lineWidth = 9;
         ctx.lineCap = 'round';
         ctx.beginPath();
         ctx.moveTo(tailBaseX, tailBaseY);
-        ctx.quadraticCurveTo(-fx * 38+lx * 8, -38-fy * 12+ly * 4, tailTipX, tailTipY);
+        ctx.quadraticCurveTo(-fx * (38 * torsoLengthScale)+lx * 8, -38-fy * (12 * torsoDepthScale)+ly * 4, tailTipX, tailTipY);
         ctx.stroke();
         ctx.strokeStyle = bodyDark;
         ctx.lineWidth = 6;
         ctx.beginPath();
         ctx.moveTo(tailBaseX, tailBaseY);
-        ctx.quadraticCurveTo(-fx * 38+lx * 8, -38-fy * 12+ly * 4, tailTipX, tailTipY);
+        ctx.quadraticCurveTo(-fx * (38 * torsoLengthScale)+lx * 8, -38-fy * (12 * torsoDepthScale)+ly * 4, tailTipX, tailTipY);
         ctx.stroke();
-        DrawMonsterLeg(-fx * 14+lx * 13, -25+ly * 4, -1, walk+Math.PI, bodyDark, dark, facing);
-        DrawMonsterLeg(fx * 12-lx * 12, -24-ly * 4, 1, walk+0.65, bodyDark, dark, facing);
+        DrawMonsterLeg(-fx * 14+lx * 13, -25+ly * 4, -1, walk+Math.PI, bodyDark, dark, facing, legThicknessScale);
+        DrawMonsterLeg(fx * 12-lx * 12, -24-ly * 4, 1, walk+0.65, bodyDark, dark, facing, legThicknessScale);
         ctx.fillStyle = bodyDark;
         ctx.strokeStyle = dark;
         ctx.lineWidth = 2.5;
@@ -16329,10 +17121,10 @@ button:hover {
         ctx.beginPath();
         ctx.ellipse(-fx * 4, -31, 15 * torsoLengthScale, 7 * bellyDepthScale, rot, 0, Math.PI * 2);
         ctx.fill();
-        DrawMonsterLeg(-fx * 8-lx * 14, -24-ly * 4, -1, walk, body, dark, facing);
-        DrawMonsterLeg(fx * 16+lx * 14, -24+ly * 4, 1, walk+Math.PI, body, dark, facing);
-        var headX = fx * 30;
-        var headY = -48+fy * 11;
+        DrawMonsterLeg(-fx * 8-lx * 14, -24-ly * 4, -1, walk, body, dark, facing, legThicknessScale);
+        DrawMonsterLeg(fx * 16+lx * 14, -24+ly * 4, 1, walk+Math.PI, body, dark, facing, legThicknessScale);
+        var headX = fx * (30 * torsoLengthScale);
+        var headY = -48+fy * (11 * torsoDepthScale);
         var snoutX = headX+fx * 15;
         var snoutY = headY+fy * 8;
         ctx.fillStyle = body;
@@ -16394,25 +17186,25 @@ button:hover {
             ctx.ellipse(headX, headY-4, 12, 7, rot, 0, Math.PI * 2);
             ctx.fill();
         }
-        ctx.fillStyle = spineColour;
-        ctx.strokeStyle = dark;
-        ctx.lineWidth = 1.5;
-        var spineOffsets = [-18,
-        -6,
-        7,
-        19];
-        for (var i = 0;
-        i<spineOffsets.length;
-        i+=1){
-            var sx = fx * spineOffsets[i]+lx * 3;
-            var sy = -51+fy * spineOffsets[i] * 0.35+ly * 3;
-            ctx.beginPath();
-            ctx.moveTo(sx-lx * 6, sy+7);
-            ctx.lineTo(sx, sy-9);
-            ctx.lineTo(sx+lx * 6, sy+7);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
+        if ((morphology.spineScale || 0)>0){
+            ctx.fillStyle = spineColour;
+            ctx.strokeStyle = dark;
+            ctx.lineWidth = 1.5;
+            var spineOffsets = [-18, -6, 7, 19];
+            var spineHeight = 8+Math.min(18, morphology.spineScale * 12);
+            var spineHalfWidth = 4+Math.min(8, morphology.spineScale * 4);
+            for (var i = 0; i<spineOffsets.length; i+=1){
+                var localX = spineOffsets[i] * torsoLengthScale;
+                var sx = fx * localX+lx * 3;
+                var sy = -50+fy * localX * 0.35+ly * 3-(torsoDepthScale-1) * 7;
+                ctx.beginPath();
+                ctx.moveTo(sx-lx * spineHalfWidth, sy+spineHeight * 0.45);
+                ctx.lineTo(sx, sy-spineHeight);
+                ctx.lineTo(sx+lx * spineHalfWidth, sy+spineHeight * 0.45);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            }
         }
         if (m.collared){
             ctx.strokeStyle = '#f2c14e';
@@ -16574,9 +17366,11 @@ button:hover {
                 item.y = previous.y+(current.y-previous.y) * alpha;
                 var dx = current.x-previous.x;
                 var dy = current.y-previous.y;
-                item.renderMoving = Math.hypot(dx, dy)>0.2;
+                item.renderSpeed = Math.hypot(dx, dy);
+                item.renderMoving = item.renderSpeed>0.2;
                 item.renderAngle = Math.atan2(dy, dx);
             } else{
+                item.renderSpeed = 0;
                 item.renderMoving = false;
                 item.renderAngle = 0;
             }
