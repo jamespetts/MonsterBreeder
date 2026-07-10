@@ -7174,6 +7174,145 @@ button:hover {
             var temperature = Number.isFinite(environment.temperature) ? environment.temperature : 0.50;
             var aridity = Number.isFinite(environment.aridity) ? environment.aridity : Math.max(0, 1-moisture);
             return Clamp(0.18+vegetation * 0.48+moisture * 0.22+(1-Math.abs(temperature-0.50) * 1.3) * 0.22-aridity * 0.35, 0.05, 1.25);
+        } ,
+        macrofaunaSpeciesWeightsForTerrain : function (world, terrainType){
+            var environment = world && world.environment ? world.environment : {
+            } ;
+            var weights = {
+            } ;
+            if (terrainType===TERRAIN_TYPE.LAKE){
+                weights.seal = 3;
+                weights.walrus =(environment.temperature || 0.5)<0.42 ? 1.4 : 0.35;
+                weights.polarBear =(environment.temperature || 0.5)<0.32 ? 0.20 : 0;
+                return weights;
+            }
+            if (terrainType===TERRAIN_TYPE.DESERT){
+                weights.hare = 1.8;
+                weights.boar =(environment.moisture || 0)>0.48 ? 0.25 : 0;
+                return weights;
+            }
+            if (terrainType===TERRAIN_TYPE.FOREST){
+                weights.deer = 2.3;
+                weights.boar =(environment.moisture || 0)>0.42 ? 1.1 : 0.45;
+                weights.bear =(environment.vegetationDensity || 0)>0.58 ? 0.32 : 0.08;
+                return weights;
+            }
+            if (terrainType===TERRAIN_TYPE.MARSH || terrainType===TERRAIN_TYPE.STREAM){
+                weights.boar = 1.3;
+                weights.deer = 0.65;
+                weights.hare = 0.35;
+                return weights;
+            }
+            if (terrainType===TERRAIN_TYPE.TUNDRA || terrainType===TERRAIN_TYPE.ICE){
+                weights.hare = 1.1;
+                weights.deer = 0.25;
+                weights.polarBear =(environment.temperature || 0.5)<0.36 ? 0.34 : 0.08;
+                return weights;
+            }
+            if (terrainType===TERRAIN_TYPE.ROCKY){
+                weights.hare = 0.9;
+                weights.deer = 0.45;
+                weights.bear =(environment.ruggedness || 0)>0.42 ? 0.16 : 0.04;
+                return weights;
+            }
+            weights.deer = 1.4;
+            weights.hare = 0.55;
+            weights.boar =(environment.moisture || 0)>0.50 ? 0.45 : 0.12;
+            return weights;
+        } ,
+        expectedMacrofaunaCapacity : function (world){
+            if (!world){
+                return 0;
+            }
+            var availability = this.macrofaunaAvailability(world);
+            var mapScale = Math.sqrt((world.width * world.height) /(REFERENCE_MAP_WIDTH * REFERENCE_MAP_HEIGHT));
+            var baseMax = Math.max(MACROFAUNA_COUNT_MIN, Math.round(MACROFAUNA_COUNT_MAX * availability * Clamp(mapScale, 0.55, 2.2)));
+            var capacity = Clamp(baseMax, 0, Math.max(1, Math.round(MACROFAUNA_COUNT_MAX * 2.4)));
+            return capacity<=0 ? 0 : (MACROFAUNA_COUNT_MIN+capacity) / 2;
+        } ,
+        macrofaunaEcologyProfile : function (world){
+            if (!world || !world.terrainGrid){
+                return {
+                    availability : this.macrofaunaAvailability(world),
+                    expectedCount : 0,
+                    expectedFood : 0,
+                    metabolicFoodAllowance : 0,
+                    species : {
+                    } ,
+                    preyNiches : []
+                } ;
+            }
+            if (world.macrofaunaEcologyProfile){
+                return world.macrofaunaEcologyProfile;
+            }
+            var terrainWeightBySpecies = {
+            } ;
+            var totalSpeciesWeight = 0;
+            for (var y = 0;
+            y<world.terrainGrid.rows;
+            y+=1){
+                for (var x = 0;
+                x<world.terrainGrid.cols;
+                x+=1){
+                    var terrainType = world.terrainGrid.getTerrainTypeAtTile(x, y);
+                    var weights = this.macrofaunaSpeciesWeightsForTerrain(world, terrainType);
+                    Object.keys(weights).forEach(function (species){
+                        var weight = Math.max(0, weights[species] || 0);
+                        if (weight<=0){
+                            return;
+                        }
+                        terrainWeightBySpecies[species] =(terrainWeightBySpecies[species] || 0)+weight;
+                        totalSpeciesWeight+=weight;
+                    } );
+                }
+            }
+            var expectedCount = this.expectedMacrofaunaCapacity(world);
+            var speciesProfiles = {
+            } ;
+            var preyNiches = [];
+            var expectedFood = 0;
+            Object.keys(terrainWeightBySpecies).forEach(function (species){
+                var macrofaunaProfile = MACROFAUNA_PROFILE && MACROFAUNA_PROFILE[species] ? MACROFAUNA_PROFILE[species] : null;
+                if (!macrofaunaProfile){
+                    return;
+                }
+                var share = totalSpeciesWeight>0 ? terrainWeightBySpecies[species] / totalSpeciesWeight : 0;
+                var expectedAnimals = expectedCount * share;
+                var speciesFood = expectedAnimals *(macrofaunaProfile.foodValue || 0);
+                var speedMid = ((macrofaunaProfile.speedMin || 0)+(macrofaunaProfile.speedMax || 0)) / 2;
+                var danger = (macrofaunaProfile.attackChance || 0) * (((macrofaunaProfile.attackDamageMin || 0)+(macrofaunaProfile.attackDamageMax || 0)) / 2)+(macrofaunaProfile.humanFear || 0) * 4;
+                expectedFood+=speciesFood;
+                var record = {
+                    species : species,
+                    displayName : macrofaunaProfile.displayName || species,
+                    share : share,
+                    expectedAnimals : expectedAnimals,
+                    expectedFood : speciesFood,
+                    foodValue : macrofaunaProfile.foodValue || 0,
+                    preyRadius : macrofaunaProfile.radius || 0,
+                    preySpeed : speedMid,
+                    preyHealth : macrofaunaProfile.health || 0,
+                    danger : danger,
+                    aquatic : !!macrofaunaProfile.aquatic,
+                    metabolicFoodAllowance : Clamp(speciesFood / 3.5, 0, 8)
+                } ;
+                speciesProfiles[species] = record;
+                if (share>0.01 && speciesFood>0){
+                    preyNiches.push(record);
+                }
+            } );
+            preyNiches.sort(function (a, b){
+                return b.expectedFood-a.expectedFood;
+            } );
+            world.macrofaunaEcologyProfile = {
+                availability : this.macrofaunaAvailability(world),
+                expectedCount : expectedCount,
+                expectedFood : expectedFood,
+                metabolicFoodAllowance : Clamp(expectedFood / 4.0, 0, 8),
+                species : speciesProfiles,
+                preyNiches : preyNiches
+            } ;
+            return world.macrofaunaEcologyProfile;
         }
     } ;
     class GeneticTraitDefinition{
@@ -7658,6 +7797,27 @@ button:hover {
             if (!profile){
                 return 1;
             }
+            if (!profile.macrofaunaNiche && profile.macrofaunaEcology && profile.macrofaunaEcology.preyNiches && profile.macrofaunaEcology.preyNiches.length>1){
+                var weightedFitness = 0;
+                var totalWeight = 0;
+                for (var nicheIndex = 0;
+                nicheIndex<profile.macrofaunaEcology.preyNiches.length;
+                nicheIndex+=1){
+                    var niche = profile.macrofaunaEcology.preyNiches[nicheIndex];
+                    var nicheWeight = Math.max(0, niche.expectedFood || niche.share || 0);
+                    if (nicheWeight<=0){
+                        continue;
+                    }
+                    var nicheProfile = Object.assign({}, profile, {
+                        macrofaunaNiche : niche
+                    });
+                    weightedFitness+=nicheWeight * this.getMetabolismPhenotypeFitness(phenotype, nicheProfile);
+                    totalWeight+=nicheWeight;
+                }
+                if (totalWeight>0){
+                    return Math.max(0.0001, weightedFitness / totalWeight);
+                }
+            }
             var temperatures = profile.seasonTemperaturesC && profile.seasonTemperaturesC.length>0 ? profile.seasonTemperaturesC : [profile.currentTemperatureC];
             var logFitness = 0;
             for (var i = 0;
@@ -7675,7 +7835,14 @@ button:hover {
                 logFitness+=-7.5 * thermalMismatch-2.0 * fatTemperatureMismatch;
             }
             logFitness/=Math.max(1, temperatures.length);
-            var foodMismatch = Math.max(0, phenotype.baseMetabolicFood-(8.5+profile.macrofaunaAvailability * 4.0)) / 10;
+            var macrofaunaFoodAllowance = profile.macrofaunaNiche && Number.isFinite(profile.macrofaunaNiche.metabolicFoodAllowance) ? profile.macrofaunaNiche.metabolicFoodAllowance : null;
+            if (macrofaunaFoodAllowance===null && profile.macrofaunaEcology && Number.isFinite(profile.macrofaunaEcology.metabolicFoodAllowance)){
+                macrofaunaFoodAllowance = profile.macrofaunaEcology.metabolicFoodAllowance;
+            }
+            if (macrofaunaFoodAllowance===null){
+                macrofaunaFoodAllowance = (profile.macrofaunaAvailability || 0) * 4.0;
+            }
+            var foodMismatch = Math.max(0, phenotype.baseMetabolicFood-(8.5+macrofaunaFoodAllowance)) / 10;
             logFitness+=-2.5 * foodMismatch;
             logFitness+=MonsterDiseaseSystem.geneticDiseaseSelectionLogFitness({
                 metabolism : phenotype
@@ -7871,10 +8038,12 @@ button:hover {
             seasonIndex+=1){
                 seasonTemperaturesC.push(MonsterMetabolismSystem.currentTemperatureC(world, seasonIndex));
             }
+            var macrofaunaEcology = MonsterMetabolismSystem.macrofaunaEcologyProfile(world);
             world.metabolismSelectionProfile = {
                 currentTemperatureC : MonsterMetabolismSystem.currentTemperatureC(world, 2),
                 seasonTemperaturesC : seasonTemperaturesC,
-                macrofaunaAvailability : MonsterMetabolismSystem.macrofaunaAvailability(world)
+                macrofaunaAvailability : macrofaunaEcology.availability,
+                macrofaunaEcology : macrofaunaEcology
             };
             return world.metabolismSelectionProfile;
         }
@@ -9072,6 +9241,24 @@ button:hover {
             attackDamageMax : 34,
             habitat : 'sea',
             aquatic : true
+        } ,
+        polarBear : {
+            displayName : 'polar bear',
+            radius : 20,
+            speedMin : 92,
+            speedMax : 122,
+            health : 138,
+            foodValue : 20,
+            colour : '#f3f4e8',
+            fleesHumans : false,
+            humanFleeChance : 0.30,
+            humanFear : 1.06,
+            humanThreatRange : 310,
+            attackHumans : true,
+            attackChance : 0.34,
+            attackDamageMin : 20,
+            attackDamageMax : 44,
+            habitat : 'arctic'
         }
     } ;
     class Macrofauna extends Agent{
@@ -9082,6 +9269,7 @@ button:hover {
             this.species = species;
             this.displayName = profile.displayName;
             this.colour = profile.colour;
+            this.defaultColour = profile.colour;
             this.maxHealth = profile.health;
             this.health = profile.health;
             this.foodValue = profile.foodValue;
@@ -9107,6 +9295,17 @@ button:hover {
             this.eyeHeight = this.species==='bear' || this.species==='walrus' ? 4 : 3;
             this.sightRange = 1100+this.perception * 700;
             this.hearingThreshold = DEFAULT_HEARING_THRESHOLD;
+        }
+        applyEnvironmentAppearance(world){
+            if (this.species==='hare' && world && world.terrainGrid){
+                var terrainType = world.terrainGrid.getTerrainTypeAtWorld(this.x, this.y);
+                var coldWorld = world.environment && Number.isFinite(world.environment.temperature) && world.environment.temperature<0.36;
+                if (terrainType===TERRAIN_TYPE.TUNDRA || terrainType===TERRAIN_TYPE.ICE || coldWorld){
+                    this.colour = '#f4f1df';
+                    return;
+                }
+            }
+            this.colour = this.defaultColour;
         }
         getMapBoundaryPolicy(){
             return {
@@ -9854,47 +10053,7 @@ button:hover {
             return counts;
         }
         macrofaunaSpeciesWeightsForTerrain(terrainType){
-            var environment = this.world.environment || {
-            } ;
-            var weights = {
-            } ;
-            if (terrainType===TERRAIN_TYPE.LAKE){
-                weights.seal = 3;
-                weights.walrus =(environment.temperature || 0.5)<0.42 ? 1.4 : 0.35;
-                return weights;
-            }
-            if (terrainType===TERRAIN_TYPE.DESERT){
-                weights.hare = 1.8;
-                weights.boar =(environment.moisture || 0)>0.48 ? 0.25 : 0;
-                return weights;
-            }
-            if (terrainType===TERRAIN_TYPE.FOREST){
-                weights.deer = 2.3;
-                weights.boar =(environment.moisture || 0)>0.42 ? 1.1 : 0.45;
-                weights.bear =(environment.vegetationDensity || 0)>0.58 ? 0.32 : 0.08;
-                return weights;
-            }
-            if (terrainType===TERRAIN_TYPE.MARSH || terrainType===TERRAIN_TYPE.STREAM){
-                weights.boar = 1.3;
-                weights.deer = 0.65;
-                weights.hare = 0.35;
-                return weights;
-            }
-            if (terrainType===TERRAIN_TYPE.TUNDRA || terrainType===TERRAIN_TYPE.ICE){
-                weights.hare = 1.1;
-                weights.deer = 0.25;
-                return weights;
-            }
-            if (terrainType===TERRAIN_TYPE.ROCKY){
-                weights.hare = 0.9;
-                weights.deer = 0.45;
-                weights.bear =(environment.ruggedness || 0)>0.42 ? 0.16 : 0.04;
-                return weights;
-            }
-            weights.deer = 1.4;
-            weights.hare = 0.55;
-            weights.boar =(environment.moisture || 0)>0.50 ? 0.45 : 0.12;
-            return weights;
+            return MonsterMetabolismSystem.macrofaunaSpeciesWeightsForTerrain(this.world, terrainType);
         }
         chooseMacrofaunaSpeciesForTerrain(terrainType){
             var weights = this.macrofaunaSpeciesWeightsForTerrain(terrainType);
@@ -9958,10 +10117,9 @@ button:hover {
             return null;
         }
         estimateMacrofaunaCapacity(){
-            var availability = MonsterMetabolismSystem.macrofaunaAvailability(this.world);
-            var mapScale = Math.sqrt((this.world.width * this.world.height) /(REFERENCE_MAP_WIDTH * REFERENCE_MAP_HEIGHT));
-            var baseMax = Math.max(MACROFAUNA_COUNT_MIN, Math.round(MACROFAUNA_COUNT_MAX * availability * Clamp(mapScale, 0.55, 2.2)));
-            return Clamp(baseMax, 0, Math.max(1, Math.round(MACROFAUNA_COUNT_MAX * 2.4)));
+            var expectedCount = MonsterMetabolismSystem.expectedMacrofaunaCapacity(this.world);
+            var capacity = Math.round(expectedCount * 2-MACROFAUNA_COUNT_MIN);
+            return Clamp(capacity, 0, Math.max(1, Math.round(MACROFAUNA_COUNT_MAX * 2.4)));
         }
         createMacrofauna(){
             var animals = [];
@@ -9986,6 +10144,7 @@ button:hover {
                     continue;
                 }
                 var animal = new Macrofauna('macrofauna_'+(i+1), species, p.x, p.y, this.rng);
+                animal.applyEnvironmentAppearance(this.world);
                 if (animal.isInsideObstacle(this.world, animal.x, animal.y)){
                     continue;
                 }
@@ -12776,6 +12935,29 @@ button:hover {
         AddRegressionResult(results, 'Explorer movement is quieter than villager movement', soundRegressionRaid.agentMovementSoundLoudness(quietExplorer)<soundRegressionRaid.agentMovementSoundLoudness(normalVillager), 'explorer='+soundRegressionRaid.agentMovementSoundLoudness(quietExplorer)+', villager='+soundRegressionRaid.agentMovementSoundLoudness(normalVillager));
         var soundTarget = hearingMonster.chooseHeardSoundTarget(soundRegressionRaid);
         AddRegressionResult(results, 'Monster can choose an audible non-visible sound target', soundTarget && soundTarget.kind==='regressionLoud', 'target='+(soundTarget ? soundTarget.kind : 'none'));
+        var arcticEcologyWorld = WorldGenerator.createWorld(240012, {
+            mapSizeKey : 'legacy',
+            temperature : 0.08,
+            moisture : 0.55,
+            altitude : 0.62,
+            ruggedness : 0.32,
+            waterAbundance : 0.35,
+            vegetationDensity : 0.20,
+            customTreasureAmounts : {
+                bronze : 20
+            }
+        });
+        var arcticEcology = MonsterMetabolismSystem.macrofaunaEcologyProfile(arcticEcologyWorld);
+        AddRegressionResult(results, 'Macrofauna ecology profile is derived from actual species weights and includes polar bears in cold terrain', !!(arcticEcology.species && arcticEcology.species.polarBear && arcticEcology.species.polarBear.expectedFood>0), 'polarBearFood='+(arcticEcology.species && arcticEcology.species.polarBear ? arcticEcology.species.polarBear.expectedFood.toFixed(2) : 'none'));
+        var ecologyMetabolismProfile = MonsterGenePool.getWorldMetabolismSelectionProfile(arcticEcologyWorld);
+        AddRegressionResult(results, 'Metabolism natural selection profile carries the shared macrofauna ecology profile', ecologyMetabolismProfile.macrofaunaEcology===arcticEcology && ecologyMetabolismProfile.macrofaunaEcology.preyNiches.length>0, 'niches='+ecologyMetabolismProfile.macrofaunaEcology.preyNiches.map(function (niche){
+            return niche.species;
+        }).join(','));
+        var importedHare = new Macrofauna('arctic_hare_colour_regression', 'hare', arcticEcologyWorld.width * 0.5, arcticEcologyWorld.height * 0.5, new SeededRng(124));
+        importedHare.applyEnvironmentAppearance(arcticEcologyWorld);
+        AddRegressionResult(results, 'Hares in arctic regions use white winter colouring', importedHare.colour==='#f4f1df', 'colour='+importedHare.colour);
+        var polarBearWeights = MonsterMetabolismSystem.macrofaunaSpeciesWeightsForTerrain(arcticEcologyWorld, TERRAIN_TYPE.TUNDRA);
+        AddRegressionResult(results, 'Raid macrofauna generation and natural selection share the same macrofauna species-weight source', polarBearWeights.polarBear>0 && arcticEcology.species.polarBear.expectedFood>0, 'weight='+(polarBearWeights.polarBear || 0));
         var wildEntryMonster = new Monster('wild_entry_state', 0, 0, new SeededRng(424260), {
             owned : false,
             collared : false,
