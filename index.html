@@ -7339,41 +7339,25 @@ button:hover {
 
         pickAlleleForColourSlot(slotIndex, rng, profile){
             var pool = this.colourChromosomeSlots[slotIndex] || [];
-            var total = 0;
-            var weights = [];
-            for (var i = 0;
-            i<pool.length;
-            i+=1){
-                var weight = this.getWildColourWeight(pool[i], profile);
-                weights.push(weight);
-                total+=weight;
-            }
-            if (total<=0){
-                return pool[0];
-            }
-            var roll = rng.range(0, total);
-            var cumulative = 0;
-            for (i = 0;
-            i<pool.length;
-            i+=1){
-                cumulative+=weights[i];
-                if (roll<=cumulative){
-                    return pool[i];
-                }
-            }
-            return pool[pool.length-1];
+            var weights = this.getNaturalSelectionSlotWeights(pool, GENETIC_TRAIT.COLOUR, profile, GENETIC_TRAIT.COLOUR+':'+slotIndex);
+            return this.pickAlleleFromWeights(pool, weights, rng);
         }
 
         pickAlleleForMetabolismSlot(slotIndex, rng, profile){
             var pool = this.metabolismChromosomeSlots[slotIndex] || [];
+            var weights = this.getNaturalSelectionSlotWeights(pool, GENETIC_TRAIT.METABOLISM, profile, GENETIC_TRAIT.METABOLISM+':'+slotIndex);
+            return this.pickAlleleFromWeights(pool, weights, rng);
+        }
+
+        pickAlleleFromWeights(pool, weights, rng){
+            if (!pool || pool.length===0){
+                return null;
+            }
             var total = 0;
-            var weights = [];
             for (var i = 0;
             i<pool.length;
             i+=1){
-                var weight = this.getWildMetabolismWeight(pool[i], profile);
-                weights.push(weight);
-                total+=weight;
+                total+=weights[i] || 0;
             }
             if (total<=0){
                 return pool[0];
@@ -7383,7 +7367,7 @@ button:hover {
             for (i = 0;
             i<pool.length;
             i+=1){
-                cumulative+=weights[i];
+                cumulative+=weights[i] || 0;
                 if (roll<=cumulative){
                     return pool[i];
                 }
@@ -7391,13 +7375,89 @@ button:hover {
             return pool[pool.length-1];
         }
 
-        getWildMetabolismWeight(allele, profile){
-            if (!profile || !allele.selectionSensitive){
+        getNaturalSelectionSlotWeights(pool, traitKey, profile, cacheKey){
+            if (!pool || pool.length===0){
+                return [];
+            }
+            if (pool.length===1){
+                return [1];
+            }
+            if (profile && cacheKey){
+                profile.naturalSelectionSlotWeightCache = profile.naturalSelectionSlotWeightCache || {
+                } ;
+                if (profile.naturalSelectionSlotWeightCache[cacheKey]){
+                    return profile.naturalSelectionSlotWeightCache[cacheKey];
+                }
+            }
+            // Natural selection must be pool-context aware. Alleles are selected
+            // through the phenotype they would usually express when paired with
+            // likely partner alleles at the same locus, not through an isolated
+            // single-allele phenotype. This is what lets harmful recessive alleles
+            // persist when they are usually masked by locally common dominant
+            // alternatives, while dominant harmful alleles remain strongly exposed.
+            // Future AI maintainers: every new genetic trait selected in wild
+            // populations must use this pairwise dominance/codominance layer rather
+            // than scoring alleles as if they were always phenotypically visible.
+            var frequencies = [];
+            for (var i = 0;
+            i<pool.length;
+            i+=1){
+                frequencies.push(1 / pool.length);
+            }
+            for (var iteration = 0;
+            iteration<4;
+            iteration+=1){
+                var next = [];
+                var total = 0;
+                for (i = 0;
+                i<pool.length;
+                i+=1){
+                    var expectedFitness = 0;
+                    for (var j = 0;
+                    j<pool.length;
+                    j+=1){
+                        expectedFitness+=frequencies[j] * this.getAllelePairFitness(pool[i], pool[j], traitKey, profile);
+                    }
+                    expectedFitness = Math.max(0.0001, expectedFitness);
+                    next.push(expectedFitness);
+                    total+=expectedFitness;
+                }
+                if (total<=0){
+                    break;
+                }
+                for (i = 0;
+                i<next.length;
+                i+=1){
+                    next[i]/=total;
+                }
+                frequencies = next;
+            }
+            if (profile && cacheKey){
+                profile.naturalSelectionSlotWeightCache[cacheKey] = frequencies;
+            }
+            return frequencies;
+        }
+
+        getAllelePairFitness(alleleA, alleleB, traitKey, profile){
+            if (traitKey===GENETIC_TRAIT.COLOUR){
+                return this.getColourAllelePairFitness(alleleA, alleleB, profile);
+            }
+            if (traitKey===GENETIC_TRAIT.METABOLISM){
+                return this.getMetabolismAllelePairFitness(alleleA, alleleB, profile);
+            }
+            return 1;
+        }
+
+        getMetabolismAllelePairFitness(alleleA, alleleB, profile){
+            var context = new PhenotypeBuildContext();
+            ChromosomePair.expressAllelePair(alleleA, alleleB, context);
+            return this.getMetabolismPhenotypeFitness(MetabolismPhenotypeSystem.resolve(context), profile);
+        }
+
+        getMetabolismPhenotypeFitness(phenotype, profile){
+            if (!profile){
                 return 1;
             }
-            var context = new PhenotypeBuildContext();
-            allele.phenotype(context, false);
-            var phenotype = MetabolismPhenotypeSystem.resolve(context);
             var temperatures = profile.seasonTemperaturesC && profile.seasonTemperaturesC.length>0 ? profile.seasonTemperaturesC : [profile.currentTemperatureC];
             var logFitness = 0;
             for (var i = 0;
@@ -7423,15 +7483,17 @@ button:hover {
             return Math.max(0.0001, Math.exp(logFitness));
         }
 
-        getWildColourWeight(allele, profile){
-            if (!profile || !allele.selectionSensitive){
+        getColourAllelePairFitness(alleleA, alleleB, profile){
+            var context = new PhenotypeBuildContext();
+            ChromosomePair.expressAllelePair(alleleA, alleleB, context);
+            return this.getColourPhenotypeFitness(ColourPhenotypeSystem.resolve(context), profile);
+        }
+
+        getColourPhenotypeFitness(colour, profile){
+            if (!profile){
                 return 1;
             }
-            var context = new PhenotypeBuildContext();
-            allele.phenotype(context, false);
-            var colour = ColourPhenotypeSystem.resolve(context);
             var profiles = profile.terrainProfiles && profile.terrainProfiles.length>0 ? profile.terrainProfiles : [profile];
-            var dominanceExposure = Clamp(allele.dominanceIndex / DOMINANCE_DEFAULT, 0.05, 1.55);
             var selectionPressure = profile.selectionPressure || 14.0;
             var weightedFitness = 0;
             var totalWeight = 0;
@@ -7456,13 +7518,21 @@ button:hover {
                 } else{
                     mismatch = hueDelta * 0.56+luminanceDelta * 0.24+saturationDelta * 0.20;
                 }
-                weightedFitness+=terrainWeight * Math.exp(-selectionPressure * mismatch * dominanceExposure);
+                weightedFitness+=terrainWeight * Math.exp(-selectionPressure * mismatch);
                 totalWeight+=terrainWeight;
             }
             if (totalWeight<=0){
                 return 1;
             }
             return Math.max(0.0001, weightedFitness / totalWeight);
+        }
+
+        getWildMetabolismWeight(allele, profile){
+            return this.getMetabolismAllelePairFitness(allele, allele, profile);
+        }
+
+        getWildColourWeight(allele, profile){
+            return this.getColourAllelePairFitness(allele, allele, profile);
         }
 
         getWorldColourSelectionProfile(world){
@@ -11456,6 +11526,28 @@ button:hover {
             metabolism : MetabolismPhenotypeSystem.resolve(adiposeMetabolismContext)
         }, hotDiseaseProfile);
         AddRegressionResult(results, 'Natural-selection dry run penalises inherited adipose-fever disease risk', adiposeDiseaseFitness<ordinaryDiseaseFitness, 'ordinary='+ordinaryDiseaseFitness.toFixed(4)+', adipose='+adiposeDiseaseFitness.toFixed(4));
+        var dominantOrdinaryAllele = new MetabolicAllele(130, {
+            plumptin : 0,
+            heatTolerance : 8,
+            coldTolerance : 8
+        }, {
+            selectionSensitive : true,
+            debugLabel : 'dominant ordinary masking regression allele'
+        });
+        var recessiveAdiposeAllele = new MetabolicAllele(20, {
+            plumptin : 155,
+            heatTolerance : -10,
+            coldTolerance : 6
+        }, {
+            selectionSensitive : true,
+            debugLabel : 'recessive adipose masked regression allele'
+        });
+        var directDominantFitness = MonsterGenePool.getMetabolismAllelePairFitness(dominantOrdinaryAllele, dominantOrdinaryAllele, hotDiseaseProfile);
+        var directRecessiveFitness = MonsterGenePool.getMetabolismAllelePairFitness(recessiveAdiposeAllele, recessiveAdiposeAllele, hotDiseaseProfile);
+        var isolatedRecessiveShare = directRecessiveFitness /(directDominantFitness+directRecessiveFitness);
+        var relativeDominanceWeights = MonsterGenePool.getNaturalSelectionSlotWeights([dominantOrdinaryAllele,
+        recessiveAdiposeAllele], GENETIC_TRAIT.METABOLISM, hotDiseaseProfile);
+        AddRegressionResult(results, 'Relative-dominance natural selection masks harmful recessive alleles when dominant partners are likely', directRecessiveFitness<directDominantFitness && relativeDominanceWeights[1]>isolatedRecessiveShare && relativeDominanceWeights[1]<relativeDominanceWeights[0], 'isolatedShare='+isolatedRecessiveShare.toFixed(4)+', contextual='+relativeDominanceWeights[1].toFixed(4));
         var allGeneticDiseasesHaveSelectionModels = Object.keys(MonsterDiseaseSystem.definitions).every(function (diseaseId){
             var selection = MonsterDiseaseSystem.definitions[diseaseId].geneticSelection;
             return selection && typeof MonsterDiseaseSystem.geneticSelectionRiskModels[selection.riskModel]==='function';
