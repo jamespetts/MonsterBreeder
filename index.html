@@ -6010,6 +6010,10 @@ button:hover {
                     deathAt : 0.92,
                     deathChance : 0.10,
                     damageMultiplier : 1.12
+                } ,
+                geneticSelection : {
+                    riskModel : 'adiposeFeverMetabolic',
+                    selectionPressure : 5.0
                 }
             } ,
             wastingChill : {
@@ -6028,8 +6032,93 @@ button:hover {
                     deathAt : 0.94,
                     deathChance : 0.12,
                     damageMultiplier : 1.22
+                } ,
+                geneticSelection : {
+                    riskModel : 'wastingChillMetabolic',
+                    selectionPressure : 5.0
                 }
             }
+        } ,
+        // Genetic disease selection is the bridge from inherited phenotype to the
+        // pre-round natural-selection dry run. Every disease whose risk is affected
+        // by genes must add a geneticSelection entry above and a risk model below.
+        // Future AI maintainers: do not add a new inherited/genetic disease only to
+        // applySeasonalDiseaseProgression(). If genes make the disease more or less
+        // likely, add it here as well, otherwise wild allele frequencies will be
+        // biased by phenotype benefits without paying the inherited disease cost.
+        geneticSelectionRiskModels : {
+            adiposeFeverMetabolic : function (phenotype, profile){
+                var metabolism = phenotype && phenotype.metabolism ? phenotype.metabolism : null;
+                if (!metabolism){
+                    return 0;
+                }
+                var raw = metabolism.rawFactors || {
+                } ;
+                var temperatures = profile && profile.seasonTemperaturesC && profile.seasonTemperaturesC.length>0 ? profile.seasonTemperaturesC : [profile && profile.currentTemperatureC ? profile.currentTemperatureC : DEFAULT_COMFORTABLE_TEMPERATURE_C];
+                var heatStressTotal = 0;
+                for (var i = 0;
+                i<temperatures.length;
+                i+=1){
+                    heatStressTotal+=Math.max(0, temperatures[i]-metabolism.heatLimitC);
+                }
+                var meanHeatStress = heatStressTotal / Math.max(1, temperatures.length);
+                return Clamp(Math.max(0, metabolism.targetFatStorage-5.8) * 0.055+Math.max(0, (raw.plumptin || 0)-115) * 0.00075+meanHeatStress * 0.010, 0, 0.75);
+            } ,
+            wastingChillMetabolic : function (phenotype, profile){
+                var metabolism = phenotype && phenotype.metabolism ? phenotype.metabolism : null;
+                if (!metabolism){
+                    return 0;
+                }
+                var raw = metabolism.rawFactors || {
+                } ;
+                var temperatures = profile && profile.seasonTemperaturesC && profile.seasonTemperaturesC.length>0 ? profile.seasonTemperaturesC : [profile && profile.currentTemperatureC ? profile.currentTemperatureC : DEFAULT_COMFORTABLE_TEMPERATURE_C];
+                var coldStressTotal = 0;
+                for (var i = 0;
+                i<temperatures.length;
+                i+=1){
+                    coldStressTotal+=Math.max(0, metabolism.coldLimitC-temperatures[i]);
+                }
+                var meanColdStress = coldStressTotal / Math.max(1, temperatures.length);
+                return Clamp(Math.max(0, 1.1-metabolism.targetFatStorage) * 0.070+Math.max(0, -75-(raw.plumptin || 0)) * 0.00075+meanColdStress * 0.010, 0, 0.75);
+            }
+        } ,
+        geneticDiseaseSelectionLogFitness : function (phenotype, profile){
+            var logFitness = 0;
+            var definitions = this.definitions || {
+            } ;
+            Object.keys(definitions).forEach(function (diseaseId){
+                var definition = definitions[diseaseId];
+                var selection = definition.geneticSelection || null;
+                if (!selection || !selection.riskModel){
+                    return;
+                }
+                var model = MonsterDiseaseSystem.geneticSelectionRiskModels[selection.riskModel];
+                if (typeof model!=='function'){
+                    throw new Error('Missing genetic disease selection risk model for '+diseaseId+': '+selection.riskModel);
+                }
+                var risk = Clamp(model(phenotype, profile), 0, 1);
+                if (risk<=0){
+                    return;
+                }
+                var effects = definition.effects || {
+                } ;
+                var severity = Clamp(risk * 1.45, 0, 1);
+                var diseaseCost = Number.isFinite(selection.selectionPressure) ? selection.selectionPressure : 4.0;
+                if (Number.isFinite(effects.infertileAt) && severity>=effects.infertileAt){
+                    diseaseCost+=2.0;
+                }
+                if (Number.isFinite(effects.incapacitatedAt) && severity>=effects.incapacitatedAt){
+                    diseaseCost+=2.0;
+                }
+                if (Number.isFinite(effects.deathAt)){
+                    diseaseCost+=(effects.deathChance || 0) * 4.0;
+                }
+                logFitness-=risk * diseaseCost;
+            });
+            return logFitness;
+        } ,
+        geneticDiseaseSelectionFitnessMultiplier : function (phenotype, profile){
+            return Math.max(0.0001, Math.exp(this.geneticDiseaseSelectionLogFitness(phenotype, profile)));
         } ,
         fromSnapshot : function (snapshot){
             var definition = this.definitions[snapshot.id] || {
@@ -7328,6 +7417,9 @@ button:hover {
             logFitness/=Math.max(1, temperatures.length);
             var foodMismatch = Math.max(0, phenotype.baseMetabolicFood-(8.5+profile.macrofaunaAvailability * 4.0)) / 10;
             logFitness+=-2.5 * foodMismatch;
+            logFitness+=MonsterDiseaseSystem.geneticDiseaseSelectionLogFitness({
+                metabolism : phenotype
+            } , profile);
             return Math.max(0.0001, Math.exp(logFitness));
         }
 
@@ -11331,6 +11423,44 @@ button:hover {
         } );
         MonsterDiseaseSystem.addOrIntensify(diseaseMonster, 'adiposeFever', 0.82, 3);
         AddRegressionResult(results, 'Disease effect layer can incapacitate and block breeding/deployment', MonsterDiseaseSystem.combinedEffects(diseaseMonster).incapacitated && diseaseMonster.getDeploymentBlockReason().indexOf('Incapacitated')>=0 && diseaseMonster.getBreedingBlockReason().indexOf('infertile')>=0, 'effects='+JSON.stringify(MonsterDiseaseSystem.combinedEffects(diseaseMonster)));
+        var hotDiseaseProfile = {
+            currentTemperatureC : 29,
+            seasonTemperaturesC : [27,
+            29,
+            33,
+            25],
+            macrofaunaAvailability : 0.8
+        };
+        var ordinaryMetabolismContext = new PhenotypeBuildContext();
+        new MetabolicAllele(100, {
+            plumptin : 0,
+            heatTolerance : 8,
+            coldTolerance : 8
+        }, {
+            selectionSensitive : true,
+            debugLabel : 'ordinary disease selection regression allele'
+        }).phenotype(ordinaryMetabolismContext, false);
+        var adiposeMetabolismContext = new PhenotypeBuildContext();
+        new MetabolicAllele(100, {
+            plumptin : 155,
+            heatTolerance : -10,
+            coldTolerance : 6
+        }, {
+            selectionSensitive : true,
+            debugLabel : 'adipose disease selection regression allele'
+        }).phenotype(adiposeMetabolismContext, false);
+        var ordinaryDiseaseFitness = MonsterDiseaseSystem.geneticDiseaseSelectionFitnessMultiplier({
+            metabolism : MetabolismPhenotypeSystem.resolve(ordinaryMetabolismContext)
+        }, hotDiseaseProfile);
+        var adiposeDiseaseFitness = MonsterDiseaseSystem.geneticDiseaseSelectionFitnessMultiplier({
+            metabolism : MetabolismPhenotypeSystem.resolve(adiposeMetabolismContext)
+        }, hotDiseaseProfile);
+        AddRegressionResult(results, 'Natural-selection dry run penalises inherited adipose-fever disease risk', adiposeDiseaseFitness<ordinaryDiseaseFitness, 'ordinary='+ordinaryDiseaseFitness.toFixed(4)+', adipose='+adiposeDiseaseFitness.toFixed(4));
+        var allGeneticDiseasesHaveSelectionModels = Object.keys(MonsterDiseaseSystem.definitions).every(function (diseaseId){
+            var selection = MonsterDiseaseSystem.definitions[diseaseId].geneticSelection;
+            return selection && typeof MonsterDiseaseSystem.geneticSelectionRiskModels[selection.riskModel]==='function';
+        });
+        AddRegressionResult(results, 'All current genetic disease definitions participate in natural-selection dry-run scoring', allGeneticDiseasesHaveSelectionModels, 'diseases='+Object.keys(MonsterDiseaseSystem.definitions).join(','));
         function makeColourRegressionWorld(terrainType){
             return {
                 terrainGrid : {
