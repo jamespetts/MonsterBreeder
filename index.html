@@ -830,6 +830,11 @@ button:hover {
     var MACROFAUNA_WANDER_RETARGET_TICKS_MAX = 240;
     var MACROFAUNA_WANDER_TURN_LIMIT_RADIANS = Math.PI * 0.34;
     var DEPARTED_MACROFAUNA_TRACK_TICKS = 180;
+    var MONSTER_SERIOUS_FATIGUE_TICKS = 230;
+    var MONSTER_EXTREME_FATIGUE_TICKS = 470;
+    var MONSTER_FATAL_EXHAUSTION_TICKS = 780;
+    var BUSH_MOVEMENT_MIN_MULTIPLIER = 0.38;
+    var BUSH_HIDE_RANGE_SCALE = 0.50;
     var MICROFAUNA_EMITTER_COUNT_MIN = 8;
     var MICROFAUNA_EMITTER_COUNT_MAX = 18;
     var FOOD_EATING_TICKS_PER_FOOD = 45;
@@ -2800,6 +2805,7 @@ button:hover {
                     bigRocks : 1.2,
                     smallRocks : 1.0,
                     sticks : 10,
+                    bushes : 9.5,
                     microfauna : 3.0
                 } ;
             }
@@ -2809,6 +2815,7 @@ button:hover {
                     bigRocks : 0.8,
                     smallRocks : 1.4,
                     sticks : 3.0,
+                    bushes : 1.2,
                     microfauna : 2.2
                 } ;
             }
@@ -2818,6 +2825,7 @@ button:hover {
                     bigRocks : 7.0,
                     smallRocks : 8.0,
                     sticks : 0.4,
+                    bushes : 0.15,
                     microfauna : 0.6
                 } ;
             }
@@ -2827,6 +2835,7 @@ button:hover {
                     bigRocks : 0.2,
                     smallRocks : 0.3,
                     sticks : 1.8,
+                    bushes : 1.6,
                     microfauna : 5.0
                 } ;
             }
@@ -2836,6 +2845,7 @@ button:hover {
                     bigRocks : 2.0,
                     smallRocks : 3.0,
                     sticks : 0.3,
+                    bushes : 0,
                     microfauna : 0.8
                 } ;
             }
@@ -2845,6 +2855,7 @@ button:hover {
                     bigRocks : 1.6,
                     smallRocks : 3.8,
                     sticks : 0.1,
+                    bushes : 0,
                     microfauna : 0.3
                 } ;
             }
@@ -2854,6 +2865,7 @@ button:hover {
                     bigRocks : 0.7,
                     smallRocks : 1.2,
                     sticks : 0,
+                    bushes : 0,
                     microfauna : 0.1
                 } ;
             }
@@ -2862,6 +2874,7 @@ button:hover {
                 bigRocks : 0,
                 smallRocks : 0,
                 sticks : 0,
+                bushes : 0,
                 microfauna : 0
             } ;
         }
@@ -2872,6 +2885,7 @@ button:hover {
                 bigRocks : 0,
                 smallRocks : 0,
                 sticks : 0,
+                bushes : 0,
                 microfauna : 0
             } ;
             var tileAreaMillion =(grid.tileSize * grid.tileSize) / 1000000;
@@ -2892,6 +2906,7 @@ button:hover {
             var rockCount = densityCount('bigRocks', 0.20);
             var throwableRockCount = densityCount('smallRocks', 0.20);
             var stickCount = densityCount('sticks', 0.18);
+            var bushCount = densityCount('bushes', 0.20);
             var microfaunaCount = densityCount('microfauna', 0.15);
             var i;
             var p;
@@ -2935,6 +2950,17 @@ button:hover {
                 TERRAIN_TYPE.MARSH]);
                 if (p){
                     objects.push(new Stick('stick_'+i, p.x, p.y, rng));
+                }
+            }
+            for (i = 0;
+            i<bushCount;
+            i+=1){
+                p = World.findOpenPointByTerrain(rng, grid, objects, 42, true, [TERRAIN_TYPE.FOREST,
+                TERRAIN_TYPE.GRASS,
+                TERRAIN_TYPE.MARSH]);
+                if (p){
+                    var bushTerrain = grid.getTerrainTypeAtWorld(p.x, p.y);
+                    objects.push(new Bush('bush_'+i, p.x, p.y, rng, bushTerrain));
                 }
             }
             for (i = 0;
@@ -3305,6 +3331,69 @@ button:hover {
             this.damage = 5;
             this.blocksVisionAmount = 0;
             this.variant = rng.integer(0, 2);
+        }
+    }
+
+    function BushVisualProfileForTerrain(terrainType, variant){
+        if (terrainType===TERRAIN_TYPE.MARSH){
+            var marshProfiles = [
+                { kind : 'reed thicket', primary : '#789347', secondary : '#9a9d4f', dark : '#465d2e', light : '#b8b866', stem : '#d1b66a', hide : 0.54, vision : 0.46 },
+                { kind : 'willow scrub', primary : '#5d7f50', secondary : '#7d9c62', dark : '#3f5c3a', light : '#9dbc78', stem : '#6f5439', hide : 0.51, vision : 0.50 }
+            ];
+            return marshProfiles[variant % marshProfiles.length];
+        }
+        if (terrainType===TERRAIN_TYPE.GRASS){
+            var grassProfiles = [
+                { kind : 'hawthorn scrub', primary : '#5f7d3a', secondary : '#78934d', dark : '#3f5f2b', light : '#9ab365', stem : '#5e4226', hide : 0.60, vision : 0.34 },
+                { kind : 'gorse brake', primary : '#67751e', secondary : '#908f2c', dark : '#47541c', light : '#d8be38', stem : '#5b4b1e', hide : 0.62, vision : 0.32 },
+                { kind : 'low sallow scrub', primary : '#6a864e', secondary : '#849d62', dark : '#455f33', light : '#a4bd7a', stem : '#6b5635', hide : 0.58, vision : 0.36 }
+            ];
+            return grassProfiles[variant % grassProfiles.length];
+        }
+        var forestProfiles = [
+            { kind : 'bramble thicket', primary : '#2f5d35', secondary : '#406f3d', dark : '#203f28', light : '#5f8c4e', stem : '#4b3328', hide : 0.48, vision : 0.55 },
+            { kind : 'hazel coppice', primary : '#3f6b37', secondary : '#577c41', dark : '#2a4d2c', light : '#77a257', stem : '#6a4b2c', hide : 0.50, vision : 0.50 },
+            { kind : 'holly brake', primary : '#234f38', secondary : '#315f49', dark : '#173728', light : '#7ea35c', stem : '#3d3026', hide : 0.46, vision : 0.58 }
+        ];
+        return forestProfiles[variant % forestProfiles.length];
+    }
+
+    class Bush extends TerrainObject{
+        constructor(id, x, y, rng, terrainType){
+            var variant = rng.integer(0, 8);
+            var radius = terrainType===TERRAIN_TYPE.FOREST ? rng.range(20, 32) : (terrainType===TERRAIN_TYPE.MARSH ? rng.range(18, 28) : rng.range(15, 24));
+            super(id, 'bush', x, y, radius, false);
+            var profile = BushVisualProfileForTerrain(terrainType, variant);
+            this.blockingRadius = 0;
+            this.terrainType = terrainType;
+            this.bushKind = profile.kind;
+            this.primaryColour = profile.primary;
+            this.secondaryColour = profile.secondary;
+            this.darkColour = profile.dark;
+            this.lightColour = profile.light;
+            this.stemColour = profile.stem;
+            this.blocksVisionAmount = profile.vision;
+            this.visionBaseHeight = 0;
+            this.visionTopHeight = terrainType===TERRAIN_TYPE.GRASS ? Math.max(7, radius * 0.64) : (terrainType===TERRAIN_TYPE.MARSH ? Math.max(9, radius * 0.92) : Math.max(8, radius * 0.78));
+            this.movementMultiplier = terrainType===TERRAIN_TYPE.GRASS ? 0.58 : (terrainType===TERRAIN_TYPE.MARSH ? 0.46 : 0.42);
+            this.hideRangeScale = profile.hide;
+            this.variant = variant;
+            this.camouflageProfile = ColourProfileFromRgb(ParseHexColour(this.primaryColour, { r : 64, g : 96, b : 48 }));
+            this.camouflageProfile.terrainType = terrainType;
+        }
+        getSnapshot(){
+            var s = super.getSnapshot();
+            s.terrainType = this.terrainType;
+            s.bushKind = this.bushKind;
+            s.primaryColour = this.primaryColour;
+            s.secondaryColour = this.secondaryColour;
+            s.darkColour = this.darkColour;
+            s.lightColour = this.lightColour;
+            s.stemColour = this.stemColour;
+            s.movementMultiplier = this.movementMultiplier;
+            s.hideRangeScale = this.hideRangeScale;
+            s.camouflageProfile = this.camouflageProfile;
+            return s;
         }
     }
     // ============================================================================
@@ -4541,6 +4630,43 @@ button:hover {
             }
             return result;
         }
+        getNearbyBushes(x, y, queryRadius){
+            return this.getNearbyTerrainObjects(x, y, queryRadius).filter(function (object){
+                return object.type==='bush';
+            } );
+        }
+        getBushMovementMultiplierFor(agent, x, y){
+            var bushes = this.getNearbyBushes(x, y, Math.max(20, (agent.radius || 10)+34));
+            var multiplier = 1;
+            for (var i = 0; i<bushes.length; i+=1){
+                var bush = bushes[i];
+                if (Distance(x, y, bush.x, bush.y)<=bush.radius+(agent.radius || 10) * 0.35){
+                    var base = Number.isFinite(bush.movementMultiplier) ? bush.movementMultiplier : BUSH_MOVEMENT_MIN_MULTIPLIER;
+                    if (agent.agentKind==='adventurer' || (agent.agentKind==='macrofauna' && (agent.bodyMass || 0)>55)){
+                        base*=0.72;
+                    }
+                    multiplier = Math.min(multiplier, Clamp(base, 0.22, 1));
+                }
+            }
+            return multiplier;
+        }
+        getBushAtPoint(x, y, radius){
+            var bushes = this.getNearbyBushes(x, y, Math.max(20, radius || 20));
+            var best = null;
+            var bestDistance = Infinity;
+            for (var i = 0; i<bushes.length; i+=1){
+                var bush = bushes[i];
+                var distance = Distance(x, y, bush.x, bush.y);
+                if (distance<=bush.radius+(radius || 0) * 0.2 && distance<bestDistance){
+                    best = bush;
+                    bestDistance = distance;
+                }
+            }
+            return best;
+        }
+        pointIsInsideBush(x, y, radius){
+            return !!this.getBushAtPoint(x, y, radius);
+        }
         getNearbyBlockingTerrainObjects(x, y, agentRadius){
             var queryRadius = this.maxBlockingObstacleRadius+agentRadius+MOVEMENT_CLEARANCE_MARGIN;
             var minCx = Math.floor((x-queryRadius) / this.obstacleSpatialCellSize);
@@ -5339,7 +5465,8 @@ button:hover {
             if (movementCost>=9999){
                 return 0;
             }
-            return distance / Math.max(0.25, movementCost);
+            var bushMultiplier = world && typeof world.getBushMovementMultiplierFor==='function' ? world.getBushMovementMultiplierFor(this, tx, ty) : 1;
+            return distance * bushMultiplier / Math.max(0.25, movementCost);
         }
         recordProgressToward(oldDistance, newDistance){
             if (newDistance<oldDistance-0.05){
@@ -5511,6 +5638,11 @@ button:hover {
             var ownMultiplier = TerrainRules.visibilityRangeMultiplierFor(ownTerrain, ownSlope);
             var targetMultiplier = TerrainRules.visibilityRangeMultiplierFor(targetTerrain, targetSlope);
             range*=0.72+Math.min(ownMultiplier, targetMultiplier) * 0.28;
+            var targetBush = world && typeof world.getBushAtPoint==='function' && target ? world.getBushAtPoint(target.x, target.y, target.radius || 8) : null;
+            if (targetBush){
+                var colourScale = target.agentKind==='monster' && typeof target.getBushCamouflageVisibilityScale==='function' ? target.getBushCamouflageVisibilityScale(world, this, targetBush) : 1;
+                range*=Clamp((targetBush.hideRangeScale || BUSH_HIDE_RANGE_SCALE) * colourScale, 0.22, 0.92);
+            }
             return Math.max(VISIBILITY_CLOSE_RANGE, range);
         }
         terrainAndElevationAllowSight(world, target, distance){
@@ -5673,6 +5805,153 @@ button:hover {
             this.carriedWorldObjectWeight = 0;
             this.lastDamageTick = -9999;
             this.lastDamagePart = null;
+        }
+
+        getAgePugilinMultiplier(){
+            var age = this.ageInSeasons || 0;
+            var youngAdultStart = 8;
+            var youngAdultEnd = 22;
+            if (this.lifeStage===MONSTER_LIFE_STAGE.JUVENILE){
+                return 0.62;
+            }
+            if (age>=youngAdultStart && age<=youngAdultEnd){
+                return 1.12;
+            }
+            if (age>MONSTER_AGEING_START_SEASONS){
+                return Clamp(1-(age-MONSTER_AGEING_START_SEASONS) / Math.max(1, MONSTER_SENESCENT_START_SEASONS-MONSTER_AGEING_START_SEASONS) * 0.36, 0.56, 1);
+            }
+            return 1;
+        }
+        currentPugilinLevel(threat, injury, hunger){
+            var fatigueSuppression = Math.max(0, this.fatigueTicks || 0) / MONSTER_EXTREME_FATIGUE_TICKS * this.exhaustionPugilinSuppression;
+            var thermalSuppression = Math.max(0, this.thermalStress || 0) * 0.18 * this.thermalPugilinSuppression;
+            var malnutritionSuppression = this.nutritionState===NUTRITION_STATE.SEVERELY_MALNOURISHED ? 0.34 : (this.nutritionState===NUTRITION_STATE.MALNOURISHED ? 0.16 : 0);
+            return Clamp((this.pugilinBase || 1) * this.getAgePugilinMultiplier()+Math.max(0, threat || 0) * 0.45 * (this.pugilinThreatGain || 1)+Math.max(0, injury || 0) * 0.34 * (this.pugilinInjuryGain || 1)+Math.max(0, hunger || 0) * 0.38 * (this.pugilinHungerGain || 1)-fatigueSuppression-thermalSuppression-malnutritionSuppression, 0.05, 2.8);
+        }
+        currentCowardinLevel(threat, injury){
+            return Clamp((this.cowardinBase || 1)+Math.max(0, threat || 0) * 0.62 * (this.cowardinThreatGain || 1)+Math.max(0, injury || 0) * 0.34 * (this.cowardinInjuryGain || 1), 0.04, 3.0);
+        }
+        bodyPowerEstimate(){
+            return Math.max(1, (this.currentBodyMass || this.bodyScale * 100 || 100) * 0.45+(this.currentMuscleMass || 30) * 1.25+(this.currentBoneMass || 18) * (this.boneDensity || 1) * 0.8+(this.toothSize || 1) * 18+(this.spineSize || 0) * 28);
+        }
+        perceivedThreatOf(target){
+            if (!target){
+                return 0;
+            }
+            if (target.agentKind==='adventurer'){
+                var classThreat = target.className==='knight' ? 1.45 : (target.className==='warrior' ? 1.05 : (target.className==='explorer' ? 0.62 : 0.36));
+                var healthFactor = target.health / Math.max(1, target.maxHealth || target.health || 1);
+                return Clamp(classThreat * healthFactor+(target.strength || 0.5) * 0.25+(target.armour || 0) / 22, 0, 2.2);
+            }
+            if (target.agentKind==='macrofauna'){
+                var mass = Number.isFinite(target.bodyMass) ? target.bodyMass : Math.max(4, (target.radius || 10) * (target.radius || 10) * 0.35);
+                var relativeMass = mass / Math.max(1, this.currentBodyMass || 100);
+                var aggression = target.aggressionLevel || 0;
+                var health = target.health / Math.max(1, target.maxHealth || target.health || 1);
+                var spineDeterrence = Math.max(0, this.spineSize || 0) * 0.28;
+                return Clamp((relativeMass * 0.58+aggression * 0.95+health * 0.24-spineDeterrence) * (2-this.relativeSizeClarity * 0.42), 0, 2.4);
+            }
+            return 0;
+        }
+        shouldFleeThreat(threat){
+            if (!threat || !this.isActive()){
+                return false;
+            }
+            var injury = 1-this.getOverallConditionRatio();
+            var perceivedThreat = this.perceivedThreatOf(threat);
+            var hunger = Clamp(NutritionSystem.getFoodNeeded(this) / Math.max(1, this.nutritionRequirement || 10), 0, 1.6);
+            var pugilin = this.currentPugilinLevel(perceivedThreat, injury, hunger);
+            var cowardin = this.currentCowardinLevel(perceivedThreat, injury);
+            var risk = perceivedThreat * cowardin;
+            var resistance = pugilin * 0.78+Math.max(0, (this.currentBodyMass || 100) / 155) * 0.18+Math.max(0, this.spineSize || 0) * 0.13;
+            return risk-resistance>0.68;
+        }
+        findMostFrighteningVisibleThreat(raid){
+            var best = null;
+            var bestScore = 0;
+            var candidates = raid.adventurers.concat(raid.macrofauna);
+            for (var i = 0; i<candidates.length; i+=1){
+                var target = candidates[i];
+                if (!target.isActive || !target.isActive()){
+                    continue;
+                }
+                var distance = this.distanceTo(target);
+                if (distance>this.sightRange && distance>this.scentRange){
+                    continue;
+                }
+                if (distance<=VISIBILITY_CLOSE_RANGE || this.canSee(raid.world, target)){
+                    var score = this.perceivedThreatOf(target) * Clamp(1-distance / 900, 0.20, 1.0);
+                    if (score>bestScore){
+                        bestScore = score;
+                        best = target;
+                    }
+                }
+            }
+            return best;
+        }
+        fleeFromThreat(raid, threat){
+            var dx = this.x-threat.x;
+            var dy = this.y-threat.y;
+            var len = Math.max(1, Math.hypot(dx, dy));
+            var tx = Clamp(this.x+(dx / len) * 520, 0, raid.world.width);
+            var ty = Clamp(this.y+(dy / len) * 520, 0, raid.world.height);
+            this.behaviourState = 'fleeingFromThreat';
+            NutritionSystem.recordActivityTick(this, 0.95);
+            this.recordFatigueFromEffort(raid, 1.25);
+            this.moveWithPath(raid.world, tx, ty, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT * 1.12, this.id+'_flee_'+threat.id);
+        }
+        recordFatigueFromEffort(raid, effort){
+            var heatCold = Math.max(0, this.thermalStress || 0);
+            var nutritionPenalty = this.nutritionState===NUTRITION_STATE.SEVERELY_MALNOURISHED ? 1.7 : (this.nutritionState===NUTRITION_STATE.MALNOURISHED ? 1.28 : 1);
+            var tenacitinPush = Clamp(this.tenacitinBase || 1, 0.35, 2.2);
+            this.fatigueTicks = Math.max(0, (this.fatigueTicks || 0)+Math.max(0, effort || 0) * nutritionPenalty * (1+heatCold * 0.22) * tenacitinPush-0.24);
+            if (!this.seriousFatigueThisSeason && this.fatigueTicks>MONSTER_SERIOUS_FATIGUE_TICKS){
+                this.seriousFatigueThisSeason = true;
+                this.speed*=0.88;
+                if (raid){
+                    raid.addEvent(this.name+' became seriously fatigued.');
+                }
+            }
+            if (this.fatigueTicks>MONSTER_EXTREME_FATIGUE_TICKS && this.extremeFatigueSeasonsRemaining<=0){
+                this.extremeFatigueSeasonsRemaining = 2;
+                this.applyDamage(Math.max(2, Math.round((this.bodyHealth.maxTotal ? this.bodyHealth.maxTotal() : 60) * 0.08)), raid.rng, raid, this);
+                this.behaviourState = 'exhaustedInjury';
+                if (raid){
+                    raid.addEvent(this.name+' drove itself into an exhaustion injury.');
+                }
+            }
+            if (this.fatigueTicks>MONSTER_FATAL_EXHAUSTION_TICKS && raid && raid.rng.nextFloat()<0.0025 * Math.max(0.5, tenacitinPush-0.60)){
+                this.applyDamage(Math.max(8, Math.round((this.bodyHealth.maxTotal ? this.bodyHealth.maxTotal() : 60) * 0.22)), raid.rng, raid, this);
+                raid.addEvent(this.name+' nearly died from over-pursuit exhaustion.');
+            }
+        }
+        getBushCamouflageVisibilityScale(world, observer, bush){
+            var monsterProfile = MonsterPhenotypeColourProfile(this);
+            var hidingBush = bush || (world && typeof world.getBushAtPoint==='function' ? world.getBushAtPoint(this.x, this.y, this.radius || 8) : null);
+            if (!monsterProfile || !hidingBush){
+                return 1;
+            }
+            var bushProfile = hidingBush.camouflageProfile;
+            if (!bushProfile && hidingBush.primaryColour){
+                bushProfile = ColourProfileFromRgb(ParseHexColour(hidingBush.primaryColour, { r : 64, g : 96, b : 48 }));
+            }
+            if (!bushProfile){
+                return 1;
+            }
+            var mismatch = ColourProfileMismatch(monsterProfile, bushProfile);
+            return Clamp(0.64+mismatch * 0.76, 0.50, 1.42);
+        }
+        carcassContestStrength(carcass){
+            var condition = this.getOverallConditionRatio ? this.getOverallConditionRatio() : 1;
+            return (this.currentBodyMass || 90) * 0.42+(this.currentMuscleMass || 30) * 1.2+(this.toothSize || 1) * 10+(this.spineSize || 0) * 20+(this.domininBase || 1) * 18+this.currentPugilinLevel(0, 1-condition, Clamp(NutritionSystem.getFoodNeeded(this) / Math.max(1, this.nutritionRequirement || 10), 0, 1.6)) * 12-condition * -8;
+        }
+        targetPreyMorphologyScore(target){
+            if (!target){
+                return 0;
+            }
+            var size = target.agentKind==='macrofauna' ? Clamp((target.bodyMass || 35) / 120, 0.1, 2.4) : Clamp((target.strength || 0.5)+(target.armour || 0) / 18, 0.1, 2.1);
+            var speed = Clamp((target.speed || 90) / 130, 0.25, 1.8);
+            return size * (this.preyPowerPreference || 0)+speed * -(this.preyShapePreference || 0);
         }
         update(raid){
             if (!this.isActive()){
@@ -6484,6 +6763,8 @@ button:hover {
             monster.combatFoodRequired = 0;
             monster.healingFoodRequirementThisSeason = 0;
             monster.plannedHealingThisSeason = 0;
+            monster.seriousFatigueThisSeason = false;
+            monster.fatigueTicks = 0;
         } ,
         getTotalFoodThisSeason : function (monster){
             return(monster.foodEatenThisSeason || 0)+(monster.foodBoughtThisSeason || 0);
@@ -6714,7 +6995,8 @@ button:hover {
     var GENETIC_TRAIT = {
         COLOUR : 'colour',
         METABOLISM : 'metabolism',
-        MORPHOLOGY : 'morphology'
+        MORPHOLOGY : 'morphology',
+        BEHAVIOUR : 'behaviour'
     } ;
     var COLOUR_CHROMOSOME_INDEX = 0;
     var COLOUR_CHROMOSOME_SLOT_COUNT = 4;
@@ -6722,6 +7004,8 @@ button:hover {
     var METABOLISM_CHROMOSOME_SLOT_COUNT = 4;
     var MORPHOLOGY_CHROMOSOME_INDEX = 2;
     var MORPHOLOGY_CHROMOSOME_SLOT_COUNT = 6;
+    var BEHAVIOUR_CHROMOSOME_INDEX = 3;
+    var BEHAVIOUR_CHROMOSOME_SLOT_COUNT = 6;
     var IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR = 9.0;
     var DEFAULT_COMFORTABLE_TEMPERATURE_C = 12;
     var DEFAULT_BASE_THERMAL_LOW_C = -4;
@@ -6985,6 +7269,50 @@ button:hover {
             return result;
         }
     }
+
+    function CreateBehaviourHormoneEffectBag(){
+        return {
+            pugilin : 0,
+            cowardin : 0,
+            vigilin : 0,
+            tenacitin : 0,
+            dominin : 0,
+            umbratin : 0,
+            pugilinThreatGain : 0,
+            pugilinInjuryGain : 0,
+            pugilinHungerGain : 0,
+            cowardinThreatGain : 0,
+            cowardinInjuryGain : 0,
+            relativeSizeClarity : 0,
+            exhaustionPugilinSuppression : 0,
+            thermalPugilinSuppression : 0,
+            preyShapePreference : 0,
+            preyPowerPreference : 0
+        } ;
+    }
+    function AddBehaviourHormoneEffects(target, amounts, scale){
+        if (!target || !amounts){
+            return;
+        }
+        var multiplier = Number.isFinite(scale) ? scale : 1;
+        Object.keys(target).forEach(function (key){
+            target[key]+=(Number.isFinite(amounts[key]) ? amounts[key] : 0) * multiplier;
+        } );
+    }
+    function CloneBehaviourHormoneEffects(source){
+        var result = CreateBehaviourHormoneEffectBag();
+        AddBehaviourHormoneEffects(result, source, 1);
+        return result;
+    }
+    function CombineBehaviourHormoneBags(context){
+        var bag = context.getBehaviourEffectBag();
+        var result = CloneBehaviourHormoneEffects(bag.baseBehaviourHormones);
+        if (bag.usedCodominantBehaviourLayers){
+            AddBehaviourHormoneEffects(result, bag.codominantBehaviourLayers[0], 1);
+            AddBehaviourHormoneEffects(result, bag.codominantBehaviourLayers[1], 1);
+        }
+        return result;
+    }
     class MonsterPhenotypeExpressionContext{
         constructor(monster){
             this.monster = monster || null;
@@ -7000,6 +7328,7 @@ button:hover {
             this.getEffectBag(GENETIC_TRAIT.COLOUR, MonsterPhenotypeExpressionContext.createColourEffectBag);
             this.getEffectBag(GENETIC_TRAIT.METABOLISM, MonsterPhenotypeExpressionContext.createMetabolismEffectBag);
             this.getEffectBag(GENETIC_TRAIT.MORPHOLOGY, MonsterPhenotypeExpressionContext.createMorphologyEffectBag);
+            this.getEffectBag(GENETIC_TRAIT.BEHAVIOUR, MonsterPhenotypeExpressionContext.createBehaviourEffectBag);
         }
 
         static createColourEffectBag(){
@@ -7029,6 +7358,15 @@ button:hover {
             } ;
         }
 
+        static createBehaviourEffectBag(){
+            return {
+                baseBehaviourHormones : CreateBehaviourHormoneEffectBag(),
+                codominantBehaviourLayers : [CreateBehaviourHormoneEffectBag(),
+                CreateBehaviourHormoneEffectBag()],
+                usedCodominantBehaviourLayers : false
+            } ;
+        }
+
         getEffectBag(traitKey, factory){
             if (!traitKey){
                 throw new Error('MonsterPhenotypeExpressionContext.getEffectBag requires a trait key.');
@@ -7054,6 +7392,10 @@ button:hover {
             return this.getEffectBag(GENETIC_TRAIT.MORPHOLOGY, MonsterPhenotypeExpressionContext.createMorphologyEffectBag);
         }
 
+        getBehaviourEffectBag(){
+            return this.getEffectBag(GENETIC_TRAIT.BEHAVIOUR, MonsterPhenotypeExpressionContext.createBehaviourEffectBag);
+        }
+
         get usedCodominantSkinLayers(){
             return this.getColourEffectBag().usedCodominantSkinLayers;
         }
@@ -7064,6 +7406,10 @@ button:hover {
 
         get usedCodominantMorphologyLayers(){
             return this.getMorphologyEffectBag().usedCodominantMorphologyLayers;
+        }
+
+        get usedCodominantBehaviourLayers(){
+            return this.getBehaviourEffectBag().usedCodominantBehaviourLayers;
         }
 
         // normalise has no default value by design. Genetic maintainers must pass
@@ -7095,6 +7441,18 @@ button:hover {
                 throw new Error('Morphology allele phenotype methods must pass the normalise boolean explicitly.');
             }
             bag.baseMorphologyFactors.add(amounts);
+        }
+        addBehaviourHormones(amounts, normalise){
+            var bag = this.getBehaviourEffectBag();
+            if (normalise===true){
+                bag.usedCodominantBehaviourLayers = true;
+                AddBehaviourHormoneEffects(bag.codominantBehaviourLayers[this.activeCodominantLayerIndex], amounts, 1);
+                return;
+            }
+            if (normalise!==false){
+                throw new Error('Behaviour allele phenotype methods must pass the normalise boolean explicitly.');
+            }
+            AddBehaviourHormoneEffects(bag.baseBehaviourHormones, amounts, 1);
         }
         addSkinProteins(amounts, normalise){
             var bag = this.getColourEffectBag();
@@ -7192,6 +7550,22 @@ button:hover {
                 throw new Error('MorphologyAllele.phenotype requires an explicit normalise boolean.');
             }
             context.addMorphologyFactors(this.morphologyFactors, normalise);
+        }
+    }
+
+    class BehaviourAllele extends Allele{
+        constructor(dominanceIndex, hormoneEffects, options){
+            super(dominanceIndex, {
+                selectionSensitive : options && options.selectionSensitive!==undefined ? !!options.selectionSensitive : true,
+                debugLabel : options && options.debugLabel ? options.debugLabel : 'behaviour allele'
+            });
+            this.hormoneEffects = Object.assign(CreateBehaviourHormoneEffectBag(), hormoneEffects || {});
+        }
+        phenotype(context, normalise){
+            if (normalise!==true && normalise!==false){
+                throw new Error('BehaviourAllele.phenotype requires an explicit normalise boolean.');
+            }
+            context.addBehaviourHormones(this.hormoneEffects, normalise);
         }
     }
     class ChromosomePair{
@@ -7633,6 +8007,8 @@ button:hover {
                     preyRadius : macrofaunaProfile.radius || 0,
                     preySpeed : speedMid,
                     preyHealth : macrofaunaProfile.health || 0,
+                    preyBodyMass : Number.isFinite(macrofaunaProfile.bodyMass) ? macrofaunaProfile.bodyMass : Math.max(4, (macrofaunaProfile.radius || 10) * (macrofaunaProfile.radius || 10) * 0.35),
+                    aggressionLevel : Number.isFinite(macrofaunaProfile.aggressionLevel) ? macrofaunaProfile.aggressionLevel : Clamp((macrofaunaProfile.attackChance || 0) * 1.8+((macrofaunaProfile.attackDamageMin || 0)+(macrofaunaProfile.attackDamageMax || 0)) / 95+(macrofaunaProfile.humanFear || 0) * 0.16, 0, 1.25),
                     danger : danger,
                     aquatic : !!macrofaunaProfile.aquatic,
                     metabolicFoodAllowance : Clamp(speciesFood / 3.5, 0, 8)
@@ -7827,26 +8203,100 @@ button:hover {
             return MorphologyPhenotypeSystem.resolve(context);
         }
     }
+
+    class BehaviourGeneticTraitDefinition extends GeneticTraitDefinition{
+        constructor(){
+            super(GENETIC_TRAIT.BEHAVIOUR, BEHAVIOUR_CHROMOSOME_INDEX, BEHAVIOUR_CHROMOSOME_SLOT_COUNT);
+        }
+        createRandomChromosomePair(rng, genePool, world){
+            var profile = genePool.getWorldBehaviourSelectionProfile(world);
+            return genePool.createNaturallySelectedChromosomePair(this, rng, profile);
+        }
+        getSelectionAllelePools(genePool){
+            return genePool.behaviourChromosomeSlots;
+        }
+        createSelectionAccumulator(){
+            return CreateBehaviourHormoneEffectBag();
+        }
+        addAllelePairSelectionContributionToAccumulator(accumulator, alleleA, alleleB, scale){
+            var pairContext = new MonsterPhenotypeExpressionContext();
+            ChromosomePair.expressAllelePair(alleleA, alleleB, pairContext);
+            AddBehaviourHormoneEffects(accumulator, CombineBehaviourHormoneBags(pairContext), scale);
+        }
+        addSelectionAccumulatorToContext(context, accumulator){
+            context.addBehaviourHormones(accumulator, false);
+        }
+        resolveBehaviourPhenotype(context){
+            var h = CombineBehaviourHormoneBags(context);
+            var pugilinBase = Clamp(1+h.pugilin / 160, 0.38, 1.75);
+            var cowardinBase = Clamp(1+h.cowardin / 160, 0.32, 1.85);
+            var vigilinBase = Clamp(1+h.vigilin / 150, 0.38, 1.85);
+            var tenacitinBase = Clamp(1+h.tenacitin / 155, 0.36, 1.95);
+            var domininBase = Clamp(1+h.dominin / 150, 0.35, 1.85);
+            var umbratinBase = Clamp(1+h.umbratin / 150, 0.35, 1.85);
+            return {
+                behaviourSystem : 'monsterHormoneScalarResponsesV1',
+                hormones : {
+                    pugilinBase : pugilinBase,
+                    cowardinBase : cowardinBase,
+                    vigilinBase : vigilinBase,
+                    tenacitinBase : tenacitinBase,
+                    domininBase : domininBase,
+                    umbratinBase : umbratinBase
+                } ,
+                regulation : {
+                    pugilinThreatGain : Clamp(1+h.pugilinThreatGain / 145, 0.35, 1.90),
+                    pugilinInjuryGain : Clamp(1+h.pugilinInjuryGain / 145, 0.30, 1.90),
+                    pugilinHungerGain : Clamp(1+h.pugilinHungerGain / 145, 0.35, 1.80),
+                    cowardinThreatGain : Clamp(1+h.cowardinThreatGain / 145, 0.35, 1.95),
+                    cowardinInjuryGain : Clamp(1+h.cowardinInjuryGain / 145, 0.35, 1.90),
+                    relativeSizeClarity : Clamp(1+h.relativeSizeClarity / 150, 0.30, 1.95),
+                    exhaustionPugilinSuppression : Clamp(1+h.exhaustionPugilinSuppression / 170, 0.45, 1.85),
+                    thermalPugilinSuppression : Clamp(1+h.thermalPugilinSuppression / 170, 0.45, 1.85),
+                    preyShapePreference : Clamp(h.preyShapePreference / 140, -1.35, 1.35),
+                    preyPowerPreference : Clamp(h.preyPowerPreference / 140, -1.35, 1.35)
+                } ,
+                labels : {
+                    pugilin : pugilinBase>1.25 ? 'pugilin-rich' : (pugilinBase<0.75 ? 'low-pugilin' : 'balanced pugilin'),
+                    cowardin : cowardinBase>1.25 ? 'cowardin-rich' : (cowardinBase<0.75 ? 'low-cowardin' : 'balanced cowardin'),
+                    vigilin : vigilinBase>1.25 ? 'high-vigilin' : (vigilinBase<0.75 ? 'low-vigilin' : 'balanced vigilin'),
+                    tenacitin : tenacitinBase>1.30 ? 'tenacitin-driven' : (tenacitinBase<0.75 ? 'low-tenacitin' : 'balanced tenacitin')
+                } ,
+                rawHormones : h
+            } ;
+        }
+        scoreSelectionContext(context, profile, genePool){
+            return genePool.getBehaviourPhenotypeFitness(this.resolveBehaviourPhenotype(context), profile);
+        }
+        resolvePhenotype(context, monster){
+            return this.resolveBehaviourPhenotype(context);
+        }
+    }
     var MonsterMorphologyTraitDefinition = new MorphologyGeneticTraitDefinition();
     var MonsterColourTraitDefinition = new ColourGeneticTraitDefinition();
     var MonsterMetabolismTraitDefinition = new MetabolismGeneticTraitDefinition();
+    var MonsterBehaviourTraitDefinition = new BehaviourGeneticTraitDefinition();
     class GenePool{
         constructor(){
             this.traitDefinitions = [
                 MonsterColourTraitDefinition,
                 MonsterMetabolismTraitDefinition,
-                MonsterMorphologyTraitDefinition
+                MonsterMorphologyTraitDefinition,
+                MonsterBehaviourTraitDefinition
             ];
             this.chromosomeSlots = [];
             this.createChromosomeSlots(COLOUR_CHROMOSOME_INDEX, COLOUR_CHROMOSOME_SLOT_COUNT);
             this.createChromosomeSlots(METABOLISM_CHROMOSOME_INDEX, METABOLISM_CHROMOSOME_SLOT_COUNT);
             this.createChromosomeSlots(MORPHOLOGY_CHROMOSOME_INDEX, MORPHOLOGY_CHROMOSOME_SLOT_COUNT);
+            this.createChromosomeSlots(BEHAVIOUR_CHROMOSOME_INDEX, BEHAVIOUR_CHROMOSOME_SLOT_COUNT);
             this.colourChromosomeSlots = this.chromosomeSlots[COLOUR_CHROMOSOME_INDEX];
             this.metabolismChromosomeSlots = this.chromosomeSlots[METABOLISM_CHROMOSOME_INDEX];
             this.morphologyChromosomeSlots = this.chromosomeSlots[MORPHOLOGY_CHROMOSOME_INDEX];
+            this.behaviourChromosomeSlots = this.chromosomeSlots[BEHAVIOUR_CHROMOSOME_INDEX];
             this.addDefaultColourAlleles();
             this.addDefaultMetabolismAlleles();
             this.addDefaultMorphologyAlleles();
+            this.addDefaultBehaviourAlleles();
         }
 
         createChromosomeSlots(chromosomeIndex, slotCount){
@@ -7867,6 +8317,9 @@ button:hover {
             }
             if (chromosomeIndex===MORPHOLOGY_CHROMOSOME_INDEX){
                 return GENETIC_TRAIT.MORPHOLOGY;
+            }
+            if (chromosomeIndex===BEHAVIOUR_CHROMOSOME_INDEX){
+                return GENETIC_TRAIT.BEHAVIOUR;
             }
             throw new Error('Unknown gene pool chromosome index: '+chromosomeIndex);
         }
@@ -8167,6 +8620,9 @@ button:hover {
             }
             if (traitKey===GENETIC_TRAIT.MORPHOLOGY){
                 return this.getMorphologyAllelePairFitness(alleleA, alleleB, profile);
+            }
+            if (traitKey===GENETIC_TRAIT.BEHAVIOUR){
+                return this.getBehaviourAllelePairFitness(alleleA, alleleB, profile);
             }
             return 1;
         }
@@ -8668,6 +9124,91 @@ button:hover {
             return Math.max(0.0001, fitness);
         }
 
+
+        getWorldBehaviourSelectionProfile(world){
+            if (!world){
+                return null;
+            }
+            if (world.behaviourSelectionProfile){
+                return world.behaviourSelectionProfile;
+            }
+            var ecology = MonsterMetabolismSystem.macrofaunaEcologyProfile(world);
+            var environment = world.environment || {};
+            var dangerousFood = 0;
+            var totalFood = Math.max(0.1, ecology.expectedFood || 0.1);
+            (ecology.preyNiches || []).forEach(function (niche){
+                if ((niche.aggressionLevel || 0)>0.22 || (niche.danger || 0)>9){
+                    dangerousFood+=niche.expectedFood || 0;
+                }
+            });
+            world.behaviourSelectionProfile = {
+                macrofaunaEcology : ecology,
+                preyNiches : ecology.preyNiches || [],
+                expectedFood : ecology.expectedFood || 0,
+                dangerousPreyShare : Clamp(dangerousFood / totalFood, 0, 1),
+                vegetationDensity : Number.isFinite(environment.vegetationDensity) ? environment.vegetationDensity : 0.45,
+                moisture : Number.isFinite(environment.moisture) ? environment.moisture : 0.45,
+                aridity : Number.isFinite(environment.aridity) ? environment.aridity : 0.5,
+                temperature : Number.isFinite(environment.temperature) ? environment.temperature : 0.5,
+                naturalSelectionCandidateCount : 36,
+                naturalSelectionCandidatePower : 2.2
+            } ;
+            return world.behaviourSelectionProfile;
+        }
+
+        getBehaviourAllelePairFitness(alleleA, alleleB, profile){
+            var context = new MonsterPhenotypeExpressionContext();
+            ChromosomePair.expressAllelePair(alleleA, alleleB, context);
+            return this.getBehaviourPhenotypeFitness(MonsterBehaviourTraitDefinition.resolveBehaviourPhenotype(context), profile);
+        }
+
+        getBehaviourPhenotypeFitness(behaviour, profile){
+            if (!behaviour || !profile){
+                return 1;
+            }
+            var hormones = behaviour.hormones || {};
+            var regulation = behaviour.regulation || {};
+            var niches = profile.preyNiches || [];
+            var expectedFood = Math.max(0.1, profile.expectedFood || 0.1);
+            var dangerousShare = profile.dangerousPreyShare || 0;
+            var denseCover = Clamp((profile.vegetationDensity || 0) * 0.65+(profile.moisture || 0) * 0.25, 0, 1);
+            var weighted = 0;
+            var total = 0;
+            for (var i = 0; i<niches.length; i+=1){
+                var niche = niches[i];
+                var weight = Math.max(0, niche.expectedFood || niche.share || 0);
+                if (weight<=0){
+                    continue;
+                }
+                var preySpeed = niche.preySpeed || 100;
+                var preySize = Clamp((niche.preyBodyMass || (niche.preyRadius || 12) * 5) / 130, 0.18, 2.2);
+                var preyAggression = Clamp(niche.aggressionLevel || 0, 0, 1.4);
+                var risk = Clamp(preyAggression * 0.8+(niche.danger || 0) / 42+preySize * 0.12, 0, 1.8);
+                var desiredPugilin = Clamp(0.72+risk * 0.34+Math.max(0, preySpeed-90) / 360, 0.62, 1.52);
+                var desiredCowardin = Clamp(0.64+risk * 0.54, 0.52, 1.72);
+                var desiredVigilin = Clamp(0.76+Math.max(0, preySpeed-80) / 210+denseCover * 0.22, 0.60, 1.70);
+                var desiredTenacitin = Clamp(0.78+Math.max(0, preySpeed-95) / 240+(niche.foodValue || 0) / 72, 0.55, 1.75);
+                var fit = 1;
+                fit*=Math.exp(-Math.pow((hormones.pugilinBase || 1)-desiredPugilin, 2) * 1.15);
+                fit*=Math.exp(-Math.pow((hormones.cowardinBase || 1)-desiredCowardin, 2) * (risk>0.65 ? 1.35 : 0.65));
+                fit*=Math.exp(-Math.pow((hormones.vigilinBase || 1)-desiredVigilin, 2) * 0.74);
+                fit*=Math.exp(-Math.pow((hormones.tenacitinBase || 1)-desiredTenacitin, 2) * 0.78);
+                if (risk>0.8 && (regulation.relativeSizeClarity || 1)<0.72){
+                    fit*=0.62;
+                }
+                weighted+=weight * fit;
+                total+=weight;
+            }
+            var fitness = total>0 ? weighted / total : 0.72;
+            var overBoldDanger = Math.max(0, (hormones.pugilinBase || 1)-1.25) * Math.max(0, 0.85-(hormones.cowardinBase || 1)) * (0.35+dangerousShare);
+            fitness*=Math.exp(-2.0 * overBoldDanger);
+            var excessiveTenacitin = Math.max(0, (hormones.tenacitinBase || 1)-1.62);
+            fitness*=Math.exp(-0.75 * excessiveTenacitin * (0.65+dangerousShare));
+            var scarceFoodRestlessness = Math.max(0, (hormones.vigilinBase || 1)-1.25) * Math.max(0, 0.45-(profile.expectedFood || 0) / 18);
+            fitness*=Math.exp(-1.2 * scarceFoodRestlessness);
+            return Math.max(0.0001, fitness);
+        }
+
         addDefaultMorphologyAlleles(){
             var junk = (slot) => new Allele(DOMINANCE_DEFAULT, { selectionSensitive : false, debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, slot) });
             for (var slot = 0; slot<MORPHOLOGY_CHROMOSOME_SLOT_COUNT; slot+=1){
@@ -8692,6 +9233,30 @@ button:hover {
             this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(55, { spineSize : 138 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
             this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(100, { toothSize : 38 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
             this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(100, { toothSize : -28 }, { debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
+        }
+
+
+        addDefaultBehaviourAlleles(){
+            var junk = (slot) => new Allele(DOMINANCE_DEFAULT, { selectionSensitive : false, debugLabel : this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, slot) });
+            for (var slot = 0; slot<BEHAVIOUR_CHROMOSOME_SLOT_COUNT; slot+=1){
+                this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, slot, junk(slot));
+                this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, slot, junk(slot));
+            }
+            this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 0, new BehaviourAllele(100, { pugilin : -46, cowardin : 20, exhaustionPugilinSuppression : 20 }, { debugLabel : this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 0) }));
+            this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 0, new BehaviourAllele(100, { pugilin : 34, cowardin : -8, pugilinThreatGain : 16 }, { debugLabel : this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 0) }));
+            this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 0, new BehaviourAllele(35, { pugilin : 94, cowardin : -34, pugilinInjuryGain : 46, thermalPugilinSuppression : -22 }, { debugLabel : this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 0) }));
+            this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 1, new BehaviourAllele(100, { cowardin : 48, cowardinThreatGain : 42, relativeSizeClarity : 36 }, { debugLabel : this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 1) }));
+            this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 1, new BehaviourAllele(100, { cowardin : -32, pugilinThreatGain : 44, relativeSizeClarity : -18 }, { debugLabel : this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 1) }));
+            this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 2, new BehaviourAllele(100, { vigilin : 54, cowardinThreatGain : 18 }, { debugLabel : this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 2) }));
+            this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 2, new BehaviourAllele(100, { vigilin : -42, tenacitin : -8 }, { debugLabel : this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 2) }));
+            this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 2, new BehaviourAllele(45, { vigilin : 96, pugilinThreatGain : 28, cowardinThreatGain : -20 }, { debugLabel : this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 2) }));
+            this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 3, new BehaviourAllele(100, { tenacitin : 48, pugilinHungerGain : 18 }, { debugLabel : this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 3) }));
+            this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 3, new BehaviourAllele(100, { tenacitin : -38, cowardinInjuryGain : 18 }, { debugLabel : this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 3) }));
+            this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 3, new BehaviourAllele(40, { tenacitin : 126, exhaustionPugilinSuppression : -34 }, { debugLabel : this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 3) }));
+            this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 4, new BehaviourAllele(100, { dominin : 50, pugilinHungerGain : 18 }, { debugLabel : this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 4) }));
+            this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 4, new BehaviourAllele(100, { dominin : -42, cowardinThreatGain : 18 }, { debugLabel : this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 4) }));
+            this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 5, new BehaviourAllele(100, { umbratin : 58, vigilin : -8, preyShapePreference : -32 }, { debugLabel : this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 5) }));
+            this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 5, new BehaviourAllele(100, { umbratin : -28, vigilin : 18, preyPowerPreference : 34 }, { debugLabel : this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 5) }));
         }
 
         addDefaultMetabolismAlleles(){
@@ -9024,6 +9589,9 @@ button:hover {
             this.thermalStress = 0;
             this.currentSprintEnduranceTicks = 0;
             this.sprinting = false;
+            this.fatigueTicks = 0;
+            this.seriousFatigueThisSeason = false;
+            this.extremeFatigueSeasonsRemaining = options && Number.isFinite(options.extremeFatigueSeasonsRemaining) ? Math.max(0, Math.floor(options.extremeFatigueSeasonsRemaining)) : 0;
             this.healingFoodRequirementThisSeason = 0;
             this.plannedHealingThisSeason = 0;
             this.diseases = options && options.diseases ? options.diseases.map(function (disease){
@@ -9076,10 +9644,35 @@ button:hover {
                 }
             }
             this.phenotype = phenotype;
+            if (typeof this.applyBehaviourPhenotypeToRuntimeTraits==='function'){
+                this.applyBehaviourPhenotypeToRuntimeTraits();
+            }
         }
         applyPhenotypeToRuntimeTraits(options, rng){
             // Kept as a compatibility hook for future phenotype refreshes.
             // Construction initialises body state only after age/life-stage state exists.
+            this.applyBehaviourPhenotypeToRuntimeTraits();
+        }
+        applyBehaviourPhenotypeToRuntimeTraits(){
+            var behaviour = this.phenotype && this.phenotype.behaviour ? this.phenotype.behaviour : null;
+            var hormones = behaviour && behaviour.hormones ? behaviour.hormones : {};
+            var regulation = behaviour && behaviour.regulation ? behaviour.regulation : {};
+            this.pugilinBase = Number.isFinite(hormones.pugilinBase) ? hormones.pugilinBase : 1;
+            this.cowardinBase = Number.isFinite(hormones.cowardinBase) ? hormones.cowardinBase : 1;
+            this.vigilinBase = Number.isFinite(hormones.vigilinBase) ? hormones.vigilinBase : 1;
+            this.tenacitinBase = Number.isFinite(hormones.tenacitinBase) ? hormones.tenacitinBase : 1;
+            this.domininBase = Number.isFinite(hormones.domininBase) ? hormones.domininBase : 1;
+            this.umbratinBase = Number.isFinite(hormones.umbratinBase) ? hormones.umbratinBase : 1;
+            this.pugilinThreatGain = Number.isFinite(regulation.pugilinThreatGain) ? regulation.pugilinThreatGain : 1;
+            this.pugilinInjuryGain = Number.isFinite(regulation.pugilinInjuryGain) ? regulation.pugilinInjuryGain : 1;
+            this.pugilinHungerGain = Number.isFinite(regulation.pugilinHungerGain) ? regulation.pugilinHungerGain : 1;
+            this.cowardinThreatGain = Number.isFinite(regulation.cowardinThreatGain) ? regulation.cowardinThreatGain : 1;
+            this.cowardinInjuryGain = Number.isFinite(regulation.cowardinInjuryGain) ? regulation.cowardinInjuryGain : 1;
+            this.relativeSizeClarity = Number.isFinite(regulation.relativeSizeClarity) ? regulation.relativeSizeClarity : 1;
+            this.exhaustionPugilinSuppression = Number.isFinite(regulation.exhaustionPugilinSuppression) ? regulation.exhaustionPugilinSuppression : 1;
+            this.thermalPugilinSuppression = Number.isFinite(regulation.thermalPugilinSuppression) ? regulation.thermalPugilinSuppression : 1;
+            this.preyShapePreference = Number.isFinite(regulation.preyShapePreference) ? regulation.preyShapePreference : 0;
+            this.preyPowerPreference = Number.isFinite(regulation.preyPowerPreference) ? regulation.preyPowerPreference : 0;
         }
         initialiseBodyAndNutritionFields(options, rng){
             var settings = options || {};
@@ -9823,6 +10416,7 @@ button:hover {
                 this.alive = false;
                 this.corpseState = 'corpse';
                 this.behaviourState = 'dead';
+                this.edibleFoodRemaining = Math.max(this.edibleFoodRemaining || 0, Math.max(2, Math.round((this.currentBodyMass || 80) / 22)));
             }
             return part;
         }
@@ -9862,6 +10456,153 @@ button:hover {
             this.currentSprintEnduranceTicks = Math.min(maxTicks, this.currentSprintEnduranceTicks+0.35);
             return 1;
         }
+
+        getAgePugilinMultiplier(){
+            var age = this.ageInSeasons || 0;
+            var youngAdultStart = 8;
+            var youngAdultEnd = 22;
+            if (this.lifeStage===MONSTER_LIFE_STAGE.JUVENILE){
+                return 0.62;
+            }
+            if (age>=youngAdultStart && age<=youngAdultEnd){
+                return 1.12;
+            }
+            if (age>MONSTER_AGEING_START_SEASONS){
+                return Clamp(1-(age-MONSTER_AGEING_START_SEASONS) / Math.max(1, MONSTER_SENESCENT_START_SEASONS-MONSTER_AGEING_START_SEASONS) * 0.36, 0.56, 1);
+            }
+            return 1;
+        }
+        currentPugilinLevel(threat, injury, hunger){
+            var fatigueSuppression = Math.max(0, this.fatigueTicks || 0) / MONSTER_EXTREME_FATIGUE_TICKS * this.exhaustionPugilinSuppression;
+            var thermalSuppression = Math.max(0, this.thermalStress || 0) * 0.18 * this.thermalPugilinSuppression;
+            var malnutritionSuppression = this.nutritionState===NUTRITION_STATE.SEVERELY_MALNOURISHED ? 0.34 : (this.nutritionState===NUTRITION_STATE.MALNOURISHED ? 0.16 : 0);
+            return Clamp((this.pugilinBase || 1) * this.getAgePugilinMultiplier()+Math.max(0, threat || 0) * 0.45 * (this.pugilinThreatGain || 1)+Math.max(0, injury || 0) * 0.34 * (this.pugilinInjuryGain || 1)+Math.max(0, hunger || 0) * 0.38 * (this.pugilinHungerGain || 1)-fatigueSuppression-thermalSuppression-malnutritionSuppression, 0.05, 2.8);
+        }
+        currentCowardinLevel(threat, injury){
+            return Clamp((this.cowardinBase || 1)+Math.max(0, threat || 0) * 0.62 * (this.cowardinThreatGain || 1)+Math.max(0, injury || 0) * 0.34 * (this.cowardinInjuryGain || 1), 0.04, 3.0);
+        }
+        bodyPowerEstimate(){
+            return Math.max(1, (this.currentBodyMass || this.bodyScale * 100 || 100) * 0.45+(this.currentMuscleMass || 30) * 1.25+(this.currentBoneMass || 18) * (this.boneDensity || 1) * 0.8+(this.toothSize || 1) * 18+(this.spineSize || 0) * 28);
+        }
+        perceivedThreatOf(target){
+            if (!target){
+                return 0;
+            }
+            if (target.agentKind==='adventurer'){
+                var classThreat = target.className==='knight' ? 1.45 : (target.className==='warrior' ? 1.05 : (target.className==='explorer' ? 0.62 : 0.36));
+                var healthFactor = target.health / Math.max(1, target.maxHealth || target.health || 1);
+                return Clamp(classThreat * healthFactor+(target.strength || 0.5) * 0.25+(target.armour || 0) / 22, 0, 2.2);
+            }
+            if (target.agentKind==='macrofauna'){
+                var mass = Number.isFinite(target.bodyMass) ? target.bodyMass : Math.max(4, (target.radius || 10) * (target.radius || 10) * 0.35);
+                var relativeMass = mass / Math.max(1, this.currentBodyMass || 100);
+                var aggression = target.aggressionLevel || 0;
+                var health = target.health / Math.max(1, target.maxHealth || target.health || 1);
+                var spineDeterrence = Math.max(0, this.spineSize || 0) * 0.28;
+                return Clamp((relativeMass * 0.58+aggression * 0.95+health * 0.24-spineDeterrence) * (2-this.relativeSizeClarity * 0.42), 0, 2.4);
+            }
+            return 0;
+        }
+        shouldFleeThreat(threat){
+            if (!threat || !this.isActive()){
+                return false;
+            }
+            var injury = 1-this.getOverallConditionRatio();
+            var perceivedThreat = this.perceivedThreatOf(threat);
+            var hunger = Clamp(NutritionSystem.getFoodNeeded(this) / Math.max(1, this.nutritionRequirement || 10), 0, 1.6);
+            var pugilin = this.currentPugilinLevel(perceivedThreat, injury, hunger);
+            var cowardin = this.currentCowardinLevel(perceivedThreat, injury);
+            var risk = perceivedThreat * cowardin;
+            var resistance = pugilin * 0.78+Math.max(0, (this.currentBodyMass || 100) / 155) * 0.18+Math.max(0, this.spineSize || 0) * 0.13;
+            return risk-resistance>0.68;
+        }
+        findMostFrighteningVisibleThreat(raid){
+            var best = null;
+            var bestScore = 0;
+            var candidates = raid.adventurers.concat(raid.macrofauna);
+            for (var i = 0; i<candidates.length; i+=1){
+                var target = candidates[i];
+                if (!target.isActive || !target.isActive()){
+                    continue;
+                }
+                var distance = this.distanceTo(target);
+                if (distance>this.sightRange && distance>this.scentRange){
+                    continue;
+                }
+                if (distance<=VISIBILITY_CLOSE_RANGE || this.canSee(raid.world, target)){
+                    var score = this.perceivedThreatOf(target) * Clamp(1-distance / 900, 0.20, 1.0);
+                    if (score>bestScore){
+                        bestScore = score;
+                        best = target;
+                    }
+                }
+            }
+            return best;
+        }
+        fleeFromThreat(raid, threat){
+            var dx = this.x-threat.x;
+            var dy = this.y-threat.y;
+            var len = Math.max(1, Math.hypot(dx, dy));
+            var tx = Clamp(this.x+(dx / len) * 520, 0, raid.world.width);
+            var ty = Clamp(this.y+(dy / len) * 520, 0, raid.world.height);
+            this.behaviourState = 'fleeingFromThreat';
+            NutritionSystem.recordActivityTick(this, 0.95);
+            this.recordFatigueFromEffort(raid, 1.25);
+            this.moveWithPath(raid.world, tx, ty, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT * 1.12, this.id+'_flee_'+threat.id);
+        }
+        recordFatigueFromEffort(raid, effort){
+            var heatCold = Math.max(0, this.thermalStress || 0);
+            var nutritionPenalty = this.nutritionState===NUTRITION_STATE.SEVERELY_MALNOURISHED ? 1.7 : (this.nutritionState===NUTRITION_STATE.MALNOURISHED ? 1.28 : 1);
+            var tenacitinPush = Clamp(this.tenacitinBase || 1, 0.35, 2.2);
+            this.fatigueTicks = Math.max(0, (this.fatigueTicks || 0)+Math.max(0, effort || 0) * nutritionPenalty * (1+heatCold * 0.22) * tenacitinPush-0.24);
+            if (!this.seriousFatigueThisSeason && this.fatigueTicks>MONSTER_SERIOUS_FATIGUE_TICKS){
+                this.seriousFatigueThisSeason = true;
+                this.speed*=0.88;
+                if (raid){
+                    raid.addEvent(this.name+' became seriously fatigued.');
+                }
+            }
+            if (this.fatigueTicks>MONSTER_EXTREME_FATIGUE_TICKS && this.extremeFatigueSeasonsRemaining<=0){
+                this.extremeFatigueSeasonsRemaining = 2;
+                this.applyDamage(Math.max(2, Math.round((this.bodyHealth.maxTotal ? this.bodyHealth.maxTotal() : 60) * 0.08)), raid.rng, raid, this);
+                this.behaviourState = 'exhaustedInjury';
+                if (raid){
+                    raid.addEvent(this.name+' drove itself into an exhaustion injury.');
+                }
+            }
+            if (this.fatigueTicks>MONSTER_FATAL_EXHAUSTION_TICKS && raid && raid.rng.nextFloat()<0.0025 * Math.max(0.5, tenacitinPush-0.60)){
+                this.applyDamage(Math.max(8, Math.round((this.bodyHealth.maxTotal ? this.bodyHealth.maxTotal() : 60) * 0.22)), raid.rng, raid, this);
+                raid.addEvent(this.name+' nearly died from over-pursuit exhaustion.');
+            }
+        }
+        getBushCamouflageVisibilityScale(world, observer, bush){
+            var monsterProfile = MonsterPhenotypeColourProfile(this);
+            var hidingBush = bush || (world && typeof world.getBushAtPoint==='function' ? world.getBushAtPoint(this.x, this.y, this.radius || 8) : null);
+            if (!monsterProfile || !hidingBush){
+                return 1;
+            }
+            var bushProfile = hidingBush.camouflageProfile;
+            if (!bushProfile && hidingBush.primaryColour){
+                bushProfile = ColourProfileFromRgb(ParseHexColour(hidingBush.primaryColour, { r : 64, g : 96, b : 48 }));
+            }
+            if (!bushProfile){
+                return 1;
+            }
+            var mismatch = ColourProfileMismatch(monsterProfile, bushProfile);
+            return Clamp(0.64+mismatch * 0.76, 0.50, 1.42);
+        }
+        carcassContestStrength(carcass){
+            var condition = this.getOverallConditionRatio ? this.getOverallConditionRatio() : 1;
+            return (this.currentBodyMass || 90) * 0.42+(this.currentMuscleMass || 30) * 1.2+(this.toothSize || 1) * 10+(this.spineSize || 0) * 20+(this.domininBase || 1) * 18+this.currentPugilinLevel(0, 1-condition, Clamp(NutritionSystem.getFoodNeeded(this) / Math.max(1, this.nutritionRequirement || 10), 0, 1.6)) * 12-condition * -8;
+        }
+        targetPreyMorphologyScore(target){
+            if (!target){
+                return 0;
+            }
+            var size = target.agentKind==='macrofauna' ? Clamp((target.bodyMass || 35) / 120, 0.1, 2.4) : Clamp((target.strength || 0.5)+(target.armour || 0) / 18, 0.1, 2.1);
+            var speed = Clamp((target.speed || 90) / 130, 0.25, 1.8);
+            return size * (this.preyPowerPreference || 0)+speed * -(this.preyShapePreference || 0);
+        }
         update(raid){
             if (!this.isActive() || !this.deployed){
                 return;
@@ -9892,6 +10633,7 @@ button:hover {
                 if (this.distanceTo(preyTarget)>MONSTER_ATTACK_RANGE){
                     this.behaviourState = 'stalking';
                     NutritionSystem.recordActivityTick(this, 1.15);
+                    this.recordFatigueFromEffort(raid, 1.10);
                     this.moveWithPath(raid.world, preyTarget.x, preyTarget.y, this.speed * this.getSprintSpeedMultiplier(raid, preyTarget) * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT, this.id+'_hunt_'+preyTarget.id);
                 } else{
                     this.behaviourState = 'attacking';
@@ -9921,6 +10663,7 @@ button:hover {
             if (this.distanceTo(target)>MONSTER_ATTACK_RANGE){
                 this.behaviourState = 'stalking';
                 NutritionSystem.recordActivityTick(this, 1.0);
+                this.recordFatigueFromEffort(raid, 0.92);
                 this.moveWithPath(raid.world, target.x, target.y, this.speed * this.getSprintSpeedMultiplier(raid, target) * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT, this.id+'_'+target.id);
             } else{
                 this.behaviourState = 'attacking';
@@ -9944,6 +10687,11 @@ button:hover {
             this.behaviourState = 'eating';
             this.eatingTicksRemaining-=1;
             if (this.eatingTicksRemaining<=0){
+                if (!raid.monsterMayFeedFromCarcass(this, carcass)){
+                    this.eatingTargetId = null;
+                    this.eatingTicksRemaining = 0;
+                    return false;
+                }
                 if (NutritionSystem.consumeOneFoodFromCarcass(this, carcass)>0){
                     raid.addEvent(this.name+' ate from a carcass.');
                 }
@@ -10044,6 +10792,9 @@ button:hover {
             s.alive = !!this.alive;
             s.health = Number.isFinite(this.health) ? this.health : (this.bodyHealth ? this.bodyHealth.total() : 0);
             s.maxHealth = Number.isFinite(this.maxHealth) ? this.maxHealth : (this.bodyHealth ? this.bodyHealth.maxTotal() : 1);
+            s.fatigueTicks = this.fatigueTicks || 0;
+            s.seriousFatigueThisSeason = !!this.seriousFatigueThisSeason;
+            s.extremeFatigueSeasonsRemaining = this.extremeFatigueSeasonsRemaining || 0;
             s.name = this.collared || this.owned ? this.name : '';
             s.owned = this.owned;
             s.collared = this.collared;
@@ -10297,6 +11048,8 @@ button:hover {
             this.maxHealth = profile.health;
             this.health = profile.health;
             this.foodValue = profile.foodValue;
+            this.bodyMass = Number.isFinite(profile.bodyMass) ? profile.bodyMass : Math.max(4, profile.radius * profile.radius * 0.35);
+            this.aggressionLevel = Number.isFinite(profile.aggressionLevel) ? profile.aggressionLevel : Clamp((profile.attackChance || 0) * 1.8+((profile.attackDamageMin || 0)+(profile.attackDamageMax || 0)) / 95+(profile.humanFear || 0) * 0.16, 0, 1.25);
             this.edibleFoodRemaining = 0;
             this.fleesHumans = profile.fleesHumans!==false;
             this.humanFleeChance = profile.humanFleeChance || 0;
@@ -10386,6 +11139,153 @@ button:hover {
             }
             return terrainType!==TERRAIN_TYPE.LAKE && terrainType!==TERRAIN_TYPE.STREAM;
         }
+
+        getAgePugilinMultiplier(){
+            var age = this.ageInSeasons || 0;
+            var youngAdultStart = 8;
+            var youngAdultEnd = 22;
+            if (this.lifeStage===MONSTER_LIFE_STAGE.JUVENILE){
+                return 0.62;
+            }
+            if (age>=youngAdultStart && age<=youngAdultEnd){
+                return 1.12;
+            }
+            if (age>MONSTER_AGEING_START_SEASONS){
+                return Clamp(1-(age-MONSTER_AGEING_START_SEASONS) / Math.max(1, MONSTER_SENESCENT_START_SEASONS-MONSTER_AGEING_START_SEASONS) * 0.36, 0.56, 1);
+            }
+            return 1;
+        }
+        currentPugilinLevel(threat, injury, hunger){
+            var fatigueSuppression = Math.max(0, this.fatigueTicks || 0) / MONSTER_EXTREME_FATIGUE_TICKS * this.exhaustionPugilinSuppression;
+            var thermalSuppression = Math.max(0, this.thermalStress || 0) * 0.18 * this.thermalPugilinSuppression;
+            var malnutritionSuppression = this.nutritionState===NUTRITION_STATE.SEVERELY_MALNOURISHED ? 0.34 : (this.nutritionState===NUTRITION_STATE.MALNOURISHED ? 0.16 : 0);
+            return Clamp((this.pugilinBase || 1) * this.getAgePugilinMultiplier()+Math.max(0, threat || 0) * 0.45 * (this.pugilinThreatGain || 1)+Math.max(0, injury || 0) * 0.34 * (this.pugilinInjuryGain || 1)+Math.max(0, hunger || 0) * 0.38 * (this.pugilinHungerGain || 1)-fatigueSuppression-thermalSuppression-malnutritionSuppression, 0.05, 2.8);
+        }
+        currentCowardinLevel(threat, injury){
+            return Clamp((this.cowardinBase || 1)+Math.max(0, threat || 0) * 0.62 * (this.cowardinThreatGain || 1)+Math.max(0, injury || 0) * 0.34 * (this.cowardinInjuryGain || 1), 0.04, 3.0);
+        }
+        bodyPowerEstimate(){
+            return Math.max(1, (this.currentBodyMass || this.bodyScale * 100 || 100) * 0.45+(this.currentMuscleMass || 30) * 1.25+(this.currentBoneMass || 18) * (this.boneDensity || 1) * 0.8+(this.toothSize || 1) * 18+(this.spineSize || 0) * 28);
+        }
+        perceivedThreatOf(target){
+            if (!target){
+                return 0;
+            }
+            if (target.agentKind==='adventurer'){
+                var classThreat = target.className==='knight' ? 1.45 : (target.className==='warrior' ? 1.05 : (target.className==='explorer' ? 0.62 : 0.36));
+                var healthFactor = target.health / Math.max(1, target.maxHealth || target.health || 1);
+                return Clamp(classThreat * healthFactor+(target.strength || 0.5) * 0.25+(target.armour || 0) / 22, 0, 2.2);
+            }
+            if (target.agentKind==='macrofauna'){
+                var mass = Number.isFinite(target.bodyMass) ? target.bodyMass : Math.max(4, (target.radius || 10) * (target.radius || 10) * 0.35);
+                var relativeMass = mass / Math.max(1, this.currentBodyMass || 100);
+                var aggression = target.aggressionLevel || 0;
+                var health = target.health / Math.max(1, target.maxHealth || target.health || 1);
+                var spineDeterrence = Math.max(0, this.spineSize || 0) * 0.28;
+                return Clamp((relativeMass * 0.58+aggression * 0.95+health * 0.24-spineDeterrence) * (2-this.relativeSizeClarity * 0.42), 0, 2.4);
+            }
+            return 0;
+        }
+        shouldFleeThreat(threat){
+            if (!threat || !this.isActive()){
+                return false;
+            }
+            var injury = 1-this.getOverallConditionRatio();
+            var perceivedThreat = this.perceivedThreatOf(threat);
+            var hunger = Clamp(NutritionSystem.getFoodNeeded(this) / Math.max(1, this.nutritionRequirement || 10), 0, 1.6);
+            var pugilin = this.currentPugilinLevel(perceivedThreat, injury, hunger);
+            var cowardin = this.currentCowardinLevel(perceivedThreat, injury);
+            var risk = perceivedThreat * cowardin;
+            var resistance = pugilin * 0.78+Math.max(0, (this.currentBodyMass || 100) / 155) * 0.18+Math.max(0, this.spineSize || 0) * 0.13;
+            return risk-resistance>0.68;
+        }
+        findMostFrighteningVisibleThreat(raid){
+            var best = null;
+            var bestScore = 0;
+            var candidates = raid.adventurers.concat(raid.macrofauna);
+            for (var i = 0; i<candidates.length; i+=1){
+                var target = candidates[i];
+                if (!target.isActive || !target.isActive()){
+                    continue;
+                }
+                var distance = this.distanceTo(target);
+                if (distance>this.sightRange && distance>this.scentRange){
+                    continue;
+                }
+                if (distance<=VISIBILITY_CLOSE_RANGE || this.canSee(raid.world, target)){
+                    var score = this.perceivedThreatOf(target) * Clamp(1-distance / 900, 0.20, 1.0);
+                    if (score>bestScore){
+                        bestScore = score;
+                        best = target;
+                    }
+                }
+            }
+            return best;
+        }
+        fleeFromThreat(raid, threat){
+            var dx = this.x-threat.x;
+            var dy = this.y-threat.y;
+            var len = Math.max(1, Math.hypot(dx, dy));
+            var tx = Clamp(this.x+(dx / len) * 520, 0, raid.world.width);
+            var ty = Clamp(this.y+(dy / len) * 520, 0, raid.world.height);
+            this.behaviourState = 'fleeingFromThreat';
+            NutritionSystem.recordActivityTick(this, 0.95);
+            this.recordFatigueFromEffort(raid, 1.25);
+            this.moveWithPath(raid.world, tx, ty, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT * 1.12, this.id+'_flee_'+threat.id);
+        }
+        recordFatigueFromEffort(raid, effort){
+            var heatCold = Math.max(0, this.thermalStress || 0);
+            var nutritionPenalty = this.nutritionState===NUTRITION_STATE.SEVERELY_MALNOURISHED ? 1.7 : (this.nutritionState===NUTRITION_STATE.MALNOURISHED ? 1.28 : 1);
+            var tenacitinPush = Clamp(this.tenacitinBase || 1, 0.35, 2.2);
+            this.fatigueTicks = Math.max(0, (this.fatigueTicks || 0)+Math.max(0, effort || 0) * nutritionPenalty * (1+heatCold * 0.22) * tenacitinPush-0.24);
+            if (!this.seriousFatigueThisSeason && this.fatigueTicks>MONSTER_SERIOUS_FATIGUE_TICKS){
+                this.seriousFatigueThisSeason = true;
+                this.speed*=0.88;
+                if (raid){
+                    raid.addEvent(this.name+' became seriously fatigued.');
+                }
+            }
+            if (this.fatigueTicks>MONSTER_EXTREME_FATIGUE_TICKS && this.extremeFatigueSeasonsRemaining<=0){
+                this.extremeFatigueSeasonsRemaining = 2;
+                this.applyDamage(Math.max(2, Math.round((this.bodyHealth.maxTotal ? this.bodyHealth.maxTotal() : 60) * 0.08)), raid.rng, raid, this);
+                this.behaviourState = 'exhaustedInjury';
+                if (raid){
+                    raid.addEvent(this.name+' drove itself into an exhaustion injury.');
+                }
+            }
+            if (this.fatigueTicks>MONSTER_FATAL_EXHAUSTION_TICKS && raid && raid.rng.nextFloat()<0.0025 * Math.max(0.5, tenacitinPush-0.60)){
+                this.applyDamage(Math.max(8, Math.round((this.bodyHealth.maxTotal ? this.bodyHealth.maxTotal() : 60) * 0.22)), raid.rng, raid, this);
+                raid.addEvent(this.name+' nearly died from over-pursuit exhaustion.');
+            }
+        }
+        getBushCamouflageVisibilityScale(world, observer, bush){
+            var monsterProfile = MonsterPhenotypeColourProfile(this);
+            var hidingBush = bush || (world && typeof world.getBushAtPoint==='function' ? world.getBushAtPoint(this.x, this.y, this.radius || 8) : null);
+            if (!monsterProfile || !hidingBush){
+                return 1;
+            }
+            var bushProfile = hidingBush.camouflageProfile;
+            if (!bushProfile && hidingBush.primaryColour){
+                bushProfile = ColourProfileFromRgb(ParseHexColour(hidingBush.primaryColour, { r : 64, g : 96, b : 48 }));
+            }
+            if (!bushProfile){
+                return 1;
+            }
+            var mismatch = ColourProfileMismatch(monsterProfile, bushProfile);
+            return Clamp(0.64+mismatch * 0.76, 0.50, 1.42);
+        }
+        carcassContestStrength(carcass){
+            var condition = this.getOverallConditionRatio ? this.getOverallConditionRatio() : 1;
+            return (this.currentBodyMass || 90) * 0.42+(this.currentMuscleMass || 30) * 1.2+(this.toothSize || 1) * 10+(this.spineSize || 0) * 20+(this.domininBase || 1) * 18+this.currentPugilinLevel(0, 1-condition, Clamp(NutritionSystem.getFoodNeeded(this) / Math.max(1, this.nutritionRequirement || 10), 0, 1.6)) * 12-condition * -8;
+        }
+        targetPreyMorphologyScore(target){
+            if (!target){
+                return 0;
+            }
+            var size = target.agentKind==='macrofauna' ? Clamp((target.bodyMass || 35) / 120, 0.1, 2.4) : Clamp((target.strength || 0.5)+(target.armour || 0) / 18, 0.1, 2.1);
+            var speed = Clamp((target.speed || 90) / 130, 0.25, 1.8);
+            return size * (this.preyPowerPreference || 0)+speed * -(this.preyShapePreference || 0);
+        }
         update(raid){
             if (!this.isActive()){
                 return;
@@ -10396,7 +11296,13 @@ button:hover {
             var speedMultiplier = 1;
             var targetX;
             var targetY;
-            if (monsterThreat && this.distanceTo(monsterThreat)<=MACROFAUNA_FLEE_RANGE){
+            var hidingBush = monsterThreat ? this.findBushHideTarget(raid, monsterThreat) : null;
+            if (hidingBush){
+                this.behaviourState = 'hidingInBush';
+                targetX = hidingBush.x;
+                targetY = hidingBush.y;
+                speedMultiplier = 1.08;
+            } else if (monsterThreat && this.distanceTo(monsterThreat)<=MACROFAUNA_FLEE_RANGE){
                 this.behaviourState = 'fleeingFromMonster';
                 var mdx = this.x-monsterThreat.x;
                 var mdy = this.y-monsterThreat.y;
@@ -10467,6 +11373,28 @@ button:hover {
                 if (distance<bestDistance){
                     bestDistance = distance;
                     best = candidates[i];
+                }
+            }
+            return best;
+        }
+        findBushHideTarget(raid, threat){
+            if (this.bodyMass>34 || !raid || !raid.world || !raid.world.getNearbyBushes || !threat){
+                return null;
+            }
+            if (this.distanceTo(threat)>MACROFAUNA_FLEE_RANGE * 1.15){
+                return null;
+            }
+            var bushes = raid.world.getNearbyBushes(this.x, this.y, 260);
+            var best = null;
+            var bestScore = -Infinity;
+            for (var i = 0; i<bushes.length; i+=1){
+                var bush = bushes[i];
+                var distanceToBush = Distance(this.x, this.y, bush.x, bush.y);
+                var distanceFromThreat = Distance(threat.x, threat.y, bush.x, bush.y);
+                var score = distanceFromThreat-distanceToBush * 0.65+bush.blocksVisionAmount * 120;
+                if (score>bestScore){
+                    bestScore = score;
+                    best = bush;
                 }
             }
             return best;
@@ -11246,8 +12174,23 @@ button:hover {
             }
             return wildMonsters;
         }
+        monsterMayFeedFromCarcass(monster, carcass){
+            if (!monster || !carcass){
+                return false;
+            }
+            var contenders = this.monsters.filter(function (candidate){
+                return candidate.isActive && candidate.isActive() && candidate.eatingTargetId===carcass.id && candidate.distanceTo(carcass)<=MONSTER_ATTACK_RANGE * 1.6;
+            });
+            if (contenders.length<=3){
+                return true;
+            }
+            contenders.sort(function (a, b){
+                return b.carcassContestStrength(carcass)-a.carcassContestStrength(carcass);
+            });
+            return contenders.slice(0, 3).indexOf(monster)>=0;
+        }
         getEdibleCarcasses(){
-            return this.adventurers.concat(this.macrofauna).filter(function (agent){
+            return this.adventurers.concat(this.macrofauna).concat(this.monsters).filter(function (agent){
                 return NutritionSystem.canFeedOnCarcass(agent);
             } );
         }
@@ -11556,6 +12499,9 @@ button:hover {
                 return SOUND_LOUDNESS.MEDIUM;
             }
             if (this.agentIsUnderAutumnTree(agent)){
+                return SOUND_LOUDNESS.MEDIUM;
+            }
+            if (this.world && typeof this.world.pointIsInsideBush==='function' && this.world.pointIsInsideBush(agent.x, agent.y, agent.radius || 8)){
                 return SOUND_LOUDNESS.MEDIUM;
             }
             return 0;
@@ -12001,8 +12947,51 @@ button:hover {
             }
             return best;
         }
+
+        resolveMacrofaunaMonsterPredation(){
+            for (var i = 0; i<this.macrofauna.length; i+=1){
+                var animal = this.macrofauna[i];
+                if (!animal.isActive || !animal.isActive() || (animal.aggressionLevel || 0)<0.72 || animal.attackCooldownTicks>0){
+                    continue;
+                }
+                for (var j = 0; j<this.monsters.length; j+=1){
+                    var monster = this.monsters[j];
+                    if (!monster.isActive || !monster.isActive() || !monster.deployed || animal.distanceTo(monster)>MONSTER_ATTACK_RANGE * 1.25){
+                        continue;
+                    }
+                    var monsterMass = monster.currentBodyMass || 100;
+                    var animalMass = animal.bodyMass || 80;
+                    var spineDeterrence = Math.max(0, monster.spineSize || 0) * 0.42;
+                    var predationPressure = (animal.aggressionLevel || 0) * (animalMass / Math.max(1, monsterMass)) * (1.18-spineDeterrence);
+                    if (predationPressure>0.92 || (animal.species==='polarBear' && predationPressure>0.64)){
+                        this.resolveMacrofaunaMonsterCounterattack(animal, monster);
+                        break;
+                    }
+                }
+            }
+        }
+        resolveMacrofaunaMonsterCounterattack(animal, monster){
+            if (!animal || !monster || !animal.isActive || !animal.isActive() || !monster.isActive || !monster.isActive() || animal.attackCooldownTicks>0){
+                return;
+            }
+            var aggression = animal.aggressionLevel || 0;
+            if (aggression<=0.05){
+                return;
+            }
+            var spineDeterrence = Math.max(0, monster.spineSize || 0) * 0.18;
+            var hitChance = Clamp((animal.attackChance || 0.12)+aggression * 0.22-spineDeterrence, 0.04, 0.82);
+            animal.attackCooldownTicks = COMBAT_COOLDOWN_TICKS * 2;
+            if (this.rng.nextFloat()<=hitChance){
+                var minDamage = Math.max(1, animal.attackDamageMin || Math.round((animal.bodyMass || 40) / 9));
+                var maxDamage = Math.max(minDamage, animal.attackDamageMax || Math.round((animal.bodyMass || 40) / 5));
+                monster.applyDamage(this.rng.integer(minDamage, maxDamage), this.rng, this, animal);
+                this.addSound('macrofaunaAttack', animal, animal.x, animal.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
+                this.addEvent('A '+animal.displayName+' injured '+monster.name+'.');
+            }
+        }
         resolveCombat(){
             this.resolveMacrofaunaHumanCombat();
+            this.resolveMacrofaunaMonsterPredation();
             for (var i = 0;
             i<this.monsters.length;
             i+=1){
@@ -12068,6 +13057,7 @@ button:hover {
                             animal.applyDamage(monster.getMeleeDamageAgainst(animal, this.rng), this, monster);
                             monster.recordAttackPerformance(Math.max(0, animalHealthBefore-animal.health), animalWasAlive && !animal.isActive());
                             this.addEvent(monster.name+' attacked a '+animal.displayName+'.');
+                            this.resolveMacrofaunaMonsterCounterattack(animal, monster);
                             if (!animal.alive){
                                 this.addEvent('A '+animal.displayName+' was killed and became edible carrion.');
                             }
@@ -14167,6 +15157,58 @@ button:hover {
         stalkRaid.macrofauna = [stalkPrey];
         wildStalker.update(stalkRaid);
         AddRegressionResult(results, 'Macrofauna pursuit uses the normal stalking state', wildStalker.behaviourState==='stalking' || wildStalker.behaviourState==='attacking', 'state='+wildStalker.behaviourState);
+
+        AddRegressionResult(results, 'Behaviour genetics are registered as a phenotype trait', MonsterGenePool.traitDefinitions.indexOf(MonsterBehaviourTraitDefinition)>=0 && MonsterGenePool.behaviourChromosomeSlots.length===BEHAVIOUR_CHROMOSOME_SLOT_COUNT, 'slots='+(MonsterGenePool.behaviourChromosomeSlots ? MonsterGenePool.behaviourChromosomeSlots.length : -1));
+        var behaviourContext = new MonsterPhenotypeExpressionContext();
+        new BehaviourAllele(100, { pugilin : 90, cowardin : -40, tenacitin : 70 }, {}).phenotype(behaviourContext, false);
+        var behaviourPhenotype = MonsterBehaviourTraitDefinition.resolveBehaviourPhenotype(behaviourContext);
+        AddRegressionResult(results, 'Behaviour allele phenotype expression changes named hormone levels', behaviourPhenotype.hormones.pugilinBase>1.2 && behaviourPhenotype.hormones.cowardinBase<0.9 && behaviourPhenotype.hormones.tenacitinBase>1.2, 'pugilin='+behaviourPhenotype.hormones.pugilinBase.toFixed(2)+', cowardin='+behaviourPhenotype.hormones.cowardinBase.toFixed(2)+', tenacitin='+behaviourPhenotype.hormones.tenacitinBase.toFixed(2));
+        var bushWorld = new World(987654, { mapSizeKey : 'legacy', temperature : 0.52, moisture : 0.70, vegetationDensity : 0.85, customTreasureAmounts : { bronze : 10 } });
+        var bushCount = bushWorld.terrainObjects.filter(function (object){ return object.type==='bush'; }).length;
+        AddRegressionResult(results, 'Temperate wooded maps generate passable vision-blocking bushes', bushCount>0 && bushWorld.terrainObjects.some(function (object){ return object.type==='bush' && object.blocksMovement===false && object.blocksVisionAmount>0; }), 'bushes='+bushCount);
+
+        var sampleBush = bushWorld.terrainObjects.find(function (object){ return object.type==='bush'; });
+        AddRegressionResult(results, 'Generated bushes are shrub-sized cover rather than tree canopies or ground clumps', !!sampleBush && sampleBush.radius>=14 && sampleBush.radius<=34 && sampleBush.visionTopHeight>=7 && sampleBush.visionTopHeight<=30 && !!sampleBush.primaryColour && !!sampleBush.camouflageProfile, 'radius='+(sampleBush ? sampleBush.radius.toFixed(1) : 'none')+', top='+(sampleBush ? sampleBush.visionTopHeight.toFixed(1) : 'none'));
+        var bushCamouflageMonster = new Monster('bush_camouflage_monster', sampleBush ? sampleBush.x : 0, sampleBush ? sampleBush.y : 0, new SeededRng(424290), {});
+        bushCamouflageMonster.deployed = true;
+        bushCamouflageMonster.phenotype.colour.camouflageHue = sampleBush && sampleBush.camouflageProfile ? sampleBush.camouflageProfile.hue : 120;
+        bushCamouflageMonster.phenotype.colour.camouflageLuminance = sampleBush && sampleBush.camouflageProfile ? sampleBush.camouflageProfile.luminance : 0.35;
+        bushCamouflageMonster.phenotype.colour.camouflageSaturation = sampleBush && sampleBush.camouflageProfile ? sampleBush.camouflageProfile.saturation : 0.45;
+        var matchedBushScale = bushCamouflageMonster.getBushCamouflageVisibilityScale(bushWorld, null, sampleBush);
+        bushCamouflageMonster.phenotype.colour.camouflageHue = 300;
+        bushCamouflageMonster.phenotype.colour.camouflageLuminance = 0.82;
+        bushCamouflageMonster.phenotype.colour.camouflageSaturation = 0.95;
+        var mismatchedBushScale = bushCamouflageMonster.getBushCamouflageVisibilityScale(bushWorld, null, sampleBush);
+        AddRegressionResult(results, 'Bush camouflage uses actual monster to bush colour contrast', matchedBushScale<mismatchedBushScale, 'matched='+matchedBushScale.toFixed(3)+', mismatched='+mismatchedBushScale.toFixed(3));
+
+        var carcassRaid = new Raid(session.world, session.gameState, 424270, 1, []);
+        var carcass = new Macrofauna('dominance_carcass', 'deer', 300, 300, new SeededRng(424271));
+        carcass.alive = false;
+        carcass.corpseState = 'corpse';
+        carcass.edibleFoodRemaining = 20;
+        carcassRaid.macrofauna = [carcass];
+        carcassRaid.monsters = [];
+        for (var feedIndex = 0; feedIndex<5; feedIndex+=1){
+            var feeder = new Monster('feeder_'+feedIndex, 300+feedIndex, 300, new SeededRng(424272+feedIndex), {});
+            feeder.deployed = true;
+            feeder.eatingTargetId = carcass.id;
+            feeder.currentBodyMass = 70+feedIndex * 35;
+            feeder.currentMuscleMass = 20+feedIndex * 12;
+            carcassRaid.monsters.push(feeder);
+        }
+        var allowedFeeders = carcassRaid.monsters.filter(function (monster){ return carcassRaid.monsterMayFeedFromCarcass(monster, carcass); }).length;
+        AddRegressionResult(results, 'Carcass feeding admits no more than the three strongest monster contenders', allowedFeeders===3, 'allowed='+allowedFeeders);
+        var tinyMonster = new Monster('polar_predation_tiny', 200, 200, new SeededRng(424280), {});
+        tinyMonster.deployed = true;
+        tinyMonster.currentBodyMass = 28;
+        tinyMonster.bodyScale = 0.50;
+        tinyMonster.spineSize = 0;
+        var predatoryBear = new Macrofauna('predatory_polar_bear', 'polarBear', 204, 200, new SeededRng(424281));
+        var predationRaid = new Raid(session.world, session.gameState, 424282, 1, []);
+        predationRaid.monsters = [tinyMonster];
+        predationRaid.macrofauna = [predatoryBear];
+        predationRaid.resolveMacrofaunaMonsterPredation();
+        AddRegressionResult(results, 'Aggressive large macrofauna can injure small monsters', tinyMonster.health<tinyMonster.maxHealth || tinyMonster.bodyHealth.missingHealth()>0, 'health='+tinyMonster.health+'/'+tinyMonster.maxHealth);
         var failed = results.filter(function (result){
             return !result.passed;
         } );
@@ -16176,8 +17218,7 @@ button:hover {
             ctx.restore();
         }
     }
-    function DrawTree(o){
-        var p = EntityScreenPoint(o.x, o.y);
+    function TreeSnowState(o){
         var season = SeasonNameForSnapshot(currentSnapshot || latestSnapshot || {
         } );
         var snowy = false;
@@ -16187,8 +17228,21 @@ button:hover {
             var ty = Math.max(0, Math.min(grid.rows-1, Math.floor(o.y /(grid.tileSize || TILE_SIZE))));
             snowy = !!(grid.climate.snowWinter && grid.climate.snowWinter[ty * grid.cols+tx]);
         }
+        return {
+            season : season,
+            snowy : snowy
+        } ;
+    }
+    function DrawTreeTrunk(o){
+        var p = EntityScreenPoint(o.x, o.y);
         ctx.fillStyle = '#6b4423';
         ctx.fillRect(p.x-5, p.y-28, 10, 34);
+    }
+    function DrawTreeCanopy(o){
+        var p = EntityScreenPoint(o.x, o.y);
+        var treeState = TreeSnowState(o);
+        var season = treeState.season;
+        var snowy = treeState.snowy;
         var palette = {
             winter : snowy ? ['#e5edf2',
             '#dbeafe',
@@ -16228,6 +17282,100 @@ button:hover {
         ctx.beginPath();
         ctx.arc(p.x-8, p.y-50, o.radius * 0.28, 0, Math.PI * 2);
         ctx.fill();
+    }
+    function DrawTree(o){
+        DrawTreeTrunk(o);
+        DrawTreeCanopy(o);
+    }
+
+    function DrawBush(o){
+        var p = EntityScreenPoint(o.x, o.y);
+        var r = o.radius || 22;
+        var kind = o.bushKind || 'bush';
+        var primary = o.primaryColour || '#315f38';
+        var secondary = o.secondaryColour || '#406f3d';
+        var dark = o.darkColour || '#203f28';
+        var light = o.lightColour || '#5f8c4e';
+        var stem = o.stemColour || '#4b3328';
+        var variant = o.variant || 0;
+        var isReed = kind==='reed thicket';
+        ctx.save();
+        ctx.globalAlpha = 0.90;
+        function irregularBlob(cx, cy, rx, ry, colour, alpha, phaseKey){
+            var points = 11;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = colour;
+            ctx.beginPath();
+            for (var i = 0; i<points; i+=1){
+                var a = -Math.PI+i * Math.PI * 2 / points;
+                var phase = StablePhase((o.id || 'bush')+'_'+phaseKey+'_'+i);
+                var wobble = 0.82+phase * 0.34;
+                var x = cx+Math.cos(a) * rx * wobble;
+                var y = cy+Math.sin(a) * ry * (0.88+phase * 0.24);
+                if (i===0){
+                    ctx.moveTo(x, y);
+                } else{
+                    var prev = -Math.PI+(i-0.5) * Math.PI * 2 / points;
+                    var midPhase = StablePhase((o.id || 'bush')+'_'+phaseKey+'_mid_'+i);
+                    var mx = cx+Math.cos(prev) * rx * (0.92+midPhase * 0.22);
+                    var my = cy+Math.sin(prev) * ry * (0.92+midPhase * 0.22);
+                    ctx.quadraticCurveTo(mx, my, x, y);
+                }
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+        if (isReed){
+            ctx.strokeStyle = stem;
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            for (var reed = 0; reed<9; reed+=1){
+                var f = reed / 8-0.5;
+                var phase = StablePhase((o.id || 'reed')+'_'+reed);
+                var baseX = p.x+f * r * 1.15;
+                var topX = baseX+(phase-0.5) * r * 0.20;
+                var topY = p.y-r * (0.72+phase * 0.36);
+                ctx.beginPath();
+                ctx.moveTo(baseX, p.y-2);
+                ctx.lineTo(topX, topY);
+                ctx.stroke();
+            }
+            irregularBlob(p.x, p.y-r * 0.36, r * 0.82, r * 0.38, primary, 0.74, 'reed_mass');
+            irregularBlob(p.x-r * 0.12, p.y-r * 0.56, r * 0.58, r * 0.28, secondary, 0.60, 'reed_top');
+        } else{
+            // Three overlapping, lumpy masses create a shrub silhouette without the
+            // artificial look of perfect circles or radial construction lines.
+            irregularBlob(p.x, p.y-r * 0.42, r * 1.08, r * 0.62, dark, 0.72, 'base_shadow');
+            irregularBlob(p.x-r * 0.26, p.y-r * 0.58, r * 0.74, r * 0.52, primary, 0.88, 'left_mass');
+            irregularBlob(p.x+r * 0.24, p.y-r * 0.54, r * 0.76, r * 0.50, secondary, 0.84, 'right_mass');
+            irregularBlob(p.x+(variant % 3-1) * r * 0.10, p.y-r * 0.85, r * 0.58, r * 0.42, light, 0.62, 'top_mass');
+            ctx.save();
+            ctx.globalAlpha = 0.34;
+            ctx.strokeStyle = stem;
+            ctx.lineWidth = 1.8;
+            ctx.lineCap = 'round';
+            for (var twig = 0; twig<3; twig+=1){
+                var t = twig / 2-0.5;
+                ctx.beginPath();
+                ctx.moveTo(p.x+t * r * 0.62, p.y-r * 0.12);
+                ctx.quadraticCurveTo(p.x+t * r * 0.74, p.y-r * 0.36, p.x+t * r * 0.38, p.y-r * 0.54);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+        ctx.save();
+        ctx.globalAlpha = 0.26;
+        ctx.fillStyle = 'rgba(12,24,14,0.70)';
+        for (var gap = 0; gap<3; gap+=1){
+            var gp = StablePhase((o.id || 'bush')+'_gap_'+gap);
+            ctx.beginPath();
+            ctx.ellipse(p.x+(gp-0.5) * r * 1.0, p.y-r * (0.42+0.22 * gap), r * 0.12, r * 0.08, gp * 1.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+        ctx.restore();
     }
     function DrawMicrofaunaEmitter(o, now){
         var p = EntityScreenPoint(o.x, o.y);
@@ -17442,7 +18590,7 @@ button:hover {
         return selectedObject && selectedObject.kind===kind && selectedObject.obj && selectedObject.obj.id===obj.id;
     }
     function SelectionKindForRenderable(kind){
-        return kind==='obstacle' ? 'worldObject' : kind;
+        return(kind==='obstacle' || kind==='treeTrunk' || kind==='treeCanopy' || kind==='bushOverlay') ? 'worldObject' : kind;
     }
     // ============================================================================
     // MODULE: RAID SCENE COMPOSITION
@@ -17480,8 +18628,31 @@ button:hover {
         }
         DrawTerrainCliffFacesForVisibleTiles(s, visibleTerrainTiles);
         var renderables = [];
+        var bushOverlays = [];
+        var treeCanopyOverlays = [];
         (s.obstacles || []).forEach(function (o){
             if (o.carriedById){
+                return;
+            }
+            if (o.type==='tree'){
+                renderables.push({
+                    sort : o.x+o.y-4,
+                    kind : 'treeTrunk',
+                    obj : o
+                } );
+                treeCanopyOverlays.push({
+                    sort : o.x+o.y+50,
+                    kind : 'treeCanopy',
+                    obj : o
+                } );
+                return;
+            }
+            if (o.type==='bush'){
+                bushOverlays.push({
+                    sort : o.x+o.y+22,
+                    kind : 'bushOverlay',
+                    obj : o
+                } );
                 return;
             }
             renderables.push({
@@ -17546,9 +18717,9 @@ button:hover {
                 ctx.save();
                 ctx.filter = 'brightness(1.5)';
             }
-            if (r.kind==='obstacle'){
-                if (r.obj.type==='tree')DrawTree(r.obj);
-                else if (r.obj.type==='microfauna')DrawMicrofaunaEmitter(r.obj, now);
+            if (r.kind==='treeTrunk')DrawTreeTrunk(r.obj);
+            else if (r.kind==='obstacle'){
+                if (r.obj.type==='microfauna')DrawMicrofaunaEmitter(r.obj, now);
                 else if (r.obj.type==='stick')DrawStick(r.obj);
                 else DrawRock(r.obj);
             } else if (r.kind==='treasure' || r.kind==='droppedTreasure')DrawTreasurePile(r.obj);
@@ -17557,6 +18728,34 @@ button:hover {
             else if (r.kind==='monster')DrawMonster(r.obj, now);
             else if (r.kind==='adventurer')DrawAdventurer(r.obj, now);
             else DrawGroundRemain(r.obj, r.obj.agentKind || 'adventurer');
+            if (selectedForBrightness){
+                ctx.restore();
+            }
+        } );
+        bushOverlays.sort(function (a, b){
+            return a.sort-b.sort;
+        } );
+        bushOverlays.forEach(function (r){
+            var selectedForBrightness = IsSelectedRenderObject(SelectionKindForRenderable('bushOverlay'), r.obj);
+            if (selectedForBrightness){
+                ctx.save();
+                ctx.filter = 'brightness(1.5)';
+            }
+            DrawBush(r.obj);
+            if (selectedForBrightness){
+                ctx.restore();
+            }
+        } );
+        treeCanopyOverlays.sort(function (a, b){
+            return a.sort-b.sort;
+        } );
+        treeCanopyOverlays.forEach(function (r){
+            var selectedForBrightness = IsSelectedRenderObject(SelectionKindForRenderable('treeCanopy'), r.obj);
+            if (selectedForBrightness){
+                ctx.save();
+                ctx.filter = 'brightness(1.5)';
+            }
+            DrawTreeCanopy(r.obj);
             if (selectedForBrightness){
                 ctx.restore();
             }
@@ -17626,6 +18825,9 @@ button:hover {
             }
             if (obj.type==='microfauna'){
                 return inEllipse(p.x, p.y-16, Math.max(14, radius * 0.65), Math.max(10, radius * 0.45)) ? score : null;
+            }
+            if (obj.type==='bush'){
+                return inEllipse(p.x, p.y-radius * 0.48, Math.max(13, radius * 1.08), Math.max(9, radius * 0.72)) ? score : null;
             }
             if (obj.type==='stick'){
                 return inRect(p.x-28, p.y-16, p.x+28, p.y+10) ? score : null;
