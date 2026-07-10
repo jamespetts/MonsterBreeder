@@ -6772,7 +6772,6 @@ button:hover {
     class Allele{
         constructor(dominanceIndex, options){
             this.dominanceIndex = ClampByte(Number.isFinite(dominanceIndex) ? dominanceIndex : DOMINANCE_DEFAULT);
-            this.commonness = options && Number.isFinite(options.commonness) ? Math.max(0.001, options.commonness) : 1;
             this.selectionSensitive = !!(options && options.selectionSensitive);
             this.debugLabel = options && options.debugLabel ? options.debugLabel : 'allele';
         }
@@ -6786,7 +6785,6 @@ button:hover {
     class ColourAllele extends Allele{
         constructor(dominanceIndex, skinProteins, options){
             super(dominanceIndex, {
-                commonness : options && Number.isFinite(options.commonness) ? options.commonness : 1,
                 selectionSensitive : options && options.selectionSensitive!==undefined ? !!options.selectionSensitive : true,
                 debugLabel : options && options.debugLabel ? options.debugLabel : 'colour allele'
             });
@@ -6809,7 +6807,6 @@ button:hover {
     class MetabolicAllele extends Allele{
         constructor(dominanceIndex, metabolicFactors, options){
             super(dominanceIndex, {
-                commonness : options && Number.isFinite(options.commonness) ? options.commonness : 1,
                 selectionSensitive : options && options.selectionSensitive!==undefined ? !!options.selectionSensitive : true,
                 debugLabel : options && options.debugLabel ? options.debugLabel : 'metabolic allele'
             });
@@ -7306,53 +7303,74 @@ button:hover {
         }
 
         getWildMetabolismWeight(allele, profile){
-            var weight = Math.pow(allele.commonness || 1, 0.55);
             if (!profile || !allele.selectionSensitive){
-                return weight;
+                return 1;
             }
             var context = new PhenotypeBuildContext();
             allele.phenotype(context, false);
             var phenotype = MetabolismPhenotypeSystem.resolve(context);
-            var thermalMismatch = 0;
-            if (profile.currentTemperatureC<phenotype.coldLimitC){
-                thermalMismatch = (phenotype.coldLimitC-profile.currentTemperatureC) / 22;
+            var temperatures = profile.seasonTemperaturesC && profile.seasonTemperaturesC.length>0 ? profile.seasonTemperaturesC : [profile.currentTemperatureC];
+            var logFitness = 0;
+            for (var i = 0;
+            i<temperatures.length;
+            i+=1){
+                var temperatureC = temperatures[i];
+                var thermalMismatch = 0;
+                if (temperatureC<phenotype.coldLimitC){
+                    thermalMismatch = (phenotype.coldLimitC-temperatureC) / 22;
+                }
+                if (temperatureC>phenotype.heatLimitC){
+                    thermalMismatch = (temperatureC-phenotype.heatLimitC) / 22;
+                }
+                var fatTemperatureMismatch = temperatureC>20 ? phenotype.targetFatStorage / 12 : Math.max(0, 2.0-phenotype.targetFatStorage) / 8;
+                logFitness+=-7.5 * thermalMismatch-2.0 * fatTemperatureMismatch;
             }
-            if (profile.currentTemperatureC>phenotype.heatLimitC){
-                thermalMismatch = (profile.currentTemperatureC-phenotype.heatLimitC) / 22;
-            }
+            logFitness/=Math.max(1, temperatures.length);
             var foodMismatch = Math.max(0, phenotype.baseMetabolicFood-(8.5+profile.macrofaunaAvailability * 4.0)) / 10;
-            var fatTemperatureMismatch = profile.currentTemperatureC>20 ? phenotype.targetFatStorage / 12 : Math.max(0, 2.0-phenotype.targetFatStorage) / 8;
-            return weight * Math.exp(-7.5 * thermalMismatch-2.5 * foodMismatch-2.0 * fatTemperatureMismatch);
+            logFitness+=-2.5 * foodMismatch;
+            return Math.max(0.0001, Math.exp(logFitness));
         }
 
         getWildColourWeight(allele, profile){
-            // Commonness describes background availability in the wild population,
-            // not a licence for one colour family to dominate every biome. Keep it
-            // sub-linear so that dominant-terrain camouflage can overpower a common
-            // but inappropriate allele in desert, tundra and rocky environments.
-            var weight = Math.pow(allele.commonness || 1, 0.55);
             if (!profile || !allele.selectionSensitive){
-                return weight;
+                return 1;
             }
             var context = new PhenotypeBuildContext();
             allele.phenotype(context, false);
             var colour = ColourPhenotypeSystem.resolve(context);
-            var hueDelta = Math.abs(colour.camouflageHue-profile.hue);
-            hueDelta = Math.min(hueDelta, 360-hueDelta) / 180;
-            var luminanceDelta = Math.abs(colour.camouflageLuminance-profile.luminance);
-            var saturationDelta = Math.abs((colour.camouflageSaturation || 0)-(profile.saturation || 0));
-            var mismatch;
-            if ((profile.saturation || 0)<0.18){
-                // Grey/tundra/rocky backgrounds are defined mostly by low chroma.
-                // Hue is unstable and misleading when saturation is near zero, so
-                // penalise saturation mismatch heavily for those environments.
-                mismatch = hueDelta * 0.20+luminanceDelta * 0.25+saturationDelta * 0.55;
-            } else{
-                mismatch = hueDelta * 0.56+luminanceDelta * 0.24+saturationDelta * 0.20;
-            }
+            var profiles = profile.terrainProfiles && profile.terrainProfiles.length>0 ? profile.terrainProfiles : [profile];
             var dominanceExposure = Clamp(allele.dominanceIndex / DOMINANCE_DEFAULT, 0.05, 1.55);
-            var selectionPressure = profile.selectionPressure || 12.0;
-            return weight * Math.exp(-selectionPressure * mismatch * dominanceExposure);
+            var selectionPressure = profile.selectionPressure || 14.0;
+            var weightedFitness = 0;
+            var totalWeight = 0;
+            for (var i = 0;
+            i<profiles.length;
+            i+=1){
+                var terrainProfile = profiles[i];
+                var terrainWeight = terrainProfile.weight || 0;
+                if (terrainWeight<=0){
+                    continue;
+                }
+                var hueDelta = Math.abs(colour.camouflageHue-terrainProfile.hue);
+                hueDelta = Math.min(hueDelta, 360-hueDelta) / 180;
+                var luminanceDelta = Math.abs(colour.camouflageLuminance-terrainProfile.luminance);
+                var saturationDelta = Math.abs((colour.camouflageSaturation || 0)-(terrainProfile.saturation || 0));
+                var mismatch;
+                if ((terrainProfile.saturation || 0)<0.18){
+                    // Grey/tundra/rocky backgrounds are defined mostly by low chroma.
+                    // Hue is unstable and misleading when saturation is near zero, so
+                    // penalise saturation mismatch heavily for those environments.
+                    mismatch = hueDelta * 0.20+luminanceDelta * 0.25+saturationDelta * 0.55;
+                } else{
+                    mismatch = hueDelta * 0.56+luminanceDelta * 0.24+saturationDelta * 0.20;
+                }
+                weightedFitness+=terrainWeight * Math.exp(-selectionPressure * mismatch * dominanceExposure);
+                totalWeight+=terrainWeight;
+            }
+            if (totalWeight<=0){
+                return 1;
+            }
+            return Math.max(0.0001, weightedFitness / totalWeight);
         }
 
         getWorldColourSelectionProfile(world){
@@ -7363,6 +7381,7 @@ button:hover {
                 return world.colourSelectionProfile;
             }
             var counts = {};
+            var totalLandTiles = 0;
             var dominantTerrainType = TERRAIN_TYPE.GRASS;
             var dominantCount = -1;
             for (var y = 0;
@@ -7379,20 +7398,43 @@ button:hover {
                         continue;
                     }
                     counts[terrainType] = (counts[terrainType] || 0)+1;
+                    totalLandTiles+=1;
                     if (counts[terrainType]>dominantCount){
                         dominantCount = counts[terrainType];
                         dominantTerrainType = terrainType;
                     }
                 }
             }
-            var target = GenePool.terrainColourForType(dominantTerrainType);
+            if (totalLandTiles<=0){
+                counts[TERRAIN_TYPE.GRASS] = 1;
+                totalLandTiles = 1;
+                dominantTerrainType = TERRAIN_TYPE.GRASS;
+            }
+            var terrainProfiles = [];
+            Object.keys(counts).forEach(function (terrainKey){
+                var terrainType = Number(terrainKey);
+                var target = GenePool.terrainColourForType(terrainType);
+                terrainProfiles.push({
+                    terrainType : terrainType,
+                    weight : counts[terrainKey] / totalLandTiles,
+                    rgb : target,
+                    hue : ColourHueFromRgb(target),
+                    luminance : ColourLuminanceFromRgb(target),
+                    saturation : ColourSaturationFromRgb(target)
+                });
+            });
+            terrainProfiles.sort(function (a, b){
+                return b.weight-a.weight;
+            });
+            var dominantTarget = GenePool.terrainColourForType(dominantTerrainType);
             world.colourSelectionProfile = {
-                rgb : target,
-                hue : ColourHueFromRgb(target),
-                luminance : ColourLuminanceFromRgb(target),
-                saturation : ColourSaturationFromRgb(target),
+                rgb : dominantTarget,
+                hue : ColourHueFromRgb(dominantTarget),
+                luminance : ColourLuminanceFromRgb(dominantTarget),
+                saturation : ColourSaturationFromRgb(dominantTarget),
                 dominantTerrainType : dominantTerrainType,
-                selectionPressure : 12.0
+                terrainProfiles : terrainProfiles,
+                selectionPressure : 14.0
             };
             return world.colourSelectionProfile;
         }
@@ -7461,8 +7503,15 @@ button:hover {
             if (world.metabolismSelectionProfile){
                 return world.metabolismSelectionProfile;
             }
+            var seasonTemperaturesC = [];
+            for (var seasonIndex = 1;
+            seasonIndex<=SEASON_NAMES.length;
+            seasonIndex+=1){
+                seasonTemperaturesC.push(MonsterMetabolismSystem.currentTemperatureC(world, seasonIndex));
+            }
             world.metabolismSelectionProfile = {
                 currentTemperatureC : MonsterMetabolismSystem.currentTemperatureC(world, 2),
+                seasonTemperaturesC : seasonTemperaturesC,
                 macrofaunaAvailability : MonsterMetabolismSystem.macrofaunaAvailability(world)
             };
             return world.metabolismSelectionProfile;
@@ -7474,7 +7523,6 @@ button:hover {
                 coldTolerance : 24,
                 heatTolerance : -8
             }, {
-                commonness : 2.8,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 0)
             }));
@@ -7483,7 +7531,6 @@ button:hover {
                 coldTolerance : 8,
                 heatTolerance : 8
             }, {
-                commonness : 5.0,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 0)
             }));
@@ -7492,7 +7539,6 @@ button:hover {
                 coldTolerance : 18,
                 heatTolerance : 16
             }, {
-                commonness : 2.0,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 0)
             }));
@@ -7501,84 +7547,72 @@ button:hover {
                 coldTolerance : -18,
                 heatTolerance : 50
             }, {
-                commonness : 1.7,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 0)
             }));
             this.addAllele(METABOLISM_CHROMOSOME_INDEX, 1, new MetabolicAllele(100, {
                 plumptin : -58
             }, {
-                commonness : 2.4,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 1)
             }));
             this.addAllele(METABOLISM_CHROMOSOME_INDEX, 1, new MetabolicAllele(100, {
                 plumptin : 0
             }, {
-                commonness : 4.6,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 1)
             }));
             this.addAllele(METABOLISM_CHROMOSOME_INDEX, 1, new MetabolicAllele(105, {
                 plumptin : 66
             }, {
-                commonness : 2.1,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 1)
             }));
             this.addAllele(METABOLISM_CHROMOSOME_INDEX, 1, new MetabolicAllele(120, {
                 plumptin : 155
             }, {
-                commonness : 0.05,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 1)
             }));
             this.addAllele(METABOLISM_CHROMOSOME_INDEX, 2, new MetabolicAllele(100, {
                 energyConservation : -70
             }, {
-                commonness : 1.5,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 2)
             }));
             this.addAllele(METABOLISM_CHROMOSOME_INDEX, 2, new MetabolicAllele(100, {
                 energyConservation : 16
             }, {
-                commonness : 4.3,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 2)
             }));
             this.addAllele(METABOLISM_CHROMOSOME_INDEX, 2, new MetabolicAllele(105, {
                 energyConservation : 78
             }, {
-                commonness : 2.7,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 2)
             }));
             this.addAllele(METABOLISM_CHROMOSOME_INDEX, 2, new MetabolicAllele(120, {
                 energyConservation : 135
             }, {
-                commonness : 0.15,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 2)
             }));
             this.addAllele(METABOLISM_CHROMOSOME_INDEX, 3, new MetabolicAllele(100, {
                 satietyConservationEffect : -20
             }, {
-                commonness : 2.2,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 3)
             }));
             this.addAllele(METABOLISM_CHROMOSOME_INDEX, 3, new MetabolicAllele(100, {
                 satietyConservationEffect : 35
             }, {
-                commonness : 4.0,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 3)
             }));
             this.addAllele(METABOLISM_CHROMOSOME_INDEX, 3, new MetabolicAllele(105, {
                 satietyConservationEffect : 86
             }, {
-                commonness : 2.0,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 3)
             }));
@@ -7586,7 +7620,6 @@ button:hover {
                 satietyConservationEffect : 160,
                 energyConservation : -40
             }, {
-                commonness : 0.08,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 3)
             }));
@@ -7594,19 +7627,16 @@ button:hover {
 
         addDefaultColourAlleles(){
             this.addAllele(COLOUR_CHROMOSOME_INDEX, 0, new Allele(DOMINANCE_DEFAULT, {
-                commonness : 12,
                 selectionSensitive : false,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 0)
             }));
             this.addAllele(COLOUR_CHROMOSOME_INDEX, 0, new Allele(DOMINANCE_DEFAULT, {
-                commonness : 2.2,
                 selectionSensitive : false,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 0)
             }));
             this.addAllele(COLOUR_CHROMOSOME_INDEX, 0, new ColourAllele(30, {
                 negrine : -80
             }, {
-                commonness : 0.28,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 0)
             }));
@@ -7615,7 +7645,6 @@ button:hover {
                 rodine : 40,
                 negrine : -35
             }, {
-                commonness : 0.06,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 0)
             }));
@@ -7623,7 +7652,6 @@ button:hover {
                 verdine : 150,
                 negrine : 18
             }, {
-                commonness : 2.7,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)
             }));
@@ -7631,7 +7659,6 @@ button:hover {
                 jaunine : 145,
                 negrine : 8
             }, {
-                commonness : 3.8,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)
             }));
@@ -7639,7 +7666,6 @@ button:hover {
                 orgine : 130,
                 negrine : 10
             }, {
-                commonness : 3.2,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)
             }));
@@ -7648,7 +7674,6 @@ button:hover {
                 orgine : 62,
                 negrine : 5
             }, {
-                commonness : 2.8,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)
             }));
@@ -7657,7 +7682,6 @@ button:hover {
                 cerulene : 6,
                 negrine : 34
             }, {
-                commonness : 2.4,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)
             }));
@@ -7665,7 +7689,6 @@ button:hover {
                 cerulene : 145,
                 negrine : 6
             }, {
-                commonness : 1.8,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)
             }));
@@ -7673,7 +7696,6 @@ button:hover {
                 rodine : 145,
                 negrine : 8
             }, {
-                commonness : 1.2,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)
             }));
@@ -7682,53 +7704,44 @@ button:hover {
                 rodine : 150,
                 negrine : 5
             }, {
-                commonness : 0.08,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)
             }));
             this.addAllele(COLOUR_CHROMOSOME_INDEX, 1, new ColourAllele(95, {}, {
-                commonness : 2.8,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)
             }));
             this.addAllele(COLOUR_CHROMOSOME_INDEX, 2, new ColourAllele(100, {
                 negrine : 24
             }, {
-                commonness : 5.5,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 2)
             }));
             this.addAllele(COLOUR_CHROMOSOME_INDEX, 2, new ColourAllele(110, {
                 negrine : 54
             }, {
-                commonness : 3.0,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 2)
             }));
             this.addAllele(COLOUR_CHROMOSOME_INDEX, 2, new ColourAllele(95, {}, {
-                commonness : 2.0,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 2)
             }));
             this.addAllele(COLOUR_CHROMOSOME_INDEX, 2, new ColourAllele(100, {
                 negrine : 82
             }, {
-                commonness : 0.9,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 2)
             }));
             this.addAllele(COLOUR_CHROMOSOME_INDEX, 2, new ColourAllele(75, {}, {
-                commonness : 0.8,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 2)
             }));
             this.addAllele(COLOUR_CHROMOSOME_INDEX, 3, new Allele(DOMINANCE_DEFAULT, {
-                commonness : 12,
                 selectionSensitive : false,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)
             }));
             this.addAllele(COLOUR_CHROMOSOME_INDEX, 3, new Allele(DOMINANCE_DEFAULT, {
-                commonness : 2.2,
                 selectionSensitive : false,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)
             }));
@@ -7737,7 +7750,6 @@ button:hover {
                 jaunine : 46,
                 negrine : 5
             }, {
-                commonness : 2.3,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)
             }));
@@ -7746,7 +7758,6 @@ button:hover {
                 cerulene : 38,
                 negrine : 4
             }, {
-                commonness : 1.8,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)
             }));
@@ -7755,14 +7766,12 @@ button:hover {
                 orgine : 36,
                 negrine : 4
             }, {
-                commonness : 2.4,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)
             }));
             this.addAllele(COLOUR_CHROMOSOME_INDEX, 3, new ColourAllele(100, {
                 negrine : 20
             }, {
-                commonness : 2.0,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)
             }));
@@ -7770,7 +7779,6 @@ button:hover {
                 rodine : 42,
                 negrine : 5
             }, {
-                commonness : 0.8,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)
             }));
@@ -7779,7 +7787,6 @@ button:hover {
                 rodine : 150,
                 negrine : 5
             }, {
-                commonness : 0.08,
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)
             }));
@@ -11170,7 +11177,6 @@ button:hover {
         var countedAllele = new CountedRegressionAllele(100, {
             verdine : 80
         } , {
-            commonness : 1,
             selectionSensitive : false,
             debugLabel : 'counted regression allele'
         } );
@@ -11180,7 +11186,6 @@ button:hover {
         var codominantA = new ColourAllele(100, {
             verdine : 140
         } , {
-            commonness : 1,
             selectionSensitive : true,
             debugLabel : 'regression green codominant'
         });
@@ -11188,7 +11193,6 @@ button:hover {
             rodine : 140,
             cerulene : 120
         } , {
-            commonness : 1,
             selectionSensitive : true,
             debugLabel : 'regression purple codominant'
         });
@@ -11199,7 +11203,6 @@ button:hover {
         new ColourAllele(100, {
             negrine : -500
         } , {
-            commonness : 1,
             selectionSensitive : true,
             debugLabel : 'regression negrine suppressor'
         }).phenotype(clampContext, false);
@@ -11364,8 +11367,8 @@ button:hover {
         var forestColourStats = sampleColourPopulation(TERRAIN_TYPE.FOREST, 7101);
         var desertColourStats = sampleColourPopulation(TERRAIN_TYPE.DESERT, 7102);
         var rockyColourStats = sampleColourPopulation(TERRAIN_TYPE.ROCKY, 7103);
-        AddRegressionResult(results, 'Wild colour selection favours green populations in forest but not in desert', forestColourStats.g>forestColourStats.r+18 && forestColourStats.g>forestColourStats.b+18 && desertColourStats.r>desertColourStats.g-8 && desertColourStats.r>desertColourStats.b+35, 'forest='+JSON.stringify(forestColourStats)+', desert='+JSON.stringify(desertColourStats));
-        AddRegressionResult(results, 'Wild colour selection makes rocky populations greyer than forest populations', Math.max(rockyColourStats.r, rockyColourStats.g, rockyColourStats.b)-Math.min(rockyColourStats.r, rockyColourStats.g, rockyColourStats.b)<65, 'rocky='+JSON.stringify(rockyColourStats));
+        AddRegressionResult(results, 'Natural-selection dry run favours green populations in forest but not in desert', forestColourStats.g>forestColourStats.r+18 && forestColourStats.g>forestColourStats.b+18 && desertColourStats.r>desertColourStats.g-8 && desertColourStats.r>desertColourStats.b+35, 'forest='+JSON.stringify(forestColourStats)+', desert='+JSON.stringify(desertColourStats));
+        AddRegressionResult(results, 'Natural-selection dry run makes rocky populations greyer than forest populations', Math.max(rockyColourStats.r, rockyColourStats.g, rockyColourStats.b)-Math.min(rockyColourStats.r, rockyColourStats.g, rockyColourStats.b)<65, 'rocky='+JSON.stringify(rockyColourStats));
         var breedingWorld = WorldGenerator.createWorld(7104, {
             mapSizeKey : 'legacy',
             customTreasureAmounts : {
