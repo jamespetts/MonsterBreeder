@@ -1857,11 +1857,12 @@ button:hover {
             var candidates = TerrainGrid.findStreamSources(cols, rows, heights, flow, runoff, waterKind, climate, perennialThreshold, intermittentThreshold, aridity, seaLevel);
             var streamId = TerrainGrid.traceChannels(cols, rows, heights, drain, flow, waterKind, channelId, channelOrder, channelWidth, waterSurfaceHeight, candidates, perennialThreshold, intermittentThreshold, aridity, seaLevel, coastalWorld);
             TerrainGrid.forceOrthogonalStreamConnectivity(cols, rows, heights, flow, waterKind, channelId, channelOrder, channelWidth, waterSurfaceHeight);
+            var hadTracedStream = TerrainGrid.collectStreamComponents(cols, rows, waterKind).length>0;
             TerrainGrid.removeInteriorStreamSpurs(cols, rows, waterKind, channelId, channelOrder, channelWidth, waterSurfaceHeight);
             TerrainGrid.removeStreamComponentsNotTerminatingAtOutlet(cols, rows, waterKind, channelId, channelOrder, channelWidth, waterSurfaceHeight, coastalWorld);
             TerrainGrid.removeTinyStreamComponents(cols, rows, waterKind, channelId, channelOrder, channelWidth, waterSurfaceHeight);
             streamId = TerrainGrid.renumberStreamChannels(cols, rows, waterKind, channelId);
-            var addedFrequencyStream = TerrainGrid.ensureTemperateStreamFrequency(cols, rows, heights, flow, waterKind, channelId, channelOrder, channelWidth, waterSurfaceHeight, environment, coastalWorld, seaLevel, seed, perennialThreshold);
+            var addedFrequencyStream = TerrainGrid.ensureTemperateStreamFrequency(cols, rows, heights, flow, waterKind, channelId, channelOrder, channelWidth, waterSurfaceHeight, environment, coastalWorld, seaLevel, seed, perennialThreshold, hadTracedStream);
             if (addedFrequencyStream){
                 TerrainGrid.forceOrthogonalStreamConnectivity(cols, rows, heights, flow, waterKind, channelId, channelOrder, channelWidth, waterSurfaceHeight);
                 TerrainGrid.removeInteriorStreamSpurs(cols, rows, waterKind, channelId, channelOrder, channelWidth, waterSurfaceHeight);
@@ -2593,10 +2594,14 @@ button:hover {
         }
         static removeStreamComponentsNotTerminatingAtOutlet(cols, rows, waterKind, channelId, channelOrder, channelWidth, waterSurfaceHeight, coastalWorld){
             var components = TerrainGrid.collectStreamComponents(cols, rows, waterKind);
-            for (var i = 0;
-            i<components.length;
-            i+=1){
-                var validOutlet = coastalWorld ? TerrainGrid.streamComponentTouchesSea(cols, rows, waterKind, components[i]) : TerrainGrid.streamComponentReachesOutlet(cols, rows, waterKind, components[i]);
+            for (var i = 0; i<components.length; i+=1){
+                var outletCount = 0;
+                for (var c = 0; c<components[i].length; c+=1){
+                    if (TerrainGrid.streamComponentReachesOutlet(cols, rows, waterKind, [components[i][c]])){
+                        outletCount+=1;
+                    }
+                }
+                var validOutlet = coastalWorld ? TerrainGrid.streamComponentTouchesSea(cols, rows, waterKind, components[i]) : outletCount>=2;
                 if (!validOutlet){
                     TerrainGrid.clearStreamComponent(components[i], waterKind, channelId, channelOrder, channelWidth, waterSurfaceHeight);
                 }
@@ -2659,9 +2664,7 @@ button:hover {
                 changed = false;
                 guard+=1;
                 var toClear = [];
-                for (var index = 0;
-                index<waterKind.length;
-                index+=1){
+                for (var index = 0; index<waterKind.length; index+=1){
                     if (waterKind[index]!=='stream'){
                         continue;
                     }
@@ -2674,9 +2677,7 @@ button:hover {
                 }
                 if (toClear.length>0){
                     changed = true;
-                    for (var i = 0;
-                    i<toClear.length;
-                    i+=1){
+                    for (var i = 0; i<toClear.length; i+=1){
                         var clearIndex = toClear[i];
                         waterKind[clearIndex] = 'none';
                         channelId[clearIndex] = -1;
@@ -2883,14 +2884,14 @@ button:hover {
                 waterSurfaceHeight[index] = heights[index];
             }
         }
-        static ensureTemperateStreamFrequency(cols, rows, heights, flow, waterKind, channelId, channelOrder, channelWidth, waterSurfaceHeight, environment, coastalWorld, seaLevel, seed, perennialThreshold){
+        static ensureTemperateStreamFrequency(cols, rows, heights, flow, waterKind, channelId, channelOrder, channelWidth, waterSurfaceHeight, environment, coastalWorld, seaLevel, seed, perennialThreshold, replaceInvalidTracedStream){
             // The explicit frequency calibration is for the default/standard map scale.
             // Smaller fast-regression/legacy maps rely on the normal flow-accumulation
             // hydrology and avoid paying the cost of synthetic through-map routing.
-            if (cols * rows<2400){
+            if (!replaceInvalidTracedStream && cols * rows<2400){
                 return false;
             }
-            if (!TerrainGrid.isTemperateStreamClimate(environment)){
+            if (!replaceInvalidTracedStream && !TerrainGrid.isTemperateStreamClimate(environment)){
                 return false;
             }
             if (TerrainGrid.collectStreamComponents(cols, rows, waterKind).length>0){
@@ -2899,7 +2900,7 @@ button:hover {
             // Calibrated target: about 60% of temperate default-size maps should show a stream.
             // This supplements physically accumulated streams only when the stricter outlet and
             // spur-pruning rules would otherwise leave a temperate map streamless.
-            if (TerrainGrid.deterministicStreamFrequencyRoll(seed, cols, rows)>=0.60){
+            if (!replaceInvalidTracedStream && TerrainGrid.deterministicStreamFrequencyRoll(seed, cols, rows)>=0.60){
                 return false;
             }
             var path = null;
@@ -3869,47 +3870,50 @@ button:hover {
             } ;
             World.applyMapSizeSettings(settings);
             var maxAttempts = Number.isFinite(settings.maxMapGenerationAttempts) ? Math.max(1, Math.floor(settings.maxMapGenerationAttempts)) : 80;
-            var originalSeed = seed>>>0;
-            var candidateSeed = originalSeed;
-            var grid = null;
-            var environment = null;
-            var rng = null;
-            var attempt;
-            for (attempt = 0;
-            attempt<maxAttempts;
-            attempt+=1){
-                rng = new SeededRng(candidateSeed);
-                environment = World.createEnvironment(rng, settings);
-                grid = World.createTerrainGrid(rng, environment);
-                if (World.validateRequiredEntryEdges(grid, settings)){
-                    break;
+            var candidateSeed = seed>>>0;
+            var lastPlacementError = null;
+            for (var attempt = 0; attempt<maxAttempts; attempt+=1){
+                var rng = new SeededRng(candidateSeed);
+                var environment = World.createEnvironment(rng, settings);
+                var grid = World.createTerrainGrid(rng, environment);
+                if (!World.validateRequiredEntryEdges(grid, settings)){
+                    candidateSeed = rng.integer(1, 0x7fffffff);
+                    continue;
                 }
-                candidateSeed = rng.integer(1, 0x7fffffff);
+                var adventurerEntryEdge = World.chooseAdventurerEntryEdge(rng, grid, settings);
+                if (!World.edgeHasLand(grid, adventurerEntryEdge)){
+                    World.ensureEntryEdgeLand(grid, adventurerEntryEdge);
+                }
+                var objects = TerrainGrid.createTerrainObjects(rng, environment, grid);
+                var deposits;
+                try{
+                    deposits = World.createTreasureDeposits(rng, grid, objects, settings, adventurerEntryEdge);
+                } catch (error){
+                    if (!error || String(error.message || error).indexOf('Could not place validated fallback treasure')<0){
+                        throw error;
+                    }
+                    lastPlacementError = error;
+                    candidateSeed = rng.integer(1, 0x7fffffff);
+                    continue;
+                }
+                var distance = World.createSettlementDistanceMiles(rng, environment, settings, grid);
+                return {
+                    seed : candidateSeed,
+                    width : MAP_WIDTH,
+                    height : MAP_HEIGHT,
+                    terrainGrid : grid,
+                    environment : environment,
+                    distanceToSettlementMiles : distance,
+                    terrainObjects : objects,
+                    treasureDeposits : deposits,
+                    adventurerEntryEdge : adventurerEntryEdge
+                } ;
             }
-            if (!World.validateRequiredEntryEdges(grid, settings)){
-                World.ensureRequiredEntryEdgeLand(grid, settings);
+            if (lastPlacementError){
+                throw lastPlacementError;
             }
-            var adventurerEntryEdge = World.chooseAdventurerEntryEdge(rng, grid, settings);
-            if (!World.edgeHasLand(grid, adventurerEntryEdge)){
-                World.ensureEntryEdgeLand(grid, adventurerEntryEdge);
-            }
-            var objects = TerrainGrid.createTerrainObjects(rng, environment, grid);
-            var deposits = World.createTreasureDeposits(rng, grid, objects, settings, adventurerEntryEdge);
-            var distance = World.createSettlementDistanceMiles(rng, environment, settings, grid);
-            return {
-                seed : candidateSeed,
-                width : MAP_WIDTH,
-                height : MAP_HEIGHT,
-                terrainGrid : grid,
-                environment : environment,
-                distanceToSettlementMiles : distance,
-                terrainObjects : objects,
-                treasureDeposits : deposits,
-                adventurerEntryEdge : adventurerEntryEdge
-            } ;
-        
+            throw new Error('Could not generate a world with valid required entry edges.');
         }
-
         static createSettlementDistanceMiles(rng, environment, settings, grid){
             return World.createSettlementDistanceMiles(rng, environment, settings);
         }
@@ -4737,46 +4741,85 @@ button:hover {
             }
             return false;
         }
-        static treasurePointIsReachableFromEntryEdge(grid, objects, point, adventurerEntryEdge){
+        static treasureReachabilityMapFromEntryEdge(grid, objects, adventurerEntryEdge){
             var entryEdge = adventurerEntryEdge || DEFAULT_ADVENTURER_ENTRY_EDGE;
-            var width = World.mapWidthForGrid(grid);
-            var height = World.mapHeightForGrid(grid);
-            var length = entryEdge==='left' || entryEdge==='right' ? height : width;
-            var samples = Math.max(8, Math.ceil(length / TILE_SIZE));
-            for (var i = 0;
-            i<=samples;
-            i+=1){
-                var offset = length *(i / samples);
-                var startPoint;
-                if (entryEdge==='right'){
-                    startPoint = {
-                        x : width,
-                        y : offset
-                    } ;
-                } else if (entryEdge==='top'){
-                    startPoint = {
-                        x : offset,
-                        y : 0
-                    } ;
-                } else if (entryEdge==='bottom'){
-                    startPoint = {
-                        x : offset,
-                        y : height
-                    } ;
-                } else{
-                    startPoint = {
-                        x : 0,
-                        y : offset
-                    } ;
+            var blockingIds = objects.filter(function (object){
+                return object.blocksMovement;
+            } ).map(function (object){
+                return object.id;
+            } ).join('|');
+            var cacheKey = entryEdge+'|'+blockingIds;
+            if (grid.treasureReachabilityCache && grid.treasureReachabilityCache.key===cacheKey){
+                return grid.treasureReachabilityCache;
+            }
+            var cols = Math.floor(World.mapWidthForGrid(grid) / NAV_CELL_SIZE)+1;
+            var rows = Math.floor(World.mapHeightForGrid(grid) / NAV_CELL_SIZE)+1;
+            var reachable = new Array(cols * rows).fill(false);
+            var queue = [];
+            var head = 0;
+            function AddEntryCell(cx, cy){
+                if (cx<0 || cy<0 || cx>=cols || cy>=rows){
+                    return;
                 }
-                if (!World.pointIsOpenForTreasureProbe(grid, objects, startPoint.x, startPoint.y)){
-                    continue;
+                var index = cy * cols+cx;
+                if (reachable[index] || !World.navCellIsOpenForTreasureProbe(grid, objects, cx, cy)){
+                    return;
                 }
-                if (World.treasureProbePathExists(grid, objects, startPoint, point)){
-                    return true;
+                reachable[index] = true;
+                queue.push({ cx : cx, cy : cy });
+            }
+            if (entryEdge==='left' || entryEdge==='right'){
+                var entryX = entryEdge==='left' ? 0 : cols-1;
+                for (var entryY = 0; entryY<rows; entryY+=1){
+                    AddEntryCell(entryX, entryY);
+                }
+            } else{
+                var entryY = entryEdge==='top' ? 0 : rows-1;
+                for (var entryX = 0; entryX<cols; entryX+=1){
+                    AddEntryCell(entryX, entryY);
                 }
             }
-            return false;
+            var directions = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+            while (head<queue.length){
+                var current = queue[head];
+                head+=1;
+                for (var i = 0; i<directions.length; i+=1){
+                    var dx = directions[i][0];
+                    var dy = directions[i][1];
+                    var nx = current.cx+dx;
+                    var ny = current.cy+dy;
+                    if (nx<0 || ny<0 || nx>=cols || ny>=rows){
+                        continue;
+                    }
+                    var neighbourIndex = ny * cols+nx;
+                    if (reachable[neighbourIndex] || !World.navCellIsOpenForTreasureProbe(grid, objects, nx, ny)){
+                        continue;
+                    }
+                    if (dx!==0 && dy!==0 && (!World.navCellIsOpenForTreasureProbe(grid, objects, current.cx+dx, current.cy) || !World.navCellIsOpenForTreasureProbe(grid, objects, current.cx, current.cy+dy))){
+                        continue;
+                    }
+                    if (World.treasureProbeMovementCostBetween(grid, current, { cx : nx, cy : ny })>=9999){
+                        continue;
+                    }
+                    reachable[neighbourIndex] = true;
+                    queue.push({ cx : nx, cy : ny });
+                }
+            }
+            grid.treasureReachabilityCache = {
+                key : cacheKey,
+                cols : cols,
+                rows : rows,
+                reachable : reachable
+            } ;
+            return grid.treasureReachabilityCache;
+        }
+        static treasurePointIsReachableFromEntryEdge(grid, objects, point, adventurerEntryEdge){
+            var goal = World.nearestOpenTreasureProbeCell(grid, objects, point);
+            if (!goal){
+                return false;
+            }
+            var reachability = World.treasureReachabilityMapFromEntryEdge(grid, objects, adventurerEntryEdge);
+            return !!reachability.reachable[goal.cy * reachability.cols+goal.cx];
         }
         static findTreasurePoint(rng, grid, things, minDistance, allowEdge, adventurerEntryEdge){
             for (var attempt = 0;
@@ -12456,6 +12499,17 @@ button:hover {
                     reason : monster.name+' is dead and cannot be released.'
                 } ;
             }
+            var activeMaternalBrood = this.eggs.some(function (brood){
+                return brood.motherId===monster.id &&(brood.eggs || []).some(function (egg){
+                    return egg.status==='incubating';
+                } );
+            } );
+            if (activeMaternalBrood){
+                return {
+                    ok : false,
+                    reason : monster.name+' cannot be released while she has an incubating brood.'
+                } ;
+            }
             monster.collared = false;
             monster.owned = false;
             monster.deployed = false;
@@ -16462,7 +16516,9 @@ button:hover {
         tinyMonster.bodyScale = 0.50;
         tinyMonster.spineSize = 0;
         var predatoryBear = new Macrofauna('predatory_polar_bear', 'polarBear', 204, 200, new SeededRng(424281));
+        predatoryBear.attackChance = 1;
         var predationRaid = new Raid(session.world, session.gameState, 424282, 1, []);
+        predationRaid.rng.nextFloat = function(){ return 0; };
         predationRaid.monsters = [tinyMonster];
         predationRaid.macrofauna = [predatoryBear];
         predationRaid.resolveMacrofaunaMonsterPredation();
@@ -16485,7 +16541,7 @@ button:hover {
         } ;
         var count = Number.isFinite(options.count) ? Math.max(1, Math.min(3, Math.floor(options.count))) : 1;
         var firstSeed = Number.isFinite(options.seed) ? Math.floor(options.seed) : 100000;
-        var maxTicks = Number.isFinite(options.maxTicks) ? Math.max(1, Math.min(90, Math.floor(options.maxTicks))) : 90;
+        var maxTicks = Number.isFinite(options.maxTicks) ? Math.max(1, Math.min(180, Math.floor(options.maxTicks))) : 90;
         var regressionTests = RunRegressionTests();
         var results = [];
         var endedCount = 0;
@@ -18434,6 +18490,11 @@ button:hover {
         RenderMonsterFamilyPanel(monster, managementMonsters);
         RenderBreedingPanel(monster);
         if (monster.alive && currentSnapshot && currentSnapshot.phase!=='raid'){
+            var activeMaternalBrood = !!managementSnapshot &&(managementSnapshot.eggs || []).some(function (brood){
+                return brood.motherId===monster.id &&(brood.eggs || []).some(function (egg){
+                    return egg.status==='incubating';
+                } );
+            } );
             var releasePanel = document.createElement('div');
             releasePanel.className = 'breedingPanel';
             var releaseHeading = document.createElement('h4');
@@ -18442,10 +18503,17 @@ button:hover {
             releaseDescription.textContent = 'Remove the collar and permanently release this monster. It will leave the captive roster and no longer add to captive food demand.';
             var releaseButton = document.createElement('button');
             releaseButton.type = 'button';
-            releaseButton.textContent = 'Release '+monster.name;
-            releaseButton.style.background = '#9f1239';
+            releaseButton.textContent = activeMaternalBrood ? 'Cannot release - mother has a brood' : 'Release '+monster.name;
+            releaseButton.disabled = activeMaternalBrood;
+            if (activeMaternalBrood){
+                releaseDescription.textContent = 'This mother has an incubating brood and cannot be released until the brood has resolved.';
+            }
+            releaseButton.style.background = activeMaternalBrood ? '#6b7280' : '#9f1239';
             releaseButton.style.color = 'white';
             releaseButton.addEventListener('click', function (){
+                if (activeMaternalBrood){
+                    return;
+                }
                 if (!window.confirm('Release '+monster.name+' into the wild permanently? This monster will leave the captive roster and cannot be recalled.')){
                     return;
                 }

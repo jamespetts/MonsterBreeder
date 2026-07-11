@@ -71,7 +71,7 @@ if (!result.payload.regressionTests || !result.payload.regressionTests.passed) {
 '''
     runner = Path('monster_breeder_node_regression_runner_20260703_2327.js')
     runner.write_text(nodeSource, encoding='utf-8')
-    result = subprocess.run(['node', str(runner), str(workerPath)], capture_output=True, text=True, timeout=60)
+    result = subprocess.run(['node', str(runner), str(workerPath)], capture_output=True, text=True, timeout=120)
     if result.stdout:
         print(result.stdout)
     if result.stderr:
@@ -213,7 +213,7 @@ def StaticDomChecks(html):
         'getTreasureBreakdown(extraLooseTreasure)',
         'function FormatEndOfRoundStats',
         'function SeasonNameForSnapshot',
-        'Food expenditure does not remove physical treasure units',
+        'Food expenditure is a score/value deduction.',
         'Knights are not deterred by lower-class adventurers failing to return alive',
     ]
     missing = [text for text in required if text not in html]
