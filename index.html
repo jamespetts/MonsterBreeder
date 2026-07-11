@@ -402,6 +402,49 @@ button:hover {
 .familyList li {
     margin: 0.18rem 0;
 }
+.eggCard {
+    min-height: 150px;
+    border-color: #8b6f47;
+    background: #fff7dd;
+}
+.eggCard.unhatched {
+    filter: grayscale(1);
+    opacity: 0.62;
+}
+.eggVisual {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 78px;
+}
+.eggShape {
+    width: 52px;
+    height: 68px;
+    border-radius: 52% 48% 47% 53% / 61% 61% 39% 39%;
+    background: radial-gradient(circle at 34% 28%, #fffdf2 0 10%, #e8d5a5 48%, #9c7a4b 100%);
+    border: 3px solid #6b4f2d;
+    box-shadow: inset -8px -10px 12px rgba(70,45,20,0.18);
+}
+.eggCard.cracked .eggShape {
+    background: linear-gradient(115deg, transparent 47%, #5b4633 48% 52%, transparent 53%), radial-gradient(circle at 34% 28%, #eee 0 10%, #bbb 48%, #777 100%);
+}
+.familyTree {
+    margin-top: 0.4rem;
+    padding-left: 0.5rem;
+    border-left: 3px solid #d8d0b8;
+}
+.familyTreeNode {
+    margin: 0.28rem 0 0.28rem 0.65rem;
+}
+.familyTreeButton {
+    width: auto;
+    padding: 0.22rem 0.42rem;
+    text-align: left;
+    font-size: 0.83rem;
+}
+.familyTreeDead {
+    color: #6b7280;
+}
 .performanceMuted {
     color: #687068;
 }
@@ -856,8 +899,8 @@ button:hover {
     var MONSTER_JUVENILE_MATURATION_SEASONS = 1;
     var MONSTER_GROWTH_TO_FULL_SIZE_SEASONS = 4;
     var MONSTER_MOTHER_BREEDING_HOLD_SEASONS = 1;
-    var MONSTER_CLUTCH_SIZE_MIN = 2;
-    var MONSTER_CLUTCH_SIZE_MAX = 4;
+    var MONSTER_CLUTCH_SIZE_MIN = 1;
+    var MONSTER_CLUTCH_SIZE_MAX = 6;
     // One year is four seasons. The current genetic/lifecycle target is an
     // average life expectancy of about ten years, with noticeable weakening in
     // the last two years for monsters that live that long. These values describe
@@ -6426,6 +6469,7 @@ button:hover {
                 effects : { speedMultiplier : 0.78, foodMultiplier : 1.14, infertileAt : 0.72, incapacitatedAt : 0.88, deathAt : 0.98, deathChance : 0.04, damageMultiplier : 1.42 },
                 geneticSelection : { riskModel : 'overmuscleStrainMorphology', selectionPressure : 5.8 }
             } ,
+            reproductiveTumour : { id:'reproductiveTumour', displayName:'Reproductive tumour', description:'An abnormal growth of reproductive tissue. Its internal cause is not observable, but swelling, weakness and impaired fertility are apparent.', ui:{morphology:'swollen',tint:'#a855f7'}, effects:{speedMultiplier:0.82,foodMultiplier:1.18,infertileAt:0.42,incapacitatedAt:0.82,deathAt:0.93,deathChance:0.16,damageMultiplier:1.18}, geneticSelection:{riskModel:'reproductiveTumourRepair',selectionPressure:7.0} },
             giantGrowthFailure : {
                 id : 'giantGrowthFailure',
                 displayName : 'Giant growth failure',
@@ -6496,6 +6540,7 @@ button:hover {
                 var muscleLoad = (m.muscleGrowthBias || 1) * Math.max(m.forelimbMuscleBias || 1, m.hindlimbMuscleBias || 1) * Math.sqrt(m.frameScale || 1);
                 return Clamp(Math.max(0, muscleLoad-skeletal * 1.42) * 0.25, 0, 0.78);
             } ,
+            reproductiveTumourRepair : function(phenotype,profile){ var r=phenotype&&phenotype.reproduction; if(!r){return 0;} var age=profile&&profile.selectionAgeFactor?profile.selectionAgeFactor:0.55; return Clamp(Math.max(0,r.reproductiveRepair-1.12)*Math.max(0,1.12-r.tumourSuppression)*0.42*age,0,0.75); },
             giantGrowthFailureMorphology : function (phenotype, profile){
                 var m = phenotype && phenotype.morphology ? phenotype.morphology : null;
                 if (!m){ return 0; }
@@ -6616,9 +6661,14 @@ button:hover {
                 congenitalMuscleWasting : (morphologyRisk.congenitalMuscleWasting || 0)+commonRisk,
                 brittleBoneSyndrome : (morphologyRisk.brittleBoneSyndrome || 0)+commonRisk,
                 overmuscleStrain : (morphologyRisk.overmuscleStrain || 0)+commonRisk,
-                giantGrowthFailure : (morphologyRisk.giantGrowthFailure || 0)+commonRisk
+                giantGrowthFailure : (morphologyRisk.giantGrowthFailure || 0)+commonRisk,
+                reproductiveTumour : this.reproductiveTumourRiskFor(monster)+commonRisk
             } ;
         } ,
+        reproductiveTumourRiskFor : function(monster){
+            var r=monster&&monster.phenotype&&monster.phenotype.reproduction; if(!r){return 0;}
+            return Clamp(Math.max(0,r.reproductiveRepair-1.08)*Math.max(0,1.12-r.tumourSuppression)*this.ageDiseaseRiskFactor(monster)*0.065,0,0.42);
+        },
         marginalMorphologyRiskFor : function (monster, world){
             var m = monster && monster.phenotype && monster.phenotype.morphology ? monster.phenotype.morphology : null;
             if (!m){
@@ -6662,7 +6712,7 @@ button:hover {
                     events.push(monster.name+' developed '+wasting.displayName+'.');
                 }
             }
-            ['congenitalMuscleWasting', 'brittleBoneSyndrome', 'overmuscleStrain', 'giantGrowthFailure'].forEach(function (diseaseId){
+            ['congenitalMuscleWasting', 'brittleBoneSyndrome', 'overmuscleStrain', 'giantGrowthFailure', 'reproductiveTumour'].forEach(function (diseaseId){
                 var riskValue = risk[diseaseId] || 0;
                 if (rng.nextFloat()<riskValue){
                     var morphologyDisease = MonsterDiseaseSystem.addOrIntensify(monster, diseaseId, Clamp(0.32+riskValue * 2.2, 0.30, 0.98), rng.integer(2, 5));
@@ -6682,7 +6732,7 @@ button:hover {
                     monster.corpseState = 'corpse';
                     monster.behaviourState = 'dead';
                     if (events){
-                        events.push(monster.name+' died from '+disease.displayName+'.');
+                        monster.observableCauseOfDeath=disease.displayName; events.push(monster.name+' died from '+disease.displayName+'.');
                     }
                 }
             } );
@@ -6996,7 +7046,8 @@ button:hover {
         COLOUR : 'colour',
         METABOLISM : 'metabolism',
         MORPHOLOGY : 'morphology',
-        BEHAVIOUR : 'behaviour'
+        BEHAVIOUR : 'behaviour',
+        REPRODUCTION : 'reproduction'
     } ;
     var COLOUR_CHROMOSOME_INDEX = 0;
     var COLOUR_CHROMOSOME_SLOT_COUNT = 4;
@@ -7006,6 +7057,8 @@ button:hover {
     var MORPHOLOGY_CHROMOSOME_SLOT_COUNT = 6;
     var BEHAVIOUR_CHROMOSOME_INDEX = 3;
     var BEHAVIOUR_CHROMOSOME_SLOT_COUNT = 6;
+    var REPRODUCTION_CHROMOSOME_INDEX = 4;
+    var REPRODUCTION_CHROMOSOME_SLOT_COUNT = 7;
     var IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR = 9.0;
     var DEFAULT_COMFORTABLE_TEMPERATURE_C = 12;
     var DEFAULT_BASE_THERMAL_LOW_C = -4;
@@ -7313,6 +7366,13 @@ button:hover {
         }
         return result;
     }
+    class ReproductionFactorState{
+        constructor(values){
+            Object.assign(this, { follicleRecruitment : 0, yolkSynthesis : 0, shellDeposition : 0, shellPermeability : 0, developmentRate : 0, gameteMaintenance : 0, reproductiveRepair : 0, reproductiveSenescenceResistance : 0, sexHormone : 0, femaleBias : 0, maleBias : 0, tumourSuppression : 0 }, values || {});
+        }
+        add(values){ Object.keys(this).forEach(function(key){ this[key]+=(values && Number.isFinite(values[key])) ? values[key] : 0; }, this); }
+        cloneWith(values){ var result = new ReproductionFactorState(this); result.add(values); return result; }
+    }
     class MonsterPhenotypeExpressionContext{
         constructor(monster){
             this.monster = monster || null;
@@ -7329,6 +7389,7 @@ button:hover {
             this.getEffectBag(GENETIC_TRAIT.METABOLISM, MonsterPhenotypeExpressionContext.createMetabolismEffectBag);
             this.getEffectBag(GENETIC_TRAIT.MORPHOLOGY, MonsterPhenotypeExpressionContext.createMorphologyEffectBag);
             this.getEffectBag(GENETIC_TRAIT.BEHAVIOUR, MonsterPhenotypeExpressionContext.createBehaviourEffectBag);
+            this.getEffectBag(GENETIC_TRAIT.REPRODUCTION, MonsterPhenotypeExpressionContext.createReproductionEffectBag);
         }
 
         static createColourEffectBag(){
@@ -7356,6 +7417,10 @@ button:hover {
                 new MorphologyFactorState()],
                 usedCodominantMorphologyLayers : false
             } ;
+        }
+
+        static createReproductionEffectBag(){
+            return { baseReproductionFactors : new ReproductionFactorState(), codominantReproductionLayers : [new ReproductionFactorState(), new ReproductionFactorState()], usedCodominantReproductionLayers : false };
         }
 
         static createBehaviourEffectBag(){
@@ -7394,6 +7459,15 @@ button:hover {
 
         getBehaviourEffectBag(){
             return this.getEffectBag(GENETIC_TRAIT.BEHAVIOUR, MonsterPhenotypeExpressionContext.createBehaviourEffectBag);
+        }
+        getReproductionEffectBag(){
+            return this.getEffectBag(GENETIC_TRAIT.REPRODUCTION, MonsterPhenotypeExpressionContext.createReproductionEffectBag);
+        }
+        addReproductionFactors(amounts, normalise){
+            var bag = this.getReproductionEffectBag();
+            if (normalise===true){ bag.usedCodominantReproductionLayers = true; bag.codominantReproductionLayers[this.activeCodominantLayerIndex].add(amounts); return; }
+            if (normalise!==false){ throw new Error('Reproduction allele phenotype methods must pass the normalise boolean explicitly.'); }
+            bag.baseReproductionFactors.add(amounts);
         }
 
         get usedCodominantSkinLayers(){
@@ -7553,6 +7627,16 @@ button:hover {
         }
     }
 
+    class ReproductionAllele extends Allele{
+        constructor(dominanceIndex, reproductionFactors, options){
+            super(dominanceIndex, { selectionSensitive : options && options.selectionSensitive!==undefined ? !!options.selectionSensitive : true, debugLabel : options && options.debugLabel ? options.debugLabel : 'reproduction allele' });
+            this.reproductionFactors = Object.assign(new ReproductionFactorState(), reproductionFactors || {});
+        }
+        phenotype(context, normalise){
+            if (normalise!==true && normalise!==false){ throw new Error('ReproductionAllele.phenotype requires an explicit normalise boolean.'); }
+            context.addReproductionFactors(this.reproductionFactors, normalise);
+        }
+    }
     class BehaviourAllele extends Allele{
         constructor(dominanceIndex, hormoneEffects, options){
             super(dominanceIndex, {
@@ -8272,31 +8356,72 @@ button:hover {
             return this.resolveBehaviourPhenotype(context);
         }
     }
+    var ReproductionPhenotypeSystem = {
+        resolve : function(context){
+            var bag=context.getReproductionEffectBag();
+            var f=bag.baseReproductionFactors.cloneWith(null);
+            if (bag.usedCodominantReproductionLayers){ f=f.cloneWith(bag.codominantReproductionLayers[0]).cloneWith(bag.codominantReproductionLayers[1]); }
+            return {
+                follicleRecruitment : Clamp(3.05+f.follicleRecruitment/65, 0.55, 7.4),
+                yolkSynthesis : Clamp(1+f.yolkSynthesis/150, 0.25, 1.9),
+                shellThickness : Clamp(1+f.shellDeposition/155, 0.25, 2.05),
+                shellPermeability : Clamp(1+f.shellPermeability/170, 0.35, 1.75),
+                developmentRate : Clamp(1+f.developmentRate/165, 0.45, 1.85),
+                gameteMaintenance : Clamp(1+f.gameteMaintenance/155, 0.25, 1.8),
+                reproductiveRepair : Clamp(1+f.reproductiveRepair/155, 0.3, 1.9),
+                reproductiveSenescenceResistance : Clamp(1+f.reproductiveSenescenceResistance/165, 0.35, 1.8),
+                sexHormone : Clamp(1+f.sexHormone/155, 0.25, 1.9),
+                femaleBias : Clamp(f.femaleBias/260, -0.26, 0.26),
+                maleBias : Clamp(f.maleBias/260, -0.26, 0.26),
+                tumourSuppression : Clamp(1+f.tumourSuppression/170, 0.3, 1.8),
+                rawFactors : Object.assign({}, f)
+            };
+        }
+    };
+    class ReproductionGeneticTraitDefinition extends GeneticTraitDefinition{
+        constructor(){ super(GENETIC_TRAIT.REPRODUCTION, REPRODUCTION_CHROMOSOME_INDEX, REPRODUCTION_CHROMOSOME_SLOT_COUNT); }
+        createRandomChromosomePair(rng, genePool, world){
+            var profile=genePool.getWorldReproductionSelectionProfile(world); var candidates=[]; var weights=[]; var total=0;
+            for(var i=0;i<3;i+=1){ var pair=genePool.createProposedChromosomePair(this,rng,null); var context=new MonsterPhenotypeExpressionContext(); pair.expressTo(context); var weight=Math.pow(Math.max(0.0001,genePool.getReproductionPhenotypeFitness(ReproductionPhenotypeSystem.resolve(context),profile)),2.2); candidates.push(pair); weights.push(weight); total+=weight; }
+            var roll=rng.range(0,total), cumulative=0; for(i=0;i<candidates.length;i+=1){cumulative+=weights[i];if(roll<=cumulative){return candidates[i];}} return candidates[0];
+        }
+        getSelectionAllelePools(genePool){ return genePool.reproductionChromosomeSlots; }
+        createSelectionAccumulator(){ return new ReproductionFactorState(); }
+        addAllelePairSelectionContributionToAccumulator(accumulator,a,b,scale){ var c=new MonsterPhenotypeExpressionContext(); ChromosomePair.expressAllelePair(a,b,c); var raw=ReproductionPhenotypeSystem.resolve(c).rawFactors; Object.keys(accumulator).forEach(function(k){ accumulator[k]+=(raw[k]||0)*scale; }); }
+        addSelectionAccumulatorToContext(context, accumulator){ context.addReproductionFactors(accumulator,false); }
+        scoreSelectionContext(context, profile, genePool){ return genePool.getReproductionPhenotypeFitness(ReproductionPhenotypeSystem.resolve(context), profile); }
+        resolvePhenotype(context, monster){ return ReproductionPhenotypeSystem.resolve(context); }
+    }
     var MonsterMorphologyTraitDefinition = new MorphologyGeneticTraitDefinition();
     var MonsterColourTraitDefinition = new ColourGeneticTraitDefinition();
     var MonsterMetabolismTraitDefinition = new MetabolismGeneticTraitDefinition();
     var MonsterBehaviourTraitDefinition = new BehaviourGeneticTraitDefinition();
+    var MonsterReproductionTraitDefinition = new ReproductionGeneticTraitDefinition();
     class GenePool{
         constructor(){
             this.traitDefinitions = [
                 MonsterColourTraitDefinition,
                 MonsterMetabolismTraitDefinition,
                 MonsterMorphologyTraitDefinition,
-                MonsterBehaviourTraitDefinition
+                MonsterBehaviourTraitDefinition,
+                MonsterReproductionTraitDefinition
             ];
             this.chromosomeSlots = [];
             this.createChromosomeSlots(COLOUR_CHROMOSOME_INDEX, COLOUR_CHROMOSOME_SLOT_COUNT);
             this.createChromosomeSlots(METABOLISM_CHROMOSOME_INDEX, METABOLISM_CHROMOSOME_SLOT_COUNT);
             this.createChromosomeSlots(MORPHOLOGY_CHROMOSOME_INDEX, MORPHOLOGY_CHROMOSOME_SLOT_COUNT);
             this.createChromosomeSlots(BEHAVIOUR_CHROMOSOME_INDEX, BEHAVIOUR_CHROMOSOME_SLOT_COUNT);
+            this.createChromosomeSlots(REPRODUCTION_CHROMOSOME_INDEX, REPRODUCTION_CHROMOSOME_SLOT_COUNT);
             this.colourChromosomeSlots = this.chromosomeSlots[COLOUR_CHROMOSOME_INDEX];
             this.metabolismChromosomeSlots = this.chromosomeSlots[METABOLISM_CHROMOSOME_INDEX];
             this.morphologyChromosomeSlots = this.chromosomeSlots[MORPHOLOGY_CHROMOSOME_INDEX];
             this.behaviourChromosomeSlots = this.chromosomeSlots[BEHAVIOUR_CHROMOSOME_INDEX];
+            this.reproductionChromosomeSlots = this.chromosomeSlots[REPRODUCTION_CHROMOSOME_INDEX];
             this.addDefaultColourAlleles();
             this.addDefaultMetabolismAlleles();
             this.addDefaultMorphologyAlleles();
             this.addDefaultBehaviourAlleles();
+            this.addDefaultReproductionAlleles();
         }
 
         createChromosomeSlots(chromosomeIndex, slotCount){
@@ -8321,6 +8446,7 @@ button:hover {
             if (chromosomeIndex===BEHAVIOUR_CHROMOSOME_INDEX){
                 return GENETIC_TRAIT.BEHAVIOUR;
             }
+            if (chromosomeIndex===REPRODUCTION_CHROMOSOME_INDEX){ return GENETIC_TRAIT.REPRODUCTION; }
             throw new Error('Unknown gene pool chromosome index: '+chromosomeIndex);
         }
 
@@ -8349,6 +8475,11 @@ button:hover {
             return allele;
         }
 
+        expressGenomePhenotype(genome){
+            var context=new MonsterPhenotypeExpressionContext(); var out={};
+            this.traitDefinitions.forEach(function(t){ t.expressToPhenotype(genome,context); });
+            this.traitDefinitions.forEach(function(t){ out[t.key]=t.resolvePhenotype(context,null); }); return out;
+        }
         createGenome(rng, world){
             var chromosomes = [];
             for (var i = 0;
@@ -8624,6 +8755,7 @@ button:hover {
             if (traitKey===GENETIC_TRAIT.BEHAVIOUR){
                 return this.getBehaviourAllelePairFitness(alleleA, alleleB, profile);
             }
+            if (traitKey===GENETIC_TRAIT.REPRODUCTION){ var c=new MonsterPhenotypeExpressionContext(); ChromosomePair.expressAllelePair(alleleA,alleleB,c); return this.getReproductionPhenotypeFitness(ReproductionPhenotypeSystem.resolve(c),profile); }
             return 1;
         }
 
@@ -9209,6 +9341,37 @@ button:hover {
             return Math.max(0.0001, fitness);
         }
 
+        getWorldReproductionSelectionProfile(world){
+            var ecology=world ? MonsterMetabolismSystem.macrofaunaEcologyProfile(world) : null;
+            return { foodAllowance: ecology ? (ecology.metabolicFoodAllowance||3) : 3, temperatureC: world && world.getCurrentTemperatureC ? world.getCurrentTemperatureC(1) : 12, naturalSelectionCandidateCount: 12, naturalSelectionCandidatePower: 2.2 };
+        }
+        getReproductionPhenotypeFitness(r, profile){
+            if (!r){ return 1; }
+            var food=profile && Number.isFinite(profile.foodAllowance) ? profile.foodAllowance : 3;
+            var eggs=Clamp(r.follicleRecruitment,1,6);
+            var provisioning=r.yolkSynthesis/Math.max(0.6,eggs/3);
+            var shellBalance=Math.exp(-Math.abs(r.shellThickness-1.0)*0.42-Math.abs(r.shellPermeability-1.0)*0.22);
+            var rateBalance=Math.exp(-Math.abs(r.developmentRate-(0.9+provisioning*0.12))*0.5);
+            var viable=eggs*Clamp(provisioning,0.12,1.15)*shellBalance*rateBalance*Clamp(r.gameteMaintenance,0.25,1.35);
+            var maternalCost=eggs*r.yolkSynthesis*(1.15/Math.max(0.45,r.reproductiveRepair));
+            var foodPenalty=Math.exp(-Math.max(0,maternalCost-(6+food*1.5))*0.10);
+            var tumourRisk=Math.max(0,r.reproductiveRepair-1.18)*Math.max(0,1.08-r.tumourSuppression)*0.9;
+            var extremePenalty=Math.exp(-Math.max(0,eggs-5)*0.7-Math.max(0,r.shellThickness-1.65)*1.4-Math.max(0,r.developmentRate-1.55)*1.5-tumourRisk*3);
+            return Math.max(0.0001,viable/3.0*foodPenalty*extremePenalty);
+        }
+        addDefaultReproductionAlleles(){
+            var add=(slot,dom,effects)=>this.addAllele(REPRODUCTION_CHROMOSOME_INDEX,slot,new ReproductionAllele(dom,effects,{debugLabel:this.createDebugLabel(REPRODUCTION_CHROMOSOME_INDEX,slot)}));
+            for(var slot=0;slot<REPRODUCTION_CHROMOSOME_SLOT_COUNT;slot+=1){ add(slot,100,{}); add(slot,100,{}); }
+            add(0,100,{follicleRecruitment:-55,yolkSynthesis:20}); add(0,100,{follicleRecruitment:35,yolkSynthesis:-12}); add(0,28,{follicleRecruitment:245,yolkSynthesis:-55});
+            add(1,100,{yolkSynthesis:48,follicleRecruitment:-16}); add(1,100,{yolkSynthesis:-32,follicleRecruitment:18}); add(1,25,{yolkSynthesis:-135}); add(1,30,{yolkSynthesis:135,follicleRecruitment:-55});
+            add(2,100,{shellDeposition:42,shellPermeability:-12}); add(2,100,{shellDeposition:-28,shellPermeability:30}); add(2,25,{shellDeposition:175,shellPermeability:-115}); add(2,24,{shellDeposition:-120,shellPermeability:70});
+            add(3,100,{developmentRate:40,yolkSynthesis:-12}); add(3,100,{developmentRate:-32,yolkSynthesis:16}); add(3,28,{developmentRate:165,yolkSynthesis:-55});
+            add(4,100,{gameteMaintenance:38,sexHormone:-12}); add(4,100,{gameteMaintenance:-24,sexHormone:36}); add(4,25,{gameteMaintenance:-135,sexHormone:70}); add(4,85,{femaleBias:45}); add(4,85,{maleBias:45});
+            add(5,100,{reproductiveRepair:42,reproductiveSenescenceResistance:25,tumourSuppression:-18}); add(5,100,{reproductiveRepair:-25,reproductiveSenescenceResistance:-15,tumourSuppression:24}); add(5,30,{reproductiveRepair:145,reproductiveSenescenceResistance:70,tumourSuppression:-115});
+            // Predominantly junk DNA. Most alleles do nothing; uncommon variants have pleiotropic extremes.
+            add(6,100,{}); add(6,100,{}); add(6,35,{shellDeposition:95,developmentRate:-45}); add(6,30,{gameteMaintenance:90,femaleBias:75,reproductiveRepair:-55}); add(6,25,{yolkSynthesis:-95,maleBias:90,tumourSuppression:65});
+        }
+
         addDefaultMorphologyAlleles(){
             var junk = (slot) => new Allele(DOMINANCE_DEFAULT, { selectionSensitive : false, debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, slot) });
             for (var slot = 0; slot<MORPHOLOGY_CHROMOSOME_SLOT_COUNT; slot+=1){
@@ -9603,6 +9766,8 @@ button:hover {
             this.juvenileMaturationSeasonsRemaining = options && Number.isFinite(options.juvenileMaturationSeasonsRemaining) ? Math.max(0, Math.floor(options.juvenileMaturationSeasonsRemaining)) : 0;
             this.juvenileGrowthSeasonsRemaining = options && Number.isFinite(options.juvenileGrowthSeasonsRemaining) ? Math.max(0, Math.floor(options.juvenileGrowthSeasonsRemaining)) : (options && options.lifeStage===MONSTER_LIFE_STAGE.JUVENILE ? MONSTER_GROWTH_TO_FULL_SIZE_SEASONS : 0);
             this.breedingHoldSeasonsRemaining = options && Number.isFinite(options.breedingHoldSeasonsRemaining) ? Math.max(0, Math.floor(options.breedingHoldSeasonsRemaining)) : 0;
+            this.fertilisationsThisSeason = options && Number.isFinite(options.fertilisationsThisSeason) ? Math.max(0, Math.floor(options.fertilisationsThisSeason)) : 0;
+            this.reproductiveHistory = Object.assign({matings:0,eggs:0,hatchlings:0}, options && options.reproductiveHistory ? options.reproductiveHistory : {});
             this.motherId = options && options.motherId ? options.motherId : null;
             this.fatherId = options && options.fatherId ? options.fatherId : null;
             this.initialiseBodyAndNutritionFields(options || {}, rng);
@@ -10212,6 +10377,18 @@ button:hover {
             var classScale = adventurer && adventurer.className==='knight' ? 0.42 : (adventurer && adventurer.className==='warrior' ? 0.62 : (adventurer && adventurer.className==='explorer' ? 0.82 : 1.10));
             return Clamp((sizeThreat+spineThreat+toothThreat+brightThreat) * classScale, 0, 1.3);
         }
+        reproductiveCondition(){
+            var nutrition=this.nutritionState===NUTRITION_STATE.NOURISHED ? 1 : (this.nutritionState===NUTRITION_STATE.MALNOURISHED ? 0.68 : 0.38);
+            var injury=this.getOverallConditionRatio ? this.getOverallConditionRatio() : 1;
+            var disease=MonsterDiseaseSystem.combinedEffects(this);
+            return Clamp(nutrition*injury*(disease.infertile?0.05:1),0.02,1);
+        }
+        maleFertilisationCapacity(){
+            var r=this.phenotype&&this.phenotype.reproduction?this.phenotype.reproduction:null;
+            var hormone=r?r.sexHormone:1; var maintenance=r?r.gameteMaintenance:1;
+            var agePenalty=this.ageInSeasons>MONSTER_AGEING_START_SEASONS ? Math.max(0.25,1-(this.ageInSeasons-MONSTER_AGEING_START_SEASONS)/28) : 1;
+            return Clamp(hormone*maintenance*this.reproductiveCondition()*agePenalty*2.05,0.15,5.5);
+        }
         getBreedingBlockReason(requiredSex){
             if (!this.alive){
                 return 'Dead monsters cannot breed.';
@@ -10234,6 +10411,7 @@ button:hover {
             if ((this.breedingHoldSeasonsRemaining || 0)>0){
                 return 'Mother is incubating a brood this season.';
             }
+            if (requiredSex===MONSTER_SEX.MALE && (this.fertilisationsThisSeason||0)>=Math.max(1,Math.floor(this.maleFertilisationCapacity()))){ return 'This sire has exhausted his effective fertility for this season.'; }
             return '';
         }
         canBreed(requiredSex){
@@ -10860,6 +11038,9 @@ button:hover {
             s.juvenileMaturationSeasonsRemaining = this.juvenileMaturationSeasonsRemaining || 0;
             s.juvenileGrowthSeasonsRemaining = this.juvenileGrowthSeasonsRemaining || 0;
             s.breedingHoldSeasonsRemaining = this.breedingHoldSeasonsRemaining || 0;
+            s.fertilisationsThisSeason = this.fertilisationsThisSeason || 0;
+            s.maleFertilisationCapacity = this.maleFertilisationCapacity();
+            s.reproductiveHistory = Object.assign({},this.reproductiveHistory);
             s.motherId = this.motherId;
             s.fatherId = this.fatherId;
             s.canBreed = this.canBreed();
@@ -11494,6 +11675,28 @@ button:hover {
     // ============================================================================
     // MODULE: GAME STATE, CAMPAIGN STATS, RAID AND GAME SESSION
     // ============================================================================
+    class Egg{
+        constructor(id, brood, genome, sex, mother, father, rng){
+            this.id=id; this.broodId=brood.id; this.motherId=mother.id; this.fatherId=father.id; this.motherName=mother.name; this.fatherName=father.name; this.genome=genome; this.sex=sex; this.status='incubating'; this.discardAfterSeasons=0;
+            var mr=mother.phenotype.reproduction; var or=MonsterGenePool.expressGenomePhenotype(genome).reproduction;
+            this.yolkProvision=Clamp(mr.yolkSynthesis/Math.max(0.7,brood.clutchSize/3)*rng.range(0.88,1.12),0.12,1.7);
+            this.shellThickness=Clamp(mr.shellThickness*rng.range(0.88,1.12),0.18,2.2); this.shellPermeability=mr.shellPermeability; this.developmentRate=or.developmentRate;
+            this.mechanicalShock=rng.range(0.12,1.20)*rng.range(0.75,1.10); this.failureReason='';
+        }
+        resolveHatching(rng){
+            if(this.shellThickness<this.mechanicalShock){ this.status='cracked'; this.failureReason='The egg was cracked by mechanical shock before hatching.'; this.discardAfterSeasons=1; return false; }
+            var oxygen=this.shellPermeability/Math.max(0.35,this.shellThickness); var demand=this.developmentRate/Math.max(0.2,this.yolkProvision);
+            var viability=Clamp(0.98-Math.max(0,demand-1.35)*0.36-Math.max(0,0.55-oxygen)*0.55-Math.max(0,0.42-this.yolkProvision)*0.8,0.02,0.995);
+            if(rng.nextFloat()>viability){ this.status='unhatched'; this.failureReason='The egg did not hatch; no more specific cause was externally observable.'; this.discardAfterSeasons=1; return false; }
+            this.status='hatched'; return true;
+        }
+        getSnapshot(){ return {id:this.id,broodId:this.broodId,motherId:this.motherId,fatherId:this.fatherId,motherName:this.motherName,fatherName:this.fatherName,status:this.status,failureReason:this.failureReason,incubationSeasonsRemaining:this.status==='incubating'?1:0,shellThickness:this.shellThickness}; }
+    }
+    class FamilyTreeRecord{
+        constructor(monster){ this.id=monster.id; this.name=monster.name; this.sex=monster.sex; this.motherId=monster.motherId||null; this.fatherId=monster.fatherId||null; this.alive=!!monster.alive; this.ageInSeasons=monster.ageInSeasons||0; this.causeOfDeath=monster.observableCauseOfDeath||''; this.performanceTotals=Monster.clonePerformanceStats(monster.performanceTotals); this.reproductiveHistory=Object.assign({},monster.reproductiveHistory||{}); }
+        update(monster){ this.name=monster.name; this.alive=!!monster.alive; this.ageInSeasons=monster.ageInSeasons||0; this.causeOfDeath=monster.observableCauseOfDeath||this.causeOfDeath; this.performanceTotals=Monster.clonePerformanceStats(monster.performanceTotals); this.reproductiveHistory=Object.assign({},monster.reproductiveHistory||{}); }
+        getSnapshot(){ return Object.assign({},this,{performanceTotals:Monster.clonePerformanceStats(this.performanceTotals),reproductiveHistory:Object.assign({},this.reproductiveHistory)}); }
+    }
     class CampaignStats{
         constructor(){
             this.worldsCompleted = 0;
@@ -11561,10 +11764,15 @@ button:hover {
             } )];
             this.eggs = [];
             this.nextBroodId = 1;
+            this.nextEggId = 1;
+            this.familyTree = {};
+            this.recordFamilyMonster(this.ownedMonsters[0]);
             this.foodExpenditureCredits = 0;
             this.roundFoodExpenditureCredits = 0;
             this.wildMonsterHarvestByBiome = {};
         }
+        recordFamilyMonster(monster){ if(!monster){return;} if(!this.familyTree[monster.id]){this.familyTree[monster.id]=new FamilyTreeRecord(monster);} else {this.familyTree[monster.id].update(monster);} }
+        updateFamilyTree(){ this.ownedMonsters.forEach(function(m){this.recordFamilyMonster(m);},this); }
         createMonsterId(prefix){
             var id =(prefix || 'monster')+'_'+this.nextMonsterId;
             this.nextMonsterId+=1;
@@ -11686,27 +11894,27 @@ button:hover {
             }
             var broodId = 'brood_'+this.nextBroodId;
             this.nextBroodId+=1;
-            var clutchSize = rng.integer(MONSTER_CLUTCH_SIZE_MIN, MONSTER_CLUTCH_SIZE_MAX);
-            var offspring = [];
-            for (var i = 0;
-            i<clutchSize;
-            i+=1){
-                offspring.push({
-                    genome : MonsterGenePool.createOffspringGenome(mother.genome, father.genome, rng),
-                    sex : rng.nextFloat()<0.5 ? MONSTER_SEX.FEMALE : MONSTER_SEX.MALE
-                } );
+            var reproductive = mother.phenotype.reproduction;
+            var condition = mother.reproductiveCondition();
+            var recruitment = reproductive.follicleRecruitment * condition * rng.range(0.82,1.16);
+            var clutchSize = Clamp(Math.round(recruitment), MONSTER_CLUTCH_SIZE_MIN, MONSTER_CLUTCH_SIZE_MAX);
+            // Five and six eggs require unusually strong recruitment and remain uncommon.
+            if (clutchSize>=5 && rng.nextFloat()>Clamp((recruitment-3.8)*0.34,0.08,0.62)){ clutchSize=4; }
+            var brood={ id:broodId,motherId:mother.id,motherName:mother.name,fatherId:father.id,fatherName:father.name,seasonMated:seasonNumber||1,incubationSeasonsRemaining:1,clutchSize:clutchSize,eggs:[] };
+            var parentBias=Clamp((mother.phenotype.reproduction.femaleBias+father.phenotype.reproduction.femaleBias)-(mother.phenotype.reproduction.maleBias+father.phenotype.reproduction.maleBias),-0.38,0.38);
+            var femaleChance=Clamp(0.5+parentBias*0.5,0.12,0.88);
+            var fatherCapacity=Math.max(0.1,father.maleFertilisationCapacity()-(father.fertilisationsThisSeason||0));
+            for (var i=0;i<clutchSize;i+=1){
+                var fertilisationChance=Clamp(0.58+0.22*mother.phenotype.reproduction.gameteMaintenance+0.22*father.phenotype.reproduction.gameteMaintenance,0.15,0.995)*Clamp(fatherCapacity,0.15,1);
+                if(rng.nextFloat()>fertilisationChance){ continue; }
+                var genome=MonsterGenePool.createOffspringGenome(mother.genome,father.genome,rng);
+                brood.eggs.push(new Egg('egg_'+this.nextEggId++,brood,genome,rng.nextFloat()<femaleChance?MONSTER_SEX.FEMALE:MONSTER_SEX.MALE,mother,father,rng));
             }
-            this.eggs.push({
-                id : broodId,
-                motherId : mother.id,
-                motherName : mother.name,
-                fatherId : father.id,
-                fatherName : father.name,
-                seasonMated : seasonNumber || 1,
-                incubationSeasonsRemaining : 1,
-                clutchSize : clutchSize,
-                offspring : offspring
-            } );
+            brood.clutchSize=brood.eggs.length;
+            if(brood.clutchSize<1){ return {ok:false,reason:'No eggs were fertilised.'}; }
+            this.eggs.push(brood);
+            father.fertilisationsThisSeason=(father.fertilisationsThisSeason||0)+1;
+            mother.reproductiveHistory.matings+=1; mother.reproductiveHistory.eggs+=brood.clutchSize; father.reproductiveHistory.matings+=1; father.reproductiveHistory.eggs+=brood.clutchSize;
             mother.breedingHoldSeasonsRemaining = Math.max(mother.breedingHoldSeasonsRemaining || 0, MONSTER_MOTHER_BREEDING_HOLD_SEASONS);
             mother.selectedForDeployment = false;
             return {
@@ -11724,6 +11932,7 @@ button:hover {
                     return;
                 }
                 monster.ageInSeasons =(monster.ageInSeasons || 0)+1;
+                monster.fertilisationsThisSeason=0;
                 if ((monster.breedingHoldSeasonsRemaining || 0)>0){
                     monster.breedingHoldSeasonsRemaining-=1;
                 }
@@ -11757,38 +11966,29 @@ button:hover {
                     monster.selectedForDeployment = false;
                     monster.corpseState = 'corpse';
                     monster.behaviourState = 'dead';
+                    monster.observableCauseOfDeath='Old age';
                     events.push(monster.name+' died of old age at '+Math.floor((monster.ageInSeasons || 0) / MONSTER_SEASONS_PER_YEAR)+' years '+((monster.ageInSeasons || 0) % MONSTER_SEASONS_PER_YEAR)+' seasons.');
                 }
             } );
-            var remainingEggs = [];
-            this.eggs.forEach(function (brood){
-                brood.incubationSeasonsRemaining-=1;
-                if (brood.incubationSeasonsRemaining>0){
-                    remainingEggs.push(brood);
-                    return;
-                }
-                var hatchedCount = 0;
-                brood.offspring.forEach(function (offspring){
-                    var hatchling = new Monster(this.createMonsterId('hatchling'), RIGHT_EDGE_X, rng.range(120, MAP_HEIGHT-120), rng, {
-                        owned : true,
-                        name : Monster.randomName(rng),
-                        selectedForDeployment : false,
-                        world : world,
-                        genome : offspring.genome,
-                        sex : offspring.sex,
-                        ageInSeasons : 0,
-                        lifeStage : MONSTER_LIFE_STAGE.JUVENILE,
-                        juvenileMaturationSeasonsRemaining : MONSTER_JUVENILE_MATURATION_SEASONS,
-                        juvenileGrowthSeasonsRemaining : MONSTER_GROWTH_TO_FULL_SIZE_SEASONS,
-                        motherId : brood.motherId,
-                        fatherId : brood.fatherId
-                    } );
-                    this.ownedMonsters.push(hatchling);
-                    hatchedCount+=1;
-                } , this);
-                events.push(brood.motherName+' and '+brood.fatherName+' produced '+hatchedCount+' hatchling'+(hatchedCount===1 ? '' : 's')+'. They will mature after one more season.');
-            } , this);
-            this.eggs = remainingEggs;
+            var remainingEggs=[];
+            this.eggs.forEach(function(brood){
+                if(brood.incubationSeasonsRemaining>0){ brood.incubationSeasonsRemaining-=1; }
+                var keep=[]; var hatchedCount=0;
+                brood.eggs.forEach(function(egg){
+                    if(egg.status==='incubating' && brood.incubationSeasonsRemaining<=0){
+                        if(egg.resolveHatching(rng)){
+                            var hatchling=new Monster(this.createMonsterId('hatchling'),RIGHT_EDGE_X,rng.range(120,MAP_HEIGHT-120),rng,{owned:true,name:Monster.randomName(rng),selectedForDeployment:false,world:world,genome:egg.genome,sex:egg.sex,ageInSeasons:0,lifeStage:MONSTER_LIFE_STAGE.JUVENILE,juvenileMaturationSeasonsRemaining:MONSTER_JUVENILE_MATURATION_SEASONS,juvenileGrowthSeasonsRemaining:MONSTER_GROWTH_TO_FULL_SIZE_SEASONS,motherId:brood.motherId,fatherId:brood.fatherId});
+                            this.ownedMonsters.push(hatchling); this.recordFamilyMonster(hatchling); hatchedCount+=1;
+                        } else { keep.push(egg); }
+                    } else if(egg.status==='unhatched'||egg.status==='cracked'){ egg.discardAfterSeasons-=1; if(egg.discardAfterSeasons>0){keep.push(egg);} }
+                    else if(egg.status==='incubating'){keep.push(egg);}
+                },this);
+                var mother=this.findOwnedMonster(brood.motherId),father=this.findOwnedMonster(brood.fatherId); if(mother){mother.reproductiveHistory.hatchlings+=hatchedCount;} if(father){father.reproductiveHistory.hatchlings+=hatchedCount;}
+                brood.eggs=keep; brood.clutchSize=keep.length; if(keep.length>0){remainingEggs.push(brood);}
+                events.push(brood.motherName+' and '+brood.fatherName+' produced '+hatchedCount+' hatchling'+(hatchedCount===1?'':'s')+'.');
+            },this);
+            this.eggs=remainingEggs;
+            this.updateFamilyTree();
             return {
                 events : events
             } ;
@@ -11811,17 +12011,9 @@ button:hover {
                     return snapshot;
                 } ),
                 eggs : this.eggs.map(function (brood){
-                    return {
-                        id : brood.id,
-                        motherId : brood.motherId,
-                        motherName : brood.motherName,
-                        fatherId : brood.fatherId,
-                        fatherName : brood.fatherName,
-                        seasonMated : brood.seasonMated,
-                        incubationSeasonsRemaining : brood.incubationSeasonsRemaining,
-                        clutchSize : brood.clutchSize
-                    } ;
+                    return { id:brood.id,motherId:brood.motherId,motherName:brood.motherName,fatherId:brood.fatherId,fatherName:brood.fatherName,seasonMated:brood.seasonMated,incubationSeasonsRemaining:brood.incubationSeasonsRemaining,clutchSize:brood.clutchSize,eggs:brood.eggs.map(function(egg){return egg.getSnapshot();}) };
                 } ),
+                familyTree : Object.keys(this.familyTree).map(function(id){return this.familyTree[id].getSnapshot();},this),
                 foodExpenditureCredits : this.foodExpenditureCredits || 0,
                 roundFoodExpenditureCredits : this.roundFoodExpenditureCredits || 0
             } ;
@@ -14162,13 +14354,17 @@ button:hover {
         breedingState.ownedMonsters.push(regressionFather);
         var breedingResult = breedingState.breedMonsters(regressionMother.id, regressionFather.id, new SeededRng(7107), breedingWorld, 1);
         AddRegressionResult(results, 'Breeding creates an incubating brood and holds the mother out of deployment', breedingResult.ok && breedingState.eggs.length===1 && regressionMother.breedingHoldSeasonsRemaining===1 && !regressionMother.selectedForDeployment, 'ok='+breedingResult.ok+', eggs='+breedingState.eggs.length+', hold='+regressionMother.breedingHoldSeasonsRemaining);
+        var broodSnapshotBeforeHatch=breedingState.getManagementSnapshot().eggs[0];
+        AddRegressionResult(results, 'Every fertilised egg is an authoritative individual object exposed to management UI', !!broodSnapshotBeforeHatch && broodSnapshotBeforeHatch.eggs.length===breedingResult.clutchSize && broodSnapshotBeforeHatch.eggs.every(function(egg){return egg.id && egg.status==='incubating';}), 'eggObjects='+(broodSnapshotBeforeHatch ? broodSnapshotBeforeHatch.eggs.length : 0));
+        AddRegressionResult(results, 'Reproduction chromosome is registered with seven loci including predominantly junk locus', MonsterGenePool.traitDefinitions.indexOf(MonsterReproductionTraitDefinition)>=0 && MonsterGenePool.reproductionChromosomeSlots.length===7, 'slots='+MonsterGenePool.reproductionChromosomeSlots.length);
         var firstLifecycle = breedingState.advanceLifecycleAfterSeason(new SeededRng(7108), breedingWorld, 1);
         var juveniles = breedingState.ownedMonsters.filter(function (monster){
             return monster.lifeStage===MONSTER_LIFE_STAGE.JUVENILE;
         } );
-        AddRegressionResult(results, 'Incubating brood hatches into juveniles after one season', breedingState.eggs.length===0 && juveniles.length===breedingResult.clutchSize && juveniles.every(function (monster){
+        var failedEggCount = breedingState.eggs.reduce(function(total, brood){ return total+(brood.eggs || []).filter(function(egg){ return egg.status==='unhatched' || egg.status==='cracked'; }).length; }, 0);
+        AddRegressionResult(results, 'Incubating brood resolves into juveniles or retained visibly failed eggs after one season', juveniles.length+failedEggCount===breedingResult.clutchSize && juveniles.every(function (monster){
             return !monster.canDeploy() && !monster.canBreed();
-        } ), 'juveniles='+juveniles.length+', clutch='+breedingResult.clutchSize+', events='+firstLifecycle.events.length);
+        } ), 'juveniles='+juveniles.length+', failed='+failedEggCount+', clutch='+breedingResult.clutchSize+', events='+firstLifecycle.events.length);
         breedingState.advanceLifecycleAfterSeason(new SeededRng(7109), breedingWorld, 2);
         AddRegressionResult(results, 'Juveniles mature after one further season', juveniles.every(function (monster){
             return monster.lifeStage===MONSTER_LIFE_STAGE.ADULT && monster.canDeploy();
@@ -16057,7 +16253,7 @@ button:hover {
             brood.motherId,
             brood.fatherId,
             brood.clutchSize,
-            brood.incubationSeasonsRemaining].join(':');
+            brood.incubationSeasonsRemaining,(brood.eggs||[]).map(function(e){return e.id+'-'+e.status;}).join(',')].join(':');
         } )).join('|');
     }
     function MonsterColourPhenotype(monster){
@@ -16271,35 +16467,13 @@ button:hover {
         } ;
     }
     function RenderMonsterFamilyPanel(monster, monsters){
-        var family = MonsterFamilyLists(monster, monsters);
-        if (family.offspring.length===0 && family.siblings.length===0){
-            return;
-        }
-        var panel = document.createElement('div');
-        panel.className = 'familyPanel';
-        var heading = document.createElement('h4');
-        heading.textContent = 'Known family';
-        panel.appendChild(heading);
-        function addList(title, members){
-            var label = document.createElement('p');
-            label.textContent = title+':';
-            panel.appendChild(label);
-            var list = document.createElement('ul');
-            list.className = 'familyList';
-            members.forEach(function (member){
-                var item = document.createElement('li');
-                item.textContent = member.name+' - '+MonsterSexLabel(member)+', '+MonsterLifeStageLabel(member)+', '+MonsterAgeLabel(member)+'; '+MonsterPerformanceBrief(member);
-                list.appendChild(item);
-            } );
-            panel.appendChild(list);
-        }
-        if (family.offspring.length>0){
-            addList('Offspring', family.offspring);
-        }
-        if (family.siblings.length>0){
-            addList('Siblings', family.siblings);
-        }
-        selectedMonsterPanel.appendChild(panel);
+        var management=(currentSnapshot&&currentSnapshot.management)||{}; var records=management.familyTree||[]; var byId={}; records.forEach(function(r){byId[r.id]=r;});
+        if(!byId[monster.id]){return;}
+        var panel=document.createElement('div'); panel.className='familyPanel'; var h=document.createElement('h4'); h.textContent='Family tree'; panel.appendChild(h);
+        var tree=document.createElement('div'); tree.className='familyTree'; var visited={};
+        function addNode(id,depth,label){ var r=byId[id]; if(!r||visited[id]||depth>8){return;} visited[id]=true; var row=document.createElement('div'); row.className='familyTreeNode'+(r.alive?'':' familyTreeDead'); var b=document.createElement('button'); b.type='button'; b.className='familyTreeButton'; b.textContent=(label?label+': ':'')+r.name+' - '+(r.sex==='female'?'female':'male')+(r.alive?'':'; dead'+(r.causeOfDeath?' - '+r.causeOfDeath:'')); b.addEventListener('click',function(){ if((management.ownedMonsters||[]).some(function(m){return m.id===id;})){selectedRosterMonsterId=id;lastManagementRenderKey='';UpdateManagementDrawer(currentSnapshot);} }); row.appendChild(b); tree.appendChild(row); addNode(r.motherId,depth+1,'mother'); addNode(r.fatherId,depth+1,'father'); }
+        addNode(monster.id,0,'selected');
+        var children=records.filter(function(r){return r.motherId===monster.id||r.fatherId===monster.id;}); children.forEach(function(r){addNode(r.id,1,'offspring');}); panel.appendChild(tree); selectedMonsterPanel.appendChild(panel);
     }
     function RenderMonsterPerformancePanel(monster){
         var panel = document.createElement('div');
@@ -16338,7 +16512,7 @@ button:hover {
             relatedBroods.forEach(function (brood){
                 var broodLine = document.createElement('p');
                 broodLine.className = 'breedingStatus';
-                broodLine.textContent = 'Incubating brood with '+brood.clutchSize+' egg'+(brood.clutchSize===1 ? '' : 's')+' from '+brood.motherName+' and '+brood.fatherName+'. Hatches after '+brood.incubationSeasonsRemaining+' season'+(brood.incubationSeasonsRemaining===1 ? '' : 's')+'.';
+                broodLine.textContent = 'Brood with '+brood.clutchSize+' egg'+(brood.clutchSize===1 ? '' : 's')+' from '+brood.motherName+' and '+brood.fatherName+'. Hatches after '+brood.incubationSeasonsRemaining+' season'+(brood.incubationSeasonsRemaining===1 ? '' : 's')+'.';
                 panel.appendChild(broodLine);
             } );
         }
@@ -16462,7 +16636,9 @@ button:hover {
         ['Season order',
         monster.selectedForDeployment ? 'Deploy at start' : 'Reserve'],
         ['Origin',
-        monster.capturedThisRaid ? 'Captured wild monster' : 'Captive monsters']]);
+        monster.capturedThisRaid ? 'Captured wild monster' : 'Captive monsters'],
+        ['Reproductive condition', monster.phenotype&&monster.phenotype.reproduction ? (monster.phenotype.reproduction.reproductiveRepair>1.22?'rapid repair':(monster.phenotype.reproduction.reproductiveRepair<0.78?'slow repair':'ordinary repair')) : 'unknown'],
+        ['Known offspring', String((monster.reproductiveHistory&&monster.reproductiveHistory.hatchlings)||0)]]);
         detailRows.forEach(function (row){
             var dt = document.createElement('dt');
             var dd = document.createElement('dd');
@@ -16619,6 +16795,12 @@ button:hover {
             card.appendChild(meta);
             rosterList.appendChild(card);
         } );
+        (management.eggs||[]).forEach(function(brood){ (brood.eggs||[]).forEach(function(egg){
+            var card=document.createElement('div'); card.className='monsterCard eggCard'+(egg.status!=='incubating'?' unhatched':'')+(egg.status==='cracked'?' cracked':'');
+            var header=document.createElement('div'); header.className='monsterCardHeader'; var name=document.createElement('span'); name.className='monsterCardName'; name.textContent=egg.status==='incubating'?'Egg':(egg.status==='cracked'?'Cracked egg':'Unhatched egg'); header.appendChild(name);
+            var visual=document.createElement('div'); visual.className='eggVisual'; var shape=document.createElement('div'); shape.className='eggShape'; visual.appendChild(shape);
+            var meta=document.createElement('div'); meta.className='monsterCardMeta'; var parents=document.createElement('span'); parents.textContent=brood.motherName+' x '+brood.fatherName; var state=document.createElement('span'); state.textContent=egg.status==='incubating'?'Hatches after '+brood.incubationSeasonsRemaining+' season':egg.failureReason; meta.appendChild(parents); meta.appendChild(state); card.appendChild(header);card.appendChild(visual);card.appendChild(meta);rosterList.appendChild(card);
+        }); });
         var selectedMonster = monsters.find(function (monster){
             return monster.id===selectedRosterMonsterId;
         } ) || null;
