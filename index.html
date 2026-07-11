@@ -11441,6 +11441,17 @@ button:hover {
             if (this.continueRecallToBase(raid)){
                 return;
             }
+            // A sufficiently frightening visible threat interrupts feeding, hunting,
+            // investigation and combat pursuit. Whether the monster retreats is an
+            // emergent result of perceived threat, injury, hunger, body power and its
+            // inherited pugilin/cowardin regulation rather than a class-specific order.
+            var frighteningThreat = this.findMostFrighteningVisibleThreat(raid);
+            if (frighteningThreat && this.shouldFleeThreat(frighteningThreat)){
+                this.eatingTargetId = null;
+                this.eatingTicksRemaining = 0;
+                this.fleeFromThreat(raid, frighteningThreat);
+                return;
+            }
             if (this.continueEating(raid)){
                 return;
             }
@@ -15557,6 +15568,24 @@ button:hover {
         session.startSeason();
         var raid = session.currentRaid;
         AddRegressionResult(results, 'Human raid population is scheduled in waves rather than all entering simultaneously', raid.pendingAdventurers.length>0 || raid.adventurers.length<=1, 'entered='+raid.adventurers.length+', pending='+(raid.pendingAdventurers ? raid.pendingAdventurers.length : 0));
+        var threatRegressionMonster = raid.monsters[0];
+        var threatRegressionKnight = new Knight('threat_regression_knight', threatRegressionMonster.x-40, threatRegressionMonster.y, new SeededRng(24681013));
+        threatRegressionMonster.deployed = true;
+        threatRegressionMonster.recallRequested = false;
+        threatRegressionMonster.pugilinBase = 0.05;
+        threatRegressionMonster.pugilinThreatGain = 0.05;
+        threatRegressionMonster.cowardinBase = 2.8;
+        threatRegressionMonster.cowardinThreatGain = 2.8;
+        threatRegressionMonster.cowardinInjuryGain = 2.8;
+        threatRegressionMonster.sightRange = Math.max(threatRegressionMonster.sightRange, 400);
+        threatRegressionMonster.scentRange = Math.max(threatRegressionMonster.scentRange, 400);
+        threatRegressionMonster.bodyHealth.getParts().forEach(function (part){
+            threatRegressionMonster.bodyHealth[part] = Math.max(1, threatRegressionMonster.bodyHealth.maxEach * 0.35);
+        } );
+        threatRegressionMonster.health = threatRegressionMonster.bodyHealth.total();
+        raid.adventurers = [threatRegressionKnight];
+        threatRegressionMonster.update(raid);
+        AddRegressionResult(results, 'A genetically fearful injured monster interrupts its normal priority cascade and flees a visible knight', threatRegressionMonster.behaviourState==='fleeingFromThreat', 'state='+threatRegressionMonster.behaviourState);
         var deposit = session.world.treasureDeposits[0];
         var treasureType = deposit.treasureType;
         var beforeAmount = session.world.getTreasureBreakdown().remaining.byType[treasureType].amount;
