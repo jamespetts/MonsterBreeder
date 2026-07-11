@@ -623,6 +623,175 @@ button:hover {
         grid-template-columns: 1fr;
     }
 }
+
+#saveLoadOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(2,6,23,0.94);
+    color: #f9fafb;
+}
+#saveLoadOverlay.dialogHidden {
+    display: none;
+}
+#saveLoadPanel {
+    width: min(720px, calc(100vw - 2rem));
+    max-height: min(760px, calc(100vh - 2rem));
+    overflow: auto;
+    border: 1px solid #475569;
+    border-radius: 0.85rem;
+    padding: 1rem;
+    background: #111827;
+    box-shadow: 0 18px 60px rgba(0,0,0,0.65);
+    box-sizing: border-box;
+}
+#saveLoadPanel h2 {
+    margin: 0 0 0.25rem;
+}
+#saveLoadDescription {
+    margin: 0 0 0.8rem;
+    color: #cbd5e1;
+}
+#saveSlotList {
+    display: grid;
+    gap: 0.5rem;
+}
+.saveSlotRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 0.45rem;
+    align-items: center;
+    border: 1px solid #334155;
+    border-radius: 0.55rem;
+    padding: 0.55rem;
+    background: #020617;
+}
+.saveSlotDetails {
+    min-width: 0;
+}
+.saveSlotName {
+    display: block;
+    color: #f8fafc;
+    font-weight: 800;
+}
+.saveSlotMetadata {
+    display: block;
+    margin-top: 0.15rem;
+    color: #94a3b8;
+    font-size: 0.84rem;
+}
+.saveSlotRow.empty .saveSlotMetadata {
+    font-style: italic;
+}
+.saveSlotRow button {
+    padding: 0.42rem 0.6rem;
+}
+.saveSlotDeleteButton {
+    background: #9f1239;
+    color: white;
+}
+.saveSlotDeleteButton:hover {
+    background: #be123c;
+}
+#saveLoadDialogActions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.8rem;
+}
+#saveLoadMessage {
+    min-height: 1.2rem;
+    margin: 0.65rem 0 0;
+    color: #fca5a5;
+}
+#saveLoadConfirmation {
+    margin-top: 0.75rem;
+    border: 1px solid #f59e0b;
+    border-radius: 0.55rem;
+    padding: 0.7rem;
+    background: #451a03;
+}
+#saveLoadConfirmation.confirmationHidden {
+    display: none;
+}
+#saveLoadConfirmation p {
+    margin: 0 0 0.65rem;
+}
+#saveLoadConfirmationActions {
+    display: flex;
+    gap: 0.45rem;
+    justify-content: flex-end;
+}
+#confirmSaveLoadActionButton {
+    background: #dc2626;
+    color: white;
+}
+
+#gameToast {
+    position: fixed;
+    left: 50%;
+    bottom: 1.25rem;
+    z-index: 45;
+    transform: translate(-50%, 1rem);
+    max-width: min(520px, calc(100vw - 2rem));
+    padding: 0.65rem 0.9rem;
+    border: 1px solid rgba(255,255,255,0.28);
+    border-radius: 999px;
+    background: rgba(22,101,52,0.96);
+    color: white;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+    font-weight: 800;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+#gameToast.toastVisible {
+    transform: translate(-50%, 0);
+    opacity: 1;
+}
+#unsavedActionOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(2,6,23,0.90);
+    color: #f9fafb;
+}
+#unsavedActionOverlay.dialogHidden {
+    display: none;
+}
+#unsavedActionPanel {
+    width: min(480px, calc(100vw - 2rem));
+    border: 1px solid #475569;
+    border-radius: 0.85rem;
+    padding: 1rem;
+    background: #111827;
+    box-shadow: 0 18px 60px rgba(0,0,0,0.65);
+}
+#unsavedActionPanel h2 {
+    margin: 0 0 0.35rem;
+}
+#unsavedActionPanel p {
+    margin: 0 0 0.85rem;
+    color: #cbd5e1;
+}
+#unsavedActionButtons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+#discardCurrentGameButton {
+    background: #9f1239;
+    color: white;
+}
+#discardCurrentGameButton:hover {
+    background: #be123c;
+}
 </style>
 </head>
 <body>
@@ -697,8 +866,9 @@ button:hover {
 <button id="quickGameMenuButton" type="button">Quick Game</button>
 <button id="customGameMenuButton" type="button">Custom Game</button>
 <button id="optionsMenuButton" type="button" disabled>Options - coming soon</button>
-<button id="saveGameMenuButton" type="button" disabled>Save - coming soon</button>
-<button id="loadGameMenuButton" type="button" disabled>Load - coming soon</button>
+<button id="saveGameMenuButton" type="button" disabled>Save game</button>
+<button id="loadGameMenuButton" type="button" disabled>Load game</button>
+<button id="quitGameMenuButton" type="button" disabled>Quit current game</button>
 </div>
 <div id="customGamePanel" aria-label="Custom game settings">
 <h3>Custom Game</h3>
@@ -735,6 +905,38 @@ button:hover {
 </div>
 </div>
 </div>
+
+<div id="saveLoadOverlay" class="dialogHidden" role="dialog" aria-modal="true" aria-labelledby="saveLoadTitle">
+<div id="saveLoadPanel">
+<h2 id="saveLoadTitle">Saved games</h2>
+<p id="saveLoadDescription"></p>
+<div id="saveSlotList" aria-live="polite"></div>
+<p id="saveLoadMessage" aria-live="assertive"></p>
+<div id="saveLoadConfirmation" class="confirmationHidden">
+<p id="saveLoadConfirmationText"></p>
+<div id="saveLoadConfirmationActions">
+<button id="cancelSaveLoadActionButton" type="button">Cancel</button>
+<button id="confirmSaveLoadActionButton" type="button">Confirm</button>
+</div>
+</div>
+<div id="saveLoadDialogActions">
+<button id="closeSaveLoadDialogButton" type="button">Close</button>
+</div>
+</div>
+</div>
+
+<div id="unsavedActionOverlay" class="dialogHidden" role="dialog" aria-modal="true" aria-labelledby="unsavedActionTitle">
+<div id="unsavedActionPanel">
+<h2 id="unsavedActionTitle">Save current game?</h2>
+<p id="unsavedActionMessage">The current game will be abandoned. Would you like to save it first?</p>
+<div id="unsavedActionButtons">
+<button id="cancelUnsavedActionButton" type="button">Cancel</button>
+<button id="discardCurrentGameButton" type="button">Don't save</button>
+<button id="saveBeforeActionButton" type="button">Save first</button>
+</div>
+</div>
+</div>
+<div id="gameToast" role="status" aria-live="polite"></div>
 <script id="simulationWorkerSource" type="text/plain">
 // SPDX-License-Identifier: GPL-3.0-only
 // @ts-check
@@ -806,6 +1008,11 @@ button:hover {
     // MODULE: CONSTANTS, ENUMS AND PROFILES
     // ============================================================================
     var PROTOCOL_VERSION = 1;
+    // Save format versions are independent of the worker message protocol. Each
+    // future incompatible state change must add a migration from the preceding
+    // format instead of changing old save data in place.
+    var SAVE_FORMAT_VERSION = 1;
+    var MIN_SUPPORTED_SAVE_FORMAT_VERSION = 1;
     var REFERENCE_MAP_WIDTH = 1800;
     var REFERENCE_MAP_HEIGHT = 1200;
     var QUICK_MAP_WIDTH = 4500;
@@ -3670,7 +3877,10 @@ button:hover {
             } );
         }
         static createEnvironment(rng, settings){
-            var temperature = Number.isFinite(settings.temperature) ? settings.temperature : rng.range(0.18, 0.88);
+            // Temperature is a broad climatic driver rather than a biome label.
+            // Retain cold and temperate worlds while allowing genuinely hot lowland
+            // climates to arise from the same continuous environmental variable.
+            var temperature = Number.isFinite(settings.temperature) ? settings.temperature : rng.range(0.14, 0.96);
             var moisture = Number.isFinite(settings.moisture) ? settings.moisture : rng.range(0.10, 0.88);
             var altitude = Number.isFinite(settings.altitude) ? settings.altitude : rng.range(0.05, 0.65);
             var ruggedness = Number.isFinite(settings.ruggedness) ? settings.ruggedness : rng.range(0.05, 0.55);
@@ -3683,8 +3893,14 @@ button:hover {
                 ruggedness : ruggedness,
                 waterAbundance : waterAbundance,
                 vegetationDensity : vegetationDensity,
-                meanAnnualTemperatureC : -4+temperature * 30-altitude * 5,
-                seasonalTemperatureAmplitudeC : 5+Math.abs(temperature-0.5) * 8+altitude * 3,
+                // The former 30 C span capped even the hottest generated lowlands
+                // at a mild annual mean. A wider physical span permits hot deserts
+                // without assigning temperature directly from the desert terrain type.
+                meanAnnualTemperatureC : -6+temperature * 38-altitude * 5,
+                // Dry continental climates have larger seasonal swings, while abundant
+                // water moderates them. This remains compositional climate simulation:
+                // aridity can produce hot or cold deserts rather than a desert heat bonus.
+                seasonalTemperatureAmplitudeC : 5+Math.abs(temperature-0.5) * 8+altitude * 3+Clamp((1-moisture * 0.62-waterAbundance * 0.38)-0.35, 0, 0.65) * 6-Clamp(waterAbundance-0.65, 0, 0.35) * 3,
                 aridity : Clamp(1-moisture * 0.62-waterAbundance * 0.38, 0, 1),
                 windSpeed : Number.isFinite(settings.windSpeed) ? Clamp(settings.windSpeed,0,1) : rng.range(0.08,0.92),
                 windDirectionRadians : Number.isFinite(settings.windDirectionRadians) ? settings.windDirectionRadians : rng.range(-Math.PI,Math.PI)
@@ -8977,6 +9193,7 @@ button:hover {
             }
             var temperatures = profile.seasonTemperaturesC && profile.seasonTemperaturesC.length>0 ? profile.seasonTemperaturesC : [profile.currentTemperatureC];
             var logFitness = 0;
+            var worstThermalMismatch = 0;
             for (var i = 0;
             i<temperatures.length;
             i+=1){
@@ -8988,10 +9205,17 @@ button:hover {
                 if (temperatureC>phenotype.heatLimitC){
                     thermalMismatch = (temperatureC-phenotype.heatLimitC) / 22;
                 }
+                worstThermalMismatch = Math.max(worstThermalMismatch, thermalMismatch);
                 var fatTemperatureMismatch = temperatureC>20 ? phenotype.targetFatStorage / 12 : Math.max(0, 2.0-phenotype.targetFatStorage) / 8;
                 logFitness+=-7.5 * thermalMismatch-2.0 * fatTemperatureMismatch;
             }
             logFitness/=Math.max(1, temperatures.length);
+            // Average seasonal fitness alone can allow a genotype that thrives for
+            // three seasons but is incapacitated in the fourth. Survival and
+            // reproduction require enduring the local annual cycle, so the worst
+            // seasonal mismatch supplies an additional bottleneck without creating
+            // a direct all-weather gene or removing metabolic tradeoffs.
+            logFitness+=-9.0 * worstThermalMismatch;
             var macrofaunaFoodAllowance = profile.macrofaunaNiche && Number.isFinite(profile.macrofaunaNiche.metabolicFoodAllowance) ? profile.macrofaunaNiche.metabolicFoodAllowance : null;
             if (macrofaunaFoodAllowance===null && profile.macrofaunaEcology && Number.isFinite(profile.macrofaunaEcology.metabolicFoodAllowance)){
                 macrofaunaFoodAllowance = profile.macrofaunaEcology.metabolicFoodAllowance;
@@ -9650,9 +9874,11 @@ button:hover {
 
         addDefaultMetabolismAlleles(){
             this.addAllele(METABOLISM_CHROMOSOME_INDEX, 0, new MetabolicAllele(100, {
-                baseMetabolicRate : -55,
-                coldTolerance : 24,
-                heatTolerance : -8
+                // High-output cold-climate physiology. The food demand and reduced
+                // heat tolerance prevent this from being a universally superior allele.
+                baseMetabolicRate : 55,
+                coldTolerance : 62,
+                heatTolerance : -18
             }, {
                 selectionSensitive : true,
                 debugLabel : this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 0)
@@ -12719,6 +12945,37 @@ button:hover {
             var net = gross * Clamp(1-depletion / Math.max(1, keys.length || 1), 0.15, 1);
             return Clamp(Math.round(net), 0, Math.max(WILD_MONSTER_COUNT_MAX, Math.round(WILD_MONSTER_COUNT_MAX * IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR)));
         }
+        monsterCanRemainActiveThroughLocalYear(monster){
+            for (var seasonNumber = 1; seasonNumber<=SEASON_NAMES.length; seasonNumber+=1){
+                if (MonsterMetabolismSystem.thermalStatus(monster, this.world, seasonNumber).severe){
+                    return false;
+                }
+            }
+            return true;
+        }
+        createAnnuallyViableWildMonster(monsterId){
+            // The gene pool selects metabolism against every local season. This final
+            // ecological filter evaluates the complete expressed animal, including
+            // body size, fat reserves and metabolic output, over the same annual cycle.
+            // A winter-active animal must therefore also be capable of summer activity,
+            // and vice versa. No tolerance gene is rewritten and wild monsters receive
+            // no immunity from the ordinary thermal simulation.
+            var candidateCount = 32;
+            for (var candidateIndex = 0; candidateIndex<candidateCount; candidateIndex+=1){
+                var candidate = new Monster(monsterId, 0, 0, this.rng, {
+                    owned : false,
+                    collared : false,
+                    wild : true,
+                    selectedForDeployment : false,
+                    world : this.world
+                } );
+                if (this.monsterCanRemainActiveThroughLocalYear(candidate)){
+                    candidate.applyThermalStatus(MonsterMetabolismSystem.thermalStatus(candidate, this.world, this.seasonNumber));
+                    return candidate;
+                }
+            }
+            return null;
+        }
         createWildMonsters(){
             var wildMonsters = [];
             var capacity = this.estimateWildMonsterCapacity();
@@ -12727,13 +12984,10 @@ button:hover {
             for (var i = 0;
             i<count;
             i+=1){
-                var monster = new Monster(this.gameState.createMonsterId('wild'), 0, 0, this.rng, {
-                    owned : false,
-                    collared : false,
-                    wild : true,
-                    selectedForDeployment : false,
-                    world : this.world
-                } );
+                var monster = this.createAnnuallyViableWildMonster(this.gameState.createMonsterId('wild'));
+                if (!monster){
+                    continue;
+                }
                 monster.wildOriginBiome = 'unknown';
                 monster.spawnTick = spawnTick;
                 monster.deployed = false;
@@ -14557,6 +14811,30 @@ button:hover {
             }
         } );
         AddRegressionResult(results, 'World seasonal temperature calculation distinguishes hot and cold worlds', hotMetabolismWorld.getCurrentTemperatureC(3)>coldMetabolismWorld.getCurrentTemperatureC(1)+20, 'hot='+hotMetabolismWorld.getCurrentTemperatureC(3)+', cold='+coldMetabolismWorld.getCurrentTemperatureC(1));
+        AddRegressionResult(results, 'Hot arid lowlands can produce genuinely hot summer weather', hotMetabolismWorld.getCurrentTemperatureC(3)>=35, 'summer='+hotMetabolismWorld.getCurrentTemperatureC(3));
+        function ThermalYearSummary(monster, world){
+            var statuses = [];
+            for (var thermalSeason = 1; thermalSeason<=SEASON_NAMES.length; thermalSeason+=1){
+                statuses.push(MonsterMetabolismSystem.thermalStatus(monster, world, thermalSeason));
+            }
+            return statuses;
+        }
+        function ThermalFactoryContext(world, seasonNumber, seed){
+            return {
+                rng : new SeededRng(seed),
+                world : world,
+                seasonNumber : seasonNumber,
+                monsterCanRemainActiveThroughLocalYear : Raid.prototype.monsterCanRemainActiveThroughLocalYear
+            };
+        }
+        var coldWildFactoryContext = ThermalFactoryContext(coldMetabolismWorld, 1, 70051);
+        var coldAdaptedWild = Raid.prototype.createAnnuallyViableWildMonster.call(coldWildFactoryContext, 'cold_wild_viability');
+        var coldAdaptedYear = coldAdaptedWild ? ThermalYearSummary(coldAdaptedWild, coldMetabolismWorld) : [];
+        AddRegressionResult(results, 'Cold-climate natural selection can generate a complete monster viable through both winter and summer extremes', !!coldAdaptedWild && coldAdaptedYear.length===4 && coldAdaptedYear.every(function(status){ return !status.severe; }), 'spawned='+(!!coldAdaptedWild)+', stresses='+coldAdaptedYear.map(function(status){ return status.stress.toFixed(2); }).join(','));
+        var hotWildFactoryContext = ThermalFactoryContext(hotMetabolismWorld, 3, 70052);
+        var heatAdaptedWild = Raid.prototype.createAnnuallyViableWildMonster.call(hotWildFactoryContext, 'hot_wild_viability');
+        var heatAdaptedYear = heatAdaptedWild ? ThermalYearSummary(heatAdaptedWild, hotMetabolismWorld) : [];
+        AddRegressionResult(results, 'Hot-desert natural selection can generate a complete monster viable through both summer and winter extremes', !!heatAdaptedWild && heatAdaptedYear.length===4 && heatAdaptedYear.every(function(status){ return !status.severe; }), 'spawned='+(!!heatAdaptedWild)+', stresses='+heatAdaptedYear.map(function(status){ return status.stress.toFixed(2); }).join(','));
         var metabolismMonster = new Monster('metabolism_regression', RIGHT_EDGE_X, 260, new SeededRng(7006), {
             owned : true,
             world : hotMetabolismWorld,
@@ -15922,6 +16200,255 @@ button:hover {
             results : results
         } ;
     }
+    // ============================================================================
+    // MODULE: SAVE/LOAD
+    // ============================================================================
+    // The authoritative GameSession object graph is saved. Renderer snapshots,
+    // camera state and interpolation state live on the main thread and are never
+    // part of a save. Reference IDs preserve shared objects such as the World and
+    // GameState references held by an active Raid.
+    function SaveTypeRegistry(){
+        return {
+            SeededRng : SeededRng,
+            BinaryHeap : BinaryHeap,
+            TerrainGrid : TerrainGrid,
+            WorldEntity : WorldEntity,
+            TerrainObject : TerrainObject,
+            Tree : Tree,
+            TerrainRock : TerrainRock,
+            ThrowableRock : ThrowableRock,
+            Stick : Stick,
+            Bush : Bush,
+            TreasureDeposit : TreasureDeposit,
+            DroppedTreasure : DroppedTreasure,
+            World : World,
+            BodyHealth : BodyHealth,
+            Agent : Agent,
+            Adventurer : Adventurer,
+            Villager : Villager,
+            DoubleVillager : DoubleVillager,
+            Explorer : Explorer,
+            Warrior : Warrior,
+            Knight : Knight,
+            MonsterDisease : MonsterDisease,
+            SkinProteinState : SkinProteinState,
+            MetabolicFactorState : MetabolicFactorState,
+            MorphologyFactorState : MorphologyFactorState,
+            ReproductionFactorState : ReproductionFactorState,
+            PerceptionFactorState : PerceptionFactorState,
+            MonsterPhenotypeExpressionContext : MonsterPhenotypeExpressionContext,
+            Allele : Allele,
+            ColourAllele : ColourAllele,
+            MetabolicAllele : MetabolicAllele,
+            MorphologyAllele : MorphologyAllele,
+            ReproductionAllele : ReproductionAllele,
+            PerceptionAllele : PerceptionAllele,
+            BehaviourAllele : BehaviourAllele,
+            ChromosomePair : ChromosomePair,
+            Genome : Genome,
+            GeneticTraitDefinition : GeneticTraitDefinition,
+            MetabolismGeneticTraitDefinition : MetabolismGeneticTraitDefinition,
+            ColourGeneticTraitDefinition : ColourGeneticTraitDefinition,
+            MorphologyGeneticTraitDefinition : MorphologyGeneticTraitDefinition,
+            BehaviourGeneticTraitDefinition : BehaviourGeneticTraitDefinition,
+            PerceptionGeneticTraitDefinition : PerceptionGeneticTraitDefinition,
+            ReproductionGeneticTraitDefinition : ReproductionGeneticTraitDefinition,
+            GenePool : GenePool,
+            Monster : Monster,
+            MicrofaunaEmitter : MicrofaunaEmitter,
+            Macrofauna : Macrofauna,
+            Egg : Egg,
+            FamilyTreeRecord : FamilyTreeRecord,
+            CampaignStats : CampaignStats,
+            GameState : GameState,
+            Raid : Raid,
+            GameSession : GameSession
+        } ;
+    }
+    function EncodeSaveNumber(value){
+        if (Number.isNaN(value)){
+            return { specialNumber : 'NaN' };
+        }
+        if (value===Infinity){
+            return { specialNumber : 'Infinity' };
+        }
+        if (value===-Infinity){
+            return { specialNumber : '-Infinity' };
+        }
+        return value;
+    }
+    function DecodeSaveNumber(value){
+        if (!value || typeof value!=='object' || !value.specialNumber){
+            return value;
+        }
+        if (value.specialNumber==='NaN'){
+            return NaN;
+        }
+        if (value.specialNumber==='Infinity'){
+            return Infinity;
+        }
+        if (value.specialNumber==='-Infinity'){
+            return -Infinity;
+        }
+        throw new Error('Unknown special number in save: '+value.specialNumber);
+    }
+    function SerializeAuthoritativeGameSession(session){
+        if (!(session instanceof GameSession)){
+            throw new Error('Cannot save without an active game session.');
+        }
+        var seen = new Map();
+        var nodes = [];
+        function encode(value){
+            if (value===null || typeof value==='string' || typeof value==='boolean'){
+                return value;
+            }
+            if (typeof value==='number'){
+                return EncodeSaveNumber(value);
+            }
+            if (typeof value==='undefined'){
+                return { undefinedValue : true };
+            }
+            if (typeof value==='function'){
+                return { omittedFunction : true };
+            }
+            if (seen.has(value)){
+                return { referenceId : seen.get(value) };
+            }
+            var id = nodes.length;
+            seen.set(value, id);
+            var node = {
+                type : Array.isArray(value) ? 'Array' : ((value.constructor && value.constructor.name) || 'Object'),
+                properties : {}
+            } ;
+            nodes.push(node);
+            Object.keys(value).forEach(function (key){
+                if (typeof value[key]!=='function'){
+                    node.properties[key] = encode(value[key]);
+                }
+            } );
+            return { referenceId : id };
+        }
+        return {
+            root : encode(session),
+            nodes : nodes
+        } ;
+    }
+    function DeserializeAuthoritativeGameSession(graph){
+        if (!graph || !Array.isArray(graph.nodes) || !graph.root){
+            throw new Error('Save payload does not contain a valid object graph.');
+        }
+        var registry = SaveTypeRegistry();
+        var objects = graph.nodes.map(function (node){
+            if (!node || typeof node.type!=='string' || !node.properties || typeof node.properties!=='object'){
+                throw new Error('Save payload contains an invalid object node.');
+            }
+            if (node.type==='Array'){
+                return [];
+            }
+            if (node.type==='Object'){
+                return {};
+            }
+            var constructorFunction = registry[node.type];
+            if (!constructorFunction){
+                throw new Error('Save payload uses an unknown game type: '+node.type);
+            }
+            return Object.create(constructorFunction.prototype);
+        } );
+        function decode(value){
+            if (value===null || typeof value!=='object'){
+                return value;
+            }
+            if (value.referenceId!==undefined){
+                var referenceId = value.referenceId;
+                if (!Number.isInteger(referenceId) || referenceId<0 || referenceId>=objects.length){
+                    throw new Error('Save payload contains an invalid object reference.');
+                }
+                return objects[referenceId];
+            }
+            if (value.undefinedValue){
+                return undefined;
+            }
+            if (value.omittedFunction){
+                return undefined;
+            }
+            return DecodeSaveNumber(value);
+        }
+        graph.nodes.forEach(function (node, index){
+            var target = objects[index];
+            Object.keys(node.properties).forEach(function (key){
+                target[key] = decode(node.properties[key]);
+            } );
+        } );
+        var restored = decode(graph.root);
+        ValidateLoadedGameSession(restored);
+        return restored;
+    }
+    function MigrateSavePayload(saveRecord){
+        if (!saveRecord || saveRecord.saveKind!=='monster-breeder-game'){
+            throw new Error('This is not a Monster Breeder game save.');
+        }
+        if (!Number.isInteger(saveRecord.formatVersion)){
+            throw new Error('The save has no valid format version.');
+        }
+        if (saveRecord.formatVersion>SAVE_FORMAT_VERSION){
+            throw new Error('This save was created by a newer version of Monster Breeder.');
+        }
+        if (saveRecord.formatVersion<MIN_SUPPORTED_SAVE_FORMAT_VERSION){
+            throw new Error('This save is older than the earliest supported save format.');
+        }
+        var migrated = saveRecord;
+        while (migrated.formatVersion<SAVE_FORMAT_VERSION){
+            if (migrated.formatVersion===1){
+                // Add a version 1 to 2 migration here when format version 2 is
+                // introduced. Migrations must return a new record and advance by
+                // exactly one version.
+                throw new Error('No migration is registered for save format '+migrated.formatVersion+'.');
+            }
+            throw new Error('No migration is registered for save format '+migrated.formatVersion+'.');
+        }
+        return migrated;
+    }
+    function ValidateLoadedGameSession(session){
+        if (!(session instanceof GameSession)){
+            throw new Error('The restored root object is not a GameSession.');
+        }
+        if (!(session.rng instanceof SeededRng) || !(session.world instanceof World) || !(session.gameState instanceof GameState)){
+            throw new Error('The save is missing essential authoritative game state.');
+        }
+        if (!Array.isArray(session.gameState.ownedMonsters) || !Array.isArray(session.gameState.eggs)){
+            throw new Error('The save contains invalid monster or egg collections.');
+        }
+        if (session.currentRaid){
+            if (!(session.currentRaid instanceof Raid)){
+                throw new Error('The save contains invalid raid state.');
+            }
+            if (session.currentRaid.world!==session.world || session.currentRaid.gameState!==session.gameState){
+                throw new Error('The save contains inconsistent shared raid references.');
+            }
+        }
+        if (!session.world.terrainGrid || !Array.isArray(session.world.terrainGrid.terrainTypes) || !Array.isArray(session.world.terrainGrid.heights)){
+            throw new Error('The save contains invalid terrain state.');
+        }
+        MAP_WIDTH = session.world.width;
+        MAP_HEIGHT = session.world.height;
+    }
+    function CreateSaveRecord(session){
+        return {
+            saveKind : 'monster-breeder-game',
+            formatVersion : SAVE_FORMAT_VERSION,
+            minimumReaderVersion : MIN_SUPPORTED_SAVE_FORMAT_VERSION,
+            createdBy : 'Monster Breeder',
+            gameMode : session.mode,
+            roundNumber : session.roundNumber,
+            seasonNumber : session.seasonNumber,
+            phase : session.phase,
+            payload : SerializeAuthoritativeGameSession(session)
+        } ;
+    }
+    function RestoreSaveRecord(saveRecord){
+        var migrated = MigrateSavePayload(saveRecord);
+        return DeserializeAuthoritativeGameSession(migrated.payload);
+    }
     var gameSession = null;
     var intervalId = 0;
     function Post(message){
@@ -16152,6 +16679,32 @@ button:hover {
                 } );
                 SendSnapshotAndEvents(command.messageId);
                 break;
+            case 'QUIT_GAME' :
+                gameSession = null;
+                Post({
+                    replyTo : command.messageId,
+                    type : 'QUIT_GAME_ACCEPTED'
+                } );
+                break;
+            case 'SAVE_GAME' : EnsureGameSession();
+                Post({
+                    replyTo : command.messageId,
+                    type : 'SAVE_GAME_DATA',
+                    payload : {
+                        saveRecord : CreateSaveRecord(gameSession)
+                    }
+                } );
+                break;
+            case 'LOAD_GAME' :
+                gameSession = RestoreSaveRecord(command.payload && command.payload.saveRecord);
+                StartTicker();
+                Post({
+                    replyTo : command.messageId,
+                    type : 'LOAD_GAME_ACCEPTED'
+                } );
+                SendWorldSnapshot(command.messageId);
+                SendSnapshotAndEvents(command.messageId);
+                break;
             case 'RUN_HEADLESS_TESTS' : Post({
                     replyTo : command.messageId,
                     type : 'HEADLESS_TEST_RESULTS',
@@ -16270,7 +16823,27 @@ button:hover {
     customGameMenuButton = document.getElementById('customGameMenuButton'),
     startCustomGameButton = document.getElementById('startCustomGameButton'),
     cancelCustomGameButton = document.getElementById('cancelCustomGameButton'),
-    customGameError = document.getElementById('customGameError');
+    customGameError = document.getElementById('customGameError'),
+    saveGameMenuButton = document.getElementById('saveGameMenuButton'),
+    loadGameMenuButton = document.getElementById('loadGameMenuButton'),
+    saveLoadOverlay = document.getElementById('saveLoadOverlay'),
+    saveLoadTitle = document.getElementById('saveLoadTitle'),
+    saveLoadDescription = document.getElementById('saveLoadDescription'),
+    saveSlotList = document.getElementById('saveSlotList'),
+    saveLoadMessage = document.getElementById('saveLoadMessage'),
+    saveLoadConfirmation = document.getElementById('saveLoadConfirmation'),
+    saveLoadConfirmationText = document.getElementById('saveLoadConfirmationText'),
+    confirmSaveLoadActionButton = document.getElementById('confirmSaveLoadActionButton'),
+    cancelSaveLoadActionButton = document.getElementById('cancelSaveLoadActionButton'),
+    closeSaveLoadDialogButton = document.getElementById('closeSaveLoadDialogButton'),
+    quitGameMenuButton = document.getElementById('quitGameMenuButton'),
+    unsavedActionOverlay = document.getElementById('unsavedActionOverlay'),
+    unsavedActionTitle = document.getElementById('unsavedActionTitle'),
+    unsavedActionMessage = document.getElementById('unsavedActionMessage'),
+    cancelUnsavedActionButton = document.getElementById('cancelUnsavedActionButton'),
+    discardCurrentGameButton = document.getElementById('discardCurrentGameButton'),
+    saveBeforeActionButton = document.getElementById('saveBeforeActionButton'),
+    gameToast = document.getElementById('gameToast');
     var latestWorldSnapshot = null,
     latestStaticObstacles = [];
     var latestSnapshot = null,
@@ -16281,6 +16854,20 @@ button:hover {
     nextMessageId = 1,
     keys = new Set();
     var RENDER_INTERPOLATION_DELAY_MS = 50;
+    var SAVE_DATABASE_NAME = 'monster-breeder-saves';
+    var SAVE_DATABASE_VERSION = 1;
+    var SAVE_OBJECT_STORE_NAME = 'gameSaves';
+    var SAVE_SLOT_COUNT = 10;
+    var pendingSaveRequest = false;
+    var pendingSaveSlotId = null;
+    var pendingSaveSlotName = null;
+    var saveLoadDialogMode = null;
+    var pendingConfirmedAction = null;
+    var pendingLoadRequest = false;
+    var pendingDestructiveAction = null;
+    var pendingDestructiveActionLabel = '';
+    var actionAfterSuccessfulSave = null;
+    var gameToastTimer = 0;
     var camera = {
         x : 0,
         y : 240,
@@ -16349,6 +16936,363 @@ button:hover {
             type : type,
             payload : payload
         } );
+    }
+    function ShowGameToast(text){
+        if (gameToastTimer){
+            clearTimeout(gameToastTimer);
+        }
+        gameToast.textContent = text;
+        gameToast.classList.add('toastVisible');
+        gameToastTimer = setTimeout(function (){
+            gameToast.classList.remove('toastVisible');
+            gameToastTimer = 0;
+        } , 2600);
+    }
+    function CurrentGameNeedsAbandonmentPrompt(){
+        return gameStarted && !!latestSnapshot;
+    }
+    function HideUnsavedActionDialog(){
+        unsavedActionOverlay.classList.add('dialogHidden');
+    }
+    function ClearPendingDestructiveAction(){
+        pendingDestructiveAction = null;
+        pendingDestructiveActionLabel = '';
+        actionAfterSuccessfulSave = null;
+        HideUnsavedActionDialog();
+    }
+    function RunPendingDestructiveAction(){
+        var action = pendingDestructiveAction;
+        pendingDestructiveAction = null;
+        pendingDestructiveActionLabel = '';
+        actionAfterSuccessfulSave = null;
+        HideUnsavedActionDialog();
+        if (action){
+            action();
+        }
+    }
+    function RequestDestructiveAction(label, action){
+        if (!CurrentGameNeedsAbandonmentPrompt()){
+            action();
+            return;
+        }
+        pendingDestructiveAction = action;
+        pendingDestructiveActionLabel = label;
+        unsavedActionTitle.textContent = label==='quit' ? 'Save before quitting?' : 'Save current game?';
+        unsavedActionMessage.textContent = label==='load' ? 'Loading another saved game will abandon the current game. Would you like to save it first?' : (label==='quit' ? 'Quitting will abandon the current game. Would you like to save it first?' : 'Starting a new game will abandon the current game. Would you like to save it first?');
+        unsavedActionOverlay.classList.remove('dialogHidden');
+        saveBeforeActionButton.focus();
+    }
+    function AbandonCurrentGame(){
+        gameStarted = false;
+        latestWorldSnapshot = null;
+        latestStaticObstacles = [];
+        latestSnapshot = null;
+        previousSnapshot = null;
+        currentSnapshot = null;
+        lastSnapshotPhase = null;
+        selectedObject = null;
+        HideCustomGamePanel();
+        RenderPlaceholder('Main menu');
+        statusBox.textContent = 'No game in progress. Choose a game mode from the main menu.';
+        objectDetails.textContent = 'Click any monster, adventurer, treasure, scenery object or terrain tile to inspect it.';
+        seasonDisplay.textContent = 'Main Menu';
+        mainMenuOverlay.classList.remove('menuHidden');
+        UpdateResumeGameButton();
+        RefreshSaveLoadButtons();
+        SendCommand('QUIT_GAME');
+    }
+    // ============================================================================
+    // MODULE: BROWSER-LOCAL SAVE STORAGE
+    // ============================================================================
+    // IndexedDB is browser-local storage but, unlike localStorage, it can hold the
+    // larger authoritative object graphs produced by large and vast maps without
+    // relying on a small synchronous string quota.
+    function OpenSaveDatabase(){
+        return new Promise(function (resolve, reject){
+            if (typeof indexedDB==='undefined'){
+                reject(new Error('This browser does not provide IndexedDB storage.'));
+                return;
+            }
+            var request = indexedDB.open(SAVE_DATABASE_NAME, SAVE_DATABASE_VERSION);
+            request.onupgradeneeded = function (){
+                var database = request.result;
+                if (!database.objectStoreNames.contains(SAVE_OBJECT_STORE_NAME)){
+                    database.createObjectStore(SAVE_OBJECT_STORE_NAME, { keyPath : 'slotId' });
+                }
+            } ;
+            request.onsuccess = function (){
+                resolve(request.result);
+            } ;
+            request.onerror = function (){
+                reject(request.error || new Error('Could not open browser save storage.'));
+            } ;
+        } );
+    }
+    function HashSavePayloadJson(text){
+        var hash = 2166136261;
+        for (var i = 0; i<text.length; i+=1){
+            hash^=text.charCodeAt(i);
+            hash = Math.imul(hash, 16777619);
+        }
+        return (hash>>>0).toString(16).padStart(8, '0');
+    }
+    function SaveSlotIdForNumber(slotNumber){
+        return 'save-slot-'+slotNumber;
+    }
+    function SaveSlotNameForNumber(slotNumber){
+        return 'Save slot '+slotNumber;
+    }
+    function PutSaveRecord(saveRecord, slotId, slotName){
+        if (!slotId || !slotName){
+            return Promise.reject(new Error('No save slot was selected.'));
+        }
+        var payloadJson = JSON.stringify(saveRecord);
+        var storedRecord = {
+            slotId : slotId,
+            slotName : slotName,
+            savedAt : new Date().toISOString(),
+            formatVersion : saveRecord.formatVersion,
+            gameMode : saveRecord.gameMode,
+            roundNumber : saveRecord.roundNumber,
+            seasonNumber : saveRecord.seasonNumber,
+            phase : saveRecord.phase,
+            checksumAlgorithm : 'fnv1a32-json',
+            checksum : HashSavePayloadJson(payloadJson),
+            saveRecord : saveRecord
+        } ;
+        return OpenSaveDatabase().then(function (database){
+            return new Promise(function (resolve, reject){
+                var transaction = database.transaction(SAVE_OBJECT_STORE_NAME, 'readwrite');
+                transaction.objectStore(SAVE_OBJECT_STORE_NAME).put(storedRecord);
+                transaction.oncomplete = function (){
+                    database.close();
+                    resolve(storedRecord);
+                } ;
+                transaction.onerror = function (){
+                    var error = transaction.error || new Error('Could not write the game save.');
+                    database.close();
+                    reject(error);
+                } ;
+                transaction.onabort = transaction.onerror;
+            } );
+        } );
+    }
+    function GetAllStoredSaveRecords(){
+        return OpenSaveDatabase().then(function (database){
+            return new Promise(function (resolve, reject){
+                var transaction = database.transaction(SAVE_OBJECT_STORE_NAME, 'readonly');
+                var request = transaction.objectStore(SAVE_OBJECT_STORE_NAME).getAll();
+                request.onsuccess = function (){
+                    database.close();
+                    var records = (request.result || []).filter(function (record){
+                        if (!record || typeof record.slotId!=='string'){
+                            return false;
+                        }
+                        var match = /^save-slot-(\d+)$/.exec(record.slotId);
+                        if (!match){
+                            return false;
+                        }
+                        var slotNumber = Number(match[1]);
+                        return Number.isInteger(slotNumber) && slotNumber>=1 && slotNumber<=SAVE_SLOT_COUNT;
+                    } );
+                    records.sort(function (a, b){
+                        return String(b.savedAt || '').localeCompare(String(a.savedAt || ''));
+                    } );
+                    resolve(records);
+                } ;
+                request.onerror = function (){
+                    var error = request.error || new Error('Could not read saved games.');
+                    database.close();
+                    reject(error);
+                } ;
+            } );
+        } );
+    }
+    function DeleteStoredSaveRecord(slotId){
+        return OpenSaveDatabase().then(function (database){
+            return new Promise(function (resolve, reject){
+                var transaction = database.transaction(SAVE_OBJECT_STORE_NAME, 'readwrite');
+                transaction.objectStore(SAVE_OBJECT_STORE_NAME).delete(slotId);
+                transaction.oncomplete = function (){
+                    database.close();
+                    resolve();
+                } ;
+                transaction.onerror = function (){
+                    var error = transaction.error || new Error('Could not delete the saved game.');
+                    database.close();
+                    reject(error);
+                } ;
+                transaction.onabort = transaction.onerror;
+            } );
+        } );
+    }
+    function ValidateStoredSaveRecord(storedRecord){
+        if (!storedRecord || !storedRecord.saveRecord){
+            throw new Error('No saved game was found in this slot.');
+        }
+        var actualChecksum = HashSavePayloadJson(JSON.stringify(storedRecord.saveRecord));
+        if (storedRecord.checksumAlgorithm!=='fnv1a32-json' || actualChecksum!==storedRecord.checksum){
+            throw new Error('The saved game failed its integrity check and may be incomplete or damaged.');
+        }
+        return storedRecord.saveRecord;
+    }
+    function FormatSavedAt(value){
+        if (!value){
+            return 'Unknown date';
+        }
+        var date = new Date(value);
+        if (Number.isNaN(date.getTime())){
+            return value;
+        }
+        return date.toLocaleString();
+    }
+    function HideSaveLoadConfirmation(){
+        pendingConfirmedAction = null;
+        saveLoadConfirmation.classList.add('confirmationHidden');
+        saveLoadConfirmationText.textContent = '';
+    }
+    function ShowSaveLoadConfirmation(text, buttonText, action){
+        pendingConfirmedAction = action;
+        saveLoadConfirmationText.textContent = text;
+        confirmSaveLoadActionButton.textContent = buttonText;
+        saveLoadConfirmation.classList.remove('confirmationHidden');
+        confirmSaveLoadActionButton.focus();
+    }
+    function CloseSaveLoadDialog(){
+        if (pendingSaveRequest || pendingLoadRequest){
+            return;
+        }
+        HideSaveLoadConfirmation();
+        saveLoadOverlay.classList.add('dialogHidden');
+        saveLoadDialogMode = null;
+        saveLoadMessage.textContent = '';
+    }
+    function RecordBySlotId(records, slotId){
+        return records.find(function (record){
+            return record.slotId===slotId;
+        } ) || null;
+    }
+    function AddSaveSlotRow(slotId, slotName, record){
+        var row = document.createElement('div');
+        row.className = 'saveSlotRow'+(record ? '' : ' empty');
+        var details = document.createElement('div');
+        details.className = 'saveSlotDetails';
+        var name = document.createElement('span');
+        name.className = 'saveSlotName';
+        name.textContent = record && record.slotName ? record.slotName : slotName;
+        var metadata = document.createElement('span');
+        metadata.className = 'saveSlotMetadata';
+        if (record){
+            metadata.textContent = (record.gameMode==='campaign' ? 'Campaign' : 'Single game')+', round '+(record.roundNumber || '?')+', season '+(record.seasonNumber || '?')+', '+(record.phase || 'unknown phase')+' - '+FormatSavedAt(record.savedAt);
+        } else{
+            metadata.textContent = 'Empty slot';
+        }
+        details.appendChild(name);
+        details.appendChild(metadata);
+        row.appendChild(details);
+        var primaryButton = document.createElement('button');
+        primaryButton.type = 'button';
+        primaryButton.textContent = saveLoadDialogMode==='save' ? (record ? 'Overwrite' : 'Save') : 'Load';
+        primaryButton.disabled = saveLoadDialogMode==='load' && !record;
+        primaryButton.addEventListener('click', function (){
+            if (saveLoadDialogMode==='save'){
+                if (record){
+                    ShowSaveLoadConfirmation('Overwrite '+name.textContent+'? The existing saved game in this slot will be permanently replaced.', 'Overwrite save', function (){
+                        BeginSaveToSlot(slotId, slotName);
+                    } );
+                } else{
+                    BeginSaveToSlot(slotId, slotName);
+                }
+            } else if (record){
+                BeginLoadFromSlot(record);
+            }
+        } );
+        row.appendChild(primaryButton);
+        var deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'saveSlotDeleteButton';
+        deleteButton.textContent = 'Delete';
+        deleteButton.disabled = !record;
+        deleteButton.addEventListener('click', function (){
+            ShowSaveLoadConfirmation('Delete '+name.textContent+'? This cannot be undone.', 'Delete save', function (){
+                DeleteStoredSaveRecord(slotId).then(function (){
+                    AppendLog(name.textContent+' deleted.');
+                    HideSaveLoadConfirmation();
+                    RenderSaveLoadSlots();
+                    RefreshSaveLoadButtons();
+                } ).catch(function (error){
+                    saveLoadMessage.textContent = 'Delete failed: '+String(error && error.message ? error.message : error);
+                    HideSaveLoadConfirmation();
+                } );
+            } );
+        } );
+        row.appendChild(deleteButton);
+        saveSlotList.appendChild(row);
+    }
+    function RenderSaveLoadSlots(){
+        saveSlotList.innerHTML = '';
+        saveLoadMessage.textContent = 'Reading browser storage...';
+        GetAllStoredSaveRecords().then(function (records){
+            saveSlotList.innerHTML = '';
+            saveLoadMessage.textContent = '';
+            for (var slotNumber = 1; slotNumber<=SAVE_SLOT_COUNT; slotNumber+=1){
+                var slotId = SaveSlotIdForNumber(slotNumber);
+                AddSaveSlotRow(slotId, SaveSlotNameForNumber(slotNumber), RecordBySlotId(records, slotId));
+            }
+        } ).catch(function (error){
+            saveLoadMessage.textContent = 'Could not read saved games: '+String(error && error.message ? error.message : error);
+        } );
+    }
+    function OpenSaveLoadDialog(mode){
+        if (pendingSaveRequest || pendingLoadRequest){
+            return;
+        }
+        saveLoadDialogMode = mode;
+        saveLoadTitle.textContent = mode==='save' ? 'Save game' : 'Load game';
+        saveLoadDescription.textContent = mode==='save' ? 'Choose an empty slot or overwrite an existing saved game.' : 'Choose a saved game to load. You may also delete saves that are no longer required.';
+        HideSaveLoadConfirmation();
+        saveLoadOverlay.classList.remove('dialogHidden');
+        RenderSaveLoadSlots();
+        closeSaveLoadDialogButton.focus();
+    }
+    function RefreshSaveLoadButtons(){
+        saveGameMenuButton.disabled = !gameStarted || pendingSaveRequest || pendingLoadRequest;
+        quitGameMenuButton.disabled = !gameStarted || pendingSaveRequest || pendingLoadRequest;
+        GetAllStoredSaveRecords().then(function (records){
+            loadGameMenuButton.disabled = records.length===0 || pendingSaveRequest || pendingLoadRequest;
+            loadGameMenuButton.textContent = records.length>0 ? 'Load game ('+records.length+' saved)' : 'Load game';
+        } ).catch(function (){
+            loadGameMenuButton.disabled = true;
+            loadGameMenuButton.textContent = 'Load game - storage unavailable';
+        } );
+    }
+    function BeginSaveToSlot(slotId, slotName){
+        if (!gameStarted || pendingSaveRequest || pendingLoadRequest){
+            return;
+        }
+        HideSaveLoadConfirmation();
+        pendingSaveSlotId = slotId;
+        pendingSaveSlotName = slotName;
+        pendingSaveRequest = true;
+        saveLoadMessage.textContent = 'Saving to '+slotName+'...';
+        saveGameMenuButton.disabled = true;
+        SendCommand('SAVE_GAME');
+    }
+    function BeginLoadFromSlot(storedRecord){
+        if (pendingSaveRequest || pendingLoadRequest){
+            return;
+        }
+        pendingLoadRequest = true;
+        saveLoadMessage.textContent = 'Loading '+(storedRecord.slotName || 'saved game')+'...';
+        try{
+            var saveRecord = ValidateStoredSaveRecord(storedRecord);
+            newGameMessagePending = true;
+            SendCommand('LOAD_GAME', { saveRecord : saveRecord });
+        } catch (error){
+            pendingLoadRequest = false;
+            saveLoadMessage.textContent = 'Load failed: '+String(error && error.message ? error.message : error);
+            RefreshSaveLoadButtons();
+        }
     }
     function AttachStaticWorldData(snapshot){
         if (!snapshot)return snapshot;
@@ -19863,7 +20807,44 @@ button:hover {
         case 'READY' : AppendLog('Simulation worker ready. Open the main menu to start.');
             RenderPlaceholder('Main menu');
             break;
-        case 'COMMAND_REJECTED' : AppendLog('Command rejected: '+message.payload.reason);
+        case 'COMMAND_REJECTED' :
+            AppendLog('Command rejected: '+message.payload.reason);
+            pendingSaveRequest = false;
+            pendingLoadRequest = false;
+            RefreshSaveLoadButtons();
+            break;
+        case 'SAVE_GAME_DATA' :
+            PutSaveRecord(message.payload.saveRecord, pendingSaveSlotId, pendingSaveSlotName).then(function (storedRecord){
+                pendingSaveRequest = false;
+                pendingSaveSlotId = null;
+                pendingSaveSlotName = null;
+                AppendLog((storedRecord.slotName || 'Game')+' saved locally at '+storedRecord.savedAt+'.');
+                CloseSaveLoadDialog();
+                ShowGameToast('Game saved to '+(storedRecord.slotName || 'save slot')+'.');
+                RefreshSaveLoadButtons();
+                if (actionAfterSuccessfulSave){
+                    RunPendingDestructiveAction();
+                } else{
+                    HideMainMenu();
+                }
+            } ).catch(function (error){
+                pendingSaveRequest = false;
+                pendingSaveSlotId = null;
+                pendingSaveSlotName = null;
+                saveLoadMessage.textContent = 'Save failed: '+String(error && error.message ? error.message : error);
+                AppendLog(saveLoadMessage.textContent);
+                RefreshSaveLoadButtons();
+            } );
+            break;
+        case 'QUIT_GAME_ACCEPTED' :
+            AppendLog('Current game closed.');
+            break;
+        case 'LOAD_GAME_ACCEPTED' :
+            gameStarted = true;
+            pendingLoadRequest = false;
+            AppendLog('Saved game restored.');
+            CloseSaveLoadDialog();
+            RefreshSaveLoadButtons();
             break;
         case 'WORLD_SNAPSHOT' : latestWorldSnapshot = message.payload.snapshot;
             latestStaticObstacles = latestWorldSnapshot.obstacles || latestWorldSnapshot.terrainObjects || [];
@@ -19908,7 +20889,11 @@ button:hover {
                 AppendLog('['+e.tickNumber+'] '+e.text);
             } );
             break;
-        case 'WORKER_ERROR' : AppendLog('Worker error: '+message.payload.message);
+        case 'WORKER_ERROR' :
+            AppendLog('Worker error: '+message.payload.message);
+            pendingSaveRequest = false;
+            pendingLoadRequest = false;
+            RefreshSaveLoadButtons();
             break;
         case 'HEADLESS_TEST_RESULTS' : AppendLog('Harness: '+message.payload.endedCount+'/'+message.payload.count+' raids ended; avg treasure units remaining '+message.payload.averageTreasureRemainingUnits.toFixed(2)+', avg treasure lost value '+message.payload.averageTreasureLostValue.toFixed(2)+', avg pathfinding calls '+message.payload.averagePathfindingCalls.toFixed(2)+', regression failures '+(message.payload.regressionTests ? message.payload.regressionTests.failures : '?')+'.');
             break;
@@ -19926,6 +20911,7 @@ button:hover {
     }
     function ShowMainMenu(){
         UpdateResumeGameButton();
+        RefreshSaveLoadButtons();
         mainMenuOverlay.classList.remove('menuHidden');
         seasonDisplay.textContent = 'Main Menu';
     }
@@ -20002,12 +20988,15 @@ button:hover {
                 return;
             }
         }
-        StartNewGame('quick', {
+        var customOptions = {
             seed : seed,
             worldOptions : {
                 customTreasureAmounts : amounts,
                 mapSizeKey : mapSizeKey
             }
+        } ;
+        RequestDestructiveAction('new', function (){
+            StartNewGame('quick', customOptions);
         } );
     }
     resumeGameMenuButton.addEventListener('click', function (){
@@ -20017,10 +21006,14 @@ button:hover {
         HideMainMenu();
     } );
     document.getElementById('campaignMenuButton').addEventListener('click', function (){
-        StartNewGame('campaign');
+        RequestDestructiveAction('new', function (){
+            StartNewGame('campaign');
+        } );
     } );
     document.getElementById('quickGameMenuButton').addEventListener('click', function (){
-        StartNewGame('quick');
+        RequestDestructiveAction('new', function (){
+            StartNewGame('quick');
+        } );
     } );
     customGameMenuButton.addEventListener('click', function (){
         ShowCustomGamePanel();
@@ -20030,6 +21023,46 @@ button:hover {
     } );
     cancelCustomGameButton.addEventListener('click', function (){
         HideCustomGamePanel();
+    } );
+    saveGameMenuButton.addEventListener('click', function (){
+        OpenSaveLoadDialog('save');
+    } );
+    loadGameMenuButton.addEventListener('click', function (){
+        RequestDestructiveAction('load', function (){
+            OpenSaveLoadDialog('load');
+        } );
+    } );
+    quitGameMenuButton.addEventListener('click', function (){
+        RequestDestructiveAction('quit', function (){
+            AbandonCurrentGame();
+        } );
+    } );
+    cancelUnsavedActionButton.addEventListener('click', function (){
+        ClearPendingDestructiveAction();
+    } );
+    discardCurrentGameButton.addEventListener('click', function (){
+        RunPendingDestructiveAction();
+    } );
+    saveBeforeActionButton.addEventListener('click', function (){
+        actionAfterSuccessfulSave = pendingDestructiveAction;
+        HideUnsavedActionDialog();
+        OpenSaveLoadDialog('save');
+    } );
+    closeSaveLoadDialogButton.addEventListener('click', function (){
+        CloseSaveLoadDialog();
+        if (actionAfterSuccessfulSave){
+            ClearPendingDestructiveAction();
+        }
+    } );
+    cancelSaveLoadActionButton.addEventListener('click', function (){
+        HideSaveLoadConfirmation();
+    } );
+    confirmSaveLoadActionButton.addEventListener('click', function (){
+        if (pendingConfirmedAction){
+            var action = pendingConfirmedAction;
+            pendingConfirmedAction = null;
+            action();
+        }
     } );
     document.getElementById('newRaidButton').addEventListener('click', function (){
         ShowMainMenu();
@@ -20067,6 +21100,12 @@ button:hover {
             UpdateManagementDrawer(latestSnapshot);
         }
         SendCommand('START_SEASON');
+    } );
+    window.addEventListener('beforeunload', function (event){
+        if (gameStarted){
+            event.preventDefault();
+            event.returnValue = '';
+        }
     } );
     window.addEventListener('keydown', function (e){
         if (e.key==='Escape'){
@@ -20199,6 +21238,7 @@ button:hover {
         if (renderSnapshot)RenderRaid(renderSnapshot, now);
         requestAnimationFrame(Frame);
     }
+    RefreshSaveLoadButtons();
     requestAnimationFrame(Frame);
 }
 ());
