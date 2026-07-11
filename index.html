@@ -7272,11 +7272,17 @@ button:hover {
         isFullyNourishedThisSeason : function (monster){
             return this.getFoodNeeded(monster)<=0;
         } ,
+        getRaidFoodNeeded : function (monster){
+            return Math.max(0, this.getMonsterRequirement(monster)-(monster.foodEatenThisSeason || 0));
+        } ,
+        isFullyFedFromRaidFood : function (monster){
+            return this.getRaidFoodNeeded(monster)<=0;
+        } ,
         canFeedOnCarcass : function (carcass){
             return !!carcass && !carcass.alive && !carcass.escaped &&(carcass.edibleFoodRemaining || 0)>0;
         } ,
         consumeOneFoodFromCarcass : function (monster, carcass){
-            if (!this.canFeedOnCarcass(carcass) || this.isFullyNourishedThisSeason(monster)){
+            if (!this.canFeedOnCarcass(carcass) || this.isFullyFedFromRaidFood(monster)){
                 return 0;
             }
             carcass.edibleFoodRemaining = Math.max(0, (carcass.edibleFoodRemaining || 0)-1);
@@ -7398,8 +7404,42 @@ button:hover {
                 died : true
             } ;
         } ,
+        settleLairFoodAfterRaid : function (gameState, world, monsters){
+            var result = {
+                raidFoodUsed : 0,
+                lairFoodReleased : 0,
+                purchasedMeatStored : 0,
+                previousStoredMeatReturned : 0,
+                captiveFoodUnused : 0
+            } ;
+            (monsters || []).forEach(function (monster){
+                var requirement = NutritionSystem.getMonsterRequirement(monster);
+                var raidFoodUsed = Math.min(requirement, monster.foodEatenThisSeason || 0);
+                var lairFoodNeeded = Math.max(0, requirement-raidFoodUsed);
+                var lairFoodCommitted = monster.foodBoughtThisSeason || 0;
+                var release = Math.max(0, lairFoodCommitted-lairFoodNeeded);
+                result.raidFoodUsed+=raidFoodUsed;
+                result.lairFoodReleased+=release;
+                var purchasedRelease = Math.min(release, monster.foodFromPurchasedMeatThisSeason || 0);
+                monster.foodFromPurchasedMeatThisSeason = Math.max(0, (monster.foodFromPurchasedMeatThisSeason || 0)-purchasedRelease);
+                release-=purchasedRelease;
+                result.purchasedMeatStored+=purchasedRelease;
+                var storedRelease = Math.min(release, monster.foodFromStoredMeatThisSeason || 0);
+                monster.foodFromStoredMeatThisSeason = Math.max(0, (monster.foodFromStoredMeatThisSeason || 0)-storedRelease);
+                release-=storedRelease;
+                result.previousStoredMeatReturned+=storedRelease;
+                var captiveRelease = Math.min(release, monster.foodFromCaptiveMacrofaunaThisSeason || 0);
+                monster.foodFromCaptiveMacrofaunaThisSeason = Math.max(0, (monster.foodFromCaptiveMacrofaunaThisSeason || 0)-captiveRelease);
+                result.captiveFoodUnused+=captiveRelease;
+                monster.foodBoughtThisSeason =(monster.foodFromCaptiveMacrofaunaThisSeason || 0)+(monster.foodFromStoredMeatThisSeason || 0)+(monster.foodFromPurchasedMeatThisSeason || 0);
+                monster.foodBoughtCostCreditsThisSeason =(monster.foodFromPurchasedMeatThisSeason || 0) * NutritionSystem.getFoodCostCredits(world);
+            } );
+            gameState.excessMeatFood =(gameState.excessMeatFood || 0)+result.purchasedMeatStored+result.previousStoredMeatReturned;
+            return result;
+        } ,
         applyBetweenSeasonFeeding : function (gameState, world, raidMonsters, rng){
             var monsters = gameState.getLivingOwnedMonsters();
+            var settlement = this.settleLairFoodAfterRaid(gameState, world, monsters);
             var result = {
                 foodCostCredits : this.getFoodCostCredits(world),
                 foodEatenInRaid : 0,
@@ -7409,6 +7449,7 @@ button:hover {
                 monstersMalnourished : 0,
                 monstersSeverelyMalnourished : 0,
                 monstersStarved : 0,
+                settlement : settlement,
                 events : []
             } ;
             monsters.forEach(function (monster){
@@ -7428,7 +7469,7 @@ button:hover {
                 }
             } );
             if (result.foodEatenInRaid>0){
-                result.events.push('Monsters ate '+result.foodEatenInRaid+' food during the raid.');
+                result.events.push('Monsters ate '+result.foodEatenInRaid+' food during the raid, displacing '+settlement.lairFoodReleased+' food from their lair provision. '+(settlement.purchasedMeatStored+settlement.previousStoredMeatReturned)+' food was retained in storage.');
             }
             if (result.monstersMalnourished>0 || result.monstersSeverelyMalnourished>0){
                 result.events.push('Nutrition shortage left '+(result.monstersMalnourished+result.monstersSeverelyMalnourished)+' monster(s) underfed.');
@@ -11514,7 +11555,7 @@ button:hover {
                 return false;
             }
             var carcass = raid.findEdibleCarcassById(this.eatingTargetId);
-            if (!NutritionSystem.canFeedOnCarcass(carcass) || NutritionSystem.isFullyNourishedThisSeason(this)){
+            if (!NutritionSystem.canFeedOnCarcass(carcass) || NutritionSystem.isFullyFedFromRaidFood(this)){
                 this.eatingTargetId = null;
                 this.eatingTicksRemaining = 0;
                 return false;
@@ -11535,7 +11576,7 @@ button:hover {
                 if (NutritionSystem.consumeOneFoodFromCarcass(this, carcass)>0){
                     raid.addEvent(this.name+' ate from a carcass.');
                 }
-                this.eatingTicksRemaining = NutritionSystem.isFullyNourishedThisSeason(this) || !NutritionSystem.canFeedOnCarcass(carcass) ? 0 : FOOD_EATING_TICKS_PER_FOOD;
+                this.eatingTicksRemaining = NutritionSystem.isFullyFedFromRaidFood(this) || !NutritionSystem.canFeedOnCarcass(carcass) ? 0 : FOOD_EATING_TICKS_PER_FOOD;
                 if (this.eatingTicksRemaining<=0){
                     this.eatingTargetId = null;
                 }
@@ -11543,7 +11584,7 @@ button:hover {
             return true;
         }
         chooseFoodTarget(raid){
-            if (NutritionSystem.isFullyNourishedThisSeason(this)){
+            if (NutritionSystem.isFullyFedFromRaidFood(this)){
                 return null;
             }
             var candidates = raid.getEdibleCarcasses().filter(function (carcass){
@@ -11558,7 +11599,7 @@ button:hover {
             return candidates[0];
         }
         chooseMacrofaunaTarget(raid){
-            if (NutritionSystem.isFullyNourishedThisSeason(this)){
+            if (NutritionSystem.isFullyFedFromRaidFood(this)){
                 return null;
             }
             var candidates = raid.macrofauna.filter(function (animal){
@@ -14645,6 +14686,12 @@ button:hover {
                 } ;
             } , this);
             var totalDemand = monsters.reduce(function (sum, monster){ return sum+monster.demand; }, 0);
+            var gameStateForFoodPlan = this.gameState;
+            var foodEatenInRaid = monsters.reduce(function (sum, entry){
+                var liveMonster = gameStateForFoodPlan.findOwnedMonster(entry.id);
+                return sum+Math.min(entry.demand, liveMonster ? (liveMonster.foodEatenThisSeason || 0) : 0);
+            } , 0);
+            var netLairFoodDemand = Math.max(0, totalDemand-foodEatenInRaid);
             var storedMeat = Math.max(0, this.gameState.excessMeatFood || 0);
             var availableWithoutSale = fauna.foodProduced+storedMeat;
             return {
@@ -14652,7 +14699,10 @@ button:hover {
                 storedExcessMeat : storedMeat,
                 availableWithoutSale : availableWithoutSale,
                 totalDemand : totalDemand,
-                shortage : Math.max(0, totalDemand-availableWithoutSale),
+                foodEatenInRaid : foodEatenInRaid,
+                netLairFoodDemand : netLairFoodDemand,
+                baseFoodBalance : fauna.foodProduced-netLairFoodDemand,
+                shortage : Math.max(0, netLairFoodDemand-availableWithoutSale),
                 foodCostCredits : NutritionSystem.getFoodCostCredits(this.world),
                 monsters : monsters
             } ;
@@ -16551,6 +16601,23 @@ button:hover {
         }
         var allowedFeeders = carcassRaid.monsters.filter(function (monster){ return carcassRaid.monsterMayFeedFromCarcass(monster, carcass); }).length;
         AddRegressionResult(results, 'Carcass feeding admits no more than the three strongest monster contenders', allowedFeeders===3, 'allowed='+allowedFeeders);
+        var raidFoodEconomySession = new GameSession(424275, { mode : 'campaign', worldOptions : { mapSizeKey : 'legacy' } });
+        var raidFoodMonster = raidFoodEconomySession.gameState.getLivingOwnedMonsters()[0];
+        NutritionSystem.resetSeasonNutrition(raidFoodMonster);
+        raidFoodMonster.deployed = true;
+        var raidFoodRequirement = raidFoodMonster.calculateSeasonFoodRequirement(raidFoodEconomySession.world);
+        raidFoodMonster.foodFromCaptiveMacrofaunaThisSeason = Math.max(0, raidFoodRequirement-4);
+        raidFoodMonster.foodFromStoredMeatThisSeason = 2;
+        raidFoodMonster.foodFromPurchasedMeatThisSeason = 2;
+        raidFoodMonster.foodBoughtThisSeason = raidFoodRequirement;
+        raidFoodMonster.foodEatenThisSeason = 4;
+        raidFoodEconomySession.gameState.excessMeatFood = 0;
+        var raidFoodSettlement = NutritionSystem.settleLairFoodAfterRaid(raidFoodEconomySession.gameState, raidFoodEconomySession.world, [raidFoodMonster]);
+        AddRegressionResult(results, 'Raid food displaces purchased and stored lair meat before captive production', raidFoodMonster.foodBoughtThisSeason===raidFoodRequirement-4 && raidFoodMonster.foodFromPurchasedMeatThisSeason===0 && raidFoodMonster.foodFromStoredMeatThisSeason===0 && raidFoodMonster.foodFromCaptiveMacrofaunaThisSeason===raidFoodRequirement-4 && raidFoodEconomySession.gameState.excessMeatFood===4, 'lair='+raidFoodMonster.foodBoughtThisSeason+', stored='+raidFoodEconomySession.gameState.excessMeatFood+', released='+raidFoodSettlement.lairFoodReleased);
+        raidFoodMonster.foodEatenThisSeason = 4;
+        var raidFoodPlan = raidFoodEconomySession.getSeasonFoodPlan();
+        AddRegressionResult(results, 'Live captive food balance credits food eaten during the raid', raidFoodPlan.foodEatenInRaid===4 && raidFoodPlan.netLairFoodDemand===Math.max(0, raidFoodPlan.totalDemand-4) && raidFoodPlan.baseFoodBalance===raidFoodPlan.captiveMacrofauna.foodProduced-raidFoodPlan.netLairFoodDemand, 'eaten='+raidFoodPlan.foodEatenInRaid+', net='+raidFoodPlan.netLairFoodDemand+', balance='+raidFoodPlan.baseFoodBalance);
+
         var tinyMonster = new Monster('polar_predation_tiny', 200, 200, new SeededRng(424280), {});
         tinyMonster.deployed = true;
         tinyMonster.currentBodyMass = 28;
@@ -17906,15 +17973,17 @@ button:hover {
         if (animalCount!==1 && speciesName.slice(-1)!=='s'){
             populationText+=' (slaughter-equivalent animals)';
         }
+        var balance = Number.isFinite(foodPlan.baseFoodBalance) ? foodPlan.baseFoodBalance : (fauna.foodProduced || 0)-(foodPlan.netLairFoodDemand || foodPlan.totalDemand || 0);
         var lines = ['CAPTIVE FOOD ECONOMY',
         'Captive macrofauna population: '+populationText,
         'Base food production this season: '+FormatNumber(fauna.foodProduced || 0)+' food',
         'Total captive monster food demand: '+FormatNumber(foodPlan.totalDemand || 0)+' food',
-        'Stored excess meat: '+FormatNumber(foodPlan.storedExcessMeat || 0)+' food'];
+        'Food eaten during this raid: '+FormatNumber(foodPlan.foodEatenInRaid || 0)+' food',
+        'Net demand from the lair: '+FormatNumber(foodPlan.netLairFoodDemand!==undefined ? foodPlan.netLairFoodDemand : foodPlan.totalDemand || 0)+' food',
+        'Stored excess meat: '+FormatNumber(foodPlan.storedExcessMeat || 0)+' food',
+        'Base food balance: '+(balance>=0 ? 'surplus ' : 'shortfall ')+FormatNumber(Math.abs(balance))+' food'];
         if ((foodPlan.shortage || 0)>0){
-            lines.push('Food shortage before treasure sales: '+FormatNumber(foodPlan.shortage)+' food');
-        } else{
-            lines.push('Base food balance: surplus '+FormatNumber(Math.max(0, (foodPlan.availableWithoutSale || 0)-(foodPlan.totalDemand || 0)))+' food');
+            lines.push('Shortage after stored meat, before new treasure sales: '+FormatNumber(foodPlan.shortage)+' food');
         }
         return lines.join('\n');
     }
