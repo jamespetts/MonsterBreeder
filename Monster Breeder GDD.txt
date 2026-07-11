@@ -686,3 +686,24 @@ Architecture notes:
 - Food value should be data on edible corpses or carcasses, not hard-coded into the rendering layer.
 - Main-thread UI may display nutrition, cost and food expenditure, but must not calculate authoritative feeding results.
 - Nutrition should be deterministic under the seeded simulation so that headless balance tests can include food cost, malnutrition, starvation, and campaign-loss pressure.
+
+- Perception Genetics
+Monster perception is an inherited physiological subsystem. It operates through sensory mechanisms rather than a single perception statistic or genes for final behaviours, prey classes or tactical roles.
+
+Inherited mechanisms include retinal photon sensitivity, brightness tolerance, visual resolution, motion detection, rod/cone balance, colour-contrast discrimination, auditory sensitivity and frequency response, auditory noise rejection, sensory gating, false-positive susceptibility and social response to other monsters' reactions. One perception locus is principally junk DNA: most alleles at this locus have no effect, but rare strongly recessive alleles may produce unusual and often harmful pleiotropic effects.
+
+Every terrain type supplies environmental brightness data and every season modifies that brightness. These terrain facts are composable into current and future biomes rather than perception selection being hard-coded to named biomes. Brightness above a monster's expressed tolerance reduces visual acuity. Darkness below its useful sensitivity also reduces acuity. Rod-rich retinas improve low-light capability but reduce colour-contrast discrimination; cone-rich retinas improve colour contrast and therefore help defeat camouflage, at a cost to low-light sensitivity.
+
+Eye colour is an expressed, positively rendered part of the perception phenotype. Natural eye colours have subtle additive effects on retinal performance. A rare recessive red-eye phenotype substantially increases fear caused to adventurers, slightly improves visual performance in very bright conditions and significantly, but not cripplingly, reduces darker-condition vision.
+
+Monsters have a tracked look direction. Normal distant vision is direction-dependent while close-range awareness remains robust. Vision continues to respect line of sight, terrain height, obstacles, target size, movement and camouflage.
+
+Sound events carry broad frequency information. Treasure collection and dropped treasure produce predominantly high-frequency coin-clinking sounds. Auditory phenotype changes sensitivity to frequency bands and resistance to masking noise; it does not reveal the identity or tactical meaning of an unseen source.
+
+Perceptual response is probabilistic and deterministic under the seeded simulation. Each potential stimulus has an individual response chance derived from stimulus strength, relevant sensitivity, discrimination, sensory gating, current hormone state and nearby monsters' responses. Environmental false stimuli include microfauna and wind-driven foliage rustle. Wind speed, wind direction, foliage position and downwind displacement affect these stimuli. Monsters may investigate false stimuli, creating real time, movement, fatigue and feeding opportunity costs.
+
+A monster seeing nearby monsters respond, or decline to respond, biases its own response. Inherited social-response and social-independence mechanisms belong to the perception-attention boundary; behaviour hormones provide environmentally varying modifiers on top of the inherited sensory baseline. Perception determines whether and with what confidence evidence is admitted. Behaviour determines investigation, attack, feeding, persistence or flight.
+
+Perception has live tradeoffs. Greater sensitivity and processing impose food costs and may increase false positives, distraction or overload. Natural selection evaluates expressed physiology against generic environmental facts including brightness distribution, clutter, ambient noise, wind, water, food scarcity and target movement, so it remains extensible to future tropical, rainforest, jungle and other biomes.
+
+Player-facing displays must not expose ranked perception labels or a consolidated perception score. Players infer sensory capability from appearance and observed behaviour. Eye colour is visible; detailed sensory values are reserved for internal simulation and deterministic diagnostics.

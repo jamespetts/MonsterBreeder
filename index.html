@@ -932,6 +932,10 @@ button:hover {
     var DEFAULT_HEARING_THRESHOLD = 0.16;
     var DEFAULT_MONSTER_HEARING_THRESHOLD = 0.11;
     var DEFAULT_ADVENTURER_HEARING_THRESHOLD = 0.20;
+    var SOUND_FREQUENCY_LOW = 0.20;
+    var SOUND_FREQUENCY_MID = 0.50;
+    var SOUND_FREQUENCY_HIGH = 0.84;
+    var PERCEPTION_FALSE_STIMULUS_INTERVAL_TICKS = 24;
     var SOUND_PROPAGATION_MULTIPLIER = 4;
     var MORALE_SKELETON_PENALTY = 0.035;
     var MORALE_INJURY_PENALTY = 0.18;
@@ -1354,6 +1358,22 @@ button:hover {
                 return 0.05;
             }
             return 0;
+        } ,
+        visualBrightnessFor : function (terrainType, seasonName){
+            // Data is keyed by terrain facts, not named biomes. Future terrain types
+            // can add profiles without changing perception genetics.
+            var baseByTerrain = {};
+            baseByTerrain[TERRAIN_TYPE.GRASS] = 0.68;
+            baseByTerrain[TERRAIN_TYPE.ROCKY] = 0.76;
+            baseByTerrain[TERRAIN_TYPE.FOREST] = 0.34;
+            baseByTerrain[TERRAIN_TYPE.MARSH] = 0.52;
+            baseByTerrain[TERRAIN_TYPE.STREAM] = 0.62;
+            baseByTerrain[TERRAIN_TYPE.LAKE] = 0.78;
+            baseByTerrain[TERRAIN_TYPE.TUNDRA] = 0.82;
+            baseByTerrain[TERRAIN_TYPE.ICE] = 0.94;
+            baseByTerrain[TERRAIN_TYPE.DESERT] = 0.88;
+            var seasonMultiplier = { winter : 0.70, spring : 0.91, summer : 1.08, autumn : 0.82 };
+            return Clamp((baseByTerrain[terrainType]!==undefined ? baseByTerrain[terrainType] : 0.60) * (seasonMultiplier[seasonName] || 1), 0.12, 1.18);
         } ,
         visibilityRangeMultiplierFor : function (terrainType, slope){
             if (terrainType===TERRAIN_TYPE.FOREST){
@@ -3665,7 +3685,9 @@ button:hover {
                 vegetationDensity : vegetationDensity,
                 meanAnnualTemperatureC : -4+temperature * 30-altitude * 5,
                 seasonalTemperatureAmplitudeC : 5+Math.abs(temperature-0.5) * 8+altitude * 3,
-                aridity : Clamp(1-moisture * 0.62-waterAbundance * 0.38, 0, 1)
+                aridity : Clamp(1-moisture * 0.62-waterAbundance * 0.38, 0, 1),
+                windSpeed : Number.isFinite(settings.windSpeed) ? Clamp(settings.windSpeed,0,1) : rng.range(0.08,0.92),
+                windDirectionRadians : Number.isFinite(settings.windDirectionRadians) ? settings.windDirectionRadians : rng.range(-Math.PI,Math.PI)
             } ;
         }
         static createSettlementDistanceMiles(rng, environment, settings){
@@ -5239,6 +5261,7 @@ button:hover {
             this.eyeHeight = 4;
             this.terrainHeight = 0;
             this.hearingThreshold = DEFAULT_HEARING_THRESHOLD;
+            this.lookDirectionAngle = 0;
             this.lastMovementSoundTick = -9999;
             this.lastMovementSoundX = x;
             this.lastMovementSoundY = y;
@@ -5596,6 +5619,11 @@ button:hover {
                 }
             }
             if (bestCandidate){
+                var movedX = bestCandidate.x-this.x;
+                var movedY = bestCandidate.y-this.y;
+                if (Math.hypot(movedX, movedY)>0.001){
+                    this.lookDirectionAngle = Math.atan2(movedY, movedX);
+                }
                 this.x = bestCandidate.x;
                 this.y = bestCandidate.y;
                 this.updateTerrainHeight(world);
@@ -5689,6 +5717,18 @@ button:hover {
             var ownSlope = world.terrainGrid.getSlopeAtWorld(this.x, this.y);
             var targetSlope = world.terrainGrid.getSlopeAtWorld(target.x, target.y);
             range*=0.95+perception * 0.45;
+            if(this.agentKind==='monster'&&this.phenotype&&this.phenotype.perception){
+                var pp=this.phenotype.perception;
+                var season=world.currentSeasonName||world.seasonName||'summer';
+                var brightness=TerrainRules.visualBrightnessFor(ownTerrain,season);
+                var excess=Math.max(0,brightness-pp.brightnessTolerance);
+                var darkness=Math.max(0,0.48-brightness);
+                range*=Clamp(1-excess*0.72-darkness*Math.max(0,1-pp.photonSensitivity)*0.62,0.38,1.12);
+                var targetSpeed=target&&Number.isFinite(target.speed)?target.speed:0;
+                range*=Clamp(0.88+pp.visualResolution*0.10+pp.motionSensitivity*Clamp(targetSpeed/220,0,1)*0.16,0.68,1.30);
+                var camouflageScale=this.getTargetCamouflageVisibilityScale(world,target,Distance(this.x,this.y,target.x,target.y));
+                range*=Clamp(1+(1-camouflageScale)*(pp.colourDiscrimination-1)*0.45,0.72,1.25);
+            }
             range*=this.getTargetVisibilityScale(target);
             range*=this.getTargetCamouflageVisibilityScale(world, target, Distance(this.x, this.y, target.x, target.y));
             var ownMultiplier = TerrainRules.visibilityRangeMultiplierFor(ownTerrain, ownSlope);
@@ -5788,6 +5828,11 @@ button:hover {
             if (distance<=VISIBILITY_CLOSE_RANGE){
                 return true;
             }
+            if(this.agentKind==='monster'&&Number.isFinite(this.lookDirectionAngle)){
+                var targetAngle=Math.atan2(target.y-this.y,target.x-this.x);
+                var angleDifference=Math.abs(Math.atan2(Math.sin(targetAngle-this.lookDirectionAngle),Math.cos(targetAngle-this.lookDirectionAngle)));
+                if(angleDifference>Math.PI*0.82&&distance>VISIBILITY_CLOSE_RANGE*1.8){return false;}
+            }
             if (distance>this.getEffectiveSightRange(world, target)){
                 return false;
             }
@@ -5803,9 +5848,11 @@ button:hover {
             s.escaped = this.escaped;
             s.corpseState = this.corpseState ||(this.alive ? 'alive' : ((this.edibleFoodRemaining || 0)>0 ? 'corpse' : 'skeleton'));
             s.behaviourState = this.behaviourState;
+            s.lookDirectionAngle = Number.isFinite(this.lookDirectionAngle) ? this.lookDirectionAngle : 0;
             s.attackCooldownTicks = this.attackCooldownTicks;
             s.terrainHeight = this.terrainHeight || 0;
             s.hearingThreshold = this.hearingThreshold;
+            s.eyeColour = this.eyeColour || '#6f5b3e';
             return s;
         }
     }
@@ -6159,7 +6206,7 @@ button:hover {
                 this.behaviourState = 'pickingUpTreasure';
                 this.currentCourage = Clamp((this.currentCourage===undefined ? this.courage : this.currentCourage)+MORALE_TREASURE_SELF_BONUS, 0, 1.75);
                 raid.addEvent('A '+this.displayName+' took '+amount+' units of '+TREASURE_TYPES[treasure.treasureType].displayName+'.');
-                raid.addSound('treasureCollected', this, this.x, this.y, SOUND_LOUDNESS.LOUD, SOUND_DEFAULT_DURATION_TICKS);
+                raid.addSound('treasureCollected', this, this.x, this.y, SOUND_LOUDNESS.LOUD, SOUND_DEFAULT_DURATION_TICKS, { frequency:SOUND_FREQUENCY_HIGH });
             }
         }
         tryPickupImprovisedWeapon(raid){
@@ -6251,6 +6298,15 @@ button:hover {
             }
             return true;
         }
+        nearbyStimulusSocialModifier(raid,sound){
+            var p=this.phenotype&&this.phenotype.perception?this.phenotype.perception:null;
+            if(!p||!raid){return 1;}
+            var neighbours=raid.monsters.filter(function(m){return m!==this&&m.isActive()&&m.deployed&&this.distanceTo(m)<240;},this);
+            if(!neighbours.length){return 1;}
+            var responders=neighbours.filter(function(m){return m.behaviourState==='investigatingSound';}).length;
+            var proportion=responders/neighbours.length;
+            return Clamp(1+(proportion-0.32)*0.55*p.socialResponseBias-(0.32-proportion)*0.20*p.socialIndependence,0.62,1.55);
+        }
         applyDamage(amount, rng, raid, attacker){
             var part = this.bodyHealth.applyGeneralDamage(this.receiveArmouredDamage(amount), rng);
             this.health = this.bodyHealth.total();
@@ -6294,7 +6350,7 @@ button:hover {
             }
             raid.droppedTreasure.push(dropped);
             raid.nextDroppedTreasureId+=1;
-            raid.addSound('treasureDropped', this, this.x, this.y, SOUND_LOUDNESS.LOUD, SOUND_DEFAULT_DURATION_TICKS);
+            raid.addSound('treasureDropped', this, this.x, this.y, SOUND_LOUDNESS.LOUD, SOUND_DEFAULT_DURATION_TICKS, { frequency:SOUND_FREQUENCY_HIGH });
             this.behaviourState = 'droppingTreasure';
             raid.addEvent('A '+this.displayName+' dropped treasure due to '+reason+'.');
             this.carryingAmount = 0;
@@ -7060,7 +7116,8 @@ button:hover {
         METABOLISM : 'metabolism',
         MORPHOLOGY : 'morphology',
         BEHAVIOUR : 'behaviour',
-        REPRODUCTION : 'reproduction'
+        REPRODUCTION : 'reproduction',
+        PERCEPTION : 'perception'
     } ;
     var COLOUR_CHROMOSOME_INDEX = 0;
     var COLOUR_CHROMOSOME_SLOT_COUNT = 4;
@@ -7072,6 +7129,8 @@ button:hover {
     var BEHAVIOUR_CHROMOSOME_SLOT_COUNT = 6;
     var REPRODUCTION_CHROMOSOME_INDEX = 4;
     var REPRODUCTION_CHROMOSOME_SLOT_COUNT = 7;
+    var PERCEPTION_CHROMOSOME_INDEX = 5;
+    var PERCEPTION_CHROMOSOME_SLOT_COUNT = 6;
     var IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR = 9.0;
     var DEFAULT_COMFORTABLE_TEMPERATURE_C = 12;
     var DEFAULT_BASE_THERMAL_LOW_C = -4;
@@ -7386,6 +7445,13 @@ button:hover {
         add(values){ Object.keys(this).forEach(function(key){ this[key]+=(values && Number.isFinite(values[key])) ? values[key] : 0; }, this); }
         cloneWith(values){ var result = new ReproductionFactorState(this); result.add(values); return result; }
     }
+    class PerceptionFactorState{
+        constructor(values){
+            Object.assign(this, { photonSensitivity:0, brightnessTolerance:0, visualResolution:0, motionSensitivity:0, rodBias:0, colourDiscrimination:0, hearingSensitivity:0, highFrequencyBias:0, lowFrequencyBias:0, noiseRejection:0, sensoryGate:0, falsePositiveBias:0, socialResponseBias:0, socialIndependence:0, neuralCost:0, eyeRedness:0, junkHealth:0 }, values || {});
+        }
+        add(values){ Object.keys(this).forEach(function(key){ this[key]+=(values && Number.isFinite(values[key])) ? values[key] : 0; }, this); }
+        cloneWith(values){ var result=new PerceptionFactorState(this); result.add(values); return result; }
+    }
     class MonsterPhenotypeExpressionContext{
         constructor(monster){
             this.monster = monster || null;
@@ -7403,6 +7469,11 @@ button:hover {
             this.getEffectBag(GENETIC_TRAIT.MORPHOLOGY, MonsterPhenotypeExpressionContext.createMorphologyEffectBag);
             this.getEffectBag(GENETIC_TRAIT.BEHAVIOUR, MonsterPhenotypeExpressionContext.createBehaviourEffectBag);
             this.getEffectBag(GENETIC_TRAIT.REPRODUCTION, MonsterPhenotypeExpressionContext.createReproductionEffectBag);
+            this.getEffectBag(GENETIC_TRAIT.PERCEPTION, MonsterPhenotypeExpressionContext.createPerceptionEffectBag);
+        }
+
+        static createPerceptionEffectBag(){
+            return { basePerceptionFactors:new PerceptionFactorState(), codominantPerceptionLayers:[new PerceptionFactorState(),new PerceptionFactorState()], usedCodominantPerceptionLayers:false };
         }
 
         static createColourEffectBag(){
@@ -7475,6 +7546,13 @@ button:hover {
         }
         getReproductionEffectBag(){
             return this.getEffectBag(GENETIC_TRAIT.REPRODUCTION, MonsterPhenotypeExpressionContext.createReproductionEffectBag);
+        }
+        getPerceptionEffectBag(){ return this.getEffectBag(GENETIC_TRAIT.PERCEPTION, MonsterPhenotypeExpressionContext.createPerceptionEffectBag); }
+        addPerceptionFactors(amounts, normalise){
+            var bag=this.getPerceptionEffectBag();
+            if(normalise===true){ bag.usedCodominantPerceptionLayers=true; bag.codominantPerceptionLayers[this.activeCodominantLayerIndex].add(amounts); return; }
+            if(normalise!==false){ throw new Error('Perception allele phenotype methods must pass the normalise boolean explicitly.'); }
+            bag.basePerceptionFactors.add(amounts);
         }
         addReproductionFactors(amounts, normalise){
             var bag = this.getReproductionEffectBag();
@@ -7649,6 +7727,13 @@ button:hover {
             if (normalise!==true && normalise!==false){ throw new Error('ReproductionAllele.phenotype requires an explicit normalise boolean.'); }
             context.addReproductionFactors(this.reproductionFactors, normalise);
         }
+    }
+    class PerceptionAllele extends Allele{
+        constructor(dominanceIndex, factors, options){
+            super(dominanceIndex,{selectionSensitive:options && options.selectionSensitive!==undefined ? !!options.selectionSensitive : true,debugLabel:options&&options.debugLabel?options.debugLabel:'perception allele'});
+            this.perceptionFactors=Object.assign(new PerceptionFactorState(),factors||{});
+        }
+        phenotype(context,normalise){ if(normalise!==true&&normalise!==false){throw new Error('PerceptionAllele.phenotype requires an explicit normalise boolean.');} context.addPerceptionFactors(this.perceptionFactors,normalise); }
     }
     class BehaviourAllele extends Allele{
         constructor(dominanceIndex, hormoneEffects, options){
@@ -7962,10 +8047,36 @@ button:hover {
         } ,
         thermalStatus : function (monster, world, seasonNumber){
             var m = monster && monster.phenotype && monster.phenotype.metabolism ? monster.phenotype.metabolism : MetabolismPhenotypeSystem.resolve(new MonsterPhenotypeExpressionContext());
-            var fat = Number.isFinite(monster && monster.currentFatMass) ? Math.max(0, monster.currentFatMass) : m.targetFatStorage * 0.70;
             var temperatureC = this.currentTemperatureC(world, seasonNumber);
-            var coldLimit = m.coldLimitC-fat * 1.35;
-            var heatLimit = m.heatLimitC-fat * 1.10;
+            var bodyMass = Number.isFinite(monster && monster.currentBodyMass) ? Math.max(1, monster.currentBodyMass) : 100;
+            var fatMass = Number.isFinite(monster && monster.currentFatMass) ? Math.max(0, monster.currentFatMass) : bodyMass * 0.10;
+            var fatFraction = Clamp(fatMass / bodyMass, 0, 0.42);
+            var bodyScale = Number.isFinite(monster && monster.bodyScale) ? Clamp(monster.bodyScale, 0.42, 1.45) : Clamp(Math.cbrt(bodyMass / 100), 0.42, 1.45);
+            var surfaceAreaToMass = Clamp(1 / bodyScale, 0.69, 2.38);
+            var baseMetabolicFood = Number.isFinite(m.baseMetabolicFood) ? m.baseMetabolicFood : DEFAULT_MONSTER_NUTRITION_REQUIREMENT;
+            var metabolicHeat = Clamp((baseMetabolicFood-10) / 6, -0.75, 1.0);
+            var conservation = Number.isFinite(m.energyConservation) ? m.energyConservation : 0.50;
+            var nutritionState = monster && monster.nutritionState ? monster.nutritionState : NUTRITION_STATE.NOURISHED;
+            var nutritionHeatCapacity = nutritionState===NUTRITION_STATE.NOURISHED ? 0.45 : (nutritionState===NUTRITION_STATE.MALNOURISHED ? -0.35 : (nutritionState===NUTRITION_STATE.SEVERELY_MALNOURISHED ? -0.95 : -1.55));
+            var currentPugilin = monster && Number.isFinite(monster.pugilinBase) ? monster.pugilinBase : 1;
+            var currentVigilin = monster && Number.isFinite(monster.vigilinBase) ? monster.vigilinBase : 1;
+            var currentTenacitin = monster && Number.isFinite(monster.tenacitinBase) ? monster.tenacitinBase : 1;
+            var behaviouralHeat = Clamp((currentPugilin-1) * 0.55+(currentVigilin-1) * 0.22+(currentTenacitin-1) * 0.34, -0.65, 1.20);
+            var fatigueHeat = Clamp((monster && monster.fatigueTicks ? monster.fatigueTicks : 0) / MONSTER_EXTREME_FATIGUE_TICKS, 0, 1.5) * 0.55;
+            var activityHeat = monster && monster.deployed ? Clamp((monster.sprinting ? 0.85 : 0)+(monster.behaviourState==='attacking' ? 0.45 : 0), 0, 1.20) : 0;
+            var diseaseFoodMultiplier = MonsterDiseaseSystem.combinedEffects(monster).foodMultiplier;
+            var diseaseHeat = Clamp((diseaseFoodMultiplier-1) * 1.4, -0.55, 1.10);
+
+            // Insulation is a bounded function of fat fraction and size, never raw
+            // fat mass. Larger and fatter monsters retain heat; smaller and leaner
+            // monsters shed it. Metabolism, nourishment, hormones, activity,
+            // fatigue and disease then alter the effective limits emergently.
+            var insulation = Clamp((fatFraction-0.10) * 18+(bodyScale-1) * 1.8, -1.9, 3.2);
+            var internalHeat = Clamp(metabolicHeat+(0.50-conservation) * 0.70+nutritionHeatCapacity+behaviouralHeat+fatigueHeat+activityHeat+diseaseHeat, -2.0, 3.2);
+            var smallBodyColdPenalty = Math.max(0, surfaceAreaToMass-1) * 1.35;
+            var largeBodyHeatPenalty = Math.max(0, bodyScale-1) * 0.85;
+            var coldLimit = Clamp(m.coldLimitC-insulation+smallBodyColdPenalty-internalHeat * 0.34, -28, 15);
+            var heatLimit = Clamp(m.heatLimitC-insulation * 0.82-largeBodyHeatPenalty-internalHeat * 0.78, 14, 52);
             var coldStress = Math.max(0, coldLimit-temperatureC);
             var heatStress = Math.max(0, temperatureC-heatLimit);
             var stress = Math.max(coldStress, heatStress);
@@ -7975,7 +8086,21 @@ button:hover {
                 stress : stress,
                 temperatureC : temperatureC,
                 coldLimitC : coldLimit,
-                heatLimitC : heatLimit
+                heatLimitC : heatLimit,
+                severe : stress>2.5,
+                factors : {
+                    bodyMass : bodyMass,
+                    bodyScale : bodyScale,
+                    fatFraction : fatFraction,
+                    insulation : insulation,
+                    metabolicHeat : metabolicHeat,
+                    nutritionHeatCapacity : nutritionHeatCapacity,
+                    behaviouralHeat : behaviouralHeat,
+                    fatigueHeat : fatigueHeat,
+                    activityHeat : activityHeat,
+                    diseaseHeat : diseaseHeat,
+                    internalHeat : internalHeat
+                }
             } ;
         } ,
         macrofaunaAvailability : function (world){
@@ -8369,6 +8494,47 @@ button:hover {
             return this.resolveBehaviourPhenotype(context);
         }
     }
+    var PerceptionPhenotypeSystem = {
+        resolve:function(context){
+            var bag=context.getPerceptionEffectBag();
+            var f=bag.basePerceptionFactors.cloneWith(null);
+            if(bag.usedCodominantPerceptionLayers){ f=f.cloneWith(bag.codominantPerceptionLayers[0]).cloneWith(bag.codominantPerceptionLayers[1]); }
+            var redEyes=f.eyeRedness>45;
+            var rodBias=Clamp(f.rodBias/150,-0.72,0.72);
+            return {
+                photonSensitivity:Clamp(1+f.photonSensitivity/170+rodBias*0.30,0.42,1.72),
+                brightnessTolerance:Clamp(0.66+f.brightnessTolerance/220-redEyes*0.00+(redEyes?0.10:0),0.24,1.18),
+                visualResolution:Clamp(1+f.visualResolution/175,0.48,1.65),
+                motionSensitivity:Clamp(1+f.motionSensitivity/175,0.44,1.72),
+                rodBias:rodBias,
+                colourDiscrimination:Clamp(1+f.colourDiscrimination/170-rodBias*0.42,0.38,1.75),
+                hearingSensitivity:Clamp(1+f.hearingSensitivity/175,0.42,1.70),
+                highFrequencyBias:Clamp(f.highFrequencyBias/150,-0.75,0.75),
+                lowFrequencyBias:Clamp(f.lowFrequencyBias/150,-0.75,0.75),
+                noiseRejection:Clamp(1+f.noiseRejection/170,0.40,1.70),
+                sensoryGate:Clamp(1+f.sensoryGate/175,0.42,1.72),
+                falsePositiveBias:Clamp(1+f.falsePositiveBias/180,0.35,1.85),
+                socialResponseBias:Clamp(1+f.socialResponseBias/170,0.35,1.85),
+                socialIndependence:Clamp(1+f.socialIndependence/170,0.35,1.85),
+                sensoryFoodCost:Clamp(0.08+Math.max(0,f.neuralCost)/240,0.02,0.75),
+                junkHealth:Clamp(1+f.junkHealth/150,0.35,1.25),
+                eyeColour:redEyes?'#d7191c':(rodBias>0.24?'#8a6b32':(f.colourDiscrimination>35?'#4e7f79':'#6f5b3e')),
+                redEyes:redEyes,
+                fearDisplayBonus:redEyes?0.28:0,
+                rawFactors:Object.assign({},f)
+            };
+        }
+    };
+    class PerceptionGeneticTraitDefinition extends GeneticTraitDefinition{
+        constructor(){ super(GENETIC_TRAIT.PERCEPTION,PERCEPTION_CHROMOSOME_INDEX,PERCEPTION_CHROMOSOME_SLOT_COUNT); }
+        createRandomChromosomePair(rng,genePool,world){ var profile=genePool.getWorldPerceptionSelectionProfile(world); var best=null; var bestFitness=-1; for(var i=0;i<5;i+=1){var pair=genePool.createProposedChromosomePair(this,rng,null); var fitness=genePool.scoreChromosomePairForTrait(this,pair,profile); if(fitness>bestFitness){bestFitness=fitness;best=pair;}} return best; }
+        getSelectionAllelePools(genePool){ return genePool.perceptionChromosomeSlots; }
+        createSelectionAccumulator(){ return new PerceptionFactorState(); }
+        addAllelePairSelectionContributionToAccumulator(a,x,y,scale){ var c=new MonsterPhenotypeExpressionContext(); ChromosomePair.expressAllelePair(x,y,c); var raw=PerceptionPhenotypeSystem.resolve(c).rawFactors; Object.keys(a).forEach(function(k){a[k]+=(raw[k]||0)*scale;}); }
+        addSelectionAccumulatorToContext(c,a){c.addPerceptionFactors(a,false);}
+        scoreSelectionContext(c,p,g){return g.getPerceptionPhenotypeFitness(PerceptionPhenotypeSystem.resolve(c),p);}
+        resolvePhenotype(c,m){return PerceptionPhenotypeSystem.resolve(c);}
+    }
     var ReproductionPhenotypeSystem = {
         resolve : function(context){
             var bag=context.getReproductionEffectBag();
@@ -8410,6 +8576,7 @@ button:hover {
     var MonsterMetabolismTraitDefinition = new MetabolismGeneticTraitDefinition();
     var MonsterBehaviourTraitDefinition = new BehaviourGeneticTraitDefinition();
     var MonsterReproductionTraitDefinition = new ReproductionGeneticTraitDefinition();
+    var MonsterPerceptionTraitDefinition = new PerceptionGeneticTraitDefinition();
     class GenePool{
         constructor(){
             this.traitDefinitions = [
@@ -8417,7 +8584,8 @@ button:hover {
                 MonsterMetabolismTraitDefinition,
                 MonsterMorphologyTraitDefinition,
                 MonsterBehaviourTraitDefinition,
-                MonsterReproductionTraitDefinition
+                MonsterReproductionTraitDefinition,
+                MonsterPerceptionTraitDefinition
             ];
             this.chromosomeSlots = [];
             this.createChromosomeSlots(COLOUR_CHROMOSOME_INDEX, COLOUR_CHROMOSOME_SLOT_COUNT);
@@ -8425,16 +8593,19 @@ button:hover {
             this.createChromosomeSlots(MORPHOLOGY_CHROMOSOME_INDEX, MORPHOLOGY_CHROMOSOME_SLOT_COUNT);
             this.createChromosomeSlots(BEHAVIOUR_CHROMOSOME_INDEX, BEHAVIOUR_CHROMOSOME_SLOT_COUNT);
             this.createChromosomeSlots(REPRODUCTION_CHROMOSOME_INDEX, REPRODUCTION_CHROMOSOME_SLOT_COUNT);
+            this.createChromosomeSlots(PERCEPTION_CHROMOSOME_INDEX, PERCEPTION_CHROMOSOME_SLOT_COUNT);
             this.colourChromosomeSlots = this.chromosomeSlots[COLOUR_CHROMOSOME_INDEX];
             this.metabolismChromosomeSlots = this.chromosomeSlots[METABOLISM_CHROMOSOME_INDEX];
             this.morphologyChromosomeSlots = this.chromosomeSlots[MORPHOLOGY_CHROMOSOME_INDEX];
             this.behaviourChromosomeSlots = this.chromosomeSlots[BEHAVIOUR_CHROMOSOME_INDEX];
             this.reproductionChromosomeSlots = this.chromosomeSlots[REPRODUCTION_CHROMOSOME_INDEX];
+            this.perceptionChromosomeSlots = this.chromosomeSlots[PERCEPTION_CHROMOSOME_INDEX];
             this.addDefaultColourAlleles();
             this.addDefaultMetabolismAlleles();
             this.addDefaultMorphologyAlleles();
             this.addDefaultBehaviourAlleles();
             this.addDefaultReproductionAlleles();
+            this.addDefaultPerceptionAlleles();
         }
 
         createChromosomeSlots(chromosomeIndex, slotCount){
@@ -8460,6 +8631,7 @@ button:hover {
                 return GENETIC_TRAIT.BEHAVIOUR;
             }
             if (chromosomeIndex===REPRODUCTION_CHROMOSOME_INDEX){ return GENETIC_TRAIT.REPRODUCTION; }
+            if (chromosomeIndex===PERCEPTION_CHROMOSOME_INDEX){ return GENETIC_TRAIT.PERCEPTION; }
             throw new Error('Unknown gene pool chromosome index: '+chromosomeIndex);
         }
 
@@ -9389,6 +9561,43 @@ button:hover {
             add(6,100,{}); add(6,100,{}); add(6,35,{shellDeposition:95,developmentRate:-45}); add(6,30,{gameteMaintenance:90,femaleBias:75,reproductiveRepair:-55}); add(6,25,{yolkSynthesis:-95,maleBias:90,tumourSuppression:65});
         }
 
+        getWorldPerceptionSelectionProfile(world){
+            if(world&&world.perceptionSelectionProfileCache){return world.perceptionSelectionProfileCache;}
+            var env=world&&world.environment?world.environment:{};
+            var terrainProfiles=[];
+            if(world&&world.terrainGrid&&Array.isArray(world.terrainGrid.terrainTypes)){
+                var counts={};
+                world.terrainGrid.terrainTypes.forEach(function(t){counts[t]=(counts[t]||0)+1;});
+                Object.keys(counts).forEach(function(key){
+                    var t=Number(key);
+                    terrainProfiles.push({weight:counts[key]/world.terrainGrid.terrainTypes.length,brightness:TerrainRules.visualBrightnessFor(t,'summer'),clutter:1-TerrainRules.visibilityRangeMultiplierFor(t,0)});
+                });
+            }
+            var result={terrainProfiles:terrainProfiles.length?terrainProfiles:[{weight:1,brightness:0.6,clutter:0.2}],ambientNoise:Clamp((env.windSpeed||0.35)*0.55+(env.waterAbundance||0.3)*0.25,0,1),foodScarcity:Clamp(1-(env.vegetationDensity||0.4),0,1)}; if(world){world.perceptionSelectionProfileCache=result;} return result;
+        }
+        getPerceptionPhenotypeFitness(p,profile){
+            var visual=0;
+            (profile.terrainProfiles||[]).forEach(function(t){
+                var brightnessPenalty=Math.max(0,t.brightness-p.brightnessTolerance)*1.5+Math.max(0,0.38-t.brightness)*Math.max(0,1-p.photonSensitivity);
+                visual+=(t.weight||0)*(1-brightnessPenalty*0.55+(t.clutter||0)*(p.colourDiscrimination-1)*0.22);
+            });
+            var noiseCost=(profile.ambientNoise||0)*Math.max(0,p.hearingSensitivity-p.noiseRejection)*0.35;
+            var energyCost=p.sensoryFoodCost*(0.45+(profile.foodScarcity||0)*0.75);
+            var junkPenalty=Math.max(0,1-p.junkHealth)*0.8;
+            return Math.exp(Clamp((visual-0.75)*1.2-noiseCost-energyCost-junkPenalty,-2.4,1.7));
+        }
+        addDefaultPerceptionAlleles(){
+            var junk=(slot)=>new PerceptionAllele(DOMINANCE_DEFAULT,{}, {selectionSensitive:false,debugLabel:this.createDebugLabel(PERCEPTION_CHROMOSOME_INDEX,slot)});
+            for(var slot=0;slot<PERCEPTION_CHROMOSOME_SLOT_COUNT;slot+=1){ this.addAllele(PERCEPTION_CHROMOSOME_INDEX,slot,junk(slot)); this.addAllele(PERCEPTION_CHROMOSOME_INDEX,slot,junk(slot)); }
+            var add=(slot,dom,effects)=>this.addAllele(PERCEPTION_CHROMOSOME_INDEX,slot,new PerceptionAllele(dom,effects,{debugLabel:this.createDebugLabel(PERCEPTION_CHROMOSOME_INDEX,slot)}));
+            add(0,100,{photonSensitivity:55,brightnessTolerance:-28,neuralCost:12}); add(0,100,{photonSensitivity:-35,brightnessTolerance:60,neuralCost:5});
+            add(1,100,{visualResolution:55,motionSensitivity:-18,neuralCost:18}); add(1,100,{visualResolution:-20,motionSensitivity:62,falsePositiveBias:15});
+            add(2,100,{rodBias:68,colourDiscrimination:-20,photonSensitivity:25}); add(2,100,{rodBias:-52,colourDiscrimination:72,photonSensitivity:-20});
+            add(3,100,{hearingSensitivity:58,highFrequencyBias:44,noiseRejection:-18,falsePositiveBias:20,neuralCost:12}); add(3,100,{hearingSensitivity:-12,lowFrequencyBias:55,noiseRejection:35});
+            add(4,100,{}); add(4,100,{}); add(4,28,{junkHealth:-92,falsePositiveBias:70,sensoryGate:-44}); add(4,32,{junkHealth:-45,eyeRedness:115,brightnessTolerance:28,photonSensitivity:-30});
+            add(5,100,{sensoryGate:48,falsePositiveBias:-25,socialIndependence:20}); add(5,100,{sensoryGate:-30,falsePositiveBias:42,socialResponseBias:55});
+        }
+
         addDefaultMorphologyAlleles(){
             var junk = (slot) => new Allele(DOMINANCE_DEFAULT, { selectionSensitive : false, debugLabel : this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, slot) });
             for (var slot = 0; slot<MORPHOLOGY_CHROMOSOME_SLOT_COUNT; slot+=1){
@@ -9764,9 +9973,13 @@ button:hover {
             this.genome = options && options.genome ? options.genome : MonsterGenePool.createGenome(rng, options && options.world ? options.world : null);
             this.phenotype = null;
             this.expressGenomeToPhenotype();
+            this.applyPerceptionPhenotypeToRuntimeTraits();
             this.activityFoodThisSeason = 0;
             this.thermalState = 'comfortable';
             this.thermalStress = 0;
+            this.thermalStatus = null;
+            this.thermalDeploymentBlockReason = '';
+            this.thermalRecallLogged = false;
             this.currentSprintEnduranceTicks = 0;
             this.sprinting = false;
             this.fatigueTicks = 0;
@@ -9858,6 +10071,15 @@ button:hover {
             this.thermalPugilinSuppression = Number.isFinite(regulation.thermalPugilinSuppression) ? regulation.thermalPugilinSuppression : 1;
             this.preyShapePreference = Number.isFinite(regulation.preyShapePreference) ? regulation.preyShapePreference : 0;
             this.preyPowerPreference = Number.isFinite(regulation.preyPowerPreference) ? regulation.preyPowerPreference : 0;
+        }
+        applyPerceptionPhenotypeToRuntimeTraits(){
+            var p=this.phenotype&&this.phenotype.perception?this.phenotype.perception:null;
+            if(!p){return;}
+            this.perception=Clamp((p.visualResolution+p.motionSensitivity+p.hearingSensitivity)/3*0.55,0.20,1);
+            this.sightRange=Clamp(1450*p.photonSensitivity,650,2800);
+            this.hearingThreshold=DEFAULT_MONSTER_HEARING_THRESHOLD/Math.max(0.35,p.hearingSensitivity);
+            this.eyeColour=p.eyeColour;
+            this.falseStimulusDecisions={};
         }
         initialiseBodyAndNutritionFields(options, rng){
             var settings = options || {};
@@ -10392,9 +10614,9 @@ button:hover {
             var sizeThreat = Math.max(0, (this.bodyScale || 1)-0.70) * 0.42;
             var spineThreat = morphology && morphology.hasSpines ? (morphology.spineSize || 0) * 0.34 : 0;
             var toothThreat = Math.max(0, (this.toothSize || 1)-1.0) * 0.10;
-            var brightThreat = 0;
+            var brightThreat = (this.phenotype&&this.phenotype.perception?this.phenotype.perception.fearDisplayBonus||0:0);
             if (colour && Number.isFinite(colour.camouflageSaturation) && Number.isFinite(colour.camouflageLuminance)){
-                brightThreat = Math.max(0, colour.camouflageSaturation-0.50) * Math.max(0, colour.camouflageLuminance-0.38) * Math.max(0, (this.bodyScale || 1)-0.92) * 0.28;
+                brightThreat+=Math.max(0, colour.camouflageSaturation-0.50) * Math.max(0, colour.camouflageLuminance-0.38) * Math.max(0, (this.bodyScale || 1)-0.92) * 0.28;
             }
             var classScale = adventurer && adventurer.className==='knight' ? 0.42 : (adventurer && adventurer.className==='warrior' ? 0.62 : (adventurer && adventurer.className==='explorer' ? 0.82 : 1.10));
             return Clamp((sizeThreat+spineThreat+toothThreat+brightThreat) * classScale, 0, 1.3);
@@ -10449,14 +10671,23 @@ button:hover {
             if (!this.alive){
                 return 'Dead monsters cannot be deployed.';
             }
+            if (!this.owned || !this.collared){
+                return 'Only living collared captive monsters can be deployed.';
+            }
             if (this.lifeStage!==MONSTER_LIFE_STAGE.ADULT){
                 return 'Juveniles must mature for one more season before deployment.';
+            }
+            if (this.nutritionState===NUTRITION_STATE.STARVED){
+                return 'Starved monsters cannot be deployed.';
             }
             if (MonsterDiseaseSystem.combinedEffects(this).incapacitated){
                 return 'Incapacitated by disease and cannot leave base.';
             }
             if ((this.breedingHoldSeasonsRemaining || 0)>0){
                 return 'Mother is incubating a brood this season.';
+            }
+            if (this.thermalDeploymentBlockReason){
+                return this.thermalDeploymentBlockReason;
             }
             return '';
         }
@@ -10631,15 +10862,32 @@ button:hover {
         }
         updateThermalState(raid){
             var status = MonsterMetabolismSystem.thermalStatus(this, raid.world, raid.seasonNumber);
-            this.thermalState = status.state;
-            this.thermalStress = status.stress;
-            if (status.stress>2.5){
+            this.applyThermalStatus(status);
+            if (status.severe){
                 this.recallRequested = true;
                 if (this.thermalState==='tooHot'){
                     this.behaviourState = 'overheated';
                 } else if (this.thermalState==='tooCold'){
                     this.behaviourState = 'chilled';
                 }
+                if (!this.thermalRecallLogged){
+                    var limit = this.thermalState==='tooHot' ? status.heatLimitC : status.coldLimitC;
+                    raid.addEvent(this.name+' became '+(this.thermalState==='tooHot' ? 'overheated' : 'chilled')+' at '+status.temperatureC.toFixed(1)+'C and is returning to base (stress '+status.stress.toFixed(1)+'C; effective '+(this.thermalState==='tooHot' ? 'upper' : 'lower')+' limit '+limit.toFixed(1)+'C).');
+                    this.thermalRecallLogged = true;
+                }
+            } else if (status.state==='comfortable'){
+                this.thermalRecallLogged = false;
+            }
+        }
+        applyThermalStatus(status){
+            this.thermalStatus = status || null;
+            this.thermalState = status && status.state ? status.state : 'comfortable';
+            this.thermalStress = status && Number.isFinite(status.stress) ? status.stress : 0;
+            this.thermalDeploymentBlockReason = '';
+            if (status && status.severe){
+                var direction = status.state==='tooHot' ? 'heat' : 'cold';
+                var limit = status.state==='tooHot' ? status.heatLimitC : status.coldLimitC;
+                this.thermalDeploymentBlockReason = 'Unsafe expected '+direction+' stress: '+status.stress.toFixed(1)+'C at '+status.temperatureC.toFixed(1)+'C (effective '+(status.state==='tooHot' ? 'upper' : 'lower')+' limit '+limit.toFixed(1)+'C).';
             }
         }
         getSprintSpeedMultiplier(raid, target){
@@ -10961,7 +11209,7 @@ button:hover {
                 if (sound.sourceKind==='monster' && sound.kind==='movement'){
                     return false;
                 }
-                return sound.sourceKind==='adventurer' || sound.sourceKind==='macrofauna' || sound.kind==='treasureCollected' || sound.kind==='treasureDropped' || sound.kind==='objectThrown' || sound.kind==='objectImpact' || sound.kind==='monsterAttack' || sound.kind==='adventurerAttack' || sound.kind==='monsterKilled' || sound.kind==='adventurerKilled' || sound.kind==='macrofaunaKilled';
+                return sound.falseStimulus || sound.sourceKind==='adventurer' || sound.sourceKind==='macrofauna' || sound.kind==='treasureCollected' || sound.kind==='treasureDropped' || sound.kind==='objectThrown' || sound.kind==='objectImpact' || sound.kind==='monsterAttack' || sound.kind==='adventurerAttack' || sound.kind==='monsterKilled' || sound.kind==='adventurerKilled' || sound.kind==='macrofaunaKilled';
             } .bind(this));
         }
         applyDamage(amount, rng, raid, attacker){
@@ -11050,6 +11298,15 @@ button:hover {
             s.activityFoodThisSeason = this.activityFoodThisSeason || 0;
             s.thermalState = this.thermalState || 'comfortable';
             s.thermalStress = this.thermalStress || 0;
+            s.thermalStatus = this.thermalStatus ? {
+                state : this.thermalStatus.state,
+                stress : this.thermalStatus.stress,
+                temperatureC : this.thermalStatus.temperatureC,
+                coldLimitC : this.thermalStatus.coldLimitC,
+                heatLimitC : this.thermalStatus.heatLimitC,
+                severe : !!this.thermalStatus.severe,
+                factors : Object.assign({}, this.thermalStatus.factors || {})
+            } : null;
             s.sprinting = !!this.sprinting;
             s.healingFoodRequirementThisSeason = this.healingFoodRequirementThisSeason || 0;
             s.plannedHealingThisSeason = this.plannedHealingThisSeason || 0;
@@ -11856,6 +12113,12 @@ button:hover {
                     reason : 'No living captive monster has that id.'
                 } ;
             }
+            if (selected && !monster.canDeploy()){
+                return {
+                    ok : false,
+                    reason : monster.name+' cannot be selected for deployment: '+monster.getDeploymentBlockReason()
+                } ;
+            }
             monster.selectedForDeployment = !!selected;
             return {
                 ok : true
@@ -12127,8 +12390,7 @@ button:hover {
             this.gameState.getLivingOwnedMonsters().forEach(function (monster){
                 NutritionSystem.resetSeasonNutrition(monster);
                 var thermal = MonsterMetabolismSystem.thermalStatus(monster, this.world, this.seasonNumber);
-                monster.thermalState = thermal.state;
-                monster.thermalStress = thermal.stress;
+                monster.applyThermalStatus(thermal);
             } , this);
             var generatedAdventurers = this.createAdventurers();
             this.adventurers = [];
@@ -12734,6 +12996,18 @@ button:hover {
                     continue;
                 }
                 var perceived = this.soundLoudnessAt(sound, listener.x, listener.y);
+                if(listener.agentKind==='monster'&&listener.phenotype&&listener.phenotype.perception){
+                    var pp=listener.phenotype.perception;
+                    var frequency=Number.isFinite(sound.frequency)?sound.frequency:SOUND_FREQUENCY_MID;
+                    var frequencyGain=1+pp.highFrequencyBias*Math.max(0,(frequency-0.5)*2)+pp.lowFrequencyBias*Math.max(0,(0.5-frequency)*2);
+                    perceived*=Clamp(frequencyGain*pp.noiseRejection,0.30,2.2);
+                    var strength=perceived/Math.max(0.0001,threshold);
+                    var hormoneModifier=Clamp((listener.vigilinBase||1)*0.55+(listener.currentPugilinLevel?listener.currentPugilinLevel(0,0,0):1)*0.15+(listener.cowardinBase||1)*0.18,0.45,1.65);
+                    var social=typeof listener.nearbyStimulusSocialModifier==='function'?listener.nearbyStimulusSocialModifier(this,sound):1;
+                    var chance=Clamp(0.12+Math.log(1+Math.max(0,strength))*0.24*pp.falsePositiveBias*pp.sensoryGate*hormoneModifier*social,0.04,0.96);
+                    var hash=World.terrainHash((sound.createdTick||0)+(listener.id||'').length,Math.floor(sound.x+sound.y),this.world.seed||1);
+                    if(hash>chance){continue;}
+                }
                 if (perceived>bestPerceived){
                     best = Object.assign({
                         perceivedLoudness : perceived
@@ -12835,7 +13109,25 @@ button:hover {
                 agent.lastMovementSoundY = agent.y;
             }
         }
+        emitEnvironmentalStimulusSounds(){
+            if(this.tickNumber%PERCEPTION_FALSE_STIMULUS_INTERVAL_TICKS!==0){return;}
+            var env=this.world.environment||{};
+            var wind=env.windSpeed||0;
+            for(var i=0;i<Math.min(this.world.terrainObjects.length,80);i+=1){
+                var object=this.world.terrainObjects[i];
+                var isFoliage=object.type==='tree'||object.type==='bush';
+                var isMicrofauna=object.type==='microfauna';
+                if(!isFoliage&&!isMicrofauna){continue;}
+                var probability=isMicrofauna?0.10:wind*0.055;
+                if(World.terrainHash(this.tickNumber+i,i,this.world.seed||1)>probability){continue;}
+                var downwind=42+wind*110;
+                var x=object.x+Math.cos(env.windDirectionRadians||0)*downwind;
+                var y=object.y+Math.sin(env.windDirectionRadians||0)*downwind;
+                this.addSound(isMicrofauna?'microfaunaStimulus':'windRustle',object,x,y,isMicrofauna?SOUND_LOUDNESS.EXTREMELY_QUIET:SOUND_LOUDNESS.QUIET,SOUND_MOVEMENT_DURATION_TICKS,{frequency:isMicrofauna?SOUND_FREQUENCY_HIGH:SOUND_FREQUENCY_MID,falseStimulus:true});
+            }
+        }
         emitMovementSounds(){
+            this.emitEnvironmentalStimulusSounds();
             this.adventurers.forEach(function (adventurer){
                 this.emitAgentMovementSound(adventurer);
             } , this);
@@ -13050,23 +13342,32 @@ button:hover {
         }
         releaseMonster(monsterId){
             var monster = this.gameState.ownedMonsters.find(function (m){
-                if (monsterId && m.id!==monsterId){
-                    return false;
-                }
-                return m.alive && !m.deployed && m.canDeploy();
+                return !monsterId || m.id===monsterId;
             } );
             if (!monster){
-                return {
-                    ok : false,
-                    reason : 'No living deployable reserve monster is available.'
-                } ;
+                var missingReason = 'No captive monster has that id.';
+                this.addEvent('Deployment refused: '+missingReason);
+                return { ok : false, reason : missingReason };
+            }
+            if (monster.deployed){
+                var deployedReason = monster.name+' is already deployed.';
+                this.addEvent('Deployment refused: '+deployedReason);
+                return { ok : false, reason : deployedReason };
+            }
+            var thermal = MonsterMetabolismSystem.thermalStatus(monster, this.world, this.seasonNumber);
+            monster.applyThermalStatus(thermal);
+            var blockReason = monster.getDeploymentBlockReason();
+            if (blockReason){
+                var reason = monster.name+' cannot deploy: '+blockReason;
+                this.addEvent('Deployment refused: '+reason);
+                return { ok : false, reason : reason };
             }
             if (!monster.enterFromRight(this.world, this.rng)){
-                return {
-                    ok : false,
-                    reason : 'No dry monster-entry point is available on the far right edge.'
-                } ;
+                var entranceReason = monster.name+' cannot deploy because no dry monster-entry point is available on the far right edge.';
+                this.addEvent('Deployment refused: '+entranceReason);
+                return { ok : false, reason : entranceReason };
             }
+            monster.thermalRecallLogged = false;
             this.addEvent(monster.name+' entered from the far right edge.');
             return {
                 ok : true
@@ -13861,7 +14162,15 @@ button:hover {
                     reason : 'Deployment choices are locked during a raid.'
                 } ;
             }
-            return this.gameState.setMonsterDeploymentSelection(monsterId, selected);
+            var monster = this.gameState.ownedMonsters.find(function (candidate){ return candidate.id===monsterId; });
+            if (monster){
+                monster.applyThermalStatus(MonsterMetabolismSystem.thermalStatus(monster, this.world, this.seasonNumber));
+            }
+            var result = this.gameState.setMonsterDeploymentSelection(monsterId, selected);
+            if (!result.ok){
+                this.pendingEvents.push({ tickNumber : 0, text : 'Deployment selection refused: '+result.reason });
+            }
+            return result;
         }
         breedMonsters(motherId, fatherId){
             if (this.phase==='raid'){
@@ -16145,7 +16454,8 @@ button:hover {
         var baseCost = monster.foodBoughtCostCreditsThisSeason || 0;
         var requirement = monster.nutritionRequirement || 10;
         var fat = monster.currentFatMass!==undefined ? ' | fat mass '+FormatFixed(monster.currentFatMass, 1) : '';
-        var heat = monster.thermalState && monster.thermalState!=='comfortable' ? ' | '+monster.thermalState+' '+FormatFixed(monster.thermalStress || 0, 1) : '';
+        var thermal = monster.thermalStatus;
+        var heat = thermal ? ' | thermal '+(thermal.state || 'comfortable')+' '+FormatFixed(thermal.stress || 0, 1)+'C (range '+FormatFixed(thermal.coldLimitC, 1)+' to '+FormatFixed(thermal.heatLimitC, 1)+'C)' : '';
         var healing = monster.healingFoodRequirementThisSeason ? ' | healing food '+FormatNumber(monster.healingFoodRequirementThisSeason) : '';
         var disease =(monster.diseases && monster.diseases.length) ? ' | disease '+monster.diseases.map(function (d){
             return d.displayName;
@@ -16370,6 +16680,9 @@ button:hover {
             Math.round((monster.seasonalOldAgeMortalityChance || 0) * 100),
             monster.canBreed ? 1 : 0,
             monster.canDeploy ? 1 : 0,
+            monster.deploymentBlockReason || '',
+            monster.thermalState || '',
+            Math.round((monster.thermalStress || 0) * 100),
             monster.breedingHoldSeasonsRemaining || 0,
             monster.juvenileMaturationSeasonsRemaining || 0,
             (monster.lastSeasonPerformance && monster.lastSeasonPerformance.timesSeen) || 0,
@@ -16868,7 +17181,8 @@ button:hover {
                 } else{
                     var deployedBadge = document.createElement('span');
                     deployedBadge.className = 'rosterBadge';
-                    deployedBadge.textContent = monster.deployed ? 'Deployed' : 'Unavailable';
+                    deployedBadge.textContent = monster.deployed ? 'Deployed' : ('Unavailable - '+(monster.deploymentBlockReason || 'deployment conditions not met'));
+                    deployedBadge.title = monster.deploymentBlockReason || '';
                     header.appendChild(deployedBadge);
                 }
             } else{
@@ -16895,6 +17209,12 @@ button:hover {
                 deployLabel.appendChild(checkbox);
                 deployLabel.appendChild(deployText);
                 header.appendChild(deployLabel);
+                if (monster.deploymentBlockReason){
+                    var deploymentReason = document.createElement('div');
+                    deploymentReason.className = 'monsterDeploymentReason';
+                    deploymentReason.textContent = monster.deploymentBlockReason;
+                    card.appendChild(deploymentReason);
+                }
             }
             var icon = document.createElement('div');
             icon.innerHTML = MonsterIconSvg(monster);
@@ -18621,7 +18941,7 @@ button:hover {
             ctx.ellipse(headX+lx * 6+fx * 2, headY-4+ly * 2, 5, 6, 0, 0, Math.PI * 2);
             ctx.ellipse(headX-lx * 5+fx * 2, headY-5-ly * 2, 5, 6, 0, 0, Math.PI * 2);
             ctx.fill();
-            ctx.fillStyle = dark;
+            ctx.fillStyle = m.eyeColour || '#6f5b3e';
             ctx.beginPath();
             ctx.ellipse(headX+lx * 6+fx * 4, headY-4+ly * 2, 2, 3, 0, 0, Math.PI * 2);
             ctx.ellipse(headX-lx * 5+fx * 4, headY-5-ly * 2, 2, 3, 0, 0, Math.PI * 2);
