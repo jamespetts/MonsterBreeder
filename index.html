@@ -792,6 +792,105 @@ button:hover {
 #discardCurrentGameButton:hover {
     background: #be123c;
 }
+
+#foodShortageOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 38;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(2,6,23,0.94);
+    color: #f9fafb;
+}
+#foodShortageOverlay.dialogHidden {
+    display: none;
+}
+#foodShortagePanel {
+    width: min(760px, calc(100vw - 2rem));
+    max-height: min(820px, calc(100vh - 2rem));
+    overflow: auto;
+    border: 1px solid #f59e0b;
+    border-radius: 0.85rem;
+    padding: 1rem;
+    background: #111827;
+    box-shadow: 0 18px 60px rgba(0,0,0,0.68);
+    box-sizing: border-box;
+}
+#foodShortagePanel h2, #foodShortagePanel h3 {
+    margin: 0 0 0.45rem;
+    color: #f2c14e;
+}
+#foodShortageSummary {
+    white-space: pre-line;
+    line-height: 1.45;
+    color: #e5e7eb;
+}
+#foodAllocationList {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0.75rem 0;
+}
+.foodAllocationRow {
+    display: grid;
+    grid-template-columns: minmax(10rem, 1fr) 7rem 7rem;
+    gap: 0.55rem;
+    align-items: center;
+    padding: 0.55rem;
+    border: 1px solid #334155;
+    border-radius: 0.5rem;
+    background: #020617;
+}
+.foodAllocationRow input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #64748b;
+    border-radius: 0.35rem;
+    padding: 0.36rem;
+    background: #0f172a;
+    color: #f8fafc;
+}
+.foodAllocationDemand {
+    color: #cbd5e1;
+    text-align: right;
+}
+#foodSalePreview {
+    min-height: 4.6rem;
+    white-space: pre-line;
+    padding: 0.65rem;
+    border-radius: 0.5rem;
+    background: #020617;
+    color: #dbeafe;
+}
+#foodShortageActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+#startSeasonButton.foodShortagePending {
+    background: #dc7b20;
+    color: #fff;
+}
+.foodEconomySummary {
+    margin: 0.5rem 0;
+    padding: 0.55rem;
+    border: 1px solid #d8d0b8;
+    border-radius: 0.45rem;
+    background: #fff4cf;
+    color: #3f3522;
+    font-weight: 700;
+    white-space: pre-line;
+}
+@media (max-width: 650px) {
+    .foodAllocationRow {
+        grid-template-columns: 1fr 5.5rem;
+    }
+    .foodAllocationDemand {
+        grid-column: 1 / -1;
+        text-align: left;
+    }
+}
 </style>
 </head>
 <body>
@@ -906,6 +1005,20 @@ button:hover {
 </div>
 </div>
 
+<div id="foodShortageOverlay" class="dialogHidden" role="dialog" aria-modal="true" aria-labelledby="foodShortageTitle">
+<div id="foodShortagePanel">
+<h2 id="foodShortageTitle">Food shortage before the new season</h2>
+<p id="foodShortageSummary"></p>
+<h3>Distribute this season's food</h3>
+<p>Set how much food each monster is to receive at the lair. Any amount above the captive-macrofauna allowance and stored excess meat is bought by selling whole treasure units. Treasure nearest the human entry point is sold first. Meat bought with indivisible excess treasure value is stored for future seasons.</p>
+<div id="foodAllocationList"></div>
+<div id="foodSalePreview" aria-live="polite"></div>
+<div id="foodShortageActions">
+<button id="cancelFoodShortageButton" type="button">Cancel</button>
+<button id="startUnderfedSeasonButton" type="button">Sell selected treasure and start season</button>
+</div>
+</div>
+</div>
 <div id="saveLoadOverlay" class="dialogHidden" role="dialog" aria-modal="true" aria-labelledby="saveLoadTitle">
 <div id="saveLoadPanel">
 <h2 id="saveLoadTitle">Saved games</h2>
@@ -4777,6 +4890,7 @@ button:hover {
             this.treasureDeposits = treasureDeposits;
             this.adventurerEntryEdge = adventurerEntryEdge || DEFAULT_ADVENTURER_ENTRY_EDGE;
             this.foodExpenditureCredits = 0;
+            this.treasureSoldForFoodValue = 0;
             this.blockingTerrainObjects = this.terrainObjects.filter(function (object){
                 return object.blocksMovement;
             } );
@@ -5251,8 +5365,9 @@ button:hover {
                 var remainingAmount = breakdown.remaining.byType[treasureType].amount;
                 addAmount('stolen', treasureType, Math.max(0, startingAmount-remainingAmount));
             } );
-            breakdown.foodExpenditureCredits = this.foodExpenditureCredits || 0;
-            breakdown.remainingAfterFoodValue = Math.max(0, breakdown.remaining.totalValue-breakdown.foodExpenditureCredits);
+            breakdown.foodExpenditureCredits = 0;
+            breakdown.treasureSoldForFoodValue = this.treasureSoldForFoodValue || 0;
+            breakdown.remainingAfterFoodValue = breakdown.remaining.totalValue;
             return breakdown;
         }
         getTreasureStateSnapshot(extraLooseTreasure){
@@ -7088,6 +7203,10 @@ button:hover {
             monster.foodEatenThisSeason = 0;
             monster.foodBoughtThisSeason = 0;
             monster.foodBoughtCostCreditsThisSeason = 0;
+            monster.foodFromCaptiveMacrofaunaThisSeason = 0;
+            monster.foodFromStoredMeatThisSeason = 0;
+            monster.foodFromPurchasedMeatThisSeason = 0;
+            monster.foodFromBodyReservesThisSeason = 0;
             monster.nutritionShortfallThisSeason = 0;
             monster.eatingTargetId = null;
             monster.eatingTicksRemaining = 0;
@@ -7177,7 +7296,7 @@ button:hover {
             if ((monster.currentFatMass || 0)>=shortfall){
                 monster.currentFatMass = Math.max(0, (monster.currentFatMass || 0)-shortfall);
                 monster.recalculateBodyMassAndDerivedFields();
-                monster.foodBoughtThisSeason =(monster.foodBoughtThisSeason || 0)+shortfall;
+                monster.foodFromBodyReservesThisSeason =(monster.foodFromBodyReservesThisSeason || 0)+shortfall;
                 monster.nutritionShortfallThisSeason = 0;
                 monster.nutritionState = NUTRITION_STATE.NOURISHED;
                 return {
@@ -7236,25 +7355,6 @@ button:hover {
                 died : true
             } ;
         } ,
-        availableTreasureCreditsForFood : function (world){
-            return Math.max(0, world.getRemainingTreasureValue()-(world.foodExpenditureCredits || 0));
-        } ,
-        buyFoodForMonster : function (gameState, world, monster, neededFood){
-            var foodCostCredits = this.getFoodCostCredits(world);
-            var availableCredits = this.availableTreasureCreditsForFood(world);
-            var affordableFood = foodCostCredits>0 ? Math.floor(availableCredits / foodCostCredits) : neededFood;
-            var boughtFood = Math.max(0, Math.min(neededFood, affordableFood));
-            var expenditure = boughtFood * foodCostCredits;
-            monster.foodBoughtThisSeason =(monster.foodBoughtThisSeason || 0)+boughtFood;
-            monster.foodBoughtCostCreditsThisSeason =(monster.foodBoughtCostCreditsThisSeason || 0)+expenditure;
-            world.foodExpenditureCredits =(world.foodExpenditureCredits || 0)+expenditure;
-            gameState.foodExpenditureCredits =(gameState.foodExpenditureCredits || 0)+expenditure;
-            gameState.roundFoodExpenditureCredits =(gameState.roundFoodExpenditureCredits || 0)+expenditure;
-            return {
-                boughtFood : boughtFood,
-                expenditure : expenditure
-            } ;
-        } ,
         applyBetweenSeasonFeeding : function (gameState, world, raidMonsters, rng){
             var monsters = gameState.getLivingOwnedMonsters();
             var result = {
@@ -7270,14 +7370,10 @@ button:hover {
             } ;
             monsters.forEach(function (monster){
                 result.foodEatenInRaid+=monster.foodEatenThisSeason || 0;
-                var neededFood = NutritionSystem.getFoodNeeded(monster);
-                if (neededFood>0){
-                    var purchase = NutritionSystem.buyFoodForMonster(gameState, world, monster, neededFood);
-                    result.foodBought+=purchase.boughtFood;
-                    result.expenditureCredits+=purchase.expenditure;
-                    if (purchase.boughtFood>0){
-                        result.monstersFed+=1;
-                    }
+                result.foodBought+=monster.foodFromPurchasedMeatThisSeason || 0;
+                result.expenditureCredits+=monster.foodBoughtCostCreditsThisSeason || 0;
+                if ((monster.foodBoughtThisSeason || 0)>0){
+                    result.monstersFed+=1;
                 }
                 var stateResult = NutritionSystem.applyNutritionStateFromSeason(monster, rng);
                 if (monster.nutritionState===NUTRITION_STATE.MALNOURISHED){
@@ -7290,9 +7386,6 @@ button:hover {
             } );
             if (result.foodEatenInRaid>0){
                 result.events.push('Monsters ate '+result.foodEatenInRaid+' food during the raid.');
-            }
-            if (result.foodBought>0){
-                result.events.push('Automatic feeding bought '+result.foodBought+' food for '+result.expenditureCredits+' credits.');
             }
             if (result.monstersMalnourished>0 || result.monstersSeverelyMalnourished>0){
                 result.events.push('Nutrition shortage left '+(result.monstersMalnourished+result.monstersSeverelyMalnourished)+' monster(s) underfed.');
@@ -10181,6 +10274,10 @@ button:hover {
             this.foodEatenThisSeason = 0;
             this.foodBoughtThisSeason = 0;
             this.foodBoughtCostCreditsThisSeason = 0;
+            this.foodFromCaptiveMacrofaunaThisSeason = 0;
+            this.foodFromStoredMeatThisSeason = 0;
+            this.foodFromPurchasedMeatThisSeason = 0;
+            this.foodFromBodyReservesThisSeason = 0;
             this.nutritionShortfallThisSeason = 0;
             this.eatingTargetId = null;
             this.eatingTicksRemaining = 0;
@@ -11020,12 +11117,18 @@ button:hover {
         }
         calculateSeasonFoodRequirement(world){
             var metabolism = this.phenotype && this.phenotype.metabolism ? this.phenotype.metabolism : null;
-            var baseMetabolicFood = metabolism ? metabolism.baseMetabolicFood : DEFAULT_MONSTER_NUTRITION_REQUIREMENT;
-            var growthFood = (this.juvenileGrowthSeasonsRemaining || 0)>0 ? Math.max(0.8, this.matureBodyMass * 0.012) : 0;
+            // The documented 10-food baseline is the complete ordinary maintenance
+            // requirement for a reference adult, not a basal term to which another
+            // near-complete maintenance bill is added. Split that baseline between
+            // metabolism/body mass and tissue upkeep so the physiological components
+            // still respond to genetics without double-counting normal maintenance.
+            var expressedBaseFood = metabolism ? metabolism.baseMetabolicFood : DEFAULT_MONSTER_NUTRITION_REQUIREMENT;
+            var calibratedBaseFood = expressedBaseFood * 0.72;
+            var growthFood = (this.juvenileGrowthSeasonsRemaining || 0)>0 ? Math.max(0.8, this.matureBodyMass * 0.009) : 0;
             var ageMultiplier = NutritionSystem.getAgeMetabolicMultiplier(this);
-            var reserveMultiplier = this.deployed ? 1.0 : 0.74;
-            this.bodyMassFoodRequired = Math.max(0.5, baseMetabolicFood * Math.pow(Math.max(0.35, this.currentBodyMass || 100) / 100, 0.72) * ageMultiplier * reserveMultiplier);
-            this.tissueMaintenanceFoodRequired = Math.max(0, (this.currentMuscleMass || 0) * 0.018+(this.currentBoneMass || 0) * 0.006+(this.currentFatMass || 0) * 0.010+(this.spineMass || 0) * 0.007);
+            var reserveMultiplier = this.deployed ? 1.0 : 0.76;
+            this.bodyMassFoodRequired = Math.max(0.5, calibratedBaseFood * Math.pow(Math.max(0.35, this.currentBodyMass || 100) / 100, 0.72) * ageMultiplier * reserveMultiplier);
+            this.tissueMaintenanceFoodRequired = Math.max(0, (this.currentMuscleMass || 0) * 0.0072+(this.currentBoneMass || 0) * 0.0024+(this.currentFatMass || 0) * 0.0040+(this.spineMass || 0) * 0.0028);
             var coldStress = Math.max(0, this.thermalState==='tooCold' ? (this.thermalStress || 0) : 0);
             var heatStress = Math.max(0, this.thermalState==='tooHot' ? (this.thermalStress || 0) : 0);
             var surfaceMassPenalty = Clamp(1 / Math.max(0.55, this.bodyScale || 1), 0.78, 1.55);
@@ -11518,6 +11621,10 @@ button:hover {
             s.nutritionState = this.nutritionState;
             s.foodEatenThisSeason = this.foodEatenThisSeason;
             s.foodBoughtThisSeason = this.foodBoughtThisSeason;
+            s.foodFromCaptiveMacrofaunaThisSeason = this.foodFromCaptiveMacrofaunaThisSeason || 0;
+            s.foodFromStoredMeatThisSeason = this.foodFromStoredMeatThisSeason || 0;
+            s.foodFromPurchasedMeatThisSeason = this.foodFromPurchasedMeatThisSeason || 0;
+            s.foodFromBodyReservesThisSeason = this.foodFromBodyReservesThisSeason || 0;
             s.foodBoughtCostCreditsThisSeason = this.foodBoughtCostCreditsThisSeason || 0;
             s.nutritionShortfallThisSeason = this.nutritionShortfallThisSeason;
             s.foodNeededThisSeason = NutritionSystem.getFoodNeeded(this);
@@ -12315,6 +12422,9 @@ button:hover {
             this.recordFamilyMonster(this.ownedMonsters[0]);
             this.foodExpenditureCredits = 0;
             this.roundFoodExpenditureCredits = 0;
+            this.excessMeatFood = 0;
+            this.treasureSoldForFoodValue = 0;
+            this.roundTreasureSoldForFoodValue = 0;
             this.wildMonsterHarvestByBiome = {};
         }
         recordFamilyMonster(monster){ if(!monster){return;} if(!this.familyTree[monster.id]){this.familyTree[monster.id]=new FamilyTreeRecord(monster);} else {this.familyTree[monster.id].update(monster);} }
@@ -12328,6 +12438,36 @@ button:hover {
             return this.ownedMonsters.filter(function (monster){
                 return monster.alive;
             } );
+        }
+        releaseOwnedMonster(monsterId){
+            var index = this.ownedMonsters.findIndex(function (monster){
+                return monster.id===monsterId;
+            } );
+            if (index<0){
+                return {
+                    ok : false,
+                    reason : 'No captive monster has that id.'
+                } ;
+            }
+            var monster = this.ownedMonsters[index];
+            if (!monster.alive){
+                return {
+                    ok : false,
+                    reason : monster.name+' is dead and cannot be released.'
+                } ;
+            }
+            monster.collared = false;
+            monster.owned = false;
+            monster.deployed = false;
+            monster.selectedForDeployment = false;
+            monster.recallRequested = false;
+            this.recordFamilyMonster(monster);
+            this.ownedMonsters.splice(index, 1);
+            return {
+                ok : true,
+                monsterId : monster.id,
+                monsterName : monster.name
+            } ;
         }
         setMonsterDeploymentSelection(monsterId, selected){
             var monster = this.ownedMonsters.find(function (m){
@@ -12593,7 +12733,10 @@ button:hover {
                 } ),
                 familyTree : Object.keys(this.familyTree).map(function(id){return this.familyTree[id].getSnapshot();},this),
                 foodExpenditureCredits : this.foodExpenditureCredits || 0,
-                roundFoodExpenditureCredits : this.roundFoodExpenditureCredits || 0
+                roundFoodExpenditureCredits : this.roundFoodExpenditureCredits || 0,
+                excessMeatFood : this.excessMeatFood || 0,
+                treasureSoldForFoodValue : this.treasureSoldForFoodValue || 0,
+                roundTreasureSoldForFoodValue : this.roundTreasureSoldForFoodValue || 0
             } ;
         }
     }
@@ -12614,7 +12757,6 @@ button:hover {
             this.monsterSightedByAdventurerKeys = {
             } ;
             this.gameState.getLivingOwnedMonsters().forEach(function (monster){
-                NutritionSystem.resetSeasonNutrition(monster);
                 var thermal = MonsterMetabolismSystem.thermalStatus(monster, this.world, this.seasonNumber);
                 monster.applyThermalStatus(thermal);
             } , this);
@@ -14380,13 +14522,190 @@ button:hover {
             this.lastRaidSummary = null;
             this.roundRemains = [];
             this.gameState.roundFoodExpenditureCredits = 0;
+            this.gameState.roundTreasureSoldForFoodValue = 0;
             this.world = World.createWorld(this.rng.integer(1, 0x7fffffff), this.getWorldOptions(this.baseWorldOptions));
             this.pendingEvents.push({
                 tickNumber : 0,
                 text : 'Round '+this.roundNumber+' created. Choose monsters for season 1.'
             } );
         }
-        startSeason(){
+        getCaptiveMacrofaunaFoodPlan(){
+            var ecology = MonsterMetabolismSystem.macrofaunaEcologyProfile(this.world);
+            var husbandrySpecies = { deer : true, boar : true, hare : true };
+            var suitableNiches = (ecology.preyNiches || []).filter(function (niche){ return !!husbandrySpecies[niche.species]; });
+            var niches = (suitableNiches.length>0 ? suitableNiches : (ecology.preyNiches || [])).slice(0).sort(function (a, b){
+                if ((b.foodValue || 0)!==(a.foodValue || 0)){
+                    return (b.foodValue || 0)-(a.foodValue || 0);
+                }
+                return (b.share || 0)-(a.share || 0);
+            } );
+            var chosen = niches.length>0 ? niches[0] : null;
+            if (!chosen){
+                return {
+                    species : 'small local livestock',
+                    displayName : 'small local livestock',
+                    animals : 0,
+                    foodPerAnimal : 0,
+                    foodProduced : 0
+                } ;
+            }
+            // The captive herd is abstracted rather than simulated. Five slaughter-
+            // equivalent animals per season gives a deer environment about 50 food:
+            // enough to sustain an initial breeding nucleus, while larger broods,
+            // costly phenotypes, injury and activity still require hunting or sales.
+            var productivity = Clamp(0.82+(ecology.availability || 0) * 0.36, 0.82, 1.18);
+            var animals = 5;
+            var foodProduced = Math.max(1, Math.round(animals * (chosen.foodValue || 1) * productivity));
+            return {
+                species : chosen.species,
+                displayName : chosen.displayName,
+                animals : animals,
+                foodPerAnimal : chosen.foodValue || 0,
+                foodProduced : foodProduced
+            } ;
+        }
+        getSeasonFoodPlan(){
+            var fauna = this.getCaptiveMacrofaunaFoodPlan();
+            var monsters = this.gameState.getLivingOwnedMonsters().map(function (monster){
+                var originalDeployed = monster.deployed;
+                monster.deployed = !!monster.selectedForDeployment;
+                var demand = monster.calculateSeasonFoodRequirement(this.world);
+                monster.deployed = originalDeployed;
+                return {
+                    id : monster.id,
+                    name : monster.name,
+                    demand : demand,
+                    selectedForDeployment : !!monster.selectedForDeployment,
+                    nutritionState : monster.nutritionState
+                } ;
+            } , this);
+            var totalDemand = monsters.reduce(function (sum, monster){ return sum+monster.demand; }, 0);
+            var storedMeat = Math.max(0, this.gameState.excessMeatFood || 0);
+            var availableWithoutSale = fauna.foodProduced+storedMeat;
+            return {
+                captiveMacrofauna : fauna,
+                storedExcessMeat : storedMeat,
+                availableWithoutSale : availableWithoutSale,
+                totalDemand : totalDemand,
+                shortage : Math.max(0, totalDemand-availableWithoutSale),
+                foodCostCredits : NutritionSystem.getFoodCostCredits(this.world),
+                monsters : monsters
+            } ;
+        }
+        treasureSaleOrder(){
+            var edge = this.world.adventurerEntryEdge || DEFAULT_ADVENTURER_ENTRY_EDGE;
+            return this.world.treasureDeposits.filter(function (deposit){
+                return (deposit.amountRemaining || 0)>0;
+            } ).slice(0).sort(function (a, b){
+                return World.distanceFromAdventurerEntryEdge(a.x, a.y, edge, this.world.terrainGrid)-World.distanceFromAdventurerEntryEdge(b.x, b.y, edge, this.world.terrainGrid);
+            }.bind(this));
+        }
+        previewTreasureSaleForFood(foodRequired){
+            var price = NutritionSystem.getFoodCostCredits(this.world);
+            var creditsRequired = Math.max(0, foodRequired) * price;
+            var remainingCredits = creditsRequired;
+            var sale = [];
+            this.treasureSaleOrder().forEach(function (deposit){
+                if (remainingCredits<=0){
+                    return;
+                }
+                var unitValue = TREASURE_TYPES[deposit.treasureType].unitValue;
+                var units = Math.min(deposit.amountRemaining, Math.ceil(remainingCredits / unitValue));
+                if (units>0){
+                    sale.push({
+                        depositId : deposit.id,
+                        treasureType : deposit.treasureType,
+                        displayName : TREASURE_TYPES[deposit.treasureType].displayName,
+                        units : units,
+                        value : units * unitValue
+                    } );
+                    remainingCredits-=units * unitValue;
+                }
+            } );
+            var value = sale.reduce(function (sum, item){ return sum+item.value; }, 0);
+            return {
+                requestedFood : Math.max(0, foodRequired),
+                creditsRequired : creditsRequired,
+                sale : sale,
+                saleValue : value,
+                foodPurchased : price>0 ? value / price : Math.max(0, foodRequired),
+                insufficientTreasure : remainingCredits>0
+            } ;
+        }
+        prepareFoodForSeason(requestedAllocations){
+            var plan = this.getSeasonFoodPlan();
+            var allocationById = {};
+            (requestedAllocations || []).forEach(function (allocation){
+                if (allocation && allocation.monsterId){
+                    allocationById[allocation.monsterId] = Math.max(0, Number(allocation.food) || 0);
+                }
+            } );
+            var allocations = plan.monsters.map(function (entry){
+                var requested = Object.prototype.hasOwnProperty.call(allocationById, entry.id) ? allocationById[entry.id] : entry.demand;
+                return {
+                    monsterId : entry.id,
+                    food : Clamp(Math.floor(requested), 0, entry.demand)
+                } ;
+            } );
+            var totalAllocated = allocations.reduce(function (sum, allocation){ return sum+allocation.food; }, 0);
+            var naturalFood = Math.min(totalAllocated, plan.availableWithoutSale);
+            var purchasedFoodNeeded = Math.max(0, totalAllocated-naturalFood);
+            var salePreview = this.previewTreasureSaleForFood(purchasedFoodNeeded);
+            if (salePreview.insufficientTreasure){
+                return {
+                    ok : false,
+                    reason : 'There is not enough reachable treasure to buy the selected amount of meat.'
+                } ;
+            }
+            salePreview.sale.forEach(function (item){
+                var deposit = this.world.treasureDeposits.find(function (candidate){ return candidate.id===item.depositId; });
+                if (deposit){
+                    deposit.amountRemaining = Math.max(0, deposit.amountRemaining-item.units);
+                }
+            } , this);
+            this.world.treasureSoldForFoodValue =(this.world.treasureSoldForFoodValue || 0)+salePreview.saleValue;
+            this.gameState.treasureSoldForFoodValue =(this.gameState.treasureSoldForFoodValue || 0)+salePreview.saleValue;
+            this.gameState.roundTreasureSoldForFoodValue =(this.gameState.roundTreasureSoldForFoodValue || 0)+salePreview.saleValue;
+            this.gameState.foodExpenditureCredits = this.gameState.treasureSoldForFoodValue;
+            this.gameState.roundFoodExpenditureCredits = this.gameState.roundTreasureSoldForFoodValue;
+            var oldStoredMeat = plan.storedExcessMeat;
+            var captiveRemaining = plan.captiveMacrofauna.foodProduced;
+            var storedRemaining = oldStoredMeat;
+            var purchasedRemaining = salePreview.foodPurchased;
+            this.gameState.getLivingOwnedMonsters().forEach(function (monster){
+                NutritionSystem.resetSeasonNutrition(monster);
+                var allocation = allocations.find(function (candidate){ return candidate.monsterId===monster.id; });
+                var remaining = allocation ? allocation.food : 0;
+                var fromCaptive = Math.min(remaining, captiveRemaining);
+                captiveRemaining-=fromCaptive;
+                remaining-=fromCaptive;
+                var fromStored = Math.min(remaining, storedRemaining);
+                storedRemaining-=fromStored;
+                remaining-=fromStored;
+                var fromPurchased = Math.min(remaining, purchasedRemaining);
+                purchasedRemaining-=fromPurchased;
+                remaining-=fromPurchased;
+                monster.foodFromCaptiveMacrofaunaThisSeason = fromCaptive;
+                monster.foodFromStoredMeatThisSeason = fromStored;
+                monster.foodFromPurchasedMeatThisSeason = fromPurchased;
+                monster.foodBoughtThisSeason = fromCaptive+fromStored+fromPurchased;
+                monster.foodBoughtCostCreditsThisSeason = fromPurchased * NutritionSystem.getFoodCostCredits(this.world);
+            } , this);
+            // Unused fresh captive production does not carry over; only meat obtained
+            // by selling indivisible treasure units remains in cold storage.
+            this.gameState.excessMeatFood = Math.max(0, purchasedRemaining);
+            this.pendingEvents.push({
+                tickNumber : 0,
+                text : 'Captive '+plan.captiveMacrofauna.displayName+' produced '+plan.captiveMacrofauna.foodProduced+' food. '+(salePreview.saleValue>0 ? 'Treasure worth '+salePreview.saleValue+' credits was sold for meat; '+this.gameState.excessMeatFood+' excess food remains stored.' : 'No treasure was sold for meat.')
+            } );
+            return {
+                ok : true,
+                plan : plan,
+                sale : salePreview,
+                allocations : allocations
+            } ;
+        }
+        startSeason(foodAllocations){
             if (this.phase==='raid'){
                 return {
                     ok : false,
@@ -14402,12 +14721,37 @@ button:hover {
                 }
                 this.startNewRound();
             }
+            var feedingResult = this.prepareFoodForSeason(foodAllocations);
+            if (!feedingResult.ok){
+                return feedingResult;
+            }
             this.currentRaid = new Raid(this.world, this.gameState, this.rng.integer(1, 0x7fffffff), this.seasonNumber, this.roundRemains);
             this.phase = 'raid';
             this.paused = false;
             return {
                 ok : true
             } ;
+        }
+        releaseOwnedMonster(monsterId){
+            if (this.phase==='raid'){
+                return {
+                    ok : false,
+                    reason : 'Captive monsters can be released into the wild only during management.'
+                } ;
+            }
+            var result = this.gameState.releaseOwnedMonster(monsterId);
+            if (result.ok){
+                this.pendingEvents.push({
+                    tickNumber : 0,
+                    text : result.monsterName+' was uncollared and released into the wild. It no longer uses captive food.'
+                } );
+            } else{
+                this.pendingEvents.push({
+                    tickNumber : 0,
+                    text : 'Monster release refused: '+result.reason
+                } );
+            }
+            return result;
         }
         setMonsterDeploymentSelection(monsterId, selected){
             if (this.phase==='raid'){
@@ -14524,6 +14868,7 @@ button:hover {
                 raidSnapshot.latestRoundSummary = this.lastRaidSummary;
                 raidSnapshot.consecutiveSeasonsWithNoReturningAdventurers = this.consecutiveSeasonsWithNoReturningAdventurers;
                 raidSnapshot.management = this.gameState.getManagementSnapshot();
+                raidSnapshot.foodPlan = this.getSeasonFoodPlan();
                 raidSnapshot.remains = this.roundRemains.slice(0);
                 return raidSnapshot;
             }
@@ -14559,7 +14904,8 @@ button:hover {
                     return monster.getSnapshot();
                 } ),
                 adventurers : [],
-                management : this.gameState.getManagementSnapshot()
+                management : this.gameState.getManagementSnapshot(),
+                foodPlan : this.getSeasonFoodPlan()
             } ;
         }
     }
@@ -15328,9 +15674,10 @@ button:hover {
             }
         } );
         economicsSession.world.treasureDeposits = [new TreasureDeposit('economics_bronze', 500, 500, 'bronze', 1)];
-        economicsSession.world.foodExpenditureCredits = 10;
+        var economicsDeposit = economicsSession.world.treasureDeposits[0];
+        economicsDeposit.amountRemaining = Math.max(0, economicsDeposit.amountRemaining-1);
         var economicsBreakdown = economicsSession.world.getTreasureBreakdown();
-        AddRegressionResult(results, 'Food expenditure does not remove physical treasure units', economicsSession.world.treasureDeposits[0].amountRemaining===1 && economicsBreakdown.remaining.totalValue===10 && economicsBreakdown.remainingAfterFoodValue===0, 'units='+economicsSession.world.treasureDeposits[0].amountRemaining+', afterFood='+economicsBreakdown.remainingAfterFoodValue);
+        AddRegressionResult(results, 'Treasure sold for meat removes physical treasure units', economicsDeposit.amountRemaining===0 && economicsBreakdown.remaining.totalValue===0 && economicsBreakdown.remainingAfterFoodValue===0, 'units='+economicsDeposit.amountRemaining+', remaining='+economicsBreakdown.remaining.totalValue);
         var lossSession = new GameSession(24679, {
             mode : 'campaign',
             worldOptions : {
@@ -16556,7 +16903,7 @@ button:hover {
                 SendSnapshotAndEvents(command.messageId);
                 break;
             case 'START_SEASON' : EnsureGameSession();
-                var startResult = gameSession.startSeason();
+                var startResult = gameSession.startSeason(command.payload && command.payload.foodAllocations ? command.payload.foodAllocations : null);
                 Post(startResult.ok ? {
                     replyTo : command.messageId,
                     type : 'COMMAND_ACCEPTED'
@@ -16571,6 +16918,21 @@ button:hover {
                 if (startResult.ok){
                     SendWorldSnapshot(command.messageId);
                 }
+                SendSnapshotAndEvents(command.messageId);
+                break;
+            case 'RELEASE_OWNED_MONSTER' : EnsureGameSession();
+                var releaseOwnedResult = gameSession.releaseOwnedMonster(command.payload && command.payload.monsterId);
+                Post(releaseOwnedResult.ok ? {
+                    replyTo : command.messageId,
+                    type : 'COMMAND_ACCEPTED'
+                }
+                : {
+                    replyTo : command.messageId,
+                    type : 'COMMAND_REJECTED',
+                    payload : {
+                        reason : releaseOwnedResult.reason
+                    }
+                } );
                 SendSnapshotAndEvents(command.messageId);
                 break;
             case 'SET_MONSTER_DEPLOYMENT' : EnsureGameSession();
@@ -16812,6 +17174,12 @@ button:hover {
     rosterList = document.getElementById('rosterList'),
     selectedMonsterPanel = document.getElementById('selectedMonsterPanel'),
     startSeasonButton = document.getElementById('startSeasonButton'),
+    foodShortageOverlay = document.getElementById('foodShortageOverlay'),
+    foodShortageSummary = document.getElementById('foodShortageSummary'),
+    foodAllocationList = document.getElementById('foodAllocationList'),
+    foodSalePreview = document.getElementById('foodSalePreview'),
+    startUnderfedSeasonButton = document.getElementById('startUnderfedSeasonButton'),
+    cancelFoodShortageButton = document.getElementById('cancelFoodShortageButton'),
     managementHint = document.getElementById('managementHint'),
     monsterTooltip = document.getElementById('monsterTooltip'),
     monsterManagementTab = document.getElementById('monsterManagementTab'),
@@ -17430,6 +17798,29 @@ button:hover {
         } );
         return lines.join('\n');
     }
+    function FormatCaptiveFoodEconomy(foodPlan){
+        if (!foodPlan || !foodPlan.captiveMacrofauna){
+            return 'Captive food economy: unavailable';
+        }
+        var fauna = foodPlan.captiveMacrofauna;
+        var animalCount = Math.max(0, Math.floor(fauna.animals || 0));
+        var speciesName = fauna.displayName || fauna.species || 'macrofauna';
+        var populationText = animalCount+' '+speciesName;
+        if (animalCount!==1 && speciesName.slice(-1)!=='s'){
+            populationText+=' (slaughter-equivalent animals)';
+        }
+        var lines = ['CAPTIVE FOOD ECONOMY',
+        'Captive macrofauna population: '+populationText,
+        'Base food production this season: '+FormatNumber(fauna.foodProduced || 0)+' food',
+        'Total captive monster food demand: '+FormatNumber(foodPlan.totalDemand || 0)+' food',
+        'Stored excess meat: '+FormatNumber(foodPlan.storedExcessMeat || 0)+' food'];
+        if ((foodPlan.shortage || 0)>0){
+            lines.push('Food shortage before treasure sales: '+FormatNumber(foodPlan.shortage)+' food');
+        } else{
+            lines.push('Base food balance: surplus '+FormatNumber(Math.max(0, (foodPlan.availableWithoutSale || 0)-(foodPlan.totalDemand || 0)))+' food');
+        }
+        return lines.join('\n');
+    }
     function FormatCampaignRoundHistory(stats, mode, currentRound){
         if (mode!=='Campaign'){
             return 'Preceding campaign rounds: n/a in single round game';
@@ -17443,7 +17834,7 @@ button:hover {
         }
         var lines = ['Preceding campaign rounds'];
         preceding.forEach(function (round){
-            lines.push('  Round '+round.roundNumber+': ending value after food '+FormatNumber(round.endingTreasureValue)+' | food '+FormatNumber(round.foodExpenditureCredits || 0)+' | '+round.result);
+            lines.push('  Round '+round.roundNumber+': ending physical treasure value '+FormatNumber(round.endingTreasureValue)+' | food '+FormatNumber(round.foodExpenditureCredits || 0)+' | '+round.result);
         } );
         return lines.join('\n');
     }
@@ -17515,8 +17906,7 @@ button:hover {
         FormatTreasureSection('Treasure stolen this round', treasureBreakdown.stolen),
         '',
         FormatTreasureSection('Physical treasure remaining', treasureBreakdown.remaining),
-        'Food expenditure this round: '+FormatNumber(treasureBreakdown.foodExpenditureCredits || summary.foodExpenditureCredits || 0)+' credits',
-        'Physical treasure piles are not reduced by food costs; food is an end-of-round value deduction.',
+        'Treasure sold for meat this round: '+FormatNumber(treasureBreakdown.foodExpenditureCredits || summary.foodExpenditureCredits || 0)+' credits',
         '',
         FormatCampaignRoundHistory(stats, mode, s.roundNumber || summary.roundNumber || 0)].join('\n');
     }
@@ -17580,7 +17970,7 @@ button:hover {
         'Captive monsters: '+owned.length+'  Deployed: '+deployed+'  Wild: '+wild,
         'Macrofauna: '+activeMacrofauna+' active; carrion food '+FormatNumber(carrionFood),
         '',
-        FormatMonsterNutritionStats(owned),
+        FormatCaptiveFoodEconomy(s.foodPlan),
         '',
         'Campaign worlds completed: '+FormatNumber(stats.worldsCompleted || 0),
         'Worlds won/lost: '+FormatNumber(stats.worldsWon || 0)+' / '+FormatNumber(stats.worldsLost || 0),
@@ -17590,9 +17980,9 @@ button:hover {
         FormatTreasureSection('Treasure stolen this round', treasureBreakdown.stolen),
         '',
         FormatTreasureSection('Treasure remaining', treasureBreakdown.remaining),
-        'Food expenditure this round: '+FormatNumber(treasureBreakdown.foodExpenditureCredits || s.foodExpenditureCredits || 0)+' credits',
-        'Campaign food expenditure total: '+FormatNumber((s.management && s.management.foodExpenditureCredits) || 0)+' credits',
-        'Treasure after food costs: '+FormatNumber(treasureBreakdown.remainingAfterFoodValue!==undefined ? treasureBreakdown.remainingAfterFoodValue : treasureBreakdown.remaining.totalValue),
+        'Treasure sold for meat this round: '+FormatNumber(treasureBreakdown.foodExpenditureCredits || s.foodExpenditureCredits || 0)+' credits',
+        'Campaign treasure sold for meat: '+FormatNumber((s.management && s.management.foodExpenditureCredits) || 0)+' credits',
+        'Physical treasure remaining: '+FormatNumber(treasureBreakdown.remainingAfterFoodValue!==undefined ? treasureBreakdown.remainingAfterFoodValue : treasureBreakdown.remaining.totalValue),
         '',
         FormatCampaignRoundHistory(stats, mode, s.roundNumber || 0)].join('\n');
     }
@@ -18043,6 +18433,117 @@ button:hover {
         RenderMonsterPerformancePanel(monster);
         RenderMonsterFamilyPanel(monster, managementMonsters);
         RenderBreedingPanel(monster);
+        if (monster.alive && currentSnapshot && currentSnapshot.phase!=='raid'){
+            var releasePanel = document.createElement('div');
+            releasePanel.className = 'breedingPanel';
+            var releaseHeading = document.createElement('h4');
+            releaseHeading.textContent = 'Release into the wild';
+            var releaseDescription = document.createElement('p');
+            releaseDescription.textContent = 'Remove the collar and permanently release this monster. It will leave the captive roster and no longer add to captive food demand.';
+            var releaseButton = document.createElement('button');
+            releaseButton.type = 'button';
+            releaseButton.textContent = 'Release '+monster.name;
+            releaseButton.style.background = '#9f1239';
+            releaseButton.style.color = 'white';
+            releaseButton.addEventListener('click', function (){
+                if (!window.confirm('Release '+monster.name+' into the wild permanently? This monster will leave the captive roster and cannot be recalled.')){
+                    return;
+                }
+                releaseButton.disabled = true;
+                releaseButton.textContent = 'Releasing...';
+                selectedRosterMonsterId = null;
+                SendCommand('RELEASE_OWNED_MONSTER', {
+                    monsterId : monster.id
+                } );
+            } );
+            releasePanel.appendChild(releaseHeading);
+            releasePanel.appendChild(releaseDescription);
+            releasePanel.appendChild(releaseButton);
+            selectedMonsterPanel.appendChild(releasePanel);
+        }
+    }
+    function FoodPlanSalePreview(plan, allocations){
+        var totalAllocated = allocations.reduce(function (sum, allocation){ return sum+allocation.food; }, 0);
+        var purchasedFoodNeeded = Math.max(0, totalAllocated-(plan.availableWithoutSale || 0));
+        var creditsNeeded = purchasedFoodNeeded * (plan.foodCostCredits || 0);
+        var remaining = creditsNeeded;
+        var sale = [];
+        var treasures = (latestSnapshot && latestSnapshot.treasures ? latestSnapshot.treasures : []).filter(function (treasure){ return (treasure.amountRemaining || 0)>0; }).slice(0);
+        var worldWidth = latestSnapshot ? latestSnapshot.mapWidth : 0;
+        var worldHeight = latestSnapshot ? latestSnapshot.mapHeight : 0;
+        var edge = latestWorldSnapshot && latestWorldSnapshot.world ? latestWorldSnapshot.world.adventurerEntryEdge : 'left';
+        function distanceFromEntry(treasure){
+            if (edge==='right'){ return worldWidth-treasure.x; }
+            if (edge==='top'){ return treasure.y; }
+            if (edge==='bottom'){ return worldHeight-treasure.y; }
+            return treasure.x;
+        }
+        treasures.sort(function (a, b){ return distanceFromEntry(a)-distanceFromEntry(b); });
+        treasures.forEach(function (treasure){
+            if (remaining<=0){ return; }
+            var units = Math.min(treasure.amountRemaining, Math.ceil(remaining / Math.max(1, treasure.unitValue || 1)));
+            if (units>0){
+                sale.push({ name : treasure.treasureDisplayName || treasure.treasureType, units : units, value : units * treasure.unitValue });
+                remaining-=units * treasure.unitValue;
+            }
+        } );
+        var saleValue = sale.reduce(function (sum, item){ return sum+item.value; }, 0);
+        return {
+            totalAllocated : totalAllocated,
+            purchasedFoodNeeded : purchasedFoodNeeded,
+            creditsNeeded : creditsNeeded,
+            sale : sale,
+            saleValue : saleValue,
+            excessMeat : Math.max(0, (plan.foodCostCredits || 0)>0 ? saleValue / plan.foodCostCredits-purchasedFoodNeeded : 0),
+            insufficient : remaining>0
+        } ;
+    }
+    function CurrentFoodAllocations(){
+        return Array.prototype.slice.call(foodAllocationList.querySelectorAll('input[data-monster-id]')).map(function (input){
+            return {
+                monsterId : input.getAttribute('data-monster-id'),
+                food : Math.max(0, Math.floor(Number(input.value) || 0))
+            } ;
+        } );
+    }
+    function RefreshFoodSalePreview(){
+        if (!latestSnapshot || !latestSnapshot.foodPlan){ return; }
+        var preview = FoodPlanSalePreview(latestSnapshot.foodPlan, CurrentFoodAllocations());
+        var saleLines = preview.sale.length>0 ? preview.sale.map(function (item){ return item.units+' '+item.name+' ('+FormatNumber(item.value)+' credits)'; }).join('\n') : 'No treasure will be sold.';
+        foodSalePreview.textContent = 'Food allocated: '+FormatNumber(preview.totalAllocated)+'\nAdditional meat required: '+FormatNumber(preview.purchasedFoodNeeded)+'\nTreasure selected nearest the human entry: '+saleLines+'\nExcess purchased meat stored: '+FormatNumber(preview.excessMeat)+(preview.insufficient ? '\nNOT ENOUGH TREASURE FOR THIS ALLOCATION.' : '');
+        startUnderfedSeasonButton.disabled = preview.insufficient;
+    }
+    function ShowFoodShortageDialog(){
+        var plan = latestSnapshot && latestSnapshot.foodPlan;
+        if (!plan){ return; }
+        foodShortageSummary.textContent = 'Total captive monster demand: '+FormatNumber(plan.totalDemand)+' food\nCaptive '+plan.captiveMacrofauna.displayName+' produce '+FormatNumber(plan.captiveMacrofauna.foodProduced)+' food this season\nStored excess meat: '+FormatNumber(plan.storedExcessMeat)+' food\nShortage if every monster is fully fed: '+FormatNumber(plan.shortage)+' food';
+        foodAllocationList.innerHTML = '';
+        plan.monsters.forEach(function (monster){
+            var row = document.createElement('label');
+            row.className = 'foodAllocationRow';
+            var name = document.createElement('span');
+            name.textContent = monster.name+(monster.selectedForDeployment ? ' (deploying)' : ' (reserve)');
+            var input = document.createElement('input');
+            input.type = 'number';
+            input.min = '0';
+            input.max = String(monster.demand);
+            input.step = '1';
+            input.value = String(monster.demand);
+            input.setAttribute('data-monster-id', monster.id);
+            input.addEventListener('input', RefreshFoodSalePreview);
+            var demand = document.createElement('span');
+            demand.className = 'foodAllocationDemand';
+            demand.textContent = 'needs '+FormatNumber(monster.demand);
+            row.appendChild(name);
+            row.appendChild(input);
+            row.appendChild(demand);
+            foodAllocationList.appendChild(row);
+        } );
+        foodShortageOverlay.classList.remove('dialogHidden');
+        RefreshFoodSalePreview();
+    }
+    function HideFoodShortageDialog(){
+        foodShortageOverlay.classList.add('dialogHidden');
     }
     function UpdateManagementDrawer(s){
         var phase = s.phase || 'raid';
@@ -18204,13 +18705,17 @@ button:hover {
         } ).length;
         startSeasonButton.style.display = phase==='raid' ? 'none' : '';
         startSeasonButton.disabled = false;
+        var foodPlan = s.foodPlan || null;
+        var hasFoodShortage = !!foodPlan && foodPlan.shortage>0;
+        startSeasonButton.textContent = hasFoodShortage ? 'Start Season - food shortage' : 'Start Season';
+        startSeasonButton.classList.toggle('foodShortagePending', hasFoodShortage);
         if (phase==='raid'){
             var reserves = monsters.filter(function (monster){
                 return monster.alive && !monster.deployed;
             } ).length;
             managementHint.textContent = reserves+' reserve monster'+(reserves===1 ? '' : 's')+' available.';
         } else{
-            managementHint.textContent = selected+' monster'+(selected===1 ? '' : 's')+' selected for deployment. '+(activeBroods>0 ? activeBroods+' brood'+(activeBroods===1 ? '' : 's')+' incubating. ' : '')+'Food expense this round: '+FormatNumber((s.treasureBreakdown && s.treasureBreakdown.foodExpenditureCredits) || s.foodExpenditureCredits || 0)+' credits.';
+            managementHint.textContent = selected+' monster'+(selected===1 ? '' : 's')+' selected for deployment. '+(activeBroods>0 ? activeBroods+' brood'+(activeBroods===1 ? '' : 's')+' incubating. ' : '')+(foodPlan ? 'CAPTIVE FOOD: '+FormatNumber(foodPlan.captiveMacrofauna.animals || 0)+' '+foodPlan.captiveMacrofauna.displayName+' produce '+FormatNumber(foodPlan.captiveMacrofauna.foodProduced)+' food this season. TOTAL MONSTER DEMAND: '+FormatNumber(foodPlan.totalDemand)+' food. Stored excess meat: '+FormatNumber(foodPlan.storedExcessMeat)+'.' : '');
         }
     }
     // ============================================================================
@@ -20596,7 +21101,8 @@ button:hover {
             'Nutrition: '+FormatNutritionLine(o),
             'Season food requirement: '+FormatNumber(GetFoodRequirement(o)),
             'Food eaten in raid: '+FormatNumber(o.foodEatenThisSeason || 0),
-            'Food fed at base: '+FormatNumber(o.foodBoughtThisSeason || 0),
+            'Food fed at lair: '+FormatNumber(o.foodBoughtThisSeason || 0)+' (captive macrofauna '+FormatNumber(o.foodFromCaptiveMacrofaunaThisSeason || 0)+', stored '+FormatNumber(o.foodFromStoredMeatThisSeason || 0)+', purchased '+FormatNumber(o.foodFromPurchasedMeatThisSeason || 0)+')',
+            'Body reserves consumed: '+FormatNumber(o.foodFromBodyReservesThisSeason || 0),
             'Base feeding cost: '+FormatNumber(o.foodBoughtCostCreditsThisSeason || 0)+' credits',
             'Eating: '+(o.eatingTargetId ?('yes, '+FormatNumber(o.eatingTicksRemaining)+' ticks remaining') : 'no'),
             'Ownership: '+(o.owned ? 'Captive/owned' : 'Wild'),
@@ -21094,12 +21600,24 @@ button:hover {
         } );
     } );
     startSeasonButton.addEventListener('click', function (){
+        if (latestSnapshot && latestSnapshot.foodPlan && latestSnapshot.foodPlan.shortage>0){
+            ShowFoodShortageDialog();
+            return;
+        }
         managementDrawerVisible = false;
         lastManagementRenderKey = '';
         if (latestSnapshot){
             UpdateManagementDrawer(latestSnapshot);
         }
         SendCommand('START_SEASON');
+    } );
+    cancelFoodShortageButton.addEventListener('click', HideFoodShortageDialog);
+    startUnderfedSeasonButton.addEventListener('click', function (){
+        var allocations = CurrentFoodAllocations();
+        HideFoodShortageDialog();
+        managementDrawerVisible = false;
+        lastManagementRenderKey = '';
+        SendCommand('START_SEASON', { foodAllocations : allocations });
     } );
     window.addEventListener('beforeunload', function (event){
         if (gameStarted){
