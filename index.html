@@ -3876,6 +3876,11 @@ button:hover {
                 var rng = new SeededRng(candidateSeed);
                 var environment = World.createEnvironment(rng, settings);
                 var grid = World.createTerrainGrid(rng, environment);
+                var campaignRound = Number.isFinite(settings.campaignRound) ? Math.max(1, Math.floor(settings.campaignRound)) : 0;
+                if (campaignRound>0 && World.campaignEcologyScore(environment, grid)<World.campaignEcologyMinimum(campaignRound)){
+                    candidateSeed = rng.integer(1, 0x7fffffff);
+                    continue;
+                }
                 if (!World.validateRequiredEntryEdges(grid, settings)){
                     candidateSeed = rng.integer(1, 0x7fffffff);
                     continue;
@@ -3989,6 +3994,34 @@ button:hover {
             }
             return 'vast';
         }
+        static campaignEcologyMinimum(roundNumber){
+            var round = Math.max(1, Math.floor(roundNumber || 1));
+            // Campaign progression chooses naturally productive early worlds; it must
+            // never inflate prey or predator counts after world generation. The scalar
+            // requirement relaxes gradually and reaches zero after round 6.
+            return round>=7 ? 0 : Clamp(0.70-(round-1) * 0.11, 0, 0.70);
+        }
+        static campaignEcologyScore(environment, grid){
+            if (!environment || !grid || !grid.terrainTypes){
+                return 0;
+            }
+            var productiveTiles = 0;
+            var desertTiles = 0;
+            for (var i = 0; i<grid.terrainTypes.length; i+=1){
+                var type = grid.terrainTypes[i];
+                if (type===TERRAIN_TYPE.FOREST || type===TERRAIN_TYPE.GRASS || type===TERRAIN_TYPE.MARSH || type===TERRAIN_TYPE.STREAM){
+                    productiveTiles+=1;
+                }
+                if (type===TERRAIN_TYPE.DESERT){
+                    desertTiles+=1;
+                }
+            }
+            var landTiles = Math.max(1, grid.terrainTypes.length);
+            var productiveShare = productiveTiles / landTiles;
+            var desertShare = desertTiles / landTiles;
+            var climateProductivity = Clamp(0.18+(environment.vegetationDensity || 0) * 0.48+(environment.moisture || 0) * 0.22+(1-Math.abs((environment.temperature || 0.5)-0.50) * 1.3) * 0.22-(environment.aridity || 0) * 0.35, 0.05, 1.25);
+            return Clamp(climateProductivity * 0.72+productiveShare * 0.38-desertShare * 0.10, 0, 1.25);
+        }
         static createWorld(seed, options){
             return new World(seed, options || {
             } );
@@ -4001,11 +4034,6 @@ button:hover {
             var temperature;
             if (Number.isFinite(settings.temperature)){
                 temperature = settings.temperature;
-            } else if (campaignRound>0 && campaignRound<=2){
-                // Early campaign worlds deliberately contain abundant small prey. The
-                // founder still comes from genuine local natural selection; campaign
-                // progression changes ecology rather than overriding its genome.
-                temperature = rng.range(0.43, 0.62);
             } else{
                 // Arctic worlds are occasional genetic opportunities, not a late-game
                 // replacement for the varied campaign. They first become possible in
@@ -4020,10 +4048,12 @@ button:hover {
                     // from metabolism, morphology and the annual viability simulation.
                     temperature = rng.range(0.14, 0.30);
                 } else{
-                    temperature = campaignRound>0 ? rng.range(0.34, 0.90) : rng.range(0.22, 0.90);
+                    // Early campaign suitability is selected from the resulting
+                    // ecology, never by constraining temperature or moisture inputs.
+                    temperature = rng.range(0.22, 0.90);
                 }
             }
-            var moisture = Number.isFinite(settings.moisture) ? settings.moisture : (campaignRound>0 && campaignRound<=2 ? rng.range(0.36, 0.70) : rng.range(0.10, 0.88));
+            var moisture = Number.isFinite(settings.moisture) ? settings.moisture : rng.range(0.10, 0.88);
             var altitude = Number.isFinite(settings.altitude) ? settings.altitude : rng.range(0.05, 0.65);
             var ruggedness = Number.isFinite(settings.ruggedness) ? settings.ruggedness : rng.range(0.05, 0.55);
             var waterAbundance = Number.isFinite(settings.waterAbundance) ? settings.waterAbundance : Clamp(moisture+rng.range(-0.18, 0.22), 0, 1);
@@ -8545,9 +8575,11 @@ button:hover {
                 return weights;
             }
             if (terrainType===TERRAIN_TYPE.DESERT){
-                weights.hare = 4.8;
-                weights.fox = 0.14;
-                weights.boar = !earlyCampaign && (environment.moisture || 0)>0.48 ? 0.12 : 0;
+                var desertTemperature = environment.temperature || 0.5;
+                var coolDesert = desertTemperature<0.50;
+                weights.hare = coolDesert ? 3.4 : 1.7;
+                weights.fox = coolDesert ? 0.22 : 0.09;
+                weights.boar = 0;
                 return weights;
             }
             if (terrainType===TERRAIN_TYPE.FOREST){
@@ -13411,11 +13443,10 @@ button:hover {
             var ecology = MonsterMetabolismSystem.macrofaunaEcologyProfile(this.world);
             var expectedFood = ecology.expectedFood || 0;
             var meanMonsterFood = 11.5;
-            var campaignRound = this.world && this.world.environment ? (this.world.environment.campaignRound || 0) : 0;
+            // Capacity is always the honest food-web result. Early campaigns obtain
+            // abundant monsters by selecting productive maps, never by multiplying
+            // food or imposing a minimum predator population.
             var ecosystemFood = expectedFood * IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR;
-            if (campaignRound>0 && campaignRound<=2){
-                ecosystemFood*=1.55;
-            }
             var sustainableMonsters = ecosystemFood / Math.max(1, meanMonsterFood * 4.2);
             var visibleFraction = Clamp(0.12+Math.sqrt(Math.max(0, ecology.availability || 0)) * 0.20, 0.06, 0.42);
             var gross = sustainableMonsters * visibleFraction;
@@ -13425,8 +13456,7 @@ button:hover {
                 depletion+=this.gameState.getWildMonsterHarvestPressureForBiome(keys[d]);
             }
             var net = gross * Clamp(1-depletion / Math.max(1, keys.length || 1), 0.15, 1);
-            var minimumEarlyCapacity = campaignRound>0 && campaignRound<=2 ? 3 : 0;
-            return Clamp(Math.max(minimumEarlyCapacity, Math.round(net)), 0, Math.max(WILD_MONSTER_COUNT_MAX, Math.round(WILD_MONSTER_COUNT_MAX * IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR)));
+            return Clamp(Math.round(net), 0, Math.max(WILD_MONSTER_COUNT_MAX, Math.round(WILD_MONSTER_COUNT_MAX * IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR)));
         }
         monsterCanRemainActiveThroughLocalYear(monster){
             for (var seasonNumber = 1; seasonNumber<=SEASON_NAMES.length; seasonNumber+=1){
@@ -13463,7 +13493,17 @@ button:hover {
                     // ecologies. Square-law trophic filtering makes large phenotypes
                     // possible but appropriately exceptional without altering their
                     // naturally selected genomes or imposing a campaign size cap.
-                    var abundanceChance = Clamp(Math.pow(35 / mass, 2.0), 0.025, 1);
+                    var ecology = MonsterMetabolismSystem.macrofaunaEcologyProfile(this.world);
+                    var localProductivity = Clamp((ecology.availability || 0) / 0.62, 0.04, 1.35);
+                    var individualFoodDemand = Math.max(1, candidate.nutritionRequirement || 10);
+                    var demandPenalty = Clamp(12 / individualFoodDemand, 0.08, 1.25);
+                    var dominantNiche = ecology.preyNiches && ecology.preyNiches.length ? ecology.preyNiches.slice(0).sort(function (a, b){ return (b.weight || 0)-(a.weight || 0); })[0] : null;
+                    var smallPreyWorld = !!dominantNiche && (dominantNiche.species==='hare' || dominantNiche.species==='fox');
+                    var oversizeSmallPreyPenalty = smallPreyWorld ? Clamp(Math.pow(52 / mass, 1.35), 0.025, 1) : 1;
+                    // Encounter frequency derives from mass, individual energetic demand
+                    // and this world's prey productivity. There is deliberately no
+                    // campaign-round bonus and no unconditional giant acceptance floor.
+                    var abundanceChance = Clamp(Math.pow(35 / mass, 2.0) * localProductivity * demandPenalty * oversizeSmallPreyPenalty, 0.0005, 1);
                     if (this.rng.nextFloat()>abundanceChance){
                         continue;
                     }
@@ -16981,6 +17021,16 @@ button:hover {
         flightAuditRaid.adventurers.push(groupSupportHuman);
         var pressureWithSupport = flightAuditMonster.fleePressureFromThreat(flightAuditExplorer, flightAuditRaid);
         AddRegressionResult(results, 'Nearby humans add diminishing threat after injury without overriding healthy attack preference', pressureWithSupport>pressureWithoutSupport && healthyFlightPressure<0.68, 'without='+pressureWithoutSupport.toFixed(3)+', with='+pressureWithSupport.toFixed(3));
+        AddRegressionResult(results, 'Early campaign ecology requirement declines smoothly rather than ending at round three', World.campaignEcologyMinimum(1)>World.campaignEcologyMinimum(2) && World.campaignEcologyMinimum(2)>World.campaignEcologyMinimum(3) && World.campaignEcologyMinimum(3)>World.campaignEcologyMinimum(4) && World.campaignEcologyMinimum(6)>0 && World.campaignEcologyMinimum(7)===0, 'thresholds='+[1,2,3,4,5,6,7].map(World.campaignEcologyMinimum).join(','));
+        var variedEarlyTemperatures = [];
+        for (var climateSeed = 1; climateSeed<=40; climateSeed+=1){
+            variedEarlyTemperatures.push(World.createEnvironment(new SeededRng(430000+climateSeed), { campaignRound : 1 }).temperature);
+        }
+        AddRegressionResult(results, 'Early campaign climate has no mild hard-coded temperature band', Math.min.apply(null, variedEarlyTemperatures)<0.40 && Math.max.apply(null, variedEarlyTemperatures)>0.70, 'range='+Math.min.apply(null, variedEarlyTemperatures).toFixed(3)+'-'+Math.max.apply(null, variedEarlyTemperatures).toFixed(3));
+        AddRegressionResult(results, 'Wild capacity contains no early-round multiplier or minimum population', Raid.prototype.estimateWildMonsterCapacity.toString().indexOf('1.55')<0 && Raid.prototype.estimateWildMonsterCapacity.toString().indexOf('minimumEarlyCapacity')<0, 'capacity is ecology-only');
+        var coolDesertWeights = MonsterMetabolismSystem.macrofaunaSpeciesWeightsForTerrain({ environment : { temperature : 0.35, campaignRound : 4 } }, TERRAIN_TYPE.DESERT);
+        var hotDesertWeights = MonsterMetabolismSystem.macrofaunaSpeciesWeightsForTerrain({ environment : { temperature : 0.80, campaignRound : 4 } }, TERRAIN_TYPE.DESERT);
+        AddRegressionResult(results, 'Cool and hot deserts have distinct small-prey ecology', coolDesertWeights.hare>hotDesertWeights.hare && coolDesertWeights.fox>hotDesertWeights.fox, 'cool='+JSON.stringify(coolDesertWeights)+', hot='+JSON.stringify(hotDesertWeights));
         var failed = results.filter(function (result){
             return !result.passed;
         } );
@@ -19288,12 +19338,22 @@ button:hover {
         if (terrainType===5)return '#4d92bd';
         if (terrainType===6)return '#adb8a3';
         if (terrainType===7)return '#c8d8df';
-        if (terrainType===8)return '#d8b873';
+        if (terrainType===8){
+            var environment = latestWorldSnapshot && latestWorldSnapshot.world ? latestWorldSnapshot.world.environment : null;
+            var temperature = environment && Number.isFinite(environment.temperature) ? environment.temperature : 0.65;
+            if (temperature<0.42){ return '#b8a078'; }
+            if (temperature<0.56){ return '#c4a46f'; }
+            return '#d8b873';
+        }
         return '#83ad60';
     }
     function TerrainStroke(terrainType){
         if (terrainType===4 || terrainType===5)return 'rgba(64,120,149,0.22)';
-        if (terrainType===8)return 'rgba(185,148,79,0.18)';
+        if (terrainType===8){
+            var environment = latestWorldSnapshot && latestWorldSnapshot.world ? latestWorldSnapshot.world.environment : null;
+            var temperature = environment && Number.isFinite(environment.temperature) ? environment.temperature : 0.65;
+            return temperature<0.50 ? 'rgba(139,119,86,0.22)' : 'rgba(185,148,79,0.18)';
+        }
         if (terrainType===7)return 'rgba(158,181,191,0.22)';
         if (terrainType===2)return 'rgba(63,116,62,0.16)';
         return 'rgba(68,92,52,0.12)';
