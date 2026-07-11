@@ -14297,7 +14297,7 @@ button:hover {
                     return sum+row.fedAtBase;
                 } , 0),
                 treasureRemaining : treasureBreakdown.remaining.totalUnits,
-                treasureDepleted : treasureBreakdown.remainingAfterFoodValue<=0,
+                treasureDepleted : treasureBreakdown.remaining.totalUnits<=0,
                 pathfindingTotalCalls : this.getPathfindingTotalCalls(),
                 maxStuckTicks : this.getMaxStuckTicks(),
                 navBlockedCacheEntries : this.getNavBlockedCacheEntryCount(),
@@ -14501,8 +14501,8 @@ button:hover {
             this.applyRoundProgression(summary);
             summary.roundEnded = this.roundEnded;
             summary.roundResult = this.roundResult;
-            summary.roundWon = this.roundEnded &&(summary.treasureRemainingAfterFoodValue || 0)>0;
-            summary.roundLost = this.roundEnded &&(summary.treasureRemainingAfterFoodValue || 0)<=0;
+            summary.roundLost = this.roundEnded && !!summary.treasureDepleted;
+            summary.roundWon = this.roundEnded && !summary.treasureDepleted;
             var finishedTickNumber = this.currentRaid.tickNumber;
             nutritionResult.events.forEach(function (eventText){
                 this.pendingEvents.push({
@@ -14562,9 +14562,9 @@ button:hover {
             } else{
                 this.consecutiveSeasonsWithNoReturningTreasure = 0;
             }
-            if ((summary.treasureRemainingAfterFoodValue || 0)<=0){
+            if (summary.treasureDepleted || (summary.treasureRemaining!==undefined && summary.treasureRemaining<=0)){
                 this.roundEnded = true;
-                this.roundResult = 'Round lost: remaining treasure value after food costs is zero.';
+                this.roundResult = 'Round lost: all treasure has been depleted.';
             } else if (this.consecutiveSeasonsWithNoReturningAdventurers>=SEASONS_WITH_NO_RETURNING_ADVENTURERS_TO_WIN_ROUND){
                 this.roundEnded = true;
                 this.roundResult = 'Round won: no adventurers returned alive for '+SEASONS_WITH_NO_RETURNING_ADVENTURERS_TO_WIN_ROUND+' consecutive seasons, so humans fear this place.';
@@ -15019,7 +15019,7 @@ button:hover {
                 treasureRemaining : treasureBreakdown.remaining.totalUnits,
                 treasureLostValue : treasureBreakdown.stolen.totalValue,
                 treasureRemainingAfterFoodValue : treasureBreakdown.remainingAfterFoodValue,
-                treasureDepleted : treasureBreakdown.remainingAfterFoodValue<=0,
+                treasureDepleted : treasureBreakdown.remaining.totalUnits<=0,
                 pathfindingTotalCalls : 0,
                 maxStuckTicks : 0,
                 navBlockedCacheEntries : 0,
@@ -15767,12 +15767,24 @@ button:hover {
                 mapSizeKey : 'legacy'
             }
         } );
-        var lossSummary = {
+        var lossSummaryWithPhysicalTreasure = {
             noAdventurersReturnedAlive : false,
+            adventurersEscapedWithTreasure : 1,
+            treasureRemaining : 1,
+            treasureDepleted : false,
             treasureRemainingAfterFoodValue : 0
         } ;
-        lossSession.applyRoundProgression(lossSummary);
-        AddRegressionResult(results, 'Round loss uses treasure value after food expenditure', lossSession.roundEnded && lossSession.roundResult.indexOf('after food')>=0, 'roundEnded='+lossSession.roundEnded+', result='+lossSession.roundResult);
+        lossSession.applyRoundProgression(lossSummaryWithPhysicalTreasure);
+        var physicalTreasurePreventedLoss = !lossSession.roundEnded;
+        var depletedLossSummary = {
+            noAdventurersReturnedAlive : false,
+            adventurersEscapedWithTreasure : 1,
+            treasureRemaining : 0,
+            treasureDepleted : true,
+            treasureRemainingAfterFoodValue : 100
+        } ;
+        lossSession.applyRoundProgression(depletedLossSummary);
+        AddRegressionResult(results, 'Round loss occurs only when all physical treasure is depleted', physicalTreasurePreventedLoss && lossSession.roundEnded && lossSession.roundResult.indexOf('all treasure')>=0, 'physicalPreventedLoss='+physicalTreasurePreventedLoss+', roundEnded='+lossSession.roundEnded+', result='+lossSession.roundResult);
         var fearSession = new GameSession(24680, {
             mode : 'campaign',
             worldOptions : {
@@ -17979,9 +17991,10 @@ button:hover {
             }
         } ;
         var afterFood = summary.treasureRemainingAfterFoodValue!==undefined ? summary.treasureRemainingAfterFoodValue : (treasureBreakdown.remainingAfterFoodValue!==undefined ? treasureBreakdown.remainingAfterFoodValue : treasureBreakdown.remaining.totalValue);
-        var state = afterFood>0 ? 'WIN' : 'LOSS';
+        var physicalTreasureRemaining = treasureBreakdown.remaining && Number.isFinite(treasureBreakdown.remaining.totalUnits) ? treasureBreakdown.remaining.totalUnits : 0;
+        var state = physicalTreasureRemaining>0 ? 'WIN' : 'LOSS';
         var reason = s.roundResult || summary.roundResult || s.raidResult;
-        return ['END OF ROUND TREASURE VALUE AFTER FOOD: '+FormatNumber(afterFood)+' CREDITS',
+        return ['END OF ROUND PHYSICAL TREASURE: '+FormatNumber(physicalTreasureRemaining)+' UNITS, '+FormatNumber(treasureBreakdown.remaining.totalValue || 0)+' CREDITS',
         'Win/loss state: '+state,
         'Reason: '+reason,
         'Mode: '+mode+'  Round: '+(s.roundNumber || summary.roundNumber || 1)+'  Season: '+(s.seasonNumber || summary.seasonNumber || 1)+' ('+SeasonNameForSnapshot(s)+')',
