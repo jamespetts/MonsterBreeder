@@ -900,7 +900,10 @@ button:hover {
         ADULT : 'adult'
     } ;
     var MONSTER_JUVENILE_MATURATION_SEASONS = 1;
+    var MONSTER_JUVENILE_MATURATION_SEASONS_MAX = 3;
     var MONSTER_GROWTH_TO_FULL_SIZE_SEASONS = 4;
+    var MONSTER_GROWTH_TO_FULL_SIZE_SEASONS_MIN = 3;
+    var MONSTER_GROWTH_TO_FULL_SIZE_SEASONS_MAX = 6;
     var MONSTER_MOTHER_BREEDING_HOLD_SEASONS = 1;
     var MONSTER_CLUTCH_SIZE_MIN = 1;
     var MONSTER_CLUTCH_SIZE_MAX = 6;
@@ -9775,6 +9778,7 @@ button:hover {
             this.lifeStage = options && options.lifeStage ? options.lifeStage : MONSTER_LIFE_STAGE.ADULT;
             this.juvenileMaturationSeasonsRemaining = options && Number.isFinite(options.juvenileMaturationSeasonsRemaining) ? Math.max(0, Math.floor(options.juvenileMaturationSeasonsRemaining)) : 0;
             this.juvenileGrowthSeasonsRemaining = options && Number.isFinite(options.juvenileGrowthSeasonsRemaining) ? Math.max(0, Math.floor(options.juvenileGrowthSeasonsRemaining)) : (options && options.lifeStage===MONSTER_LIFE_STAGE.JUVENILE ? MONSTER_GROWTH_TO_FULL_SIZE_SEASONS : 0);
+            this.juvenileGrowthSeasonsTotal = options && Number.isFinite(options.juvenileGrowthSeasonsTotal) ? Math.max(1, Math.floor(options.juvenileGrowthSeasonsTotal)) : Math.max(1, this.juvenileGrowthSeasonsRemaining || MONSTER_GROWTH_TO_FULL_SIZE_SEASONS);
             this.breedingHoldSeasonsRemaining = options && Number.isFinite(options.breedingHoldSeasonsRemaining) ? Math.max(0, Math.floor(options.breedingHoldSeasonsRemaining)) : 0;
             this.fertilisationsThisSeason = options && Number.isFinite(options.fertilisationsThisSeason) ? Math.max(0, Math.floor(options.fertilisationsThisSeason)) : 0;
             this.reproductiveHistory = Object.assign({matings:0,eggs:0,hatchlings:0}, options && options.reproductiveHistory ? options.reproductiveHistory : {});
@@ -9907,11 +9911,12 @@ button:hover {
             }
         }
         getGrowthScaleForRemainingSeasons(remainingGrowthSeasons){
-            var remaining = Clamp(Number.isFinite(remainingGrowthSeasons) ? Math.floor(remainingGrowthSeasons) : 0, 0, MONSTER_GROWTH_TO_FULL_SIZE_SEASONS);
+            var total = Math.max(1, this.juvenileGrowthSeasonsTotal || MONSTER_GROWTH_TO_FULL_SIZE_SEASONS);
+            var remaining = Clamp(Number.isFinite(remainingGrowthSeasons) ? Math.floor(remainingGrowthSeasons) : 0, 0, total);
             if (remaining<=0){
                 return 1;
             }
-            var progress = (MONSTER_GROWTH_TO_FULL_SIZE_SEASONS-remaining) / MONSTER_GROWTH_TO_FULL_SIZE_SEASONS;
+            var progress = (total-remaining) / total;
             return Clamp(0.52+0.48 * progress, 0.52, 1);
         }
         getBodyHealthRatios(){
@@ -9955,6 +9960,7 @@ button:hover {
                 adultBodyScale : this.adultBodyScale,
                 unstuntedAdultBodyScale : this.unstuntedAdultBodyScale,
                 juvenileGrowthSeasonsRemaining : this.juvenileGrowthSeasonsRemaining,
+                juvenileGrowthSeasonsTotal : this.juvenileGrowthSeasonsTotal,
                 sex : this.sex
             }, rng);
             this.restoreBodyHealthRatios(ratios);
@@ -11047,6 +11053,7 @@ button:hover {
             s.lifeStage = this.lifeStage || MONSTER_LIFE_STAGE.ADULT;
             s.juvenileMaturationSeasonsRemaining = this.juvenileMaturationSeasonsRemaining || 0;
             s.juvenileGrowthSeasonsRemaining = this.juvenileGrowthSeasonsRemaining || 0;
+            s.juvenileGrowthSeasonsTotal = this.juvenileGrowthSeasonsTotal || MONSTER_GROWTH_TO_FULL_SIZE_SEASONS;
             s.breedingHoldSeasonsRemaining = this.breedingHoldSeasonsRemaining || 0;
             s.fertilisationsThisSeason = this.fertilisationsThisSeason || 0;
             s.maleFertilisationCapacity = this.maleFertilisationCapacity();
@@ -11693,6 +11700,34 @@ button:hover {
             this.shellThickness=Clamp(mr.shellThickness*rng.range(0.88,1.12),0.18,2.2); this.shellPermeability=mr.shellPermeability; this.developmentRate=or.developmentRate;
             this.mechanicalShock=rng.range(0.12,1.20)*rng.range(0.75,1.10); this.failureReason='';
         }
+        getOffspringDevelopmentPhenotype(){
+            return MonsterGenePool.expressGenomePhenotype(this.genome);
+        }
+        calculateJuvenileMaturationSeasons(rng){
+            var phenotype = this.getOffspringDevelopmentPhenotype();
+            var reproduction = phenotype.reproduction || {};
+            var morphology = phenotype.morphology || {};
+            var developmentRate = Number.isFinite(reproduction.developmentRate) ? reproduction.developmentRate : 1;
+            var growthRate = Number.isFinite(morphology.growthRate) ? morphology.growthRate : 1;
+            var provisioning = Clamp(this.yolkProvision || 1, 0.25, 1.5);
+            var effectiveRate = developmentRate * Math.sqrt(Math.max(0.45, growthRate)) * (0.90+0.10 * provisioning);
+            // One juvenile season remains normal. Two seasons occur mainly in the slow tail;
+            // three require an extreme inherited rate and an unfavourable developmental roll.
+            var twoSeasonChance = Clamp((0.92-effectiveRate) * 1.35, 0, 0.48);
+            var threeSeasonChance = Clamp((0.62-effectiveRate) * 0.90, 0, 0.12);
+            var roll = rng.nextFloat();
+            if (roll<threeSeasonChance){ return MONSTER_JUVENILE_MATURATION_SEASONS_MAX; }
+            if (roll<threeSeasonChance+twoSeasonChance){ return 2; }
+            return MONSTER_JUVENILE_MATURATION_SEASONS;
+        }
+        calculateGrowthSeasons(rng){
+            var phenotype = this.getOffspringDevelopmentPhenotype();
+            var morphology = phenotype.morphology || {};
+            var growthRate = Number.isFinite(morphology.growthRate) ? morphology.growthRate : 1;
+            var expected = MONSTER_GROWTH_TO_FULL_SIZE_SEASONS / Math.max(0.70, growthRate);
+            var varied = expected+rng.range(-0.35, 0.35);
+            return Clamp(Math.round(varied), MONSTER_GROWTH_TO_FULL_SIZE_SEASONS_MIN, MONSTER_GROWTH_TO_FULL_SIZE_SEASONS_MAX);
+        }
         resolveHatching(rng){
             if(this.shellThickness<this.mechanicalShock){ this.status='cracked'; this.failureReason='The egg was cracked by mechanical shock before hatching.'; this.discardAfterSeasons=1; return false; }
             var oxygen=this.shellPermeability/Math.max(0.35,this.shellThickness); var demand=this.developmentRate/Math.max(0.2,this.yolkProvision);
@@ -11987,7 +12022,9 @@ button:hover {
                 brood.eggs.forEach(function(egg){
                     if(egg.status==='incubating' && brood.incubationSeasonsRemaining<=0){
                         if(egg.resolveHatching(rng)){
-                            var hatchling=new Monster(this.createMonsterId('hatchling'),RIGHT_EDGE_X,rng.range(120,MAP_HEIGHT-120),rng,{owned:true,name:Monster.randomName(rng),selectedForDeployment:false,world:world,genome:egg.genome,sex:egg.sex,ageInSeasons:0,lifeStage:MONSTER_LIFE_STAGE.JUVENILE,juvenileMaturationSeasonsRemaining:MONSTER_JUVENILE_MATURATION_SEASONS,juvenileGrowthSeasonsRemaining:MONSTER_GROWTH_TO_FULL_SIZE_SEASONS,motherId:brood.motherId,fatherId:brood.fatherId});
+                            var maturationSeasons=egg.calculateJuvenileMaturationSeasons(rng);
+                            var growthSeasons=egg.calculateGrowthSeasons(rng);
+                            var hatchling=new Monster(this.createMonsterId('hatchling'),RIGHT_EDGE_X,rng.range(120,MAP_HEIGHT-120),rng,{owned:true,name:Monster.randomName(rng),selectedForDeployment:false,world:world,genome:egg.genome,sex:egg.sex,ageInSeasons:0,lifeStage:MONSTER_LIFE_STAGE.JUVENILE,juvenileMaturationSeasonsRemaining:maturationSeasons,juvenileGrowthSeasonsRemaining:growthSeasons,juvenileGrowthSeasonsTotal:growthSeasons,motherId:brood.motherId,fatherId:brood.fatherId});
                             this.ownedMonsters.push(hatchling); this.recordFamilyMonster(hatchling); hatchedCount+=1;
                         } else { keep.push(egg); }
                     } else if(egg.status==='unhatched'||egg.status==='cracked'){ egg.discardAfterSeasons-=1; if(egg.discardAfterSeasons>0){keep.push(egg);} }
@@ -14407,14 +14444,21 @@ button:hover {
             return !monster.canDeploy() && !monster.canBreed();
         } ), 'juveniles='+juveniles.length+', failed='+failedEggCount+', clutch='+breedingResult.clutchSize+', events='+firstLifecycle.events.length);
         breedingState.advanceLifecycleAfterSeason(new SeededRng(7109), breedingWorld, 2);
-        AddRegressionResult(results, 'Juveniles mature after one further season', juveniles.every(function (monster){
-            return monster.lifeStage===MONSTER_LIFE_STAGE.ADULT && monster.canDeploy();
-        } ), 'mature='+juveniles.filter(function (monster){
-            return monster.lifeStage===MONSTER_LIFE_STAGE.ADULT;
-        } ).length);
-        AddRegressionResult(results, 'Mature but still-growing monsters are described as adolescent', juveniles.every(function (monster){
-            return monster.lifeStage===MONSTER_LIFE_STAGE.ADULT && (monster.juvenileGrowthSeasonsRemaining || 0)>0 && monster.getAgeCategory()==='adolescent';
-        } ), 'category='+(juveniles[0] ? juveniles[0].getAgeCategory() : 'none')+', growthRemaining='+(juveniles[0] ? juveniles[0].juvenileGrowthSeasonsRemaining : 'none'));
+        AddRegressionResult(results, 'Ordinary-rate juveniles usually mature after one further season while slower inherited rates may remain juvenile', juveniles.every(function (monster){
+            return monster.juvenileMaturationSeasonsRemaining>=0 && monster.juvenileMaturationSeasonsRemaining<MONSTER_JUVENILE_MATURATION_SEASONS_MAX;
+        } ), 'mature='+juveniles.filter(function (monster){ return monster.lifeStage===MONSTER_LIFE_STAGE.ADULT; }).length+', juvenile='+juveniles.filter(function (monster){ return monster.lifeStage===MONSTER_LIFE_STAGE.JUVENILE; }).length);
+        var maturedJuveniles=juveniles.filter(function(monster){return monster.lifeStage===MONSTER_LIFE_STAGE.ADULT;});
+        AddRegressionResult(results, 'Mature but still-growing monsters are described as adolescent', maturedJuveniles.every(function (monster){
+            return (monster.juvenileGrowthSeasonsRemaining || 0)>0 && monster.getAgeCategory()==='adolescent';
+        } ), 'matured='+maturedJuveniles.length);
+        var maturationCounts={1:0,2:0,3:0};
+        var lifecycleEgg={genome:regressionMother.genome,yolkProvision:1,getOffspringDevelopmentPhenotype:Egg.prototype.getOffspringDevelopmentPhenotype,calculateJuvenileMaturationSeasons:Egg.prototype.calculateJuvenileMaturationSeasons};
+        for(var maturationSeed=0;maturationSeed<400;maturationSeed+=1){maturationCounts[lifecycleEgg.calculateJuvenileMaturationSeasons(new SeededRng(88000+maturationSeed))]+=1;}
+        AddRegressionResult(results, 'One season remains the normal juvenile duration', maturationCounts[1]>maturationCounts[2]+maturationCounts[3], 'one='+maturationCounts[1]+', two='+maturationCounts[2]+', three='+maturationCounts[3]);
+        var slowLifecycleEgg={yolkProvision:0.45,getOffspringDevelopmentPhenotype:function(){return {reproduction:{developmentRate:0.48},morphology:{growthRate:0.72}};},calculateJuvenileMaturationSeasons:Egg.prototype.calculateJuvenileMaturationSeasons};
+        var slowDurationCounts={1:0,2:0,3:0};
+        for(var slowSeed=0;slowSeed<400;slowSeed+=1){slowDurationCounts[slowLifecycleEgg.calculateJuvenileMaturationSeasons(new SeededRng(89000+slowSeed))]+=1;}
+        AddRegressionResult(results, 'Extreme slow development can produce two or three juvenile seasons', slowDurationCounts[2]>0 && slowDurationCounts[3]>0, 'one='+slowDurationCounts[1]+', two='+slowDurationCounts[2]+', three='+slowDurationCounts[3]);
         var ageingMonster = new Monster('ageing_regression', RIGHT_EDGE_X, 180, new SeededRng(7110), {
             owned : true,
             sex : MONSTER_SEX.MALE,
