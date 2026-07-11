@@ -825,14 +825,17 @@ button:hover {
     var TERRAIN_STEEP_SLOPE = 5;
     var LEFT_EDGE_X = 0;
     var RIGHT_EDGE_X = MAP_WIDTH;
-    var TREASURE_MINIMUM_DISTANCE_FROM_ADVENTURER_ENTRY_FRACTION = 1 / 3;
-    var TREASURE_DEEP_PLACEMENT_FRACTION = 1 / 2;
-    var TREASURE_NEAR_HALF_PLACEMENT_CHANCE = 0.15;
+    var TREASURE_MINIMUM_DISTANCE_FROM_ADVENTURER_ENTRY_FRACTION = 2 / 3;
+    var TREASURE_DEEP_PLACEMENT_FRACTION = 3 / 4;
+    var TREASURE_LOWER_DEPTH_ZONE_PLACEMENT_CHANCE = 0.75;
     var DEFAULT_ADVENTURER_ENTRY_EDGE = 'left';
     var ADVENTURER_ENTRY_EDGES = ['left',
     'right',
     'top',
     'bottom'];
+    var ADVENTURER_WAVE_COUNT_TARGET = 3;
+    var ADVENTURER_WAVE_GAP_TICKS_MIN = 180;
+    var ADVENTURER_WAVE_GAP_TICKS_MAX = 300;
     var TICK_DT = 1 / 30;
     var TICK_MS = 33;
     var AGENT_MOVEMENT_RATE_MULTIPLIER = 2;
@@ -863,7 +866,7 @@ button:hover {
     var SEASONS_WITH_NO_RETURNING_ADVENTURERS_TO_WIN_ROUND = 4;
     var SEASONS_WITH_NO_RETURNING_TREASURE_TO_WIN_ROUND = 12;
     var DEFAULT_MONSTER_NUTRITION_REQUIREMENT = 10;
-    var DEFAULT_FOOD_COST_CREDITS = 1;
+    var DEFAULT_FOOD_COST_CREDITS = 0.5;
     var HUMAN_FOOD_VALUE = 1;
     var LARGE_MACROFAUNA_FOOD_VALUE = 10;
     var MACROFAUNA_COUNT_MIN = 0;
@@ -4052,19 +4055,26 @@ button:hover {
         static mapHeightForGrid(grid){
             return grid && Number.isFinite(grid.height) ? grid.height : MAP_HEIGHT;
         }
-        static treasureMinimumDistanceFromAdventurerEntry(grid){
-            return Math.min(World.mapWidthForGrid(grid), World.mapHeightForGrid(grid)) * TREASURE_MINIMUM_DISTANCE_FROM_ADVENTURER_ENTRY_FRACTION;
+        static treasureMapDepthForEntryEdge(grid, adventurerEntryEdge){
+            var entryEdge = adventurerEntryEdge || DEFAULT_ADVENTURER_ENTRY_EDGE;
+            if (entryEdge==='top' || entryEdge==='bottom'){
+                return World.mapHeightForGrid(grid);
+            }
+            return World.mapWidthForGrid(grid);
         }
-        static treasureDeepPlacementBoundary(grid){
-            return Math.min(World.mapWidthForGrid(grid), World.mapHeightForGrid(grid)) * TREASURE_DEEP_PLACEMENT_FRACTION;
+        static treasureMinimumDistanceFromAdventurerEntry(grid, adventurerEntryEdge){
+            return World.treasureMapDepthForEntryEdge(grid, adventurerEntryEdge) * TREASURE_MINIMUM_DISTANCE_FROM_ADVENTURER_ENTRY_FRACTION;
         }
-        static sampleTreasureDepthFromAdventurerEntry(rng, allowEdge, grid){
+        static treasureDeepPlacementBoundary(grid, adventurerEntryEdge){
+            return World.treasureMapDepthForEntryEdge(grid, adventurerEntryEdge) * TREASURE_DEEP_PLACEMENT_FRACTION;
+        }
+        static sampleTreasureDepthFromAdventurerEntry(rng, allowEdge, grid, adventurerEntryEdge){
             var edgeMargin = allowEdge ? 80 : 150;
-            var mapDepth = Math.min(World.mapWidthForGrid(grid), World.mapHeightForGrid(grid));
-            var nearLimit = Math.max(edgeMargin, World.treasureMinimumDistanceFromAdventurerEntry(grid));
+            var mapDepth = World.treasureMapDepthForEntryEdge(grid, adventurerEntryEdge);
+            var nearLimit = Math.max(edgeMargin, World.treasureMinimumDistanceFromAdventurerEntry(grid, adventurerEntryEdge));
             var farLimit = Math.max(nearLimit, mapDepth-edgeMargin);
-            var deepBoundary = Clamp(World.treasureDeepPlacementBoundary(grid), nearLimit, farLimit);
-            if (deepBoundary>nearLimit && rng.nextFloat()<TREASURE_NEAR_HALF_PLACEMENT_CHANCE){
+            var deepBoundary = Clamp(World.treasureDeepPlacementBoundary(grid, adventurerEntryEdge), nearLimit, farLimit);
+            if (deepBoundary>nearLimit && rng.nextFloat()<TREASURE_LOWER_DEPTH_ZONE_PLACEMENT_CHANCE){
                 return rng.range(nearLimit, deepBoundary);
             }
             return rng.range(deepBoundary, farLimit);
@@ -4074,7 +4084,7 @@ button:hover {
             var width = World.mapWidthForGrid(grid);
             var height = World.mapHeightForGrid(grid);
             var entryEdge = adventurerEntryEdge || DEFAULT_ADVENTURER_ENTRY_EDGE;
-            var depth = World.sampleTreasureDepthFromAdventurerEntry(rng, allowEdge, grid);
+            var depth = World.sampleTreasureDepthFromAdventurerEntry(rng, allowEdge, grid, entryEdge);
             if (entryEdge==='right'){
                 return {
                     x : width-depth,
@@ -4117,7 +4127,7 @@ button:hover {
             var entryEdge = adventurerEntryEdge || DEFAULT_ADVENTURER_ENTRY_EDGE;
             var width = World.mapWidthForGrid(grid);
             var height = World.mapHeightForGrid(grid);
-            var depth = World.treasureDeepPlacementBoundary(grid)+60+index * 35;
+            var depth = World.treasureDeepPlacementBoundary(grid, entryEdge)+60+index * 35;
             var lateralFraction = 0.35+0.07 * index;
             var lateralX = Clamp(width * lateralFraction, 150, width-150);
             var lateralY = Clamp(height * lateralFraction, 150, height-150);
@@ -4183,7 +4193,7 @@ button:hover {
                         x : Clamp(base.x+Math.cos(angle) * radius, margin, width-margin),
                         y : Clamp(base.y+Math.sin(angle) * radius, margin, height-margin)
                     } ;
-                    if (World.distanceFromAdventurerEntryEdge(candidate.x, candidate.y, adventurerEntryEdge, grid)<World.treasureMinimumDistanceFromAdventurerEntry(grid)){
+                    if (World.distanceFromAdventurerEntryEdge(candidate.x, candidate.y, adventurerEntryEdge, grid)<World.treasureMinimumDistanceFromAdventurerEntry(grid, adventurerEntryEdge)){
                         continue;
                     }
                     if (World.treasurePointIsValid(grid, things, candidate, minDistance, adventurerEntryEdge)){
@@ -12041,7 +12051,11 @@ button:hover {
                 monster.thermalState = thermal.state;
                 monster.thermalStress = thermal.stress;
             } , this);
-            this.adventurers = this.createAdventurers();
+            var generatedAdventurers = this.createAdventurers();
+            this.adventurers = [];
+            this.pendingAdventurers = [];
+            this.scheduleAdventurerWaves(generatedAdventurers);
+            this.spawnDueAdventurers();
             this.macrofauna = this.createMacrofauna();
             this.departedMacrofaunaTrails = [];
             this.wildMonsters = [];
@@ -12059,6 +12073,28 @@ button:hover {
             this.addEvent(World.seasonNameForNumber(this.seasonNumber).replace(/^./, function (c){
                 return c.toUpperCase();
             } )+' season '+this.seasonNumber+' raid started in world seed '+this.world.seed+'.');
+        }
+        scheduleAdventurerWaves(adventurers){
+            if (!adventurers || adventurers.length===0){ return; }
+            var waveCount = Math.min(ADVENTURER_WAVE_COUNT_TARGET, adventurers.length);
+            var waveSize = Math.max(1, Math.ceil(adventurers.length / waveCount));
+            var nextWaveTick = 0;
+            for (var i = 0; i<adventurers.length; i+=1){
+                if (i>0 && i % waveSize===0){ nextWaveTick+=this.rng.integer(ADVENTURER_WAVE_GAP_TICKS_MIN, ADVENTURER_WAVE_GAP_TICKS_MAX); }
+                adventurers[i].spawnTick = nextWaveTick;
+                this.pendingAdventurers.push(adventurers[i]);
+            }
+        }
+        spawnDueAdventurers(){
+            var spawnedWave = false;
+            for (var i = this.pendingAdventurers.length-1; i>=0; i-=1){
+                var adventurer = this.pendingAdventurers[i];
+                if ((adventurer.spawnTick || 0)>this.tickNumber){ continue; }
+                this.pendingAdventurers.splice(i, 1);
+                this.adventurers.push(adventurer);
+                spawnedWave = spawnedWave || (adventurer.spawnTick || 0)>0;
+            }
+            if (spawnedWave){ this.addEvent('A new wave of human adventurers entered the map.'); }
         }
         createAdventurers(){
             var treasureValue = this.world.getRemainingTreasureValue();
@@ -13022,6 +13058,7 @@ button:hover {
             }
             this.tickNumber+=1;
             this.spawnDueWildMonsters();
+            this.spawnDueAdventurers();
             this.purgeDepartedMacrofaunaTrails();
             this.purgeExpiredThrownProjectiles();
             this.purgeExpiredSoundEvents();
@@ -13304,6 +13341,10 @@ button:hover {
             } , this);
         }
         checkRaidEnd(){
+            if (this.pendingAdventurers && this.pendingAdventurers.length>0){
+                this.noActiveAdventurerSinceTick = null;
+                return;
+            }
             var active = this.adventurers.some(function (adventurer){
                 return adventurer.isActive();
             } );
@@ -14442,6 +14483,7 @@ button:hover {
         } );
         session.startSeason();
         var raid = session.currentRaid;
+        AddRegressionResult(results, 'Human raid population is scheduled in waves rather than all entering simultaneously', raid.pendingAdventurers.length>0 || raid.adventurers.length<=1, 'entered='+raid.adventurers.length+', pending='+(raid.pendingAdventurers ? raid.pendingAdventurers.length : 0));
         var deposit = session.world.treasureDeposits[0];
         var treasureType = deposit.treasureType;
         var beforeAmount = session.world.getTreasureBreakdown().remaining.byType[treasureType].amount;
@@ -14546,8 +14588,8 @@ button:hover {
                 treasurePlacementDeepHalfCount+=1;
             }
         }
-        AddRegressionResult(results, 'Treasure placement sampler never places treasure in the first third from adventurer entry', treasurePlacementAllDistantEnough, 'nearHalf='+treasurePlacementNearHalfCount+', deepHalf='+treasurePlacementDeepHalfCount);
-        AddRegressionResult(results, 'Treasure placement sampler strongly favours the far half of the map', treasurePlacementDeepHalfCount>treasurePlacementNearHalfCount * 4, 'nearHalf='+treasurePlacementNearHalfCount+', deepHalf='+treasurePlacementDeepHalfCount);
+        AddRegressionResult(results, 'Treasure placement sampler never places treasure before two thirds from adventurer entry', treasurePlacementAllDistantEnough, 'nearHalf='+treasurePlacementNearHalfCount+', deepHalf='+treasurePlacementDeepHalfCount);
+        AddRegressionResult(results, 'Treasure placement sampler centres its expected depth at three quarters of the map', treasurePlacementNearHalfCount>=700 && treasurePlacementNearHalfCount<=800 && treasurePlacementDeepHalfCount>=200 && treasurePlacementDeepHalfCount<=300, 'lowerZone='+treasurePlacementNearHalfCount+', upperZone='+treasurePlacementDeepHalfCount);
         var generatedTreasureDistantEnough = true;
         for (var placementSeed = 150000;
         placementSeed<150025;
@@ -14559,7 +14601,7 @@ button:hover {
                 }
             } );
             generatedTreasureDistantEnough = generatedTreasureDistantEnough && placementSession.world.treasureDeposits.every(function (placementDeposit){
-                return World.distanceFromAdventurerEntryEdge(placementDeposit.x, placementDeposit.y, placementSession.world.adventurerEntryEdge)>=World.treasureMinimumDistanceFromAdventurerEntry();
+                return World.distanceFromAdventurerEntryEdge(placementDeposit.x, placementDeposit.y, placementSession.world.adventurerEntryEdge)>=World.treasureMinimumDistanceFromAdventurerEntry(placementSession.world.terrainGrid, placementSession.world.adventurerEntryEdge);
             } );
         }
         AddRegressionResult(results, 'Generated treasure is never placed in the first third from adventurer entry', generatedTreasureDistantEnough, 'seeds=150000-150024');
