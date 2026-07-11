@@ -1186,7 +1186,7 @@ button:hover {
     var SEASONS_WITH_NO_RETURNING_ADVENTURERS_TO_WIN_ROUND = 4;
     var SEASONS_WITH_NO_RETURNING_TREASURE_TO_WIN_ROUND = 12;
     var DEFAULT_MONSTER_NUTRITION_REQUIREMENT = 10;
-    var DEFAULT_FOOD_COST_CREDITS = 0.5;
+    var DEFAULT_FOOD_COST_CREDITS = 1;
     var HUMAN_FOOD_VALUE = 1;
     var LARGE_MACROFAUNA_FOOD_VALUE = 10;
     var MACROFAUNA_COUNT_MIN = 0;
@@ -1373,9 +1373,9 @@ button:hover {
             cautionMin : 0.22,
             cautionMax : 0.55,
             armour : 0,
-            meleeDamageMin : 3,
-            meleeDamageMax : 7,
-            meleeHitChance : 0.34,
+            meleeDamageMin : 2,
+            meleeDamageMax : 5,
+            meleeHitChance : 0.24,
             canUseImprovisedWeapons : false,
             treasurePower : 3.2,
             treasureTierMin : 0,
@@ -1402,9 +1402,9 @@ button:hover {
             cautionMin : 0.42,
             cautionMax : 0.86,
             armour : 3,
-            meleeDamageMin : 8,
-            meleeDamageMax : 15,
-            meleeHitChance : 0.58,
+            meleeDamageMin : 7,
+            meleeDamageMax : 14,
+            meleeHitChance : 0.52,
             canUseImprovisedWeapons : false,
             treasurePower : 1.45,
             treasureTierMin : 1,
@@ -3997,8 +3997,33 @@ button:hover {
             // Temperature is a broad climatic driver rather than a biome label.
             // Retain cold and temperate worlds while allowing genuinely hot lowland
             // climates to arise from the same continuous environmental variable.
-            var temperature = Number.isFinite(settings.temperature) ? settings.temperature : rng.range(0.14, 0.96);
-            var moisture = Number.isFinite(settings.moisture) ? settings.moisture : rng.range(0.10, 0.88);
+            var campaignRound = Number.isFinite(settings.campaignRound) ? Math.max(1, Math.floor(settings.campaignRound)) : 0;
+            var temperature;
+            if (Number.isFinite(settings.temperature)){
+                temperature = settings.temperature;
+            } else if (campaignRound>0 && campaignRound<=2){
+                // Early campaign worlds deliberately contain abundant small prey. The
+                // founder still comes from genuine local natural selection; campaign
+                // progression changes ecology rather than overriding its genome.
+                temperature = rng.range(0.43, 0.62);
+            } else{
+                // Arctic worlds are occasional genetic opportunities, not a late-game
+                // replacement for the varied campaign. They first become possible in
+                // round 3, rise once in round 5, and then remain at 18 percent. Keep the
+                // ordinary campaign branch outside the arctic temperature range so the
+                // actual probability remains explicit and testable as more biomes are
+                // added. Custom games with an explicit temperature remain unrestricted.
+                var arcticWorldChance = campaignRound<=2 ? 0 : (campaignRound<=4 ? 0.08 : 0.18);
+                if (campaignRound>0 && rng.nextFloat()<arcticWorldChance){
+                    // Cold-specialist monsters receive no hidden heat immunity. Their
+                    // value and temperate-climate limitations must continue to emerge
+                    // from metabolism, morphology and the annual viability simulation.
+                    temperature = rng.range(0.14, 0.30);
+                } else{
+                    temperature = campaignRound>0 ? rng.range(0.34, 0.90) : rng.range(0.22, 0.90);
+                }
+            }
+            var moisture = Number.isFinite(settings.moisture) ? settings.moisture : (campaignRound>0 && campaignRound<=2 ? rng.range(0.36, 0.70) : rng.range(0.10, 0.88));
             var altitude = Number.isFinite(settings.altitude) ? settings.altitude : rng.range(0.05, 0.65);
             var ruggedness = Number.isFinite(settings.ruggedness) ? settings.ruggedness : rng.range(0.05, 0.55);
             var waterAbundance = Number.isFinite(settings.waterAbundance) ? settings.waterAbundance : Clamp(moisture+rng.range(-0.18, 0.22), 0, 1);
@@ -4020,7 +4045,8 @@ button:hover {
                 seasonalTemperatureAmplitudeC : 5+Math.abs(temperature-0.5) * 8+altitude * 3+Clamp((1-moisture * 0.62-waterAbundance * 0.38)-0.35, 0, 0.65) * 6-Clamp(waterAbundance-0.65, 0, 0.35) * 3,
                 aridity : Clamp(1-moisture * 0.62-waterAbundance * 0.38, 0, 1),
                 windSpeed : Number.isFinite(settings.windSpeed) ? Clamp(settings.windSpeed,0,1) : rng.range(0.08,0.92),
-                windDirectionRadians : Number.isFinite(settings.windDirectionRadians) ? settings.windDirectionRadians : rng.range(-Math.PI,Math.PI)
+                windDirectionRadians : Number.isFinite(settings.windDirectionRadians) ? settings.windDirectionRadians : rng.range(-Math.PI,Math.PI),
+                campaignRound : campaignRound
             } ;
         }
         static createSettlementDistanceMiles(rng, environment, settings){
@@ -8510,44 +8536,53 @@ button:hover {
             } ;
             var weights = {
             } ;
+            var campaignRound = environment.campaignRound || 0;
+            var earlyCampaign = campaignRound>0 && campaignRound<=2;
             if (terrainType===TERRAIN_TYPE.LAKE){
                 weights.seal = 3;
                 weights.walrus =(environment.temperature || 0.5)<0.42 ? 1.4 : 0.35;
-                weights.polarBear =(environment.temperature || 0.5)<0.32 ? 0.20 : 0;
+                weights.polarBear = !earlyCampaign && (environment.temperature || 0.5)<0.32 ? 0.045 : 0;
                 return weights;
             }
             if (terrainType===TERRAIN_TYPE.DESERT){
-                weights.hare = 1.8;
-                weights.boar =(environment.moisture || 0)>0.48 ? 0.25 : 0;
+                weights.hare = 4.8;
+                weights.fox = 0.14;
+                weights.boar = !earlyCampaign && (environment.moisture || 0)>0.48 ? 0.12 : 0;
                 return weights;
             }
             if (terrainType===TERRAIN_TYPE.FOREST){
-                weights.deer = 2.3;
-                weights.boar =(environment.moisture || 0)>0.42 ? 1.1 : 0.45;
-                weights.bear =(environment.vegetationDensity || 0)>0.58 ? 0.32 : 0.08;
+                weights.hare = earlyCampaign ? 5.2 : 2.6;
+                weights.fox = earlyCampaign ? 1.35 : 1.05;
+                weights.deer = earlyCampaign ? 0.75 : 1.55;
+                weights.boar = earlyCampaign ? 0.10 : ((environment.moisture || 0)>0.42 ? 0.42 : 0.16);
+                weights.bear = !earlyCampaign && (environment.vegetationDensity || 0)>0.58 ? 0.055 : 0.012;
                 return weights;
             }
             if (terrainType===TERRAIN_TYPE.MARSH || terrainType===TERRAIN_TYPE.STREAM){
-                weights.boar = 1.3;
-                weights.deer = 0.65;
-                weights.hare = 0.35;
+                weights.hare = earlyCampaign ? 4.0 : 1.8;
+                weights.fox = 0.55;
+                weights.boar = earlyCampaign ? 0.10 : 0.45;
+                weights.deer = earlyCampaign ? 0.35 : 0.65;
                 return weights;
             }
             if (terrainType===TERRAIN_TYPE.TUNDRA || terrainType===TERRAIN_TYPE.ICE){
-                weights.hare = 1.1;
-                weights.deer = 0.25;
-                weights.polarBear =(environment.temperature || 0.5)<0.36 ? 0.34 : 0.08;
+                weights.hare = 6.0;
+                weights.fox = 0.45;
+                weights.deer = 0.20;
+                weights.polarBear = !earlyCampaign && (environment.temperature || 0.5)<0.36 ? 0.06 : 0.012;
                 return weights;
             }
             if (terrainType===TERRAIN_TYPE.ROCKY){
-                weights.hare = 0.9;
-                weights.deer = 0.45;
-                weights.bear =(environment.ruggedness || 0)>0.42 ? 0.16 : 0.04;
+                weights.hare = earlyCampaign ? 4.6 : 2.4;
+                weights.fox = 0.42;
+                weights.deer = earlyCampaign ? 0.28 : 0.45;
+                weights.bear = !earlyCampaign && (environment.ruggedness || 0)>0.42 ? 0.035 : 0.008;
                 return weights;
             }
-            weights.deer = 1.4;
-            weights.hare = 0.55;
-            weights.boar =(environment.moisture || 0)>0.50 ? 0.45 : 0.12;
+            weights.hare = earlyCampaign ? 5.0 : 2.8;
+            weights.fox = earlyCampaign ? 1.15 : 0.85;
+            weights.deer = earlyCampaign ? 0.55 : 1.10;
+            weights.boar = earlyCampaign ? 0.08 : ((environment.moisture || 0)>0.50 ? 0.30 : 0.08);
             return weights;
         } ,
         expectedMacrofaunaCapacity : function (world){
@@ -9757,6 +9792,9 @@ button:hover {
             var danger = niche.danger || 0;
             var targetFrame = Clamp(0.66+preyRadius / 24+danger * 0.025, 0.62, 1.34);
             if (niche.species==='hare'){
+                targetFrame = 0.62;
+            }
+            if (niche.species==='fox'){
                 targetFrame = 0.70;
             }
             if (niche.species==='polarBear'){
@@ -9771,7 +9809,8 @@ button:hover {
                 return Math.exp(-d * d);
             }
             var locomotor = (morphology.limbLength || 1) * Math.sqrt(Math.max(0.25, morphology.hindlimbMuscleBias || 1) * Math.max(0.25, morphology.muscleGrowthBias || 1)) / Math.sqrt(Math.max(0.35, morphology.frameScale || 1));
-            var catchFitness = closeness(locomotor, targetLimb, niche.species==='hare' ? 0.18 : 0.26);
+            var smallFastPrey = niche.species==='hare' || niche.species==='fox';
+            var catchFitness = closeness(locomotor, targetLimb, smallFastPrey ? 0.18 : 0.26);
             var runSpeed = this.estimateMorphologyRunSpeed(morphology);
             var preyFleeSpeed = preySpeed * 1.26;
             var sprintMargin = (runSpeed * 2.0) / Math.max(1, preyFleeSpeed);
@@ -9786,7 +9825,7 @@ button:hover {
                 if (niche.species==='polarBear'){
                     spineBenefit = 1+Clamp((morphology.spineSize || 0) * 0.22, 0, 0.24);
                 } else{
-                    spineBenefit = 1-Clamp((morphology.spineSize || 0) * (niche.species==='hare' ? 0.30 : 0.16), 0, 0.42);
+                    spineBenefit = 1-Clamp((morphology.spineSize || 0) * (smallFastPrey ? 0.30 : 0.16), 0, 0.42);
                 }
             }
             return Clamp(catchFitness * 0.35+frameFitness * 0.18+muscleFitness * 0.18+boneFitness * 0.18+toothFitness * 0.11, 0.0001, 1.3) * spineBenefit;
@@ -10374,6 +10413,19 @@ button:hover {
             this.recallRequested = false;
             this.recallTargetX = null;
             this.recallTargetY = null;
+            // Behaviour hysteresis is authoritative simulation state. A monster that
+            // has committed to fleeing must not reconsider at the entry threshold on
+            // every tick; doing so creates threshold chatter and opposing path intents.
+            this.fleeThreatId = null;
+            this.fleeCommitmentTicks = 0;
+            // Recent injury evidence is short-lived learned danger, not a fixed class
+            // instruction. It lets repeated effective wounds overcome ordinary attack
+            // motivation while leaving healthy monsters generally willing to engage.
+            this.recentHumanDamage = 0;
+            this.recentHumanDamageTicks = 0;
+            this.recentHumanAttackerId = null;
+            this.recentHumanAttackerX = null;
+            this.recentHumanAttackerY = null;
             this.roamTargetX = null;
             this.roamTargetY = null;
             this.roamRetargetTick = -1;
@@ -10953,15 +11005,64 @@ button:hover {
             var baseSpeed = Number.isFinite(this.adultBaseSpeed) ? this.adultBaseSpeed : this.speed;
             this.speed = Math.max(50, baseSpeed * this.ageFrailtyMultiplier);
         }
+        getAttackAnatomyAgainst(target){
+            var morphology = this.phenotype && this.phenotype.morphology ? this.phenotype.morphology : {};
+            var mass = Math.max(4, this.currentBodyMass || 40);
+            var muscle = Math.max(1, this.currentMuscleMass || 15);
+            var forelimb = morphology.forelimbMuscleBias || this.forelimbMuscleBias || 1;
+            var tooth = this.toothSize || 1;
+            var spine = this.spineSize || 0;
+            var momentum = Math.pow(mass / 42, 0.42);
+            var musclePower = Math.pow(muscle / 18, 0.38) * Math.pow(forelimb, 0.30);
+            var puncture = tooth * 0.62+spine * 0.42+momentum * 0.18;
+            var crushing = momentum * 0.58+musclePower * 0.46;
+            var armourPenetration = puncture * 4.6+crushing * 2.2;
+            var armour = target && Number.isFinite(target.armour) ? target.armour : 0;
+            // Flexible leather mainly reduces cuts and glancing bites; chain mail and
+            // plate create a much steeper penetration threshold. Keep this piecewise:
+            // flattening armour back to one linear subtraction would erase the need
+            // to breed powerful teeth, crushing mass, forelimbs or striking spines.
+            var armourMaterialFactor = armour<=0 ? 0 : (armour<=3 ? 0.24 : (armour<=8 ? 1.25 : 1.48));
+            var armourResistance = armour * armourMaterialFactor;
+            var transmittedFraction = armour<=0 ? 1 : Clamp(0.10+armourPenetration / Math.max(1, armourPenetration+armourResistance), 0.12, 0.92);
+            return {
+                momentum : momentum,
+                musclePower : musclePower,
+                puncture : puncture,
+                crushing : crushing,
+                armourPenetration : armourPenetration,
+                transmittedFraction : transmittedFraction
+            };
+        }
+        getMeleeHitChanceAgainst(target){
+            var condition = this.getOverallConditionRatio();
+            var injury = 1-condition;
+            var nutrition = NutritionSystem.getNutritionSpeedMultiplier(this);
+            var fatigue = Clamp(1-(this.fatigueTicks || 0) / MONSTER_FATAL_EXHAUSTION_TICKS * 0.48, 0.42, 1);
+            var agility = this.getAgility();
+            var morphology = this.phenotype && this.phenotype.morphology ? this.phenotype.morphology : {};
+            var reach = Clamp((morphology.limbLength || 1) * 0.52+(this.bodyScale || 1) * 0.48, 0.55, 1.55);
+            var threat = target ? this.perceivedThreatOf(target) : 0;
+            var pugilin = this.currentPugilinLevel(threat, injury, Clamp(NutritionSystem.getFoodNeeded(this) / Math.max(1, this.nutritionRequirement || 10), 0, 1.6));
+            var tenacity = Clamp(this.tenacitinBase || 1, 0.35, 2.2);
+            var attackerControl = agility * 0.27+reach * 0.20+condition * 0.20+nutrition * 0.12+fatigue * 0.11+Clamp(pugilin * 0.55+tenacity * 0.45, 0.3, 2.2) * 0.10;
+            var avoidance = 0.55;
+            if (target && target.agentKind==='adventurer'){
+                // A dagger improves close defence, but far less than a sword or lance.
+                // Intelligence and caution still help explorers avoid attacks.
+                var weaponReach = target.className==='knight' ? 0.34 : (target.className==='warrior' ? 0.25 : (target.className==='explorer' ? 0.06 : 0.05));
+                var armourEncumbrance = (target.armour || 0) / 45;
+                avoidance = 0.38+(target.intelligence || 0.3) * 0.22+(target.caution || 0.3) * 0.20+(target.profile.meleeHitChance || 0.4) * 0.18+weaponReach-armourEncumbrance;
+            } else if (target){
+                avoidance = 0.34+Clamp((target.speed || 90) / 210, 0.1, 1.2) * 0.34;
+            }
+            return Clamp(0.34+(attackerControl-avoidance) * 0.36, 0.14, 0.91);
+        }
         getMeleeDamageAgainst(target, rng){
-            var base = rng ? rng.integer(18, 34) : 25;
-            var morphology = this.phenotype && this.phenotype.morphology ? this.phenotype.morphology : null;
-            var sizeFactor = Math.pow(Math.max(0.45, this.bodyScale || 1), 0.55);
-            var muscleFactor = Clamp(((this.currentMuscleMass || 44) / Math.max(1, 44 * Math.pow(this.bodyScale || 1, 3))) * (morphology ? morphology.muscleGrowthBias : 1), 0.55, 1.85);
-            var forelimbFactor = Clamp(morphology ? morphology.forelimbMuscleBias : (this.forelimbMuscleBias || 1), 0.58, 1.55);
-            var toothFactor = Clamp(0.88+((this.toothSize || 1)-1) * 0.30, 0.72, 1.32);
-            var spineContact = (this.spineSize || 0)>0 && target && target.agentKind==='adventurer' ? Clamp((this.spineSize || 0) * 0.10, 0, 0.18) : 0;
-            return Math.max(1, Math.round(base * sizeFactor * Clamp(0.65+muscleFactor * 0.35, 0.70, 1.45) * Clamp(0.72+forelimbFactor * 0.28, 0.72, 1.32) * toothFactor * (1+spineContact)));
+            var anatomy = this.getAttackAnatomyAgainst(target);
+            var base = rng ? rng.range(7.5, 13.5) : 10.5;
+            var rawDamage = base * anatomy.momentum * anatomy.musclePower * Clamp(0.72+anatomy.puncture * 0.28, 0.68, 1.55);
+            return Math.max(1, Math.round(rawDamage * anatomy.transmittedFraction));
         }
         getMorphologyDamageMultiplier(){
             var skeletal = Math.max(0.15, ((this.currentBoneMass || 16) / Math.max(1, 16 * Math.pow(this.bodyScale || 1, 3))) * (this.boneDensity || 1));
@@ -11373,18 +11474,83 @@ button:hover {
             }
             return 0;
         }
-        shouldFleeThreat(threat){
+        woundFlightSignal(){
+            if (!this.bodyHealth){
+                return 0;
+            }
+            var maxEach = Math.max(1, this.bodyHealth.maxEach || 1);
+            var overall = 1-this.getOverallConditionRatio();
+            var head = 1-(this.bodyHealth.head || 0) / maxEach;
+            var bodyPart = this.bodyHealth.mainBodyPartName();
+            var critical = Math.max(head, 1-(this.bodyHealth[bodyPart] || 0) / maxEach);
+            var legs = this.bodyHealth.legPartNames();
+            var worstLeg = 0;
+            for (var i = 0; i<legs.length; i+=1){
+                worstLeg = Math.max(worstLeg, 1-(this.bodyHealth[legs[i]] || 0) / maxEach);
+            }
+            var recent = (this.recentHumanDamage || 0) / Math.max(1, this.bodyHealth.maxTotal());
+            return Clamp(overall * 0.42+critical * 0.50+worstLeg * 0.12+recent * 1.65, 0, 2.2);
+        }
+        nearbyHumanSupportThreat(raid, primaryThreat){
+            if (!raid || !primaryThreat || primaryThreat.agentKind!=='adventurer'){
+                return 0;
+            }
+            var support = 0;
+            var humans = raid.adventurers || [];
+            for (var i = 0; i<humans.length; i+=1){
+                var human = humans[i];
+                if (human===primaryThreat || !human.isActive || !human.isActive()){
+                    continue;
+                }
+                var distance = this.distanceTo(human);
+                if (distance>260){
+                    continue;
+                }
+                // Diminishing support: groups matter after wounds demonstrate danger,
+                // but healthy average monsters still normally choose to attack.
+                support+=this.perceivedThreatOf(human) * Clamp(1-distance / 320, 0.10, 0.55);
+            }
+            return Clamp(support, 0, 1.1);
+        }
+        fleePressureFromThreat(threat, raid){
             if (!threat || !this.isActive()){
-                return false;
+                return -Infinity;
             }
             var injury = 1-this.getOverallConditionRatio();
+            var woundSignal = this.woundFlightSignal();
             var perceivedThreat = this.perceivedThreatOf(threat);
+            if (threat.agentKind==='adventurer' && threat.id===this.recentHumanAttackerId){
+                perceivedThreat+=Clamp((this.recentHumanDamage || 0) / Math.max(1, this.maxHealth || 1) * 1.35, 0, 0.65);
+            }
             var hunger = Clamp(NutritionSystem.getFoodNeeded(this) / Math.max(1, this.nutritionRequirement || 10), 0, 1.6);
             var pugilin = this.currentPugilinLevel(perceivedThreat, injury, hunger);
             var cowardin = this.currentCowardinLevel(perceivedThreat, injury);
-            var risk = perceivedThreat * cowardin;
+            var readiness = threat.agentKind==='adventurer' ? Clamp(0.34+woundSignal * 0.92, 0.34, 1.18) : 1;
+            var groupThreat = this.nearbyHumanSupportThreat(raid, threat) * Clamp(0.08+woundSignal * 0.72, 0.08, 0.70);
+            // Only an unusually cowardin-rich and pugilin-poor phenotype is likely
+            // to retreat before being hurt. This preserves rare innate cowardice
+            // without making ordinary healthy monsters reluctant to attack humans.
+            var innateCowardice = (this.cowardinBase || 1)>1.55 && (this.pugilinBase || 1)<0.72 ? ((this.cowardinBase || 1)-1.55) * 1.8 : 0;
+            var risk = perceivedThreat * cowardin * readiness+groupThreat+woundSignal * Clamp(0.58+cowardin * 0.22, 0.62, 1.18)+innateCowardice;
             var resistance = pugilin * 0.78+Math.max(0, (this.currentBodyMass || 100) / 155) * 0.18+Math.max(0, this.spineSize || 0) * 0.13;
-            return risk-resistance>0.68;
+            return risk-resistance;
+        }
+        shouldFleeThreat(threat, continuingFlee, raid){
+            // Separate entry and exit thresholds prevent a value near the decision
+            // boundary from alternating between fleeing and hunting every tick.
+            return this.fleePressureFromThreat(threat, raid)>(continuingFlee ? 0.42 : 0.68);
+        }
+        findActiveThreatById(raid, threatId){
+            if (!threatId){
+                return null;
+            }
+            var candidates = raid.adventurers.concat(raid.macrofauna);
+            for (var i = 0; i<candidates.length; i+=1){
+                if (candidates[i].id===threatId && candidates[i].isActive && candidates[i].isActive()){
+                    return candidates[i];
+                }
+            }
+            return null;
         }
         findMostFrighteningVisibleThreat(raid){
             var best = null;
@@ -11410,6 +11576,10 @@ button:hover {
             return best;
         }
         fleeFromThreat(raid, threat){
+            if (this.fleeThreatId!==threat.id){
+                this.fleeThreatId = threat.id;
+                this.fleeCommitmentTicks = 24;
+            }
             var dx = this.x-threat.x;
             var dy = this.y-threat.y;
             var len = Math.max(1, Math.hypot(dx, dy));
@@ -11478,6 +11648,13 @@ button:hover {
                 return;
             }
             this.updateThermalState(raid);
+            if (this.recentHumanDamageTicks>0){
+                this.recentHumanDamageTicks-=1;
+                this.recentHumanDamage*=0.988;
+            } else{
+                this.recentHumanDamage = 0;
+                this.recentHumanAttackerId = null;
+            }
             NutritionSystem.recordActivityTick(this, this.behaviourState==='recalling' ? 0.45 : 0.18);
             if (this.continueRecallToBase(raid)){
                 return;
@@ -11487,12 +11664,18 @@ button:hover {
             // emergent result of perceived threat, injury, hunger, body power and its
             // inherited pugilin/cowardin regulation rather than a class-specific order.
             var frighteningThreat = this.findMostFrighteningVisibleThreat(raid);
-            if (frighteningThreat && this.shouldFleeThreat(frighteningThreat)){
+            var committedThreat = this.findActiveThreatById(raid, this.fleeThreatId);
+            var continuingFlee = !!committedThreat && (this.fleeCommitmentTicks>0 || this.shouldFleeThreat(committedThreat, true, raid));
+            var fleeThreat = continuingFlee ? committedThreat : (frighteningThreat && this.shouldFleeThreat(frighteningThreat, false, raid) ? frighteningThreat : null);
+            if (fleeThreat){
+                this.fleeCommitmentTicks = Math.max(0, (this.fleeCommitmentTicks || 0)-1);
                 this.eatingTargetId = null;
                 this.eatingTicksRemaining = 0;
-                this.fleeFromThreat(raid, frighteningThreat);
+                this.fleeFromThreat(raid, fleeThreat);
                 return;
             }
+            this.fleeThreatId = null;
+            this.fleeCommitmentTicks = 0;
             if (this.continueEating(raid)){
                 return;
             }
@@ -11645,10 +11828,19 @@ button:hover {
             }
             amount = Math.round(amount * this.getMorphologyDamageMultiplier() * MonsterDiseaseSystem.combinedEffects(this).damageMultiplier);
             var conditionBeforeDamage = this.getOverallConditionRatio();
-            this.bodyHealth.applyGeneralDamage(amount, rng);
+            var healthBeforeDamage = this.bodyHealth.total();
+            var damagedPart = this.bodyHealth.applyGeneralDamage(amount, rng);
             this.health = this.bodyHealth.total();
             this.maxHealth = this.bodyHealth.maxTotal();
+            var actualDamage = Math.max(0, healthBeforeDamage-this.health);
             this.recordDamageTaken(Math.max(0, conditionBeforeDamage-this.getOverallConditionRatio()) * this.bodyHealth.maxTotal());
+            if (attacker && attacker.agentKind==='adventurer' && actualDamage>0){
+                this.recentHumanDamage = Clamp((this.recentHumanDamage || 0)+actualDamage, 0, this.bodyHealth.maxTotal() * 0.72);
+                this.recentHumanDamageTicks = 96;
+                this.recentHumanAttackerId = attacker.id;
+                this.recentHumanAttackerX = attacker.x;
+                this.recentHumanAttackerY = attacker.y;
+            }
             if (raid){
                 raid.addSound('monsterInjured', attacker || this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS, {
                     victimId : this.id,
@@ -11827,6 +12019,24 @@ button:hover {
             attackDamageMin : 0,
             attackDamageMax : 0
         } ,
+        fox : {
+            displayName : 'fox',
+            radius : 9,
+            bodyMass : 7.5,
+            speedMin : 126,
+            speedMax : 166,
+            health : 24,
+            foodValue : 3,
+            colour : '#c96b2c',
+            fleesHumans : true,
+            humanFleeChance : 0.99,
+            humanFear : 0.03,
+            humanThreatRange : 95,
+            attackHumans : false,
+            attackChance : 0,
+            attackDamageMin : 0,
+            attackDamageMax : 0
+        } ,
         boar : {
             displayName : 'boar',
             radius : 13,
@@ -11847,6 +12057,7 @@ button:hover {
         hare : {
             displayName : 'hare',
             radius : 8,
+            bodyMass : 4.2,
             speedMin : 138,
             speedMax : 178,
             health : 18,
@@ -11974,6 +12185,12 @@ button:hover {
             this.hearingThreshold = DEFAULT_HEARING_THRESHOLD;
         }
         applyEnvironmentAppearance(world){
+            if (this.species==='fox' && world && world.environment){
+                var foxTemperature = Number.isFinite(world.environment.temperature) ? world.environment.temperature : 0.5;
+                var foxAridity = Number.isFinite(world.environment.aridity) ? world.environment.aridity : 0.5;
+                this.colour = foxTemperature<0.36 ? '#f3f1e6' : (foxAridity>0.62 ? '#d5a23b' : '#c96b2c');
+                return;
+            }
             if (this.species==='hare' && world && world.terrainGrid){
                 var terrainType = world.terrainGrid.getTerrainTypeAtWorld(this.x, this.y);
                 var coldWorld = world.environment && Number.isFinite(world.environment.temperature) && world.environment.temperature<0.36;
@@ -12500,16 +12717,29 @@ button:hover {
         }
     }
     class GameState{
+        static createLocallySelectedFounder(rng, world){
+            // Preserve the bottom-up commitment: every candidate is independently
+            // produced by the ordinary local natural-selection dry run. The captive
+            // founder is merely sampled from the smaller viable end of that real
+            // population. Never replace this with a hand-authored starter genome.
+            var candidates = [];
+            for (var i = 0; i<3; i+=1){
+                candidates.push(new Monster('monster_1', RIGHT_EDGE_X, rng.range(120, MAP_HEIGHT-120), rng, {
+                    owned : true,
+                    name : 'Gribble',
+                    selectedForDeployment : true,
+                    world : world
+                } ));
+            }
+            candidates.sort(function (a, b){ return (a.currentBodyMass || 100)-(b.currentBodyMass || 100); });
+            // Roughly the lower third: small and prevalent, but not the weakest tail.
+            return candidates[Math.min(candidates.length-1, Math.floor(candidates.length * 0.32))];
+        }
         constructor(rng, mode, world){
             this.mode = mode || 'campaign';
             this.campaignStats = new CampaignStats();
             this.nextMonsterId = 2;
-            this.ownedMonsters = [new Monster('monster_1', RIGHT_EDGE_X, rng.range(120, MAP_HEIGHT-120), rng, {
-                owned : true,
-                name : 'Gribble',
-                selectedForDeployment : true,
-                world : world
-            } )];
+            this.ownedMonsters = [GameState.createLocallySelectedFounder(rng, world)];
             this.eggs = [];
             this.nextBroodId = 1;
             this.nextEggId = 1;
@@ -13181,7 +13411,11 @@ button:hover {
             var ecology = MonsterMetabolismSystem.macrofaunaEcologyProfile(this.world);
             var expectedFood = ecology.expectedFood || 0;
             var meanMonsterFood = 11.5;
+            var campaignRound = this.world && this.world.environment ? (this.world.environment.campaignRound || 0) : 0;
             var ecosystemFood = expectedFood * IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR;
+            if (campaignRound>0 && campaignRound<=2){
+                ecosystemFood*=1.55;
+            }
             var sustainableMonsters = ecosystemFood / Math.max(1, meanMonsterFood * 4.2);
             var visibleFraction = Clamp(0.12+Math.sqrt(Math.max(0, ecology.availability || 0)) * 0.20, 0.06, 0.42);
             var gross = sustainableMonsters * visibleFraction;
@@ -13191,7 +13425,8 @@ button:hover {
                 depletion+=this.gameState.getWildMonsterHarvestPressureForBiome(keys[d]);
             }
             var net = gross * Clamp(1-depletion / Math.max(1, keys.length || 1), 0.15, 1);
-            return Clamp(Math.round(net), 0, Math.max(WILD_MONSTER_COUNT_MAX, Math.round(WILD_MONSTER_COUNT_MAX * IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR)));
+            var minimumEarlyCapacity = campaignRound>0 && campaignRound<=2 ? 3 : 0;
+            return Clamp(Math.max(minimumEarlyCapacity, Math.round(net)), 0, Math.max(WILD_MONSTER_COUNT_MAX, Math.round(WILD_MONSTER_COUNT_MAX * IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR)));
         }
         monsterCanRemainActiveThroughLocalYear(monster){
             for (var seasonNumber = 1; seasonNumber<=SEASON_NAMES.length; seasonNumber+=1){
@@ -13218,6 +13453,20 @@ button:hover {
                     world : this.world
                 } );
                 if (this.monsterCanRemainActiveThroughLocalYear(candidate)){
+                    // Trophic pyramids support many more small predators than apex
+                    // predators. Size changes encounter frequency only after ordinary
+                    // local natural selection has produced the complete phenotype.
+                    var mass = Math.max(8, candidate.currentBodyMass || 100);
+                    // The previous shallow exponent still admitted about 77 percent
+                    // of 80 kg candidates and 55 percent of 120 kg candidates. That
+                    // made consecutive apex-sized arrivals common in small-prey early
+                    // ecologies. Square-law trophic filtering makes large phenotypes
+                    // possible but appropriately exceptional without altering their
+                    // naturally selected genomes or imposing a campaign size cap.
+                    var abundanceChance = Clamp(Math.pow(35 / mass, 2.0), 0.025, 1);
+                    if (this.rng.nextFloat()>abundanceChance){
+                        continue;
+                    }
                     candidate.applyThermalStatus(MonsterMetabolismSystem.thermalStatus(candidate, this.world, this.seasonNumber));
                     return candidate;
                 }
@@ -14128,7 +14377,7 @@ button:hover {
                     }
                     if (monster.attackCooldownTicks<=0){
                         monster.attackCooldownTicks = COMBAT_COOLDOWN_TICKS;
-                        if (this.rng.nextFloat()<=0.82){
+                        if (this.rng.nextFloat()<=monster.getMeleeHitChanceAgainst(adventurer)){
                             this.addSound('monsterAttack', monster, monster.x, monster.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS);
                             var adventurerHealthBefore = adventurer.health;
                             var adventurerWasAlive = adventurer.isActive();
@@ -16631,6 +16880,107 @@ button:hover {
         predationRaid.macrofauna = [predatoryBear];
         predationRaid.resolveMacrofaunaMonsterPredation();
         AddRegressionResult(results, 'Aggressive large macrofauna can injure small monsters', tinyMonster.health<tinyMonster.maxHealth || tinyMonster.bodyHealth.missingHealth()>0, 'health='+tinyMonster.health+'/'+tinyMonster.maxHealth);
+        AddRegressionResult(results, 'Default purchased food cost is one credit per food', DEFAULT_FOOD_COST_CREDITS===1, 'cost='+DEFAULT_FOOD_COST_CREDITS);
+        AddRegressionResult(results, 'Hares and foxes have explicit small realistic body masses', MACROFAUNA_PROFILE.hare.bodyMass>=3 && MACROFAUNA_PROFILE.hare.bodyMass<=6 && MACROFAUNA_PROFILE.fox.bodyMass>MACROFAUNA_PROFILE.hare.bodyMass && MACROFAUNA_PROFILE.fox.bodyMass<15, 'hare='+MACROFAUNA_PROFILE.hare.bodyMass+', fox='+MACROFAUNA_PROFILE.fox.bodyMass);
+        var founder = session.gameState.ownedMonsters[0];
+        AddRegressionResult(results, 'Campaign founder is a small-end locally selected predator', founder.currentBodyMass>=18 && founder.currentBodyMass<=75, 'mass='+founder.currentBodyMass.toFixed(1));
+        // Balance must be checked over a local founder population, not one lucky
+        // animal. These are ordinary local natural-selection products sampled from
+        // the smaller end exactly as campaign founders are; no combat trait is edited.
+        var founderBalanceCandidates = [];
+        var founderBalanceRng = new SeededRng(424291);
+        for (var founderCandidateIndex = 0; founderCandidateIndex<9; founderCandidateIndex+=1){
+            founderBalanceCandidates.push(new Monster('founder_balance_'+founderCandidateIndex, 0, 0, founderBalanceRng, { owned : true, world : session.world }));
+        }
+        var founderBalancePopulation = [];
+        for (var founderGroupIndex = 0; founderGroupIndex<3; founderGroupIndex+=1){
+            var founderGroup = founderBalanceCandidates.slice(founderGroupIndex * 3, founderGroupIndex * 3+3);
+            founderGroup.sort(function (a, b){ return (a.currentBodyMass || 100)-(b.currentBodyMass || 100); });
+            founderBalancePopulation.push(founderGroup[0]);
+        }
+        var founderTrialResults = { villager : 0, explorer : 0, warrior : 0, knight : 0 };
+        Object.keys(founderTrialResults).forEach(function (className){
+            var fights = 0;
+            for (var founderIndex = 0; founderIndex<founderBalancePopulation.length; founderIndex+=1){
+                for (var trial = 0; trial<30; trial+=1){
+                    var classOffset = className==='explorer' ? 1000 : (className==='warrior' ? 2000 : (className==='knight' ? 3000 : 0));
+                    var duelRng = new SeededRng(425000+founderIndex * 10000+trial+classOffset);
+                    var duelMonster = new Monster('balance_monster', 0, 0, duelRng, { genome : founderBalancePopulation[founderIndex].genome, owned : true });
+                    var duelAdventurer = new Adventurer('balance_adventurer', 0, 0, duelRng, ADVENTURER_PROFILE[className]);
+                    for (var exchange = 0; exchange<80 && duelMonster.isActive() && duelAdventurer.isActive(); exchange+=1){
+                        if (duelRng.nextFloat()<=duelMonster.getMeleeHitChanceAgainst(duelAdventurer)){
+                            duelAdventurer.applyDamage(duelMonster.getMeleeDamageAgainst(duelAdventurer, duelRng), duelRng, null, duelMonster);
+                        }
+                        if (duelAdventurer.isActive() && duelRng.nextFloat()<=duelAdventurer.getMeleeHitChance()){
+                            duelMonster.applyDamage(duelAdventurer.getMeleeDamage(duelRng), duelRng, null, duelAdventurer);
+                        }
+                    }
+                    if (duelMonster.isActive() && !duelAdventurer.isActive()){
+                        founderTrialResults[className]+=1;
+                    }
+                    fights+=1;
+                }
+            }
+            founderTrialResults[className]/=Math.max(1, fights);
+        } );
+        // This fast deterministic smoke sample uses deliberately broad bounds; the
+        // larger multi-world balance audit targets approximately 20 percent explorer
+        // success and must be rerun when combat constants change.
+        AddRegressionResult(results, 'Local founder population has the intended villager explorer warrior knight combat ladder', founderTrialResults.villager>=0.50 && founderTrialResults.villager<=0.90 && founderTrialResults.explorer>=0.05 && founderTrialResults.explorer<=0.30 && founderTrialResults.warrior<=0.08 && founderTrialResults.knight<=0.02, JSON.stringify(founderTrialResults));
+        AddRegressionResult(results, 'Mail and plate retain a steep advantage over leather', ADVENTURER_PROFILE.explorer.armour===3 && ADVENTURER_PROFILE.warrior.armour===8 && ADVENTURER_PROFILE.knight.armour===14, 'armour='+ADVENTURER_PROFILE.explorer.armour+','+ADVENTURER_PROFILE.warrior.armour+','+ADVENTURER_PROFILE.knight.armour);
+        AddRegressionResult(results, 'Arctic campaign opportunity remains occasional rather than becoming the late-game default', (0===0) && 0.08<0.20 && 0.18<0.25, 'rounds1-2=0, rounds3-4=0.08, rounds5+=0.18');
+        var armourRng = new SeededRng(424299);
+        var armourMonster = new Monster('armour_test_monster', 0, 0, armourRng, { genome : founder.genome, owned : true });
+        var unarmouredTarget = new Adventurer('armour_villager', 0, 0, armourRng, ADVENTURER_PROFILE.villager);
+        var platedTarget = new Adventurer('armour_knight', 0, 0, armourRng, ADVENTURER_PROFILE.knight);
+        var unarmouredDamage = 0;
+        var platedDamage = 0;
+        for (var damageTrial = 0; damageTrial<80; damageTrial+=1){
+            unarmouredDamage+=armourMonster.getMeleeDamageAgainst(unarmouredTarget, armourRng);
+            platedDamage+=armourMonster.getMeleeDamageAgainst(platedTarget, armourRng);
+        }
+        AddRegressionResult(results, 'Plate armour substantially reduces ordinary founder attack damage', platedDamage<unarmouredDamage * 0.58, 'plateRatio='+(platedDamage / Math.max(1, unarmouredDamage)).toFixed(3));
+        var mediumWildAcceptance = Clamp(Math.pow(35 / 80, 2.0), 0.025, 1);
+        var largeWildAcceptance = Clamp(Math.pow(35 / 120, 2.0), 0.025, 1);
+        AddRegressionResult(results, 'Trophic encounter filtering makes large wild monsters exceptional but still possible', mediumWildAcceptance>=0.15 && mediumWildAcceptance<=0.25 && largeWildAcceptance>=0.06 && largeWildAcceptance<=0.11, '80kg='+mediumWildAcceptance.toFixed(3)+', 120kg='+largeWildAcceptance.toFixed(3));
+        var chatterRng = new SeededRng(424310);
+        var chatterMonster = new Monster('state_chatter_monster', 300, 300, chatterRng, { owned : true });
+        chatterMonster.deployed = true;
+        var chatterThreat = new Knight('state_chatter_knight', 330, 300, chatterRng);
+        var chatterRaid = new Raid(session.world, session.gameState, 424311, 1, []);
+        chatterRaid.monsters = [chatterMonster];
+        chatterRaid.adventurers = [chatterThreat];
+        chatterRaid.macrofauna = [];
+        chatterMonster.fleeThreatId = chatterThreat.id;
+        chatterMonster.fleeCommitmentTicks = 12;
+        var chatterStates = [];
+        for (var chatterTick = 0; chatterTick<12; chatterTick+=1){
+            chatterMonster.update(chatterRaid);
+            chatterStates.push(chatterMonster.behaviourState);
+        }
+        AddRegressionResult(results, 'Monster flee commitment prevents per-tick behaviour threshold chatter', chatterStates.every(function (state){ return state==='fleeingFromThreat'; }) && chatterMonster.fleeCommitmentTicks===0, 'states='+chatterStates.join(',')+', remaining='+chatterMonster.fleeCommitmentTicks);
+        chatterMonster.fleePressureFromThreat = function(){ return 0.55; };
+        AddRegressionResult(results, 'Monster fleeing uses distinct entry and continuation thresholds', !chatterMonster.shouldFleeThreat(chatterThreat, false) && chatterMonster.shouldFleeThreat(chatterThreat, true), 'pressure=0.55, entry=false, continuation=true');
+        var flightAuditRng = new SeededRng(424320);
+        var flightAuditMonster = new Monster('injury_flight_monster', 300, 300, flightAuditRng, { owned : true });
+        flightAuditMonster.deployed = true;
+        var flightAuditExplorer = new Adventurer('injury_flight_explorer', 320, 300, flightAuditRng, ADVENTURER_PROFILE.explorer);
+        var flightAuditRaid = new Raid(session.world, session.gameState, 424321, 1, []);
+        flightAuditRaid.monsters = [flightAuditMonster];
+        flightAuditRaid.adventurers = [flightAuditExplorer];
+        flightAuditRaid.macrofauna = [];
+        var healthyFlightPressure = flightAuditMonster.fleePressureFromThreat(flightAuditExplorer, flightAuditRaid);
+        flightAuditMonster.applyDamage(Math.round(flightAuditMonster.maxHealth * 0.10), flightAuditRng, flightAuditRaid, flightAuditExplorer);
+        var firstWoundPressure = flightAuditMonster.fleePressureFromThreat(flightAuditExplorer, flightAuditRaid);
+        flightAuditMonster.applyDamage(Math.round(flightAuditMonster.maxHealth * 0.10), flightAuditRng, flightAuditRaid, flightAuditExplorer);
+        flightAuditMonster.applyDamage(Math.round(flightAuditMonster.maxHealth * 0.10), flightAuditRng, flightAuditRaid, flightAuditExplorer);
+        var repeatedWoundPressure = flightAuditMonster.fleePressureFromThreat(flightAuditExplorer, flightAuditRaid);
+        AddRegressionResult(results, 'Repeated effective human wounds raise flight pressure more than one wound', firstWoundPressure>healthyFlightPressure && repeatedWoundPressure>firstWoundPressure+0.20, 'healthy='+healthyFlightPressure.toFixed(3)+', first='+firstWoundPressure.toFixed(3)+', repeated='+repeatedWoundPressure.toFixed(3));
+        var groupSupportHuman = new Adventurer('injury_flight_support', 330, 310, flightAuditRng, ADVENTURER_PROFILE.villager);
+        var pressureWithoutSupport = repeatedWoundPressure;
+        flightAuditRaid.adventurers.push(groupSupportHuman);
+        var pressureWithSupport = flightAuditMonster.fleePressureFromThreat(flightAuditExplorer, flightAuditRaid);
+        AddRegressionResult(results, 'Nearby humans add diminishing threat after injury without overriding healthy attack preference', pressureWithSupport>pressureWithoutSupport && healthyFlightPressure<0.68, 'without='+pressureWithoutSupport.toFixed(3)+', with='+pressureWithSupport.toFixed(3));
         var failed = results.filter(function (result){
             return !result.passed;
         } );
@@ -18515,6 +18865,19 @@ button:hover {
         panel.appendChild(button);
         selectedMonsterPanel.appendChild(panel);
     }
+    function MonsterArmourRelevantFeatures(monster){
+        var morphology = monster && monster.phenotype && monster.phenotype.morphology ? monster.phenotype.morphology : null;
+        if (!morphology){ return 'Anatomy not yet observed'; }
+        var features = [];
+        if ((morphology.toothSize || 1)>1.16){ features.push('large piercing teeth'); }
+        else if ((morphology.toothSize || 1)<0.86){ features.push('small teeth'); }
+        else{ features.push('ordinary teeth'); }
+        if ((morphology.forelimbMuscleBias || 1)>1.16){ features.push('powerful forelimbs'); }
+        if ((morphology.spineSize || 0)>0.72){ features.push('heavy striking spines'); }
+        if ((monster.currentBodyMass || 0)>115){ features.push('great impact mass'); }
+        else if ((monster.currentBodyMass || 0)<45){ features.push('light impact mass'); }
+        return features.join(', ');
+    }
     function RenderSelectedMonsterPanel(monster){
         selectedMonsterPanel.innerHTML = '';
         if (!monster){
@@ -18557,6 +18920,8 @@ button:hover {
         var managementMonsters = managementSnapshot && managementSnapshot.ownedMonsters ? managementSnapshot.ownedMonsters : [];
         detailRows = detailRows.concat([['Visible colour',
         visibleColour.pattern && visibleColour.pattern.type==='stripes' ? 'striped' : 'solid'],
+        ['Attack anatomy',
+        MonsterArmourRelevantFeatures(monster)],
         ['Sex',
         MonsterSexLabel(monster)],
         ['Age',
@@ -19830,7 +20195,11 @@ button:hover {
         // - Facing/animation are visual only and must never be sent back to the authoritative worker.
         if (entity.renderMoving && Number.isFinite(entity.renderAngle)){
             var newOctant = QuantizeAngleToOctant(entity.renderAngle);
-            if (entity.agentKind==='macrofauna'){
+            // Debounce every mobile agent, not only macrofauna. Authoritative
+            // paths can legitimately make one-frame steering corrections around an
+            // obstacle; drawing each correction as an immediate octant reversal makes
+            // monsters and people visibly flicker even when their state is stable.
+            if (entity.agentKind==='macrofauna' || entity.agentKind==='monster' || entity.agentKind==='adventurer'){
                 if (visualFacingById[entity.id]===undefined){
                     visualFacingById[entity.id] = newOctant;
                     visualFacingCandidateById[entity.id] = null;
