@@ -774,6 +774,45 @@ button:hover {
     color: white;
 }
 
+#monsterTransferOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(2,6,23,0.94);
+    color: #f9fafb;
+}
+#monsterTransferOverlay.dialogHidden { display: none; }
+#monsterTransferPanel {
+    width: min(780px, calc(100vw - 2rem));
+    max-height: min(820px, calc(100vh - 2rem));
+    overflow: auto;
+    border: 1px solid #475569;
+    border-radius: 0.85rem;
+    padding: 1rem;
+    background: #111827;
+    box-shadow: 0 18px 60px rgba(0,0,0,0.65);
+    box-sizing: border-box;
+}
+#monsterTransferPanel h2, #monsterTransferPanel h3 { margin: 0 0 0.45rem; }
+#monsterTransferStatus { min-height: 1.3rem; color: #fcd34d; white-space: pre-line; }
+.monsterTransferGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+.monsterTransferSection { border: 1px solid #334155; border-radius: 0.55rem; padding: 0.75rem; background: #020617; }
+.monsterTransferSection select, .monsterTransferSection input { width: 100%; box-sizing: border-box; margin: 0.4rem 0 0.6rem; }
+.monsterExportList { max-height: 18rem; overflow: auto; border: 1px solid #334155; border-radius: 0.4rem; margin: 0.45rem 0 0.7rem; }
+.monsterExportChoice { display: flex; gap: 0.55rem; align-items: center; padding: 0.48rem 0.55rem; cursor: pointer; border-bottom: 1px solid #1e293b; }
+.monsterExportChoice:last-child { border-bottom: 0; }
+.monsterExportChoice:hover { background: #172033; }
+.monsterExportChoice input { width: auto; margin: 0; }
+#monsterExportToolbar { margin-top: 0.35rem; }
+#monsterTransferPanel.advancedCampaignSetup #monsterExportSection { display: none; }
+#monsterTransferPanel.advancedCampaignSetup .monsterTransferGrid { grid-template-columns: 1fr; }
+#monsterTransferPanel.advancedCampaignSetup #monsterImportSection { width: 100%; box-sizing: border-box; }
+#monsterTransferActions { display: flex; justify-content: flex-end; margin-top: 0.8rem; }
+@media (max-width: 650px) { .monsterTransferGrid { grid-template-columns: 1fr; } }
+
 #gameToast {
     position: fixed;
     left: 50%;
@@ -973,6 +1012,8 @@ button:hover {
 </aside>
 </div>
 <div id="managementActions">
+<button id="openMonsterTransferButton" type="button">Import / Export Monsters</button>
+
 <span id="managementHint" class="hint">
 </span>
 </div>
@@ -1015,6 +1056,7 @@ button:hover {
 <button id="resumeGameMenuButton" type="button" disabled>Resume game</button>
 <button id="tutorialMenuButton" type="button" disabled>Tutorial - coming soon</button>
 <button id="campaignMenuButton" type="button">Campaign</button>
+<button id="advancedCampaignMenuButton" type="button">Advanced Campaign</button>
 <button id="quickGameMenuButton" type="button">Quick Game</button>
 <button id="customGameMenuButton" type="button">Custom Game</button>
 <button id="optionsMenuButton" type="button" disabled>Options - coming soon</button>
@@ -1083,6 +1125,30 @@ button:hover {
 <button id="cancelFoodShortageButton" type="button">Cancel</button>
 <button id="startUnderfedSeasonButton" type="button">Sell selected treasure and start season</button>
 </div>
+</div>
+</div>
+<div id="monsterTransferOverlay" class="dialogHidden" role="dialog" aria-modal="true" aria-labelledby="monsterTransferTitle">
+<div id="monsterTransferPanel">
+<h2 id="monsterTransferTitle">Monster Import / Export</h2>
+<p>Share complete authoritative monster records as versioned JSON files. Import and export are available only between seasons.</p>
+<div class="monsterTransferGrid">
+<section id="monsterExportSection" class="monsterTransferSection">
+<h3>Export monsters</h3>
+<div id="monsterExportToolbar"><button id="selectAllMonsterExportsButton" type="button">Select all</button> <button id="clearMonsterExportsButton" type="button">Clear</button></div>
+<div id="monsterExportList" class="monsterExportList" role="group" aria-label="Monsters to export"></div>
+<button id="exportMonsterButton" type="button">Export selected monsters</button>
+<p id="monsterExportAvailabilityMessage">Select one or more monsters, then choose a destination folder.</p>
+</section>
+<section id="monsterImportSection" class="monsterTransferSection">
+<h3>Import monsters</h3>
+<label for="monsterImportFile">Choose one or more monster JSON files</label>
+<input id="monsterImportFile" type="file" accept="application/json,.json" multiple>
+<p>Choosing files immediately starts the import; no second button is required.</p>
+<p id="monsterImportAvailabilityMessage">The imported monster receives a new local identity, retaining its genome, age, health, fertility, pedigree summary and appearance-generating state.</p>
+</section>
+</div>
+<p id="monsterTransferStatus" aria-live="assertive"></p>
+<div id="monsterTransferActions"><button id="closeMonsterTransferButton" type="button">Return to Monster Management</button></div>
 </div>
 </div>
 <div id="saveLoadOverlay" class="dialogHidden" role="dialog" aria-modal="true" aria-labelledby="saveLoadTitle">
@@ -1190,7 +1256,7 @@ button:hover {
     // Save format versions are independent of the worker message protocol. Each
     // future incompatible state change must add a migration from the preceding
     // format instead of changing old save data in place.
-    var SAVE_FORMAT_VERSION = 1;
+    var SAVE_FORMAT_VERSION = 2;
     var MIN_SUPPORTED_SAVE_FORMAT_VERSION = 1;
     var REFERENCE_MAP_WIDTH = 1800;
     var REFERENCE_MAP_HEIGHT = 1200;
@@ -13200,13 +13266,16 @@ button:hover {
         constructor(rng, mode, world){
             this.mode = mode || 'campaign';
             this.campaignStats = new CampaignStats();
-            this.nextMonsterId = 2;
-            this.ownedMonsters = [GameState.createLocallySelectedFounder(rng, world)];
+            this.nextMonsterId = mode==='advancedCampaign' ? 1 : 2;
+            this.ownedMonsters = mode==='advancedCampaign' ? [] : [GameState.createLocallySelectedFounder(rng, world)];
             this.eggs = [];
             this.nextBroodId = 1;
             this.nextEggId = 1;
             this.familyTree = {};
-            this.recordFamilyMonster(this.ownedMonsters[0]);
+            this.importedMonsterTransferIds = [];
+            if (this.ownedMonsters.length>0){
+                this.recordFamilyMonster(this.ownedMonsters[0]);
+            }
             this.foodExpenditureCredits = 0;
             this.roundFoodExpenditureCredits = 0;
             this.excessMeatFood = 0;
@@ -13229,6 +13298,33 @@ button:hover {
             return this.ownedMonsters.filter(function (monster){
                 return monster.alive;
             } );
+        }
+        addImportedMonster(monster){
+            if (!(monster instanceof Monster)){
+                return { ok:false, reason:'The transfer does not contain a valid monster.' };
+            }
+            var originalId = monster.id;
+            monster.id = this.createMonsterId('imported_monster');
+            monster.importedSourceId = originalId || null;
+            monster.owned = true;
+            monster.collared = true;
+            monster.deployed = false;
+            monster.selectedForDeployment = false;
+            monster.recallRequested = false;
+            monster.capturedThisRaid = false;
+            monster.x = RIGHT_EDGE_X;
+            monster.y = MAP_HEIGHT / 2;
+            monster.path = [];
+            monster.pathIndex = 0;
+            monster.pathIntentKey = '';
+            monster.targetId = null;
+            monster.alive = monster.alive!==false;
+            if (!monster.alive){
+                return { ok:false, reason:'Dead monsters cannot be imported into the captive roster.' };
+            }
+            this.ownedMonsters.push(monster);
+            this.recordFamilyMonster(monster);
+            return { ok:true, monsterId:monster.id, monsterName:monster.name };
         }
         releaseOwnedMonster(monsterId, world){
             var index = this.ownedMonsters.findIndex(function (monster){
@@ -15300,8 +15396,17 @@ button:hover {
             this.roundRemains = [];
             this.pendingEvents = [{
                 tickNumber : 0,
-                text : (this.mode==='campaign' ? 'Campaign' : 'Single game')+' created. Choose monsters for round 1 season 1.'
+                text : (this.mode==='advancedCampaign' ? 'Advanced campaign created. Import the founding brood before starting season 1.' : (this.mode==='campaign' ? 'Campaign created. Choose monsters for round 1 season 1.' : 'Single game created. Choose monsters for round 1 season 1.'))
             } ];
+        }
+        isCampaignMode(){
+            return this.mode==='campaign' || this.mode==='advancedCampaign';
+        }
+        effectiveCampaignRound(){
+            if (this.mode==='advancedCampaign'){
+                return 6+Math.floor((this.roundNumber-1) * 1.5);
+            }
+            return this.roundNumber;
         }
         getWorldOptions(baseOptions){
             var result = Object.assign({
@@ -15311,16 +15416,90 @@ button:hover {
                 result.adventurerEntryEdge = this.adventurerEntryEdge;
             }
             if (!result.mapSizeKey){
-                if (this.mode==='campaign'){
-                    result.mapSizeKey = World.campaignMapSizeKeyForRound(this.roundNumber);
+                if (this.isCampaignMode()){
+                    result.mapSizeKey = World.campaignMapSizeKeyForRound(this.effectiveCampaignRound());
                 } else{
                     result.mapSizeKey = 'quick';
                 }
             }
-            if (this.mode==='campaign'){
-                result.campaignRound = this.roundNumber;
+            if (this.isCampaignMode()){
+                result.campaignRound = this.effectiveCampaignRound();
             }
             return result;
+        }
+        exportMonster(monsterId){
+            if (this.phase==='raid'){
+                return { ok:false, reason:'Monsters can be exported only between seasons.' };
+            }
+            if (this.mode==='advancedCampaign' && this.roundNumber===1 && this.seasonNumber===1 && this.phase==='management'){
+                return { ok:false, reason:'Monsters cannot be exported during advanced campaign setup.' };
+            }
+            var monster = this.gameState.findOwnedMonster(monsterId);
+            if (!monster || !monster.alive){
+                return { ok:false, reason:'No living captive monster has that id.' };
+            }
+            return { ok:true, transfer:CreateMonsterTransferRecord(monster) };
+        }
+        exportMonsters(monsterIds){
+            if (!Array.isArray(monsterIds) || monsterIds.length===0){
+                return { ok:false, reason:'Select at least one monster to export.' };
+            }
+            var transfers=[];
+            for (var i=0; i<monsterIds.length; i+=1){
+                var result=this.exportMonster(monsterIds[i]);
+                if (!result.ok){ return result; }
+                transfers.push(result.transfer);
+            }
+            return { ok:true, transfers:transfers };
+        }
+        importMonster(transferRecord){
+            if (this.phase==='raid'){
+                return { ok:false, reason:'Monsters can be imported only between seasons.' };
+            }
+            if (this.mode==='campaign'){
+                return { ok:false, reason:'Monster import is disabled in a standard campaign.' };
+            }
+            if (this.mode==='advancedCampaign' && !(this.roundNumber===1 && this.seasonNumber===1 && this.phase==='management')){
+                return { ok:false, reason:'Advanced campaign monsters can be imported only before the first season begins.' };
+            }
+            try{
+                var transferId=MonsterTransferFingerprint(transferRecord);
+                if (!Array.isArray(this.gameState.importedMonsterTransferIds)){
+                    this.gameState.importedMonsterTransferIds=[];
+                }
+                if (this.mode==='advancedCampaign' && this.gameState.importedMonsterTransferIds.indexOf(transferId)>=0){
+                    return { ok:false, reason:'This monster has already been imported into this advanced campaign.' };
+                }
+                var monster = RestoreMonsterTransferRecord(transferRecord);
+                // Thermal deployment status is current-world state, not portable
+                // monster state. Recalculate it for this map and season before the
+                // imported monster enters the captive roster.
+                monster.localWorldSeed = this.world.seed;
+                monster.applyThermalStatus(MonsterMetabolismSystem.thermalStatus(monster, this.world, this.seasonNumber));
+                var result = this.gameState.addImportedMonster(monster);
+                if (result.ok){
+                    if (this.mode==='advancedCampaign'){
+                        this.gameState.importedMonsterTransferIds.push(transferId);
+                    }
+                    this.pendingEvents.push({ tickNumber:0, text:result.monsterName+' was imported into the captive brood.' });
+                }
+                return result;
+            } catch (error){
+                return { ok:false, reason:String(error && error.message ? error.message : error) };
+            }
+        }
+        importMonsters(transferRecords){
+            if (!Array.isArray(transferRecords) || transferRecords.length===0){
+                return { ok:false, reason:'No monster files were selected.' };
+            }
+            var imported=[];
+            var rejected=[];
+            transferRecords.forEach(function(record,index){
+                var result=this.importMonster(record);
+                if (result.ok){ imported.push(result); }
+                else{ rejected.push({ index:index, name:record && record.displayName ? record.displayName : 'File '+(index+1), reason:result.reason }); }
+            },this);
+            return { ok:imported.length>0, imported:imported, rejected:rejected, reason:imported.length ? '' : rejected.map(function(item){return item.name+': '+item.reason;}).join('\n') };
         }
         tick(){
             if (!this.paused && this.currentRaid && this.phase==='raid'){
@@ -15420,7 +15599,7 @@ button:hover {
             this.currentRaid = null;
             if (this.roundEnded){
                 this.recordCompletedRound(summary);
-                if (this.mode==='campaign'){
+                if (this.isCampaignMode()){
                     this.phase = 'roundEnded';
                     this.pendingEvents.push({
                         tickNumber : finishedTickNumber,
@@ -18019,10 +18198,11 @@ button:hover {
         var migrated = saveRecord;
         while (migrated.formatVersion<SAVE_FORMAT_VERSION){
             if (migrated.formatVersion===1){
-                // Add a version 1 to 2 migration here when format version 2 is
-                // introduced. Migrations must return a new record and advance by
-                // exactly one version.
-                throw new Error('No migration is registered for save format '+migrated.formatVersion+'.');
+                // Version 2 adds optional transfer provenance state. The object
+                // graph itself remains readable; missing fields are normalised
+                // after deserialisation rather than rewriting graph references.
+                migrated = Object.assign({},migrated,{ formatVersion:2, minimumReaderVersion:1 });
+                continue;
             }
             throw new Error('No migration is registered for save format '+migrated.formatVersion+'.');
         }
@@ -18065,9 +18245,123 @@ button:hover {
             payload : SerializeAuthoritativeGameSession(session)
         } ;
     }
+    function NormaliseLoadedGameSession(session){
+        // Defaults for fields introduced after the first public save schema.
+        // Keep this idempotent so that both migrated and current saves use the
+        // same restoration path.
+        if (!Array.isArray(session.gameState.importedMonsterTransferIds)){
+            session.gameState.importedMonsterTransferIds=[];
+        }
+        if (!session.mode){ session.mode='campaign'; }
+        if (!session.baseWorldOptions || typeof session.baseWorldOptions!=='object'){
+            session.baseWorldOptions={};
+        }
+        if (!Number.isFinite(session.roundNumber)){ session.roundNumber=1; }
+        if (!Number.isFinite(session.seasonNumber)){ session.seasonNumber=1; }
+        if (!session.phase){ session.phase=session.currentRaid ? 'raid' : 'management'; }
+        session.gameState.mode=session.gameState.mode || session.mode;
+        session.gameState.ownedMonsters.forEach(function(monster){
+            if (monster.importedSourceId===undefined){ monster.importedSourceId=null; }
+            if (monster.portableTransferId===undefined){ monster.portableTransferId=null; }
+        });
+        return session;
+    }
     function RestoreSaveRecord(saveRecord){
         var migrated = MigrateSavePayload(saveRecord);
-        return DeserializeAuthoritativeGameSession(migrated.payload);
+        return NormaliseLoadedGameSession(DeserializeAuthoritativeGameSession(migrated.payload));
+    }
+    var MONSTER_TRANSFER_FORMAT_VERSION = 1;
+    function SerializeMonsterObjectGraph(monster){
+        var seen = new Map();
+        var nodes = [];
+        function encode(value){
+            if (value===null || typeof value==='string' || typeof value==='boolean'){ return value; }
+            if (typeof value==='number'){ return EncodeSaveNumber(value); }
+            if (typeof value==='undefined'){ return { undefinedValue:true }; }
+            if (typeof value==='function'){ return { omittedFunction:true }; }
+            if (seen.has(value)){ return { referenceId:seen.get(value) }; }
+            var id = nodes.length;
+            if (id>=5000){ throw new Error('Monster transfer is too complex.'); }
+            seen.set(value,id);
+            var node={ type:Array.isArray(value)?'Array':((value.constructor&&value.constructor.name)||'Object'), properties:{} };
+            nodes.push(node);
+            Object.keys(value).forEach(function(key){
+                if (key==='__proto__' || key==='prototype' || key==='constructor'){ return; }
+                if (typeof value[key]!=='function'){ node.properties[key]=encode(value[key]); }
+            });
+            return { referenceId:id };
+        }
+        return { root:encode(monster), nodes:nodes };
+    }
+    function DeserializeMonsterObjectGraph(graph){
+        if (!graph || !graph.root || !Array.isArray(graph.nodes) || graph.nodes.length===0 || graph.nodes.length>5000){
+            throw new Error('The monster transfer contains an invalid object graph.');
+        }
+        var registry=SaveTypeRegistry();
+        var objects=graph.nodes.map(function(node){
+            if (!node || typeof node.type!=='string' || !node.properties || typeof node.properties!=='object' || Object.keys(node.properties).length>2000){
+                throw new Error('The monster transfer contains an invalid object node.');
+            }
+            if (node.type==='Array'){ return []; }
+            if (node.type==='Object'){ return {}; }
+            var constructorFunction=registry[node.type];
+            if (!constructorFunction){ throw new Error('The monster transfer uses an unknown game type: '+node.type); }
+            return Object.create(constructorFunction.prototype);
+        });
+        function decode(value){
+            if (value===null || typeof value!=='object'){ return value; }
+            if (value.referenceId!==undefined){
+                if (!Number.isInteger(value.referenceId) || value.referenceId<0 || value.referenceId>=objects.length){ throw new Error('The monster transfer contains an invalid object reference.'); }
+                return objects[value.referenceId];
+            }
+            if (value.undefinedValue || value.omittedFunction){ return undefined; }
+            return DecodeSaveNumber(value);
+        }
+        graph.nodes.forEach(function(node,index){
+            Object.keys(node.properties).forEach(function(key){
+                if (key!=='__proto__' && key!=='prototype' && key!=='constructor'){ objects[index][key]=decode(node.properties[key]); }
+            });
+        });
+        var monster=decode(graph.root);
+        if (!(monster instanceof Monster) || !(monster.genome instanceof Genome) || !monster.bodyHealth){
+            throw new Error('The transfer does not contain a complete Monster record.');
+        }
+        return monster;
+    }
+    function MonsterTransferFingerprint(record){
+        if (record && typeof record.transferId==='string' && record.transferId){
+            return record.transferId;
+        }
+        var source=JSON.stringify(record && record.payload ? record.payload : record || {});
+        var hash=2166136261;
+        for (var i=0; i<source.length; i+=1){
+            hash^=source.charCodeAt(i);
+            hash=Math.imul(hash,16777619);
+        }
+        return 'legacy-'+(hash>>>0).toString(16)+'-'+source.length;
+    }
+    function CreateMonsterTransferRecord(monster){
+        if (!monster.portableTransferId){
+            monster.portableTransferId='monster-'+Date.now().toString(36)+'-'+Math.floor(Math.random()*0x100000000).toString(36)+'-'+String(monster.id || 'unknown');
+        }
+        return {
+            transferKind:'monster-breeder-monster',
+            formatVersion:MONSTER_TRANSFER_FORMAT_VERSION,
+            createdBy:'Monster Breeder',
+            transferId:monster.portableTransferId,
+            displayName:monster.name,
+            exportedAt:new Date().toISOString(),
+            payload:SerializeMonsterObjectGraph(monster)
+        };
+    }
+    function RestoreMonsterTransferRecord(record){
+        if (!record || record.transferKind!=='monster-breeder-monster'){
+            throw new Error('This is not a Monster Breeder monster transfer file.');
+        }
+        if (record.formatVersion!==MONSTER_TRANSFER_FORMAT_VERSION){
+            throw new Error('Unsupported monster transfer format version.');
+        }
+        return DeserializeMonsterObjectGraph(record.payload);
     }
     var gameSession = null;
     var intervalId = 0;
@@ -18255,6 +18549,15 @@ button:hover {
                         reason : breedResult.reason
                     }
                 } );
+                SendSnapshotAndEvents(command.messageId);
+                break;
+            case 'EXPORT_MONSTERS' : EnsureGameSession();
+                var exportResult = gameSession.exportMonsters(command.payload && command.payload.monsterIds);
+                Post(exportResult.ok ? { replyTo:command.messageId, type:'MONSTER_EXPORT_DATA', payload:{ transfers:exportResult.transfers } } : { replyTo:command.messageId, type:'COMMAND_REJECTED', payload:{ reason:exportResult.reason } });
+                break;
+            case 'IMPORT_MONSTERS' : EnsureGameSession();
+                var importResult = gameSession.importMonsters(command.payload && command.payload.transfers);
+                Post(importResult.ok ? { replyTo:command.messageId, type:'MONSTER_IMPORT_ACCEPTED', payload:importResult } : { replyTo:command.messageId, type:'COMMAND_REJECTED', payload:{ reason:importResult.reason } });
                 SendSnapshotAndEvents(command.messageId);
                 break;
             case 'CAPTURE_WILD_MONSTER' : EnsureGameSession();
@@ -18460,6 +18763,18 @@ button:hover {
     monsterTooltip = document.getElementById('monsterTooltip'),
     monsterManagementTab = document.getElementById('monsterManagementTab'),
     closeManagementButton = document.getElementById('closeManagementButton'),
+    openMonsterTransferButton = document.getElementById('openMonsterTransferButton'),
+    monsterTransferOverlay = document.getElementById('monsterTransferOverlay'),
+    monsterTransferPanel = document.getElementById('monsterTransferPanel'),
+    monsterExportList = document.getElementById('monsterExportList'),
+    selectAllMonsterExportsButton = document.getElementById('selectAllMonsterExportsButton'),
+    clearMonsterExportsButton = document.getElementById('clearMonsterExportsButton'),
+    exportMonsterButton = document.getElementById('exportMonsterButton'),
+    monsterExportAvailabilityMessage = document.getElementById('monsterExportAvailabilityMessage'),
+    monsterImportFile = document.getElementById('monsterImportFile'),
+    monsterImportAvailabilityMessage = document.getElementById('monsterImportAvailabilityMessage'),
+    monsterTransferStatus = document.getElementById('monsterTransferStatus'),
+    closeMonsterTransferButton = document.getElementById('closeMonsterTransferButton'),
     seasonDisplay = document.getElementById('seasonDisplay'),
     mainMenuOverlay = document.getElementById('mainMenuOverlay'),
     worldLoadingOverlay = document.getElementById('worldLoadingOverlay'),
@@ -18852,7 +19167,7 @@ button:hover {
         var metadata = document.createElement('span');
         metadata.className = 'saveSlotMetadata';
         if (record){
-            metadata.textContent = (record.gameMode==='campaign' ? 'Campaign' : 'Single game')+', round '+(record.roundNumber || '?')+', season '+(record.seasonNumber || '?')+', '+(record.phase || 'unknown phase')+' - '+FormatSavedAt(record.savedAt);
+            metadata.textContent = (record.gameMode==='advancedCampaign' ? 'Advanced campaign' : (record.gameMode==='campaign' ? 'Campaign' : 'Single game'))+', round '+(record.roundNumber || '?')+', season '+(record.seasonNumber || '?')+', '+(record.phase || 'unknown phase')+' - '+FormatSavedAt(record.savedAt);
         } else{
             metadata.textContent = 'Empty slot';
         }
@@ -19177,7 +19492,7 @@ button:hover {
     function FormatEndOfRoundStats(s){
         var stats = s.campaignStats || {
         } ;
-        var mode = s.gameMode==='campaign' ? 'Campaign' : 'Single round game';
+        var mode = s.gameMode==='advancedCampaign' ? 'Advanced campaign' : (s.gameMode==='campaign' ? 'Campaign' : 'Single round game');
         var summary = s.latestRoundSummary || {
         } ;
         var treasureBreakdown = summary.treasureBreakdown || s.treasureBreakdown || {
@@ -19263,7 +19578,7 @@ button:hover {
                 totalValue : 0
             }
         } ;
-        var mode = s.gameMode==='campaign' ? 'Campaign' : 'Single round game';
+        var mode = s.gameMode==='advancedCampaign' ? 'Advanced campaign' : (s.gameMode==='campaign' ? 'Campaign' : 'Single round game');
         seasonDisplay.textContent = mode+' - Round '+(s.roundNumber || 1)+' Season '+s.seasonNumber+' ('+SeasonNameForSnapshot(s)+')';
         if ((s.phase==='roundEnded' || s.phase==='gameOver' || s.roundEnded) && s.latestRoundSummary){
             statusBox.textContent = FormatEndOfRoundStats(s);
@@ -19799,6 +20114,82 @@ button:hover {
             selectedMonsterPanel.appendChild(releasePanel);
         }
     }
+    var pendingMonsterTransferAction = '';
+    var pendingMonsterExportDirectory = null;
+    function MonsterTransferAvailable(){
+        return !!currentSnapshot && currentSnapshot.phase!=='raid' && !!currentSnapshot.management;
+    }
+    function AdvancedCampaignSetupActive(){
+        return !!currentSnapshot && currentSnapshot.gameMode==='advancedCampaign' && currentSnapshot.roundNumber===1 && currentSnapshot.seasonNumber===1 && currentSnapshot.phase==='management';
+    }
+    function MonsterImportAvailable(){
+        if (!MonsterTransferAvailable() || currentSnapshot.gameMode==='campaign'){ return false; }
+        if (currentSnapshot.gameMode==='advancedCampaign'){ return AdvancedCampaignSetupActive(); }
+        return true;
+    }
+    function MonsterExportAvailable(){
+        return MonsterTransferAvailable() && !AdvancedCampaignSetupActive();
+    }
+    function SelectedMonsterExportIds(){
+        return Array.prototype.slice.call(monsterExportList.querySelectorAll('input[type="checkbox"]:checked')).map(function(input){ return input.value; });
+    }
+    function RefreshMonsterExportButton(){
+        exportMonsterButton.disabled=!MonsterExportAvailable() || SelectedMonsterExportIds().length===0 || pendingMonsterTransferAction!=='';
+    }
+    function RefreshMonsterTransferScreen(){
+        var management=currentSnapshot && currentSnapshot.management;
+        var monsters=management && management.ownedMonsters ? management.ownedMonsters.filter(function(monster){ return monster.alive; }) : [];
+        var selected={};
+        SelectedMonsterExportIds().forEach(function(id){ selected[id]=true; });
+        monsterExportList.innerHTML='';
+        monsters.forEach(function(monster){
+            var label=document.createElement('label'); label.className='monsterExportChoice';
+            var input=document.createElement('input'); input.type='checkbox'; input.value=monster.id; input.checked=!!selected[monster.id] || (!Object.keys(selected).length && monster.id===selectedRosterMonsterId);
+            input.addEventListener('change',RefreshMonsterExportButton);
+            var text=document.createElement('span'); text.textContent=monster.name+' - '+MonsterSexLabel(monster)+', '+MonsterAgeLabel(monster);
+            label.appendChild(input); label.appendChild(text); monsterExportList.appendChild(label);
+        });
+        var advancedSetup=AdvancedCampaignSetupActive();
+        monsterTransferPanel.classList.toggle('advancedCampaignSetup',advancedSetup);
+        var exportAvailable=MonsterExportAvailable();
+        selectAllMonsterExportsButton.disabled=!exportAvailable || monsters.length===0;
+        clearMonsterExportsButton.disabled=!exportAvailable || monsters.length===0;
+        monsterExportAvailabilityMessage.textContent='Select any number of monsters, then choose one destination folder for their JSON files.';
+        var importAvailable=MonsterImportAvailable();
+        monsterImportFile.disabled=!importAvailable || pendingMonsterTransferAction!=='';
+        if (currentSnapshot && currentSnapshot.gameMode==='campaign'){
+            monsterImportAvailabilityMessage.textContent='Monster import is disabled in a standard campaign to preserve campaign balance.';
+        } else if (currentSnapshot && currentSnapshot.gameMode==='advancedCampaign' && !importAvailable){
+            monsterImportAvailabilityMessage.textContent='Advanced campaign import is available only before the first season begins.';
+        } else if (currentSnapshot && currentSnapshot.gameMode==='advancedCampaign'){
+            monsterImportAvailabilityMessage.textContent='Choose one or more founding monsters. A particular exported monster can be imported only once into this campaign.';
+        } else{
+            monsterImportAvailabilityMessage.textContent='Choose one or more monster JSON files; valid monsters are imported immediately.';
+        }
+        RefreshMonsterExportButton();
+    }
+    function OpenMonsterTransferScreen(){
+        if (!MonsterTransferAvailable()){ return; }
+        monsterTransferStatus.textContent=''; RefreshMonsterTransferScreen(); monsterTransferOverlay.classList.remove('dialogHidden'); closeMonsterTransferButton.focus();
+    }
+    function CloseMonsterTransferScreen(){
+        monsterTransferOverlay.classList.add('dialogHidden'); monsterTransferStatus.textContent=''; openMonsterTransferButton.focus();
+    }
+    function SafeMonsterFileName(name){
+        var safe=String(name || 'monster').replace(/[^A-Za-z0-9_-]+/g,'_').replace(/^_+|_+$/g,''); return (safe || 'monster')+'.monster.json';
+    }
+    async function SaveMonsterTransfers(transfers){
+        if (!pendingMonsterExportDirectory){ throw new Error('No export destination folder was selected.'); }
+        var directory=pendingMonsterExportDirectory; pendingMonsterExportDirectory=null;
+        var used={};
+        for (var i=0; i<transfers.length; i+=1){
+            var base=SafeMonsterFileName(transfers[i].displayName); var name=base; var suffix=2;
+            while (used[name]){ name=base.replace(/\.monster\.json$/, '_'+suffix+'.monster.json'); suffix+=1; }
+            used[name]=true;
+            var handle=await directory.getFileHandle(name,{create:true}); var writable=await handle.createWritable();
+            await writable.write(JSON.stringify(transfers[i],null,2)); await writable.close();
+        }
+    }
     function CurrentFoodAllocations(){
         return Array.prototype.slice.call(foodAllocationList.querySelectorAll('input[data-monster-id]')).map(function (input){
             return {
@@ -19861,6 +20252,9 @@ button:hover {
             } )
         } ;
         var visible = managementDrawerVisible;
+        openMonsterTransferButton.disabled = phase==='raid';
+        openMonsterTransferButton.setAttribute('aria-disabled', phase==='raid' ? 'true' : 'false');
+        openMonsterTransferButton.title = phase==='raid' ? 'Monster import and export are available only between seasons.' : '';
         managementDrawer.classList.toggle('drawerHidden', !visible);
         managementDrawer.classList.toggle('raidDrawer', phase==='raid');
         monsterManagementTab.textContent = visible ? 'Monster Management ▲' : 'Monster Management ▼';
@@ -22642,6 +23036,37 @@ button:hover {
     }
     // ============================================================================
     // MODULE: WORKER MESSAGE HANDLING
+    openMonsterTransferButton.addEventListener('click', OpenMonsterTransferScreen);
+    closeMonsterTransferButton.addEventListener('click', CloseMonsterTransferScreen);
+    monsterTransferOverlay.addEventListener('click', function(event){ if (event.target===monsterTransferOverlay){ CloseMonsterTransferScreen(); } });
+    selectAllMonsterExportsButton.addEventListener('click',function(){ Array.prototype.forEach.call(monsterExportList.querySelectorAll('input[type="checkbox"]'),function(input){input.checked=true;}); RefreshMonsterExportButton(); });
+    clearMonsterExportsButton.addEventListener('click',function(){ Array.prototype.forEach.call(monsterExportList.querySelectorAll('input[type="checkbox"]'),function(input){input.checked=false;}); RefreshMonsterExportButton(); });
+    exportMonsterButton.addEventListener('click',async function(){
+        var ids=SelectedMonsterExportIds(); if (!MonsterExportAvailable() || !ids.length){ RefreshMonsterTransferScreen(); return; }
+        if (typeof window.showDirectoryPicker!=='function'){ monsterTransferStatus.textContent='Export failed: this browser does not support choosing a destination folder.'; return; }
+        try{ pendingMonsterExportDirectory=await window.showDirectoryPicker({mode:'readwrite'}); }
+        catch(error){ pendingMonsterExportDirectory=null; monsterTransferStatus.textContent=error && error.name==='AbortError' ? 'Export cancelled; no files were written.' : 'Export failed: '+String(error && error.message ? error.message : error); return; }
+        pendingMonsterTransferAction='export'; RefreshMonsterExportButton(); monsterTransferStatus.textContent='Preparing '+ids.length+' monster export'+(ids.length===1?'':'s')+'...';
+        SendCommand('EXPORT_MONSTERS',{monsterIds:ids});
+    });
+    monsterImportFile.addEventListener('change',async function(){
+        if (!MonsterImportAvailable()){ monsterImportFile.value=''; RefreshMonsterTransferScreen(); return; }
+        var files=Array.prototype.slice.call(monsterImportFile.files || []); monsterImportFile.value=''; if (!files.length){ return; }
+        pendingMonsterTransferAction='import'; RefreshMonsterTransferScreen(); monsterTransferStatus.textContent='Reading '+files.length+' monster file'+(files.length===1?'':'s')+'...';
+        var transfers=[]; var localErrors=[];
+        for (var i=0; i<files.length; i+=1){
+            try{
+                if (files[i].size>5*1024*1024){ throw new Error('file is too large'); }
+                var transfer=JSON.parse(await files[i].text());
+                if (!transfer || typeof transfer!=='object' || transfer.transferKind!=='monster-breeder-monster' || !Number.isInteger(transfer.formatVersion) || !transfer.payload){ throw new Error('not a valid Monster Breeder monster export'); }
+                transfers.push(transfer);
+            } catch(error){ localErrors.push(files[i].name+': '+String(error && error.message ? error.message : error)); }
+        }
+        if (!transfers.length){ pendingMonsterTransferAction=''; RefreshMonsterTransferScreen(); monsterTransferStatus.textContent='Import rejected:\n'+localErrors.join('\n'); return; }
+        window.pendingMonsterLocalImportErrors=localErrors;
+        monsterTransferStatus.textContent='Validating and importing '+transfers.length+' monster'+(transfers.length===1?'':'s')+'...';
+        SendCommand('IMPORT_MONSTERS',{transfers:transfers});
+    });
     // ============================================================================
     // Receives authoritative snapshots, events, errors and headless harness results.
     worker.onerror = function (event){
@@ -22664,9 +23089,31 @@ button:hover {
         case 'COMMAND_REJECTED' :
             if (worldLoadingActive){ HideWorldLoading(); }
             AppendLog('Command rejected: '+message.payload.reason);
+            if (pendingMonsterTransferAction){
+                if (pendingMonsterTransferAction==='export'){
+                    pendingMonsterExportDirectory=null;
+                }
+                monsterTransferStatus.textContent=(pendingMonsterTransferAction==='import' ? 'Import rejected: ' : 'Export rejected: ')+message.payload.reason;
+                pendingMonsterTransferAction='';
+                RefreshMonsterTransferScreen();
+            }
             pendingSaveRequest = false;
             pendingLoadRequest = false;
             RefreshSaveLoadButtons();
+            break;
+        case 'MONSTER_EXPORT_DATA' :
+            SaveMonsterTransfers(message.payload.transfers || []).then(function(){
+                var count=(message.payload.transfers || []).length; pendingMonsterTransferAction=''; RefreshMonsterTransferScreen();
+                monsterTransferStatus.textContent=count+' monster'+(count===1?' was':'s were')+' exported successfully.';
+            }).catch(function(error){ pendingMonsterTransferAction=''; pendingMonsterExportDirectory=null; RefreshMonsterTransferScreen(); monsterTransferStatus.textContent='Export failed: '+String(error && error.message ? error.message : error); });
+            break;
+        case 'MONSTER_IMPORT_ACCEPTED' :
+            pendingMonsterTransferAction='';
+            var imported=message.payload.imported || []; var rejected=message.payload.rejected || []; var localErrors=window.pendingMonsterLocalImportErrors || []; window.pendingMonsterLocalImportErrors=[];
+            if (imported.length){ selectedRosterMonsterId=imported[imported.length-1].monsterId; lastManagementRenderKey=''; ShowGameToast(imported.length+' monster'+(imported.length===1?'':'s')+' joined the captive brood.'); }
+            var lines=[imported.length+' monster'+(imported.length===1?'':'s')+' imported.'];
+            rejected.forEach(function(item){lines.push(item.name+': '+item.reason);}); localErrors.forEach(function(item){lines.push(item);});
+            monsterTransferStatus.textContent=lines.join('\n'); RefreshMonsterTransferScreen();
             break;
         case 'SAVE_GAME_DATA' :
             PutSaveRecord(message.payload.saveRecord, pendingSaveSlotId, pendingSaveSlotName).then(function (storedRecord){
@@ -22737,6 +23184,10 @@ button:hover {
             }
             lastSnapshotPhase = latestSnapshot.phase || 'raid';
             UpdateManagementDrawer(latestSnapshot);
+            if (openAdvancedImportOnNextSnapshot && latestSnapshot.gameMode==='advancedCampaign' && latestSnapshot.phase==='management'){
+                openAdvancedImportOnNextSnapshot=false;
+                OpenMonsterTransferScreen();
+            }
             RefreshSelectedObjectFromSnapshot(latestSnapshot);
             UpdateSelectedObjectPanel();
             if (newGameMessagePending && latestSnapshot.phase!=='gameOver'){
@@ -22757,6 +23208,9 @@ button:hover {
         case 'WORKER_ERROR' :
             if (worldLoadingActive){ HideWorldLoading(); }
             AppendLog('Worker error: '+message.payload.message);
+            if (pendingLoadRequest){
+                saveLoadMessage.textContent='Load failed: '+message.payload.message;
+            }
             pendingSaveRequest = false;
             pendingLoadRequest = false;
             RefreshSaveLoadButtons();
@@ -22811,6 +23265,7 @@ button:hover {
         }
         return Math.floor(value);
     }
+    var openAdvancedImportOnNextSnapshot = false;
     function StartNewGame(mode, options){
         var startOptions = options || {
         } ;
@@ -22827,6 +23282,7 @@ button:hover {
         UpdateSelectedObjectPanel();
         managementDrawerVisible = true;
         lastManagementRenderKey = '';
+        openAdvancedImportOnNextSnapshot = mode==='advancedCampaign';
         SendCommand('NEW_WORLD', {
             seed : Number.isFinite(startOptions.seed) ? startOptions.seed : Date.now(),
             mode : mode,
@@ -22878,6 +23334,11 @@ button:hover {
     document.getElementById('campaignMenuButton').addEventListener('click', function (){
         RequestDestructiveAction('new', function (){
             StartNewGame('campaign');
+        } );
+    } );
+    document.getElementById('advancedCampaignMenuButton').addEventListener('click', function (){
+        RequestDestructiveAction('new', function (){
+            StartNewGame('advancedCampaign');
         } );
     } );
     document.getElementById('quickGameMenuButton').addEventListener('click', function (){
