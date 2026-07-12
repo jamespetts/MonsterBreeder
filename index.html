@@ -1216,7 +1216,7 @@ button:hover {
     var BUSH_HIDE_RANGE_SCALE = 0.50;
     var MICROFAUNA_EMITTER_COUNT_MIN = 8;
     var MICROFAUNA_EMITTER_COUNT_MAX = 18;
-    var FOOD_EATING_TICKS_PER_FOOD = 45;
+    var BASE_FOOD_EATING_TICKS_PER_FOOD = 45;
     var MONSTER_FOOD_SENSE_RANGE = 260;
     var NUTRITION_STATE = {
         NOURISHED : 'Nourished',
@@ -1372,7 +1372,7 @@ button:hover {
             speedMin : 58,
             speedMax : 74,
             bodyPartHealth : 13,
-            carryCapacity : 45,
+            carryCapacity : 40,
             courageMin : 0.48,
             courageMax : 0.98,
             greedMin : 0.45,
@@ -1401,7 +1401,7 @@ button:hover {
             speedMin : 96,
             speedMax : 126,
             bodyPartHealth : 15,
-            carryCapacity : 20,
+            carryCapacity : 10,
             courageMin : 0.88,
             courageMax : 1.35,
             greedMin : 0.42,
@@ -1430,7 +1430,7 @@ button:hover {
             speedMin : 82,
             speedMax : 112,
             bodyPartHealth : 21,
-            carryCapacity : 24,
+            carryCapacity : 10,
             courageMin : 1.08,
             courageMax : 1.48,
             greedMin : 0.48,
@@ -1461,7 +1461,8 @@ button:hover {
             mountedSpeedMin : 132,
             mountedSpeedMax : 168,
             bodyPartHealth : 27,
-            carryCapacity : 30,
+            carryCapacity : 10,
+            mountedCarryCapacity : 25,
             courageMin : 1.18,
             courageMax : 1.58,
             greedMin : 0.55,
@@ -5601,6 +5602,7 @@ button:hover {
         constructor(maxEach, bodyPlan){
             this.maxEach = maxEach;
             this.bodyPlan = bodyPlan || 'humanoid';
+            this.permanentLoss = {};
             this.head = maxEach;
             if (this.bodyPlan==='quadrupedMonster'){
                 this.body = maxEach;
@@ -5655,8 +5657,34 @@ button:hover {
             this[part] = Math.max(0, (this[part] || 0)-Math.max(0, amount || 0));
             return part;
         }
+        maximumForPart(part){
+            return Math.max(0, this.maxEach-(this.permanentLoss[part] || 0));
+        }
+        permanentLossTotal(){
+            var total = 0;
+            var parts = this.getParts();
+            for (var i = 0; i<parts.length; i+=1){
+                total+=this.permanentLoss[parts[i]] || 0;
+            }
+            return total;
+        }
+        addPermanentLoss(part, amount){
+            if (this.getParts().indexOf(part)<0){
+                return 0;
+            }
+            var previous = this.permanentLoss[part] || 0;
+            var maximumLoss = this.maxEach * 0.45;
+            this.permanentLoss[part] = Clamp(previous+Math.max(0, amount || 0), 0, maximumLoss);
+            this[part] = Math.min(this[part] || 0, this.maximumForPart(part));
+            return this.permanentLoss[part]-previous;
+        }
         missingHealth(){
-            return Math.max(0, this.maxTotal()-this.total());
+            var missing = 0;
+            var parts = this.getParts();
+            for (var i = 0; i<parts.length; i+=1){
+                missing+=Math.max(0, this.maximumForPart(parts[i])-(this[parts[i]] || 0));
+            }
+            return missing;
         }
         healGeneral(amount){
             var remaining = Math.max(0, amount || 0);
@@ -5667,7 +5695,7 @@ button:hover {
                 var mostMissing = 0;
                 for (var i = 0; i<parts.length; i+=1){
                     var part = parts[i];
-                    var missing = this.maxEach-(this[part] || 0);
+                    var missing = this.maximumForPart(part)-(this[part] || 0);
                     if (missing>mostMissing){
                         mostMissing = missing;
                         mostDamagedPart = part;
@@ -5704,7 +5732,8 @@ button:hover {
         getSnapshot(){
             var snapshot = {
                 maxEach : this.maxEach,
-                bodyPlan : this.bodyPlan
+                bodyPlan : this.bodyPlan,
+                permanentLoss : Object.assign({}, this.permanentLoss)
             };
             var parts = this.getParts();
             for (var i = 0; i<parts.length; i+=1){
@@ -6402,6 +6431,12 @@ button:hover {
             this.perception = rng.range(profile.perceptionMin, profile.perceptionMax);
             this.strength = rng.range(profile.strengthMin, profile.strengthMax);
             this.caution = rng.range(profile.cautionMin, profile.cautionMax);
+            this.combatSkill = rng.range(profile.combatSkillMin || 0.25, profile.combatSkillMax || 0.75);
+            this.painTolerance = rng.range(profile.painToleranceMin || 0.25, profile.painToleranceMax || 0.75);
+            this.fleeLikelihood = rng.range(profile.fleeLikelihoodMin || 0.25, profile.fleeLikelihoodMax || 0.75);
+            this.highValueTreasurePreference = rng.range(profile.highValueTreasurePreferenceMin || 0.35, profile.highValueTreasurePreferenceMax || 0.90);
+            this.willingnessToFight = rng.range(profile.willingnessToFightMin || 0.25, profile.willingnessToFightMax || 0.85);
+            this.terrainUse = rng.range(profile.terrainUseMin || 0.25, profile.terrainUseMax || 0.85);
             this.sightRange = 1250+this.perception * 900;
             this.hearingThreshold = DEFAULT_ADVENTURER_HEARING_THRESHOLD;
             this.eyeHeight = 5;
@@ -6648,11 +6683,17 @@ button:hover {
             }
             var greedWeight = 0.8+(this.greed || 0.5) * 0.7;
             var intelligenceWeight = 0.78+(this.intelligence || 0.5) * 0.5;
-            var power = classProfile.treasurePower || 1.25;
+            var valuePreference = 0.55+this.highValueTreasurePreference * 0.90;
+            unitValue = Math.pow(unitValue, valuePreference);
+            var power = (classProfile.treasurePower || 1.25) * (1.12-this.terrainUse * 0.24);
             if (this.className==='villager' || this.className==='doubleVillager'){
                 return(unitValue * greedWeight) / Math.pow(distance, power);
             }
             return(unitValue * greedWeight * intelligenceWeight) / Math.pow(distance, power);
+        }
+        terrainMovementCostMultiplier(terrainType, slope){
+            var difficult = terrainType===TERRAIN_TYPE.FOREST || terrainType===TERRAIN_TYPE.ROCKY || terrainType===TERRAIN_TYPE.MARSH || slope>=TERRAIN_STEEP_SLOPE;
+            return difficult ? Clamp(1.14-this.terrainUse * 0.28, 0.88, 1.08) : 1;
         }
         updateMountedState(raid){
             if (!this.profile || !this.profile.canMount){
@@ -6677,9 +6718,15 @@ button:hover {
             var bonus = this.isMounted ?(profile.mountedDamageBonus || 0) : 0;
             return rng.integer(profile.meleeDamageMin+bonus, profile.meleeDamageMax+bonus);
         }
+        getCarryCapacity(){
+            if (this.className==='knight' && this.isMounted){
+                return this.profile.mountedCarryCapacity || 25;
+            }
+            return this.carryCapacity;
+        }
         getMeleeHitChance(){
             var profile = this.profile || ADVENTURER_PROFILE.villager;
-            return Clamp((profile.meleeHitChance || 0.5)+(this.strength-0.5) * 0.08-(this.carryingTreasure ? 0.08 : 0), 0.18, 0.92);
+            return Clamp((profile.meleeHitChance || 0.5)+(this.strength-0.5) * 0.08+(this.combatSkill-0.5) * 0.22+(this.willingnessToFight-0.5) * 0.05-(this.carryingTreasure ? 0.08 : 0), 0.18, 0.92);
         }
         receiveArmouredDamage(amount){
             var reduced = Math.max(1, Math.round(amount-(this.armour || 0) * 0.55));
@@ -6700,7 +6747,8 @@ button:hover {
             return available[0];
         }
         collectTreasure(raid, treasure){
-            var amount = treasure.take ? treasure.take(this.carryCapacity) : Math.min(this.carryCapacity, treasure.amountRemaining);
+            var capacity = this.getCarryCapacity();
+            var amount = treasure.take ? treasure.take(capacity) : Math.min(capacity, treasure.amountRemaining);
             if (!treasure.take){
                 treasure.amountRemaining-=amount;
             }
@@ -6840,8 +6888,11 @@ button:hover {
                     } );
                 }
                 this.dropTreasure(raid, 'death');
-            } else if (!this.fleeing && this.health<this.maxHealth * 0.35){
-                this.fleeing = true;
+            } else if (!this.fleeing){
+                var fleeThreshold = Clamp(0.23+this.fleeLikelihood * 0.30-this.painTolerance * 0.16-this.willingnessToFight * 0.10, 0.12, 0.52);
+                if (this.health<this.maxHealth * fleeThreshold){
+                    this.fleeing = true;
+                }
             }
             return part;
         }
@@ -6876,7 +6927,13 @@ button:hover {
             s.health = this.health;
             s.maxHealth = this.maxHealth;
             s.bodyHealth = this.bodyHealth.getSnapshot();
-            s.carryCapacity = this.carryCapacity;
+            s.carryCapacity = this.getCarryCapacity();
+            s.combatSkill = this.combatSkill;
+            s.painTolerance = this.painTolerance;
+            s.fleeLikelihood = this.fleeLikelihood;
+            s.highValueTreasurePreference = this.highValueTreasurePreference;
+            s.willingnessToFight = this.willingnessToFight;
+            s.terrainUse = this.terrainUse;
             s.carryingAmount = this.carryingAmount;
             s.carryingTreasure = this.carryingTreasure;
             s.carryingTreasureType = this.carryingTreasureType;
@@ -6931,7 +6988,52 @@ button:hover {
             this.speed = this.mountedSpeed;
             this.isMounted = true;
             this.canRemount = true;
+            this.horseMaxHealth = 58;
+            this.horseHealth = this.horseMaxHealth;
+            this.horseAlive = true;
             this.radius = 16;
+        }
+        applyDamage(amount, rng, raid, attacker){
+            if (this.isMounted && this.horseAlive && attacker && attacker.agentKind==='monster' && rng.nextFloat()<0.48){
+                var horseDamage = Math.max(1, Math.round(amount * rng.range(0.85, 1.20)));
+                this.horseHealth = Math.max(0, this.horseHealth-horseDamage);
+                if (this.horseHealth<=0){
+                    this.horseAlive = false;
+                    this.isMounted = false;
+                    this.canRemount = false;
+                    this.speed = this.dismountedSpeed;
+                    this.dropExcessTreasureAfterDismount(raid);
+                    this.behaviourState = 'horseKilled';
+                    if (raid){
+                        raid.addEvent((attacker.name || 'A monster')+' killed a knight\'s horse; the knight survived and was thrown clear.');
+                        raid.addSound('horseKilled', attacker, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS, { victimId:this.id, victimKind:'horse' });
+                    }
+                } else if (raid){
+                    raid.addEvent((attacker.name || 'A monster')+' wounded a knight\'s horse.');
+                }
+                return 'horse';
+            }
+            return super.applyDamage(amount, rng, raid, attacker);
+        }
+        dropExcessTreasureAfterDismount(raid){
+            var capacity = this.getCarryCapacity();
+            if (!raid || !this.carryingTreasure || this.carryingAmount<=capacity){
+                return;
+            }
+            var excess = this.carryingAmount-capacity;
+            var dropped = new DroppedTreasure('dropped_'+raid.nextDroppedTreasureId, this.x, this.y, this.carryingTreasureType, excess, this.id);
+            dropped.terrainHeight = raid.world.terrainGrid.getHeightAtWorld(dropped.x, dropped.y);
+            raid.droppedTreasure.push(dropped);
+            raid.nextDroppedTreasureId+=1;
+            this.carryingAmount = capacity;
+            raid.addEvent('A dismounted knight dropped '+excess+' units of '+TREASURE_TYPES[this.carryingTreasureType].displayName+'.');
+        }
+        getSnapshot(){
+            var s = super.getSnapshot();
+            s.horseAlive = this.horseAlive;
+            s.horseHealth = this.horseHealth;
+            s.horseMaxHealth = this.horseMaxHealth;
+            return s;
         }
     }
     // ============================================================================
@@ -7409,11 +7511,34 @@ button:hover {
         isFullyFedFromRaidFood : function (monster){
             return this.getRaidFoodNeeded(monster)<=0;
         } ,
+        getHunger : function (monster){
+            return Clamp(monster && Number.isFinite(monster.hunger) ? monster.hunger : 0, 0, 1.5);
+        } ,
+        getEatingHungerThreshold : function (monster){
+            var metabolism = monster && monster.phenotype && monster.phenotype.metabolism ? monster.phenotype.metabolism : null;
+            var appetite = metabolism ? metabolism.plumptinLevel : 0.5;
+            return Clamp(0.34-appetite * 0.10, 0.18, 0.34);
+        } ,
+        isHungryEnoughToEat : function (monster){
+            return this.getHunger(monster)>=this.getEatingHungerThreshold(monster);
+        } ,
+        updateHungerTick : function (monster, activityIntensity){
+            if (!monster || !monster.alive || !monster.deployed){
+                return;
+            }
+            var metabolism = monster.phenotype && monster.phenotype.metabolism ? monster.phenotype.metabolism : null;
+            var appetite = metabolism ? metabolism.plumptinLevel : 0.5;
+            var fatRatio = (monster.currentFatMass || 0) / Math.max(1, monster.targetFatMass || 1);
+            var baseReturn = 0.00042+appetite * 0.00048;
+            var activityReturn = Math.max(0, activityIntensity || 0) * 0.00026;
+            var adiposeSatiety = Clamp((fatRatio-1) * 0.00018, 0, 0.00016);
+            monster.hunger = Clamp(this.getHunger(monster)+baseReturn+activityReturn-adiposeSatiety, 0, 1.5);
+        } ,
         canFeedOnCarcass : function (carcass){
             return !!carcass && !carcass.alive && !carcass.escaped &&(carcass.edibleFoodRemaining || 0)>0;
         } ,
         consumeOneFoodFromCarcass : function (monster, carcass){
-            if (!this.canFeedOnCarcass(carcass) || this.isFullyFedFromRaidFood(monster)){
+            if (!this.canFeedOnCarcass(carcass) || !this.isHungryEnoughToEat(monster)){
                 return 0;
             }
             carcass.edibleFoodRemaining = Math.max(0, (carcass.edibleFoodRemaining || 0)-1);
@@ -7422,6 +7547,9 @@ button:hover {
                 carcass.behaviourState = 'skeleton';
             }
             monster.foodEatenThisSeason =(monster.foodEatenThisSeason || 0)+1;
+            var metabolism = monster.phenotype && monster.phenotype.metabolism ? monster.phenotype.metabolism : null;
+            var appetite = metabolism ? metabolism.plumptinLevel : 0.5;
+            monster.hunger = Clamp(this.getHunger(monster)-(0.20-appetite * 0.045), 0, 1.5);
             return 1;
         } ,
         getNutritionSpeedMultiplier : function (monster){
@@ -10509,6 +10637,9 @@ button:hover {
             this.nutritionState = options && options.nutritionState ? options.nutritionState : NUTRITION_STATE.NOURISHED;
             this.foodEatenThisSeason = 0;
             this.foodBoughtThisSeason = 0;
+            // Hunger is a short-term appetite signal, not a synonym for seasonal
+            // nutritional need. It can therefore permit surplus eating and fat gain.
+            this.hunger = options && Number.isFinite(options.hunger) ? Clamp(options.hunger, 0, 1.5) : 0.58;
             this.foodBoughtCostCreditsThisSeason = 0;
             this.foodFromCaptiveMacrofaunaThisSeason = 0;
             this.foodFromStoredMeatThisSeason = 0;
@@ -10700,10 +10831,11 @@ button:hover {
         }
         restoreMonsterBodyHealth(snapshot){
             var parts = this.bodyHealth.getParts();
+            this.bodyHealth.permanentLoss = Object.assign({}, snapshot.permanentLoss || {});
             for (var i = 0; i<parts.length; i+=1){
                 var part = parts[i];
                 if (Number.isFinite(snapshot[part])){
-                    this.bodyHealth[part] = Clamp(snapshot[part], 0, this.bodyHealth.maxEach);
+                    this.bodyHealth[part] = Clamp(snapshot[part], 0, this.bodyHealth.maximumForPart(part));
                 }
             }
             if (Number.isFinite(snapshot.torso) && !Number.isFinite(snapshot.body)){
@@ -11768,7 +11900,9 @@ button:hover {
                 this.recentHumanDamage = 0;
                 this.recentHumanAttackerId = null;
             }
-            NutritionSystem.recordActivityTick(this, this.behaviourState==='recalling' ? 0.45 : 0.18);
+            var hungerActivity = this.behaviourState==='attacking' || this.behaviourState==='stalking' ? 1.0 : (this.behaviourState==='recalling' ? 0.45 : 0.18);
+            NutritionSystem.recordActivityTick(this, hungerActivity);
+            NutritionSystem.updateHungerTick(this, hungerActivity);
             if (this.continueRecallToBase(raid)){
                 return;
             }
@@ -11799,7 +11933,7 @@ button:hover {
                     this.moveWithPath(raid.world, foodTarget.x, foodTarget.y, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT, this.id+'_food_'+foodTarget.id);
                 } else{
                     this.eatingTargetId = foodTarget.id;
-                    this.eatingTicksRemaining = FOOD_EATING_TICKS_PER_FOOD;
+                    this.eatingTicksRemaining = this.getEatingTicksPerFood();
                     this.behaviourState = 'eating';
                 }
                 return;
@@ -11846,12 +11980,18 @@ button:hover {
                 this.behaviourState = 'attacking';
             }
         }
+        getEatingTicksPerFood(){
+            var mouthEfficiency = Clamp((this.toothSize || 1) * 0.48+(this.bodyScale || 1) * 0.32+(this.forelimbMuscleBias || 1) * 0.20, 0.45, 1.85);
+            var hunger = NutritionSystem.getHunger(this);
+            var urgency = Clamp(0.82+hunger * 0.22+(this.pugilinBase || 1) * 0.05-(this.cowardinBase || 1) * 0.04, 0.62, 1.38);
+            return Math.max(12, Math.round(BASE_FOOD_EATING_TICKS_PER_FOOD / (mouthEfficiency * urgency)));
+        }
         continueEating(raid){
             if (!this.eatingTargetId){
                 return false;
             }
             var carcass = raid.findEdibleCarcassById(this.eatingTargetId);
-            if (!NutritionSystem.canFeedOnCarcass(carcass) || NutritionSystem.isFullyFedFromRaidFood(this)){
+            if (!NutritionSystem.canFeedOnCarcass(carcass) || !NutritionSystem.isHungryEnoughToEat(this)){
                 this.eatingTargetId = null;
                 this.eatingTicksRemaining = 0;
                 return false;
@@ -11872,7 +12012,7 @@ button:hover {
                 if (NutritionSystem.consumeOneFoodFromCarcass(this, carcass)>0){
                     raid.addEvent(this.name+' ate from a carcass.');
                 }
-                this.eatingTicksRemaining = NutritionSystem.isFullyFedFromRaidFood(this) || !NutritionSystem.canFeedOnCarcass(carcass) ? 0 : FOOD_EATING_TICKS_PER_FOOD;
+                this.eatingTicksRemaining = !NutritionSystem.isHungryEnoughToEat(this) || !NutritionSystem.canFeedOnCarcass(carcass) ? 0 : this.getEatingTicksPerFood();
                 if (this.eatingTicksRemaining<=0){
                     this.eatingTargetId = null;
                 }
@@ -11880,7 +12020,7 @@ button:hover {
             return true;
         }
         chooseFoodTarget(raid){
-            if (NutritionSystem.isFullyFedFromRaidFood(this)){
+            if (!NutritionSystem.isHungryEnoughToEat(this)){
                 return null;
             }
             var candidates = raid.getEdibleCarcasses().filter(function (carcass){
@@ -11895,9 +12035,8 @@ button:hover {
             return candidates[0];
         }
         chooseMacrofaunaTarget(raid){
-            if (NutritionSystem.isFullyFedFromRaidFood(this)){
-                return null;
-            }
+            // Predatory pursuit is intrinsically rewarding: monsters hunt available
+            // prey whether hungry or not. Hunger controls only subsequent feeding.
             var candidates = raid.macrofauna.filter(function (animal){
                 return animal.isActive() && this.distanceTo(animal)<=Math.max(MONSTER_FOOD_SENSE_RANGE * 1.35, (this.scentRange || 0) * 1.18) && this.canSee(raid.world, animal);
             } , this);
@@ -11943,6 +12082,15 @@ button:hover {
             var conditionBeforeDamage = this.getOverallConditionRatio();
             var healthBeforeDamage = this.bodyHealth.total();
             var damagedPart = this.bodyHealth.applyGeneralDamage(amount, rng);
+            var partDamageFraction = amount / Math.max(1, this.bodyHealth.maxEach);
+            var tissueResilience = Clamp((this.boneDensity || 1) * 0.45+(this.muscleDensity || 1) * 0.35+(this.bodyScale || 1) * 0.20, 0.55, 1.55);
+            var permanentInjuryChance = Clamp((partDamageFraction-0.22) * 0.34 / tissueResilience, 0, 0.28);
+            if (rng.nextFloat()<permanentInjuryChance){
+                var permanentLoss = this.bodyHealth.addPermanentLoss(damagedPart, Math.max(0.5, amount * rng.range(0.06, 0.18)));
+                if (permanentLoss>0 && raid){
+                    raid.addEvent(this.name+' suffered a permanent '+damagedPart.replace(/([A-Z])/g, ' $1').toLowerCase()+' injury.');
+                }
+            }
             this.health = this.bodyHealth.total();
             this.maxHealth = this.bodyHealth.maxTotal();
             var actualDamage = Math.max(0, healthBeforeDamage-this.health);
@@ -11969,6 +12117,7 @@ button:hover {
                         victimId : this.id,
                         victimKind : this.agentKind
                     } );
+                    raid.addEvent((this.name || 'A wild monster')+' was killed.');
                 }
             }
         }
@@ -12020,6 +12169,7 @@ button:hover {
             s.nutritionRequirement = NutritionSystem.getMonsterRequirement(this);
             s.nutritionState = this.nutritionState;
             s.foodEatenThisSeason = this.foodEatenThisSeason;
+            s.hunger = NutritionSystem.getHunger(this);
             s.foodBoughtThisSeason = this.foodBoughtThisSeason;
             s.foodFromCaptiveMacrofaunaThisSeason = this.foodFromCaptiveMacrofaunaThisSeason || 0;
             s.foodFromStoredMeatThisSeason = this.foodFromStoredMeatThisSeason || 0;
@@ -14514,7 +14664,9 @@ button:hover {
                             var part = adventurer.applyDamage(monster.getMeleeDamageAgainst(adventurer, this.rng), this.rng, this, monster);
                             monster.recordAttackPerformance(Math.max(0, adventurerHealthBefore-adventurer.health), adventurerWasAlive && !adventurer.isActive());
                             adventurer.behaviourState = 'takingDamage';
-                            this.addEvent(monster.name+' hit a '+adventurer.displayName+' in the '+part+'.');
+                            if (part!=='horse'){
+                                this.addEvent(monster.name+' hit a '+adventurer.displayName+' in the '+part+'.');
+                            }
                         }
                     }
                     if (adventurer.isActive() && adventurer.attackCooldownTicks<=0){
@@ -14531,7 +14683,9 @@ button:hover {
                         }
                     }
                 }
-                if (!NutritionSystem.isFullyNourishedThisSeason(monster)){
+                // Hunting is independent of hunger. A satiated monster may kill
+                // prey and leave the carcass; hunger alone controls whether it eats.
+                {
                     for (var k = 0;
                     k<this.macrofauna.length;
                     k+=1){
@@ -16944,6 +17098,29 @@ button:hover {
         stalkRaid.macrofauna = [stalkPrey];
         wildStalker.update(stalkRaid);
         AddRegressionResult(results, 'Macrofauna pursuit uses the normal stalking state', wildStalker.behaviourState==='stalking' || wildStalker.behaviourState==='attacking', 'state='+wildStalker.behaviourState);
+
+        var catHuntRaid = new Raid(session.world, session.gameState, 424267, 1, []);
+        var satiatedHunter = new Monster('satiated_cat_hunter', 320, 320, new SeededRng(424268), {});
+        satiatedHunter.deployed = true;
+        satiatedHunter.hunger = 0;
+        satiatedHunter.foodBoughtThisSeason = NutritionSystem.getMonsterRequirement(satiatedHunter);
+        var catHuntHare = new Macrofauna('cat_hunt_hare', 'hare', 320, 320, new SeededRng(424269));
+        catHuntRaid.monsters = [satiatedHunter];
+        catHuntRaid.adventurers = [];
+        catHuntRaid.macrofauna = [catHuntHare];
+        var satiatedPreyTarget = satiatedHunter.chooseMacrofaunaTarget(catHuntRaid);
+        var catHuntHealthBefore = catHuntHare.health;
+        satiatedHunter.attackCooldownTicks = 0;
+        catHuntRaid.resolveCombat();
+        AddRegressionResult(results, 'A satiated monster still selects and attacks available live prey', satiatedPreyTarget===catHuntHare && catHuntHare.health<catHuntHealthBefore, 'target='+(satiatedPreyTarget ? satiatedPreyTarget.id : 'none')+', before='+catHuntHealthBefore+', after='+catHuntHare.health);
+        AddRegressionResult(results, 'A satiated monster does not select or eat a carcass', satiatedHunter.chooseFoodTarget(catHuntRaid)===null && NutritionSystem.consumeOneFoodFromCarcass(satiatedHunter, catHuntHare)===0, 'hunger='+NutritionSystem.getHunger(satiatedHunter).toFixed(3)+', eaten='+(satiatedHunter.foodEatenThisSeason || 0));
+        satiatedHunter.hunger = 1.0;
+        var fatFoodRequirement = NutritionSystem.getMonsterRequirement(satiatedHunter);
+        satiatedHunter.foodBoughtThisSeason = fatFoodRequirement;
+        var fatMassBeforeSurplus = satiatedHunter.currentFatMass;
+        var surplusConsumed = NutritionSystem.consumeOneFoodFromCarcass(satiatedHunter, catHuntHare);
+        NutritionSystem.applyNutritionStateFromSeason(satiatedHunter, new SeededRng(424270));
+        AddRegressionResult(results, 'Independent hunger permits surplus eating to increase genetically regulated fat mass', surplusConsumed===1 && satiatedHunter.currentFatMass>fatMassBeforeSurplus, 'consumed='+surplusConsumed+', fat='+fatMassBeforeSurplus.toFixed(2)+'->'+satiatedHunter.currentFatMass.toFixed(2));
 
         AddRegressionResult(results, 'Behaviour genetics are registered as a phenotype trait', MonsterGenePool.traitDefinitions.indexOf(MonsterBehaviourTraitDefinition)>=0 && MonsterGenePool.behaviourChromosomeSlots.length===BEHAVIOUR_CHROMOSOME_SLOT_COUNT, 'slots='+(MonsterGenePool.behaviourChromosomeSlots ? MonsterGenePool.behaviourChromosomeSlots.length : -1));
         var behaviourContext = new MonsterPhenotypeExpressionContext();
@@ -19392,17 +19569,10 @@ button:hover {
             }
             var icon = document.createElement('div');
             icon.innerHTML = MonsterIconSvg(monster);
-            var hpRatio = Math.max(0, Math.min(1, (monster.overallConditionPercent || 100) / 100));
-            var hpBar = document.createElement('div');
-            hpBar.className = 'monsterHpBar';
-            var hpFill = document.createElement('div');
-            hpFill.className = 'monsterHpFill'+(hpRatio<0.45 ? ' low' : '');
-            hpFill.style.width = Math.round(hpRatio * 100)+'%';
-            hpBar.appendChild(hpFill);
             var meta = document.createElement('div');
             meta.className = 'monsterCardMeta';
             var status = document.createElement('span');
-            status.textContent = monster.alive ? 'Condition '+(monster.overallConditionPercent || 100)+'%' : 'dead';
+            status.textContent = monster.alive ? (monster.overallConditionPercent<45 ? 'badly injured' : (monster.overallConditionPercent<75 ? 'injured' : 'active')) : 'dead';
             var state = document.createElement('span');
             state.textContent = MonsterSexLabel(monster)+' | '+MonsterAgeLabel(monster)+' | '+MonsterLifeStageLabel(monster)+' | '+(monster.nutritionState || 'Nourished')+' | '+(phase==='raid' ?(monster.deployed ? 'deployed' : 'in cage') : (monster.capturedThisRaid ? 'new capture' : (monster.selectedForDeployment ? 'deploy' : 'reserve')));
             var shortfall = GetFoodShortfall(monster);
@@ -19414,7 +19584,6 @@ button:hover {
             meta.appendChild(state);
             card.appendChild(header);
             card.appendChild(icon);
-            card.appendChild(hpBar);
             card.appendChild(meta);
             rosterList.appendChild(card);
         } );
@@ -20786,6 +20955,9 @@ button:hover {
             ctx.ellipse(0, -18, 31, 13, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
+            if (Number.isFinite(a.horseHealth) && Number.isFinite(a.horseMaxHealth) && a.horseHealth<a.horseMaxHealth * 0.72){
+                DrawInjuryMarker(0, -18, a.horseHealth<a.horseMaxHealth * 0.38 ? 2 : 1, 12, 7, 0.05);
+            }
             ctx.beginPath();
             ctx.ellipse(facing.facingX * 25, -25+facing.facingY * 4, 12, 8, 0, 0, Math.PI * 2);
             ctx.fill();
@@ -20916,10 +21088,6 @@ button:hover {
             }
             ctx.stroke();
         }
-        DrawHealthBar({
-            x : 0,
-            y : -76
-        } , 32, 5, a.health, a.maxHealth);
         ctx.restore();
         ctx.globalAlpha = 1;
     }
@@ -20975,10 +21143,6 @@ button:hover {
             ctx.fill();
             ctx.restore();
         }
-        DrawHealthBar({
-            x : 0,
-            y : -72
-        } , 38, 5, a.health, a.maxHealth);
     }
     // ============================================================================
     // MODULE: MONSTER RENDERING
@@ -21017,6 +21181,18 @@ button:hover {
         ctx.globalAlpha = !m.alive ? 0.25 : !m.deployed ? 0.55 : 1;
         ctx.save();
         ctx.translate(p.x, p.y+bob);
+        var fearfulPosture = m.behaviourState==='fleeingFromThreat' || m.behaviourState==='recalling';
+        var aggressivePosture = m.behaviourState==='attacking' || m.behaviourState==='stalking';
+        var senescentPosture = m.ageCategory==='senescent' || m.ageCategory==='veryOld';
+        if (fearfulPosture){
+            ctx.rotate(-facing.facingY * 0.08);
+            ctx.transform(1, 0, -0.12 * facing.facingX, 0.88, 0, 5);
+        } else if (aggressivePosture){
+            ctx.rotate(facing.facingY * 0.06);
+            ctx.transform(1.06, 0, 0.10 * facing.facingX, 0.92, 0, 3);
+        } else if (senescentPosture){
+            ctx.transform(0.96, 0, -0.08 * facing.facingX, 0.90, 0, 6);
+        }
         var renderBodyScale = m.bodyScale || 1;
         ctx.scale(0.66 * renderBodyScale, 0.66 * renderBodyScale);
         // 8-direction monster commitment:
@@ -21188,6 +21364,31 @@ button:hover {
                 ctx.stroke();
             }
         }
+        if (m.bodyHealth){
+            var injuryPoints = [
+                { part:'head', x:headX, y:headY },
+                { part:'body', x:0, y:-36 },
+                { part:'frontLeftLeg', x:fx * 15+lx * 14, y:-18 },
+                { part:'frontRightLeg', x:fx * 15-lx * 14, y:-18 },
+                { part:'rearLeftLeg', x:-fx * 13+lx * 13, y:-18 },
+                { part:'rearRightLeg', x:-fx * 13-lx * 13, y:-18 }
+            ];
+            ctx.strokeStyle = '#7f1d1d';
+            ctx.lineWidth = 2.8;
+            for (var injuryIndex = 0; injuryIndex<injuryPoints.length; injuryIndex+=1){
+                var injury = injuryPoints[injuryIndex];
+                var partCondition = Number.isFinite(m.bodyHealth[injury.part]) ? m.bodyHealth[injury.part] : m.bodyHealth.maxEach;
+                var permanentLoss = m.bodyHealth.permanentLoss && m.bodyHealth.permanentLoss[injury.part] ? m.bodyHealth.permanentLoss[injury.part] : 0;
+                if (partCondition<m.bodyHealth.maxEach * 0.72 || permanentLoss>0){
+                    ctx.beginPath();
+                    ctx.moveTo(injury.x-5, injury.y-4);
+                    ctx.lineTo(injury.x+5, injury.y+4);
+                    ctx.moveTo(injury.x+4, injury.y-5);
+                    ctx.lineTo(injury.x-4, injury.y+5);
+                    ctx.stroke();
+                }
+            }
+        }
         if (m.collared){
             ctx.strokeStyle = '#f2c14e';
             ctx.lineWidth = 5;
@@ -21212,10 +21413,6 @@ button:hover {
             ctx.fill();
             ctx.globalAlpha = !m.alive ? 0.25 : !m.deployed ? 0.55 : 1;
         }
-        DrawHealthBar({
-            x : 0,
-            y : -82
-        } , 44, 5, m.overallConditionPercent || 100, 100);
         ctx.restore();
         ctx.globalAlpha = 1;
     }
@@ -21314,12 +21511,6 @@ button:hover {
             ctx.arc(headX+lx * 4+fx * 3, headY-2, 1.2, 0, Math.PI * 2);
             ctx.arc(headX-lx * 4+fx * 3, headY-2, 1.2, 0, Math.PI * 2);
             ctx.fill();
-        }
-        if (hurtRatio<1 || animal.edibleFoodRemaining>0){
-            DrawHealthBar({
-                x : 0,
-                y : -63
-            } , 36, 4, animal.health, animal.maxHealth);
         }
         ctx.restore();
         ctx.globalAlpha = 1;
