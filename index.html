@@ -984,6 +984,19 @@ button:hover {
 <option value="huge">Huge - 14400 x 9600</option>
 <option value="vast">Vast - 21600 x 14400</option>
 </select>
+<label for="customBiomeInput">Biome</label>
+<select id="customBiomeInput">
+<option value="random" selected>Random</option>
+<option value="tropicalRainforest">Tropical rainforest</option>
+<option value="coastalTropical">Coastal tropical</option>
+<option value="coastalTemperate">Coastal temperate</option>
+<option value="oceanicTemperate">Oceanic temperate</option>
+<option value="temperateContinental">Temperate continental</option>
+<option value="continentalHighland">Continental / highland</option>
+<option value="hotDesert">Hot desert</option>
+<option value="coolDesert">Cool desert</option>
+<option value="polar">Polar</option>
+</select>
 <label for="customBronzeInput">Bronze units</label>
 <input id="customBronzeInput" type="number" min="0" step="1" value="55">
 <label for="customSilverInput">Silver units</label>
@@ -1749,7 +1762,7 @@ button:hover {
             var heights = new Array(cols * rows);
             var seedA = rng.integer(1, 0x7fffffff);
             var seedB = rng.integer(1, 0x7fffffff);
-            var coastalWorld = rng.nextFloat()<0.12+Math.max(0, environment.waterAbundance-0.75) * 0.10;
+            var coastalWorld = environment.forceCoastline===true || (environment.forceCoastline!==false && rng.nextFloat()<0.12+Math.max(0, environment.waterAbundance-0.75) * 0.10);
             var seaLevel = coastalWorld ? Math.round(6+environment.waterAbundance * 5) : 0;
             var coastEdge = rng.integer(0, 3);
             environment.hasCoastline = coastalWorld;
@@ -4063,7 +4076,27 @@ button:hover {
             return new World(seed, options || {
             } );
         }
+        static customBiomePreset(biomeName){
+            var presets = {
+                tropicalRainforest : { temperature:0.72, moisture:0.84, waterAbundance:0.78, altitude:0.14, ruggedness:0.18, vegetationDensity:0.90, forceCoastline:false },
+                coastalTropical : { temperature:0.72, moisture:0.82, waterAbundance:0.86, altitude:0.10, ruggedness:0.14, vegetationDensity:0.88, forceCoastline:true },
+                coastalTemperate : { temperature:0.48, moisture:0.72, waterAbundance:0.82, altitude:0.13, ruggedness:0.18, vegetationDensity:0.72, forceCoastline:true },
+                oceanicTemperate : { temperature:0.48, moisture:0.70, waterAbundance:0.74, altitude:0.16, ruggedness:0.18, vegetationDensity:0.70, forceCoastline:false },
+                temperateContinental : { temperature:0.52, moisture:0.48, waterAbundance:0.42, altitude:0.20, ruggedness:0.18, vegetationDensity:0.56, forceCoastline:false },
+                continentalHighland : { temperature:0.46, moisture:0.46, waterAbundance:0.40, altitude:0.56, ruggedness:0.48, vegetationDensity:0.44, forceCoastline:false },
+                hotDesert : { temperature:0.78, moisture:0.12, waterAbundance:0.08, altitude:0.14, ruggedness:0.16, vegetationDensity:0.10, forceCoastline:false },
+                coolDesert : { temperature:0.47, moisture:0.14, waterAbundance:0.10, altitude:0.20, ruggedness:0.18, vegetationDensity:0.14, forceCoastline:false },
+                polar : { temperature:0.24, moisture:0.36, waterAbundance:0.34, altitude:0.24, ruggedness:0.24, vegetationDensity:0.12, forceCoastline:false }
+            };
+            return presets[biomeName] ? Object.assign({}, presets[biomeName]) : null;
+        }
         static createEnvironment(rng, settings){
+            var selectedBiome = settings && settings.biomeType && settings.biomeType!=='random' ? settings.biomeType : null;
+            var biomePreset = selectedBiome ? World.customBiomePreset(selectedBiome) : null;
+            if (biomePreset){
+                settings = Object.assign({}, settings, biomePreset);
+                settings.selectedBiomeType = selectedBiome;
+            }
             // Temperature is a broad climatic driver rather than a biome label.
             // Retain cold and temperate worlds while allowing genuinely hot lowland
             // climates to arise from the same continuous environmental variable.
@@ -4096,7 +4129,7 @@ button:hover {
             var waterAbundance = Number.isFinite(settings.waterAbundance) ? settings.waterAbundance : Clamp(moisture+rng.range(-0.18, 0.22), 0, 1);
             var vegetationDensity = Number.isFinite(settings.vegetationDensity) ? settings.vegetationDensity : Clamp(moisture * 0.75+temperature * 0.2+rng.range(-0.12, 0.18), 0, 1);
             var provisionalAridity = Clamp(1-moisture * 0.62-waterAbundance * 0.38, 0, 1);
-            var climateClass = temperature>=0.66 && moisture>=0.66 && provisionalAridity<0.38 ? 'tropicalRainforest' : (provisionalAridity>=0.62 ? (temperature>=0.58 ? 'hotDesert' : 'coolDesert') : (temperature<0.32 ? 'polar' : (altitude>0.48 || ruggedness>0.42 ? 'continentalHighland' : (waterAbundance>0.66 ? 'oceanicTemperate' : 'temperateContinental'))));
+            var climateClass = settings.selectedBiomeType || (temperature>=0.66 && moisture>=0.66 && provisionalAridity<0.38 ? 'tropicalRainforest' : (provisionalAridity>=0.62 ? (temperature>=0.58 ? 'hotDesert' : 'coolDesert') : (temperature<0.32 ? 'polar' : (altitude>0.48 || ruggedness>0.42 ? 'continentalHighland' : (waterAbundance>0.66 ? 'oceanicTemperate' : 'temperateContinental')))));
             var climateAmplitude = climateClass==='tropicalRainforest' ? rng.range(1.2, 2.8) : (climateClass==='oceanicTemperate' ? rng.range(4.0, 7.0) : (climateClass==='hotDesert' ? rng.range(6.0, 10.0) : (climateClass==='coolDesert' ? rng.range(8.0, 14.0) : (climateClass==='polar' ? rng.range(9.0, 16.0) : (climateClass==='continentalHighland' ? rng.range(11.0, 18.0) : rng.range(7.0, 12.0))))));
             return {
                 climateClass : climateClass,
@@ -4117,7 +4150,8 @@ button:hover {
                 aridity : provisionalAridity,
                 windSpeed : Number.isFinite(settings.windSpeed) ? Clamp(settings.windSpeed,0,1) : rng.range(0.08,0.92),
                 windDirectionRadians : Number.isFinite(settings.windDirectionRadians) ? settings.windDirectionRadians : rng.range(-Math.PI,Math.PI),
-                campaignRound : campaignRound
+                campaignRound : campaignRound,
+                forceCoastline : settings.forceCoastline
             } ;
         }
         static createSettlementDistanceMiles(rng, environment, settings){
@@ -17121,6 +17155,11 @@ button:hover {
         var coolDesertGrid = TerrainGrid.createTerrainGrid(new SeededRng(440304), coolDesertEnvironment);
         var coolDominant = World.dominantBiomeType(coolDesertEnvironment, coolDesertGrid);
         AddRegressionResult(results, 'Displayed biome is derived from dominant generated terrain', coolDominant==='coolDesert', 'dominant='+coolDominant+', climate='+coolDesertEnvironment.climateClass);
+        var customBiomeNames = ['tropicalRainforest','coastalTropical','coastalTemperate','oceanicTemperate','temperateContinental','continentalHighland','hotDesert','coolDesert','polar'];
+        AddRegressionResult(results, 'Every custom biome selector option has an environment preset', customBiomeNames.every(function (name){ return !!World.customBiomePreset(name); }), customBiomeNames.join(','));
+        var customHotDesert = World.createEnvironment(new SeededRng(440401), { biomeType:'hotDesert' });
+        var customCoastalTemperate = World.createEnvironment(new SeededRng(440402), { biomeType:'coastalTemperate' });
+        AddRegressionResult(results, 'Custom biome selection controls climate inputs', customHotDesert.climateClass==='hotDesert' && customHotDesert.aridity>=0.62 && customCoastalTemperate.climateClass==='coastalTemperate' && customCoastalTemperate.forceCoastline===true, 'hot='+customHotDesert.climateClass+'/'+customHotDesert.aridity.toFixed(2)+', coast='+customCoastalTemperate.climateClass+'/'+customCoastalTemperate.forceCoastline);
         var failed = results.filter(function (result){
             return !result.passed;
         } );
@@ -22192,6 +22231,8 @@ button:hover {
         var seed = ReadNonNegativeIntegerInput('customWorldSeedInput');
         var mapSizeElement = document.getElementById('customMapSizeInput');
         var mapSizeKey = mapSizeElement ? mapSizeElement.value : 'standard';
+        var biomeElement = document.getElementById('customBiomeInput');
+        var biomeType = biomeElement ? biomeElement.value : 'random';
         var amounts = {
             bronze : ReadNonNegativeIntegerInput('customBronzeInput'),
             silver : ReadNonNegativeIntegerInput('customSilverInput'),
@@ -22213,7 +22254,8 @@ button:hover {
             seed : seed,
             worldOptions : {
                 customTreasureAmounts : amounts,
-                mapSizeKey : mapSizeKey
+                mapSizeKey : mapSizeKey,
+                biomeType : biomeType
             }
         } ;
         RequestDestructiveAction('new', function (){
