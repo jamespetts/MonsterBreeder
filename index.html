@@ -530,6 +530,51 @@ button:hover {
 #mainMenuOverlay.menuHidden {
     display: none;
 }
+#worldLoadingOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(18, 27, 20, 0.94);
+    color: #f4f1df;
+}
+#worldLoadingOverlay.loadingVisible {
+    display: flex;
+}
+#worldLoadingPanel {
+    width: min(34rem, calc(100vw - 3rem));
+    padding: 1.5rem;
+    border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 0.9rem;
+    background: #2f3d2f;
+    box-shadow: 0 1rem 3rem rgba(0,0,0,0.45);
+}
+#worldLoadingPanel h2 {
+    margin: 0 0 0.7rem;
+}
+#worldLoadingMessage {
+    min-height: 1.5rem;
+    margin: 0 0 0.8rem;
+}
+#worldLoadingTrack {
+    height: 1rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.14);
+}
+#worldLoadingFill {
+    width: 0;
+    height: 100%;
+    background: #d8b64c;
+    transition: width 0.22s ease-out;
+}
+#worldLoadingPercent {
+    margin-top: 0.45rem;
+    text-align: right;
+    font-weight: 800;
+}
 #mainMenuPanel {
     width: min(420px, calc(100vw - 2rem));
     border: 1px solid #334155;
@@ -954,6 +999,14 @@ button:hover {
 </section>
 </aside>
 </main>
+<div id="worldLoadingOverlay" role="status" aria-live="polite" aria-busy="true">
+<div id="worldLoadingPanel">
+<h2>Generating ecological unit</h2>
+<p id="worldLoadingMessage">Reticulating splines...</p>
+<div id="worldLoadingTrack"><div id="worldLoadingFill"></div></div>
+<div id="worldLoadingPercent">0%</div>
+</div>
+</div>
 <div id="mainMenuOverlay">
 <div id="mainMenuPanel">
 <h2>Monster Breeder</h2>
@@ -11767,7 +11820,10 @@ button:hover {
             if (threat.agentKind==='adventurer' && threat.id===this.recentHumanAttackerId){
                 perceivedThreat+=Clamp((this.recentHumanDamage || 0) / Math.max(1, this.maxHealth || 1) * 1.35, 0, 0.65);
             }
-            var hunger = Clamp(NutritionSystem.getFoodNeeded(this) / Math.max(1, this.nutritionRequirement || 10), 0, 1.6);
+            var distance = this.distanceTo(threat);
+            var distancePressure = Clamp(1-distance / 720, 0, 1);
+            perceivedThreat*=distancePressure;
+            var hunger = NutritionSystem.getHunger(this);
             var pugilin = this.currentPugilinLevel(perceivedThreat, injury, hunger);
             var cowardin = this.currentCowardinLevel(perceivedThreat, injury);
             var readiness = threat.agentKind==='adventurer' ? Clamp(0.34+woundSignal * 0.92, 0.34, 1.18) : 1;
@@ -11792,7 +11848,11 @@ button:hover {
             var candidates = raid.adventurers.concat(raid.macrofauna);
             for (var i = 0; i<candidates.length; i+=1){
                 if (candidates[i].id===threatId && candidates[i].isActive && candidates[i].isActive()){
-                    return candidates[i];
+                    var distance = this.distanceTo(candidates[i]);
+                    var sensoryRange = Math.max(this.sightRange || 0, this.scentRange || 0, VISIBILITY_CLOSE_RANGE);
+                    if (distance<=VISIBILITY_CLOSE_RANGE || (distance<=sensoryRange && this.canSee(raid.world, candidates[i]))){
+                        return candidates[i];
+                    }
                 }
             }
             return null;
@@ -11825,17 +11885,50 @@ button:hover {
                 this.fleeThreatId = threat.id;
                 this.fleeCommitmentTicks = 24;
             }
-            var dx = this.x-threat.x;
-            var dy = this.y-threat.y;
-            var len = Math.max(1, Math.hypot(dx, dy));
-            var tx = Clamp(this.x+(dx / len) * 520, 0, raid.world.width);
-            var ty = Clamp(this.y+(dy / len) * 520, 0, raid.world.height);
+            var awayAngle = Math.atan2(this.y-threat.y, this.x-threat.x);
+            var margin = Math.max(28, (this.radius || 12) * 2.2);
+            var bestTarget = null;
+            var bestScore = -Infinity;
+            for (var i = 0; i<16; i+=1){
+                var angle = awayAngle+(i-7.5) * (Math.PI / 15);
+                var candidateX = Clamp(this.x+Math.cos(angle) * 420, margin, raid.world.width-margin);
+                var candidateY = Clamp(this.y+Math.sin(angle) * 420, margin, raid.world.height-margin);
+                var separation = Distance(candidateX, candidateY, threat.x, threat.y);
+                var boundaryClearance = Math.min(candidateX-margin, raid.world.width-margin-candidateX, candidateY-margin, raid.world.height-margin-candidateY);
+                var turnPenalty = Math.abs(i-7.5) * 8;
+                var pathBonus = this.segmentIsClear(raid.world, this.x, this.y, candidateX, candidateY) ? 90 : 0;
+                var score = separation+Math.max(0, boundaryClearance) * 0.55+pathBonus-turnPenalty;
+                if (score>bestScore){
+                    bestScore = score;
+                    bestTarget = { x:candidateX, y:candidateY };
+                }
+            }
+            var beforeX = this.x;
+            var beforeY = this.y;
             this.behaviourState = 'fleeingFromThreat';
             NutritionSystem.recordActivityTick(this, 0.95);
-            this.recordFatigueFromEffort(raid, 1.25);
-            this.moveWithPath(raid.world, tx, ty, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT * 1.12, this.id+'_flee_'+threat.id);
+            this.moveWithPath(raid.world, bestTarget.x, bestTarget.y, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT * 1.12, this.id+'_flee_'+threat.id+'_'+Math.floor(bestTarget.x / NAV_CELL_SIZE)+'_'+Math.floor(bestTarget.y / NAV_CELL_SIZE));
+            var actualMovement = Distance(beforeX, beforeY, this.x, this.y);
+            if (actualMovement>0.05){
+                this.recordFatigueFromEffort(raid, 1.25);
+            } else{
+                // Being blocked is not physical exertion and must never injure or kill
+                // a monster merely because movement bounds prevented displacement.
+                this.fatigueTicks = Math.max(0, (this.fatigueTicks || 0)-1.2);
+                if (this.stuckTicks>=PATH_STUCK_REPATH_TICKS * 2){
+                    this.fleeThreatId = null;
+                    this.fleeCommitmentTicks = 0;
+                    this.path = [];
+                    this.pathKey = '';
+                    this.pathIntentKey = '';
+                    this.pathRepathCooldownTicks = 0;
+                }
+            }
         }
         recordFatigueFromEffort(raid, effort){
+            if (!Number.isFinite(effort) || effort<=0){
+                return;
+            }
             var heatCold = Math.max(0, this.thermalStress || 0);
             var nutritionPenalty = this.nutritionState===NUTRITION_STATE.SEVERELY_MALNOURISHED ? 1.7 : (this.nutritionState===NUTRITION_STATE.MALNOURISHED ? 1.28 : 1);
             var tenacitinPush = Clamp(this.tenacitinBase || 1, 0.35, 2.2);
@@ -13036,7 +13129,7 @@ button:hover {
                 return monster.alive;
             } );
         }
-        releaseOwnedMonster(monsterId){
+        releaseOwnedMonster(monsterId, world){
             var index = this.ownedMonsters.findIndex(function (monster){
                 return monster.id===monsterId;
             } );
@@ -13064,6 +13157,7 @@ button:hover {
                     reason : monster.name+' cannot be released while she has an incubating brood.'
                 } ;
             }
+            this.recordWildMonsterRelease(monster, world);
             monster.collared = false;
             monster.owned = false;
             monster.deployed = false;
@@ -13110,6 +13204,33 @@ button:hover {
                 return 'unknown';
             }
             return TERRAIN_NAMES[world.terrainGrid.getTerrainTypeAtWorld(x, y)] || 'unknown';
+        }
+        dominantBiomeForWorld(world){
+            if (!world || !world.terrainGrid || !world.terrainGrid.terrainTypes){
+                return 'unknown';
+            }
+            var counts = {};
+            for (var i = 0; i<world.terrainGrid.terrainTypes.length; i+=1){
+                var biome = TERRAIN_NAMES[world.terrainGrid.terrainTypes[i]] || 'unknown';
+                counts[biome] = (counts[biome] || 0)+1;
+            }
+            var keys = Object.keys(counts);
+            keys.sort(function(a, b){ return counts[b]-counts[a]; });
+            return keys.length ? keys[0] : 'unknown';
+        }
+        recordWildMonsterRelease(monster, world){
+            if (!monster){
+                return;
+            }
+            var biome = monster.wildOriginBiome && monster.wildOriginBiome!=='unknown' ? monster.wildOriginBiome : this.dominantBiomeForWorld(world);
+            this.wildMonsterHarvestByBiome[biome] = Math.max(0, (this.wildMonsterHarvestByBiome[biome] || 0)-1);
+            if (this.wildMonsterHarvestByBiome[biome]<0.05){
+                delete this.wildMonsterHarvestByBiome[biome];
+            }
+            monster.wildOriginBiome = biome;
+        }
+        resetWildMonsterDepletionForNewRound(){
+            this.wildMonsterHarvestByBiome = {};
         }
         recordWildMonsterHarvest(monster){
             if (!monster || !monster.wildOriginBiome){
@@ -13696,7 +13817,7 @@ button:hover {
                 depletion+=this.gameState.getWildMonsterHarvestPressureForBiome(keys[d]);
             }
             var net = gross * Clamp(1-depletion / Math.max(1, keys.length || 1), 0.15, 1);
-            return Clamp(Math.round(net), 0, Math.max(WILD_MONSTER_COUNT_MAX, Math.round(WILD_MONSTER_COUNT_MAX * IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR)));
+            return Clamp(net, 0, Math.max(WILD_MONSTER_COUNT_MAX, WILD_MONSTER_COUNT_MAX * IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR));
         }
         monsterCanRemainActiveThroughLocalYear(monster){
             for (var seasonNumber = 1; seasonNumber<=SEASON_NAMES.length; seasonNumber+=1){
@@ -13755,8 +13876,11 @@ button:hover {
         }
         createWildMonsters(){
             var wildMonsters = [];
-            var capacity = this.estimateWildMonsterCapacity();
-            var count = capacity<=0 ? 0 : this.rng.integer(WILD_MONSTER_COUNT_MIN, Math.max(WILD_MONSTER_COUNT_MIN, capacity));
+            var expectedEncounters = this.estimateWildMonsterCapacity();
+            var count = Math.floor(expectedEncounters);
+            if (this.rng.nextFloat()<expectedEncounters-count){
+                count+=1;
+            }
             var spawnTick = this.rng.integer(WILD_MONSTER_FIRST_SPAWN_TICK_MIN, WILD_MONSTER_FIRST_SPAWN_TICK_MAX);
             for (var i = 0;
             i<count;
@@ -15165,6 +15289,7 @@ button:hover {
             this.roundRemains = [];
             this.gameState.roundFoodExpenditureCredits = 0;
             this.gameState.roundTreasureSoldForFoodValue = 0;
+            this.gameState.resetWildMonsterDepletionForNewRound();
             this.world = World.createWorld(this.rng.integer(1, 0x7fffffff), this.getWorldOptions(this.baseWorldOptions));
             this.pendingEvents.push({
                 tickNumber : 0,
@@ -15390,7 +15515,7 @@ button:hover {
                     reason : 'Captive monsters can be released into the wild only during management.'
                 } ;
             }
-            var result = this.gameState.releaseOwnedMonster(monsterId);
+            var result = this.gameState.releaseOwnedMonster(monsterId, this.world);
             if (result.ok){
                 this.pendingEvents.push({
                     tickNumber : 0,
@@ -17273,6 +17398,30 @@ button:hover {
         AddRegressionResult(results, 'Monster flee commitment prevents per-tick behaviour threshold chatter', chatterStates.every(function (state){ return state==='fleeingFromThreat'; }) && chatterMonster.fleeCommitmentTicks===0, 'states='+chatterStates.join(',')+', remaining='+chatterMonster.fleeCommitmentTicks);
         chatterMonster.fleePressureFromThreat = function(){ return 0.55; };
         AddRegressionResult(results, 'Monster fleeing uses distinct entry and continuation thresholds', !chatterMonster.shouldFleeThreat(chatterThreat, false) && chatterMonster.shouldFleeThreat(chatterThreat, true), 'pressure=0.55, entry=false, continuation=true');
+        var distantThreatPressure = chatterMonster.fleePressureFromThreat(chatterThreat, chatterRaid);
+        chatterThreat.x = chatterRaid.world.width-20;
+        chatterThreat.y = chatterRaid.world.height-20;
+        var remoteThreatPressure = chatterMonster.fleePressureFromThreat(chatterThreat, chatterRaid);
+        AddRegressionResult(results, 'Flee pressure falls to safety as separation from the threat increases', remoteThreatPressure<distantThreatPressure-0.25, 'near='+distantThreatPressure.toFixed(3)+', remote='+remoteThreatPressure.toFixed(3));
+        var cornerFlightMonster = new Monster('corner_flight_monster', 20, 20, new SeededRng(424312), { owned:true });
+        cornerFlightMonster.deployed = true;
+        var cornerThreat = new Knight('corner_flight_threat', 80, 80, new SeededRng(424313));
+        var cornerFlightRaid = new Raid(session.world, session.gameState, 424314, 1, []);
+        cornerFlightRaid.monsters = [cornerFlightMonster];
+        cornerFlightRaid.adventurers = [cornerThreat];
+        cornerFlightRaid.macrofauna = [];
+        var cornerStartX = cornerFlightMonster.x;
+        var cornerStartY = cornerFlightMonster.y;
+        for (var cornerTick = 0; cornerTick<45; cornerTick+=1){
+            cornerFlightMonster.fleeFromThreat(cornerFlightRaid, cornerThreat);
+        }
+        AddRegressionResult(results, 'Corner flight chooses navigable lateral or inward escape rather than pressing against the map boundary', Distance(cornerStartX, cornerStartY, cornerFlightMonster.x, cornerFlightMonster.y)>20 && cornerFlightMonster.x>0 && cornerFlightMonster.y>0, 'from='+cornerStartX+','+cornerStartY+' to='+cornerFlightMonster.x.toFixed(1)+','+cornerFlightMonster.y.toFixed(1));
+        var blockedFatigueBefore = cornerFlightMonster.fatigueTicks;
+        cornerFlightMonster.moveWithPath = function(){};
+        for (var blockedTick = 0; blockedTick<120; blockedTick+=1){
+            cornerFlightMonster.fleeFromThreat(cornerFlightRaid, cornerThreat);
+        }
+        AddRegressionResult(results, 'Blocked flight cannot accumulate exhaustion or self-inflicted damage', cornerFlightMonster.fatigueTicks<=blockedFatigueBefore && cornerFlightMonster.alive, 'fatigue='+blockedFatigueBefore.toFixed(2)+'->'+cornerFlightMonster.fatigueTicks.toFixed(2)+', alive='+cornerFlightMonster.alive);
         var flightAuditRng = new SeededRng(424320);
         var flightAuditMonster = new Monster('injury_flight_monster', 300, 300, flightAuditRng, { owned : true });
         flightAuditMonster.deployed = true;
@@ -18056,6 +18205,10 @@ button:hover {
     closeManagementButton = document.getElementById('closeManagementButton'),
     seasonDisplay = document.getElementById('seasonDisplay'),
     mainMenuOverlay = document.getElementById('mainMenuOverlay'),
+    worldLoadingOverlay = document.getElementById('worldLoadingOverlay'),
+    worldLoadingMessage = document.getElementById('worldLoadingMessage'),
+    worldLoadingFill = document.getElementById('worldLoadingFill'),
+    worldLoadingPercent = document.getElementById('worldLoadingPercent'),
     resumeGameMenuButton = document.getElementById('resumeGameMenuButton'),
     customGamePanel = document.getElementById('customGamePanel'),
     customGameMenuButton = document.getElementById('customGameMenuButton'),
@@ -18166,6 +18319,50 @@ button:hover {
     }
     function EndWorldRenderTransform(){
         ctx.restore();
+    }
+    var worldLoadingTimer = 0;
+    var worldLoadingProgress = 0;
+    var worldLoadingMessages = [
+        'Reticulating splines...',
+        'Surveying imaginary watersheds...',
+        'Negotiating with local geology...',
+        'Distributing suspiciously convenient bushes...',
+        'Calibrating predator eyebrows...',
+        'Teaching rivers which way is downhill...',
+        'Counting prey twice, then correcting it...',
+        'Polishing treasure that nobody buried...',
+        'Asking the climate to remain coherent...',
+        'Finalising ecological paperwork...'
+    ];
+    function UpdateWorldLoading(progress){
+        worldLoadingProgress = Math.max(0, Math.min(100, progress));
+        worldLoadingFill.style.width = worldLoadingProgress.toFixed(0)+'%';
+        worldLoadingPercent.textContent = worldLoadingProgress.toFixed(0)+'%';
+        var index = Math.min(worldLoadingMessages.length-1, Math.floor(worldLoadingProgress / 10));
+        worldLoadingMessage.textContent = worldLoadingMessages[index];
+    }
+    function ShowWorldLoading(){
+        if (!worldLoadingOverlay){
+            return;
+        }
+        if (typeof clearInterval==='function'){ clearInterval(worldLoadingTimer); }
+        UpdateWorldLoading(1);
+        worldLoadingOverlay.classList.add('loadingVisible');
+        worldLoadingTimer = typeof setInterval==='function' ? setInterval(function(){
+            if (worldLoadingProgress<92){
+                UpdateWorldLoading(Math.min(92, worldLoadingProgress+Math.max(1, (94-worldLoadingProgress) * 0.08)));
+            }
+        }, 120) : 0;
+    }
+    function HideWorldLoading(){
+        if (typeof clearInterval==='function'){ clearInterval(worldLoadingTimer); }
+        worldLoadingTimer = 0;
+        UpdateWorldLoading(100);
+        if (typeof setTimeout==='function'){
+            setTimeout(function(){ worldLoadingOverlay.classList.remove('loadingVisible'); }, 220);
+        } else{
+            worldLoadingOverlay.classList.remove('loadingVisible');
+        }
     }
     function SendCommand(type, payload){
         worker.postMessage({
@@ -22259,6 +22456,7 @@ button:hover {
             RenderPlaceholder('Main menu');
             break;
         case 'COMMAND_REJECTED' :
+            HideWorldLoading();
             AppendLog('Command rejected: '+message.payload.reason);
             pendingSaveRequest = false;
             pendingLoadRequest = false;
@@ -22298,6 +22496,7 @@ button:hover {
             RefreshSaveLoadButtons();
             break;
         case 'WORLD_SNAPSHOT' : latestWorldSnapshot = message.payload.snapshot;
+            HideWorldLoading();
             latestStaticObstacles = latestWorldSnapshot.obstacles || latestWorldSnapshot.terrainObjects || [];
             previousSnapshot = null;
             currentSnapshot = null;
@@ -22341,6 +22540,7 @@ button:hover {
             } );
             break;
         case 'WORKER_ERROR' :
+            HideWorldLoading();
             AppendLog('Worker error: '+message.payload.message);
             pendingSaveRequest = false;
             pendingLoadRequest = false;
@@ -22407,6 +22607,7 @@ button:hover {
         lastSnapshotPhase = null;
         HideMainMenu();
         HideCustomGamePanel();
+        ShowWorldLoading();
         selectedObject = null;
         UpdateSelectedObjectPanel();
         managementDrawerVisible = true;
@@ -22548,6 +22749,9 @@ button:hover {
         } );
     } );
     startSeasonButton.addEventListener('click', function (){
+        if (latestSnapshot && latestSnapshot.phase==='roundEnded'){
+            ShowWorldLoading();
+        }
         if (latestSnapshot && latestSnapshot.foodPlan && latestSnapshot.foodPlan.shortage>0){
             ShowFoodShortageDialog();
             return;
