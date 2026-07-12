@@ -8039,28 +8039,106 @@ button:hover {
         scale = 1+(scale-1) * distanceFactor;
         return Clamp(scale, 0.58, 1.22);
     }
+    function AddNumericEffectValues(target, amounts){
+        if (!amounts){
+            return;
+        }
+        Object.keys(target).forEach(function (key){
+            if (typeof target[key]!=='number'){
+                return;
+            }
+            target[key]+=Number.isFinite(amounts[key]) ? amounts[key] : 0;
+        } );
+    }
+    function AddSkinProteinValues(target, amounts){
+        if (!amounts){
+            return;
+        }
+        ['verdine',
+        'jaunine',
+        'orgine',
+        'cerulene',
+        'rodine',
+        'negrine'].forEach(function (key){
+            target[key]+=Number.isFinite(amounts[key]) ? amounts[key] : 0;
+        } );
+    }
     function CreateSkinProteinState(values){
-        var state = Object.assign({ verdine:0, jaunine:0, orgine:0, cerulene:0, rodine:0, negrine:0 }, values || {});
-        state.add = function(amounts){ if (!amounts){ return; } ['verdine','jaunine','orgine','cerulene','rodine','negrine'].forEach(function(key){ state[key]+=(Number.isFinite(amounts[key]) ? amounts[key] : 0); }); };
-        state.cloneWith = function(other){ var result=CreateSkinProteinState(state); result.add(other); return result; };
-        state.clamp = function(){ ['verdine','jaunine','orgine','cerulene','rodine','negrine'].forEach(function(key){ state[key]=ClampByte(state[key]); }); };
+        var state = {
+            verdine : 0,
+            jaunine : 0,
+            orgine : 0,
+            cerulene : 0,
+            rodine : 0,
+            negrine : 0
+        };
+        AddSkinProteinValues(state, values);
+        state.add = function (amounts){
+            AddSkinProteinValues(state, amounts);
+        };
+        state.cloneWith = function (other){
+            var result = CreateSkinProteinState(state);
+            result.add(other);
+            return result;
+        };
+        state.clamp = function (){
+            ['verdine',
+            'jaunine',
+            'orgine',
+            'cerulene',
+            'rodine',
+            'negrine'].forEach(function (key){
+                state[key] = ClampByte(state[key]);
+            } );
+        };
         return state;
     }
-
     function CreateMetabolicFactorState(values){
-        var state=Object.assign({ baseMetabolicRate:0, coldTolerance:0, heatTolerance:0, plumptin:0, energyConservation:0, satietyConservationEffect:0 }, values || {});
-        state.add=function(amounts){ if (!amounts){ return; } Object.keys(state).forEach(function(key){ if (typeof state[key]==='number'){ state[key]+=(Number.isFinite(amounts[key]) ? amounts[key] : 0); } }); };
-        state.cloneWith=function(other){ var result=CreateMetabolicFactorState(state); result.add(other); return result; };
+        var state = {
+            baseMetabolicRate : 0,
+            coldTolerance : 0,
+            heatTolerance : 0,
+            plumptin : 0,
+            energyConservation : 0,
+            satietyConservationEffect : 0
+        };
+        AddNumericEffectValues(state, values);
+        state.add = function (amounts){
+            AddNumericEffectValues(state, amounts);
+        };
+        state.cloneWith = function (other){
+            var result = CreateMetabolicFactorState(state);
+            result.add(other);
+            return result;
+        };
         return state;
     }
-
     function CreateMorphologyFactorState(values){
-        var state=Object.assign({ frameScale:0, vertebralLength:0, torsoDepth:0, limbLength:0, forelimbMuscle:0, hindlimbMuscle:0, muscleGrowth:0, boneGrowth:0, boneMineralisation:0, spineSize:0, toothSize:0, growthRate:0 }, values || {});
-        state.add=function(amounts){ if (!amounts){ return; } Object.keys(state).forEach(function(key){ if (typeof state[key]==='number'){ state[key]+=(Number.isFinite(amounts[key]) ? amounts[key] : 0); } }); };
-        state.cloneWith=function(other){ var result=CreateMorphologyFactorState(state); result.add(other); return result; };
+        var state = {
+            frameScale : 0,
+            vertebralLength : 0,
+            torsoDepth : 0,
+            limbLength : 0,
+            forelimbMuscle : 0,
+            hindlimbMuscle : 0,
+            muscleGrowth : 0,
+            boneGrowth : 0,
+            boneMineralisation : 0,
+            spineSize : 0,
+            toothSize : 0,
+            growthRate : 0
+        };
+        AddNumericEffectValues(state, values);
+        state.add = function (amounts){
+            AddNumericEffectValues(state, amounts);
+        };
+        state.cloneWith = function (other){
+            var result = CreateMorphologyFactorState(state);
+            result.add(other);
+            return result;
+        };
         return state;
     }
-
 
     function CreateBehaviourHormoneEffectBag(){
         return {
@@ -8106,19 +8184,62 @@ button:hover {
         return result;
     }
     function CreateReproductionFactorState(values){
-        var state=Object.assign({ follicleRecruitment:0, yolkSynthesis:0, shellDeposition:0, shellPermeability:0, developmentRate:0, gameteMaintenance:0, reproductiveRepair:0, reproductiveSenescenceResistance:0, sexHormone:0, femaleBias:0, maleBias:0, tumourSuppression:0 }, values || {});
-        state.add=function(amounts){ Object.keys(state).forEach(function(key){ if (typeof state[key]==='number'){ state[key]+=(amounts && Number.isFinite(amounts[key])) ? amounts[key] : 0; } }); };
-        state.cloneWith=function(other){ var result=CreateReproductionFactorState(state); result.add(other); return result; };
+        var state = {
+            follicleRecruitment : 0,
+            yolkSynthesis : 0,
+            shellDeposition : 0,
+            shellPermeability : 0,
+            developmentRate : 0,
+            gameteMaintenance : 0,
+            reproductiveRepair : 0,
+            reproductiveSenescenceResistance : 0,
+            sexHormone : 0,
+            femaleBias : 0,
+            maleBias : 0,
+            tumourSuppression : 0
+        };
+        AddNumericEffectValues(state, values);
+        state.add = function (amounts){
+            AddNumericEffectValues(state, amounts);
+        };
+        state.cloneWith = function (other){
+            var result = CreateReproductionFactorState(state);
+            result.add(other);
+            return result;
+        };
         return state;
     }
-
     function CreatePerceptionFactorState(values){
-        var state=Object.assign({ photonSensitivity:0, brightnessTolerance:0, visualResolution:0, motionSensitivity:0, rodBias:0, colourDiscrimination:0, hearingSensitivity:0, highFrequencyBias:0, lowFrequencyBias:0, noiseRejection:0, sensoryGate:0, falsePositiveBias:0, socialResponseBias:0, socialIndependence:0, neuralCost:0, eyeRedness:0, junkHealth:0 }, values || {});
-        state.add=function(amounts){ Object.keys(state).forEach(function(key){ if (typeof state[key]==='number'){ state[key]+=(amounts && Number.isFinite(amounts[key])) ? amounts[key] : 0; } }); };
-        state.cloneWith=function(other){ var result=CreatePerceptionFactorState(state); result.add(other); return result; };
+        var state = {
+            photonSensitivity : 0,
+            brightnessTolerance : 0,
+            visualResolution : 0,
+            motionSensitivity : 0,
+            rodBias : 0,
+            colourDiscrimination : 0,
+            hearingSensitivity : 0,
+            highFrequencyBias : 0,
+            lowFrequencyBias : 0,
+            noiseRejection : 0,
+            sensoryGate : 0,
+            falsePositiveBias : 0,
+            socialResponseBias : 0,
+            socialIndependence : 0,
+            neuralCost : 0,
+            eyeRedness : 0,
+            junkHealth : 0
+        };
+        AddNumericEffectValues(state, values);
+        state.add = function (amounts){
+            AddNumericEffectValues(state, amounts);
+        };
+        state.cloneWith = function (other){
+            var result = CreatePerceptionFactorState(state);
+            result.add(other);
+            return result;
+        };
         return state;
     }
-
     class MonsterPhenotypeExpressionContext{
         constructor(monster){
             this.monster = monster || null;
@@ -8140,7 +8261,14 @@ button:hover {
         }
 
         static createPerceptionEffectBag(){
-            return { basePerceptionFactors:CreatePerceptionFactorState(), codominantPerceptionLayers:[CreatePerceptionFactorState(),CreatePerceptionFactorState()], usedCodominantPerceptionLayers:false };
+            return {
+                basePerceptionFactors : CreatePerceptionFactorState(),
+                codominantPerceptionLayers : [
+                    CreatePerceptionFactorState(),
+                    CreatePerceptionFactorState()
+                ],
+                usedCodominantPerceptionLayers : false
+            };
         }
 
         static createColourEffectBag(){
@@ -8171,7 +8299,14 @@ button:hover {
         }
 
         static createReproductionEffectBag(){
-            return { baseReproductionFactors : CreateReproductionFactorState(), codominantReproductionLayers : [CreateReproductionFactorState(), CreateReproductionFactorState()], usedCodominantReproductionLayers : false };
+            return {
+                baseReproductionFactors : CreateReproductionFactorState(),
+                codominantReproductionLayers : [
+                    CreateReproductionFactorState(),
+                    CreateReproductionFactorState()
+                ],
+                usedCodominantReproductionLayers : false
+            };
         }
 
         static createBehaviourEffectBag(){
@@ -13710,7 +13845,10 @@ button:hover {
                 // Seeded stochastic rounding preserves expected deterrence even when
                 // the unmodified class count is one, so a fully deterred knight raid
                 // has a real chance to contain no knights.
-                counts[className] = Math.floor(adjustedCount)+(this.rng.nextFloat()<adjustedCount-Math.floor(adjustedCount) ? 1 : 0);
+                var wholeCount = Math.floor(adjustedCount);
+                var fractionalCount = adjustedCount-wholeCount;
+                counts[className] = wholeCount+
+                    (this.rng.nextFloat()<fractionalCount ? 1 : 0);
             } , this);
             if (counts.villager<=0 && counts.explorer<=0 && counts.warrior<=0 && counts.knight<=0){
                 counts.villager = 1;
@@ -17568,13 +17706,36 @@ button:hover {
         var customHotDesert = World.createEnvironment(new SeededRng(440401), { biomeType:'hotDesert' });
         var customCoastalTemperate = World.createEnvironment(new SeededRng(440402), { biomeType:'coastalTemperate' });
         AddRegressionResult(results, 'Custom biome selection controls climate inputs', customHotDesert.climateClass==='hotDesert' && customHotDesert.aridity>=0.62 && customCoastalTemperate.climateClass==='coastalTemperate' && customCoastalTemperate.forceCoastline===true, 'hot='+customHotDesert.climateClass+'/'+customHotDesert.aridity.toFixed(2)+', coast='+customCoastalTemperate.climateClass+'/'+customCoastalTemperate.forceCoastline);
-        var wildReturnRegression = new Monster('wild_return_regression', 0, 0, new SeededRng(777001), { owned:false, collared:false, wild:true });
+        var wildReturnRegression = new Monster(
+            'wild_return_regression',
+            0,
+            0,
+            new SeededRng(777001),
+            {
+                owned : false,
+                collared : false,
+                wild : true
+            }
+        );
         wildReturnRegression.alive = true;
         wildReturnRegression.deployed = false;
         wildReturnRegression.escaped = true;
         wildReturnRegression.wildReturnTick = 1;
-        AddRegressionResult(results, 'Departed wild monsters retain an in-season return schedule', Number.isFinite(wildReturnRegression.wildReturnTick) && WILD_MONSTER_RETURN_CHANCE>0, 'returnTick='+wildReturnRegression.wildReturnTick+', chance='+WILD_MONSTER_RETURN_CHANCE);
-        AddRegressionResult(results, 'Knight deterrence can reduce a one-knight expectation below one before seeded rounding', ADVENTURER_PROFILE.knight.deterrenceSensitivity>0.20 && (1-ADVENTURER_PROFILE.knight.deterrenceSensitivity*0.65)<1, 'sensitivity='+ADVENTURER_PROFILE.knight.deterrenceSensitivity);
+        AddRegressionResult(
+            results,
+            'Departed wild monsters retain an in-season return schedule',
+            Number.isFinite(wildReturnRegression.wildReturnTick) &&
+                WILD_MONSTER_RETURN_CHANCE>0,
+            'returnTick='+wildReturnRegression.wildReturnTick+
+                ', chance='+WILD_MONSTER_RETURN_CHANCE
+        );
+        AddRegressionResult(
+            results,
+            'Knight deterrence can reduce a one-knight expectation below one before seeded rounding',
+            ADVENTURER_PROFILE.knight.deterrenceSensitivity>0.20 &&
+                (1-ADVENTURER_PROFILE.knight.deterrenceSensitivity*0.65)<1,
+            'sensitivity='+ADVENTURER_PROFILE.knight.deterrenceSensitivity
+        );
         var round8TreasureProbabilities = World.campaignTreasureTierProbabilities(8);
         var round9TreasureProbabilities = World.campaignTreasureTierProbabilities(9);
         var round12TreasureProbabilities = World.campaignTreasureTierProbabilities(12);
