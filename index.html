@@ -1194,6 +1194,11 @@ button:hover {
     var MIN_SUPPORTED_SAVE_FORMAT_VERSION = 1;
     var REFERENCE_MAP_WIDTH = 1800;
     var REFERENCE_MAP_HEIGHT = 1200;
+    // Every campaign round represents this fixed ecological unit. The playable map
+    // occupies a centred fraction of it; the remainder exists off-map but supports
+    // the same local breeding population.
+    var ECOLOGICAL_UNIT_WIDTH = 30000;
+    var ECOLOGICAL_UNIT_HEIGHT = 20000;
     var QUICK_MAP_WIDTH = 4500;
     var QUICK_MAP_HEIGHT = 3000;
     var DEFAULT_MAP_WIDTH = 7200;
@@ -11049,17 +11054,9 @@ button:hover {
             return clone;
         }
         static randomName(rng){
-            return rng.pick(['Gr',
-            'Sn',
-            'Dr',
-            'Br',
-            'Kr',
-            'Mog'])+rng.pick(['ibble',
-            'ash',
-            'og',
-            'fang',
-            'mire',
-            'snout']);
+            var beginnings = ['Gr','Sn','Dr','Br','Kr','Mog','Fl','Sk','Tr','Vr','Cl','Gl','Pr','Zog','Th','Bl','Fr','Qu','Scr','Pl','Gn','Wr','Spl','Ch'];
+            var endings = ['ibble','ash','og','fang','mire','snout','onk','oodle','ump','izzle','ackle','umbo','erp','osh','indle','onkles','uff','aggle','imble','oof','uzzle','eek','omp','ackleby','nibble','gloop','whisk','rumble','sprocket','pickle','biscuit','wobble','crump','bog','muffin','chomp','doodle','sprout','truffle','bonk'];
+            return rng.pick(beginnings)+rng.pick(endings);
         }
         getRepathCooldownTicks(){
             return PATH_MONSTER_REPATH_COOLDOWN_TICKS;
@@ -13116,6 +13113,10 @@ button:hover {
             this.treasureSoldForFoodValue = 0;
             this.roundTreasureSoldForFoodValue = 0;
             this.wildMonsterHarvestByBiome = {};
+            this.wildPopulation = [];
+            this.wildPopulationWorldSeed = null;
+            this.wildPopulationCarryingCapacity = 0;
+            this.wildPopulationGeneration = 0;
         }
         recordFamilyMonster(monster){ if(!monster){return;} if(!this.familyTree[monster.id]){this.familyTree[monster.id]=new FamilyTreeRecord(monster);} else {this.familyTree[monster.id].update(monster);} }
         updateFamilyTree(){ this.ownedMonsters.forEach(function(m){this.recordFamilyMonster(m);},this); }
@@ -13206,50 +13207,97 @@ button:hover {
             return TERRAIN_NAMES[world.terrainGrid.getTerrainTypeAtWorld(x, y)] || 'unknown';
         }
         dominantBiomeForWorld(world){
-            if (!world || !world.terrainGrid || !world.terrainGrid.terrainTypes){
-                return 'unknown';
-            }
+            if (!world || !world.terrainGrid || !world.terrainGrid.terrainTypes){ return 'unknown'; }
             var counts = {};
-            for (var i = 0; i<world.terrainGrid.terrainTypes.length; i+=1){
-                var biome = TERRAIN_NAMES[world.terrainGrid.terrainTypes[i]] || 'unknown';
-                counts[biome] = (counts[biome] || 0)+1;
+            for (var i=0; i<world.terrainGrid.terrainTypes.length; i+=1){
+                var biome=TERRAIN_NAMES[world.terrainGrid.terrainTypes[i]] || 'unknown';
+                counts[biome]=(counts[biome] || 0)+1;
             }
-            var keys = Object.keys(counts);
-            keys.sort(function(a, b){ return counts[b]-counts[a]; });
-            return keys.length ? keys[0] : 'unknown';
+            return Object.keys(counts).sort(function(a,b){ return counts[b]-counts[a]; })[0] || 'unknown';
         }
         recordWildMonsterRelease(monster, world){
-            if (!monster){
-                return;
-            }
-            var biome = monster.wildOriginBiome && monster.wildOriginBiome!=='unknown' ? monster.wildOriginBiome : this.dominantBiomeForWorld(world);
-            this.wildMonsterHarvestByBiome[biome] = Math.max(0, (this.wildMonsterHarvestByBiome[biome] || 0)-1);
-            if (this.wildMonsterHarvestByBiome[biome]<0.05){
-                delete this.wildMonsterHarvestByBiome[biome];
-            }
-            monster.wildOriginBiome = biome;
+            if (!monster){ return; }
+            monster.wildOriginBiome = monster.wildOriginBiome && monster.wildOriginBiome!=='unknown' ? monster.wildOriginBiome : this.dominantBiomeForWorld(world);
+            monster.wild = true;
+            monster.localWorldSeed = world ? world.seed : null;
+            monster.wildResident = true;
+            monster.wildAvailableFromSeason = Math.max(1, (this.currentSeasonNumber || 1)+1);
+            if (!Number.isFinite(monster.wildHomeRangeX)){ monster.wildHomeRangeX=ECOLOGICAL_UNIT_WIDTH * 0.5; }
+            if (!Number.isFinite(monster.wildHomeRangeY)){ monster.wildHomeRangeY=ECOLOGICAL_UNIT_HEIGHT * 0.5; }
+            if (!Number.isFinite(monster.wildHomeRangeRadius)){ monster.wildHomeRangeRadius=2200; }
+            if (this.wildPopulation.indexOf(monster)<0){ this.wildPopulation.push(monster); }
         }
         resetWildMonsterDepletionForNewRound(){
             this.wildMonsterHarvestByBiome = {};
+            this.wildPopulation = [];
+            this.wildPopulationWorldSeed = null;
+            this.wildPopulationCarryingCapacity = 0;
+            this.wildPopulationGeneration = 0;
         }
         recordWildMonsterHarvest(monster){
-            if (!monster || !monster.wildOriginBiome){
-                return;
-            }
-            this.wildMonsterHarvestByBiome[monster.wildOriginBiome] =(this.wildMonsterHarvestByBiome[monster.wildOriginBiome] || 0)+1;
+            if (monster){ monster.wildResident = false; }
         }
-        getWildMonsterHarvestPressureForBiome(biome){
-            var harvested = this.wildMonsterHarvestByBiome[biome] || 0;
-            return Clamp(harvested / Math.max(1, IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR), 0, 0.85);
+        getFreeWildResidents(){
+            return this.wildPopulation.filter(function(monster){ return monster && monster.alive && !monster.owned && !monster.collared; });
         }
         recoverWildMonsterEcosystem(){
-            var self = this;
-            Object.keys(this.wildMonsterHarvestByBiome).forEach(function (biome){
-                self.wildMonsterHarvestByBiome[biome] = Math.max(0, self.wildMonsterHarvestByBiome[biome] * 0.72-0.15);
-                if (self.wildMonsterHarvestByBiome[biome]<0.05){
-                    delete self.wildMonsterHarvestByBiome[biome];
+            // Population recovery is performed by breeding real residents after each
+            // season; no abstract depletion counter recovers independently.
+        }
+        breedWildPopulation(rng, world, seasonNumber, captivePreyFoodEaten){
+            var free = this.getFreeWildResidents();
+            var capacity = Math.max(1, Math.round(this.wildPopulationCarryingCapacity || free.length || 1));
+            if (free.length>=capacity){ return []; }
+            if (free.length<2){
+                if (rng.nextFloat()>0.07*(1-free.length/Math.max(1,capacity))){ return []; }
+                var existingFemales=free.filter(function(m){ return m.sex===MONSTER_SEX.FEMALE; }).length;
+                var existingMales=free.length-existingFemales;
+                var immigrantSex=existingFemales<existingMales ? MONSTER_SEX.FEMALE : (existingMales<existingFemales ? MONSTER_SEX.MALE : (rng.nextFloat()<0.5 ? MONSTER_SEX.FEMALE : MONSTER_SEX.MALE));
+                for (var immigrantAttempt=0;immigrantAttempt<1024;immigrantAttempt+=1){
+                    var immigrant=new Monster(this.createMonsterId('wildimmigrant'),0,0,rng,{owned:false,collared:false,wild:true,selectedForDeployment:false,world:world,ageInSeasons:4,sex:immigrantSex});
+                    var viable=true;
+                    for (var immigrantSeason=1;immigrantSeason<=SEASON_NAMES.length;immigrantSeason+=1){ if (MonsterMetabolismSystem.thermalStatus(immigrant,world,immigrantSeason).severe){ viable=false; break; } }
+                    if (viable){
+                        immigrant.wildResident=true; immigrant.localWorldSeed=world.seed;
+                        immigrant.wildOriginBiome=this.dominantBiomeForWorld(world); immigrant.wildAvailableFromSeason=seasonNumber+1;
+                        immigrant.wildHomeRangeX=rng.range(0,ECOLOGICAL_UNIT_WIDTH); immigrant.wildHomeRangeY=rng.range(0,ECOLOGICAL_UNIT_HEIGHT);
+                        immigrant.wildHomeRangeRadius=rng.range(1500,3200) * Clamp(Math.sqrt(immigrant.bodyScale || 1),0.75,1.35);
+                        this.wildPopulation.push(immigrant); return [immigrant];
+                    }
                 }
-            });
+                return [];
+            }
+            var females=free.filter(function(m){ return m.sex===MONSTER_SEX.FEMALE && m.lifeStage===MONSTER_LIFE_STAGE.ADULT && m.reproductiveCondition()>0.35; });
+            var males=free.filter(function(m){ return m.sex===MONSTER_SEX.MALE && m.lifeStage===MONSTER_LIFE_STAGE.ADULT && m.reproductiveCondition()>0.35; });
+            if (!females.length || !males.length){ return []; }
+            var ecology=MonsterMetabolismSystem.macrofaunaEcologyProfile(world);
+            var preyFood=Math.max(1, ecology.expectedFood || 1);
+            var captivePressure=Clamp((captivePreyFoodEaten || 0)/(preyFood * Math.max(1, IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR)),0,0.65);
+            var densityPressure=free.length/Math.max(1,capacity);
+            var recruitmentChance=Clamp(0.20*(1-densityPressure)*(1-captivePressure),0.015,0.18);
+            if (rng.nextFloat()>recruitmentChance){ return []; }
+            var mother=rng.pick(females), father=rng.pick(males);
+            var childGenome=MonsterGenePool.createOffspringGenome(mother.genome,father.genome,rng);
+            var motherReproduction=mother.phenotype && mother.phenotype.reproduction ? mother.phenotype.reproduction : null;
+            var fatherReproduction=father.phenotype && father.phenotype.reproduction ? father.phenotype.reproduction : null;
+            var parentSexBias=((motherReproduction ? motherReproduction.offspringSexBias : 0)+(fatherReproduction ? fatherReproduction.offspringSexBias : 0)) * 0.5;
+            var childFemaleChance=Clamp(0.5+parentSexBias * 0.5,0.12,0.88);
+            var childSex=rng.nextFloat()<childFemaleChance ? MONSTER_SEX.FEMALE : MONSTER_SEX.MALE;
+            var child=new Monster(this.createMonsterId('wildborn'),0,0,rng,{owned:false,collared:false,wild:true,selectedForDeployment:false,world:world,genome:childGenome,ageInSeasons:4,sex:childSex});
+            for (var childSeason=1;childSeason<=SEASON_NAMES.length;childSeason+=1){
+                if (MonsterMetabolismSystem.thermalStatus(child,world,childSeason).severe){ return []; }
+            }
+            child.wildResident=true;
+            child.localWorldSeed=world.seed;
+            child.wildOriginBiome=mother.wildOriginBiome || father.wildOriginBiome || this.dominantBiomeForWorld(world);
+            child.wildAvailableFromSeason=seasonNumber+1;
+            child.wildParentIds=[mother.id,father.id];
+            child.wildHomeRangeX=Clamp(((mother.wildHomeRangeX || ECOLOGICAL_UNIT_WIDTH * 0.5)+(father.wildHomeRangeX || ECOLOGICAL_UNIT_WIDTH * 0.5))*0.5+rng.range(-1800,1800),0,ECOLOGICAL_UNIT_WIDTH);
+            child.wildHomeRangeY=Clamp(((mother.wildHomeRangeY || ECOLOGICAL_UNIT_HEIGHT * 0.5)+(father.wildHomeRangeY || ECOLOGICAL_UNIT_HEIGHT * 0.5))*0.5+rng.range(-1400,1400),0,ECOLOGICAL_UNIT_HEIGHT);
+            child.wildHomeRangeRadius=rng.range(1500,3000) * Clamp(Math.sqrt(child.bodyScale || 1),0.75,1.35);
+            this.wildPopulation.push(child);
+            this.wildPopulationGeneration+=1;
+            return [child];
         }
         resetAllOwnedForManagement(){
             this.updateFamilyTree();
@@ -13488,6 +13536,7 @@ button:hover {
             this.gameState.getLivingOwnedMonsters().forEach(function (monster){
                 var thermal = MonsterMetabolismSystem.thermalStatus(monster, this.world, this.seasonNumber);
                 monster.applyThermalStatus(thermal);
+                if (monster.localWorldSeed===this.world.seed){ monster.thermalDeploymentBlockReason=''; }
             } , this);
             var generatedAdventurers = this.createAdventurers();
             this.adventurers = [];
@@ -13801,102 +13850,111 @@ button:hover {
             return animals;
         }
         estimateWildMonsterCapacity(){
-            var ecology = MonsterMetabolismSystem.macrofaunaEcologyProfile(this.world);
-            var expectedFood = ecology.expectedFood || 0;
-            var meanMonsterFood = 11.5;
-            // Capacity is always the honest food-web result. Early campaigns obtain
-            // abundant monsters by selecting productive maps, never by multiplying
-            // food or imposing a minimum predator population.
-            var ecosystemFood = expectedFood * IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR;
-            var sustainableMonsters = ecosystemFood / Math.max(1, meanMonsterFood * 4.2);
-            var visibleFraction = Clamp(0.12+Math.sqrt(Math.max(0, ecology.availability || 0)) * 0.20, 0.06, 0.42);
-            var gross = sustainableMonsters * visibleFraction;
-            var depletion = 0;
-            var keys = Object.keys(this.gameState.wildMonsterHarvestByBiome || {});
-            for (var d = 0; d<keys.length; d+=1){
-                depletion+=this.gameState.getWildMonsterHarvestPressureForBiome(keys[d]);
-            }
-            var net = gross * Clamp(1-depletion / Math.max(1, keys.length || 1), 0.15, 1);
-            return Clamp(net, 0, Math.max(WILD_MONSTER_COUNT_MAX, WILD_MONSTER_COUNT_MAX * IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR));
+            var ecology=MonsterMetabolismSystem.macrofaunaEcologyProfile(this.world);
+            var expectedFood=ecology.expectedFood || 0;
+            // Every round represents the same fixed ecological unit. Expected food is
+            // already an area-normalised density, so changing interactive map size
+            // changes the implied off-map remainder rather than total ecological food.
+            var fixedEcologicalUnitFoodFactor=45;
+            var unitFood=expectedFood*fixedEcologicalUnitFoodFactor;
+            var climateHarshness=Clamp((ecology.availability || 0.5),0.12,1.1);
+            var capacity=unitFood/Math.max(1,11.5*2.15);
+            capacity*=Clamp(0.72+climateHarshness*0.55,0.45,1.25);
+            return Clamp(capacity,1,Math.max(6,WILD_MONSTER_COUNT_MAX*IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR));
         }
         monsterCanRemainActiveThroughLocalYear(monster){
-            for (var seasonNumber = 1; seasonNumber<=SEASON_NAMES.length; seasonNumber+=1){
-                if (MonsterMetabolismSystem.thermalStatus(monster, this.world, seasonNumber).severe){
-                    return false;
-                }
+            for (var seasonNumber=1;seasonNumber<=SEASON_NAMES.length;seasonNumber+=1){
+                if (MonsterMetabolismSystem.thermalStatus(monster,this.world,seasonNumber).severe){ return false; }
             }
             return true;
         }
-        createAnnuallyViableWildMonster(monsterId){
-            // The gene pool selects metabolism against every local season. This final
-            // ecological filter evaluates the complete expressed animal, including
-            // body size, fat reserves and metabolic output, over the same annual cycle.
-            // A winter-active animal must therefore also be capable of summer activity,
-            // and vice versa. No tolerance gene is rewritten and wild monsters receive
-            // no immunity from the ordinary thermal simulation.
-            var candidateCount = 32;
-            for (var candidateIndex = 0; candidateIndex<candidateCount; candidateIndex+=1){
-                var candidate = new Monster(monsterId, 0, 0, this.rng, {
-                    owned : false,
-                    collared : false,
-                    wild : true,
-                    selectedForDeployment : false,
-                    world : this.world
-                } );
+        createAnnuallyViableWildMonster(monsterId, genome, requiredSex){
+            var best=null, bestWorstStress=Infinity;
+            // Population count is fixed before phenotype selection. Keep sampling until
+            // a resident able to deploy in every season when healthy is found.
+            for (var candidateIndex=0;candidateIndex<4096;candidateIndex+=1){
+                var candidate=new Monster(monsterId,0,0,this.rng,{owned:false,collared:false,wild:true,selectedForDeployment:false,world:this.world,genome:genome || undefined,sex:requiredSex || undefined});
+                var worst=0;
+                for (var season=1;season<=SEASON_NAMES.length;season+=1){ worst=Math.max(worst,MonsterMetabolismSystem.thermalStatus(candidate,this.world,season).stress || 0); }
+                if (worst<bestWorstStress){ best=candidate; bestWorstStress=worst; }
                 if (this.monsterCanRemainActiveThroughLocalYear(candidate)){
-                    // Trophic pyramids support many more small predators than apex
-                    // predators. Size changes encounter frequency only after ordinary
-                    // local natural selection has produced the complete phenotype.
-                    var mass = Math.max(8, candidate.currentBodyMass || 100);
-                    // The previous shallow exponent still admitted about 77 percent
-                    // of 80 kg candidates and 55 percent of 120 kg candidates. That
-                    // made consecutive apex-sized arrivals common in small-prey early
-                    // ecologies. Square-law trophic filtering makes large phenotypes
-                    // possible but appropriately exceptional without altering their
-                    // naturally selected genomes or imposing a campaign size cap.
-                    var ecology = MonsterMetabolismSystem.macrofaunaEcologyProfile(this.world);
-                    var localProductivity = Clamp((ecology.availability || 0) / 0.62, 0.04, 1.35);
-                    var individualFoodDemand = Math.max(1, candidate.nutritionRequirement || 10);
-                    var demandPenalty = Clamp(12 / individualFoodDemand, 0.08, 1.25);
-                    var dominantNiche = ecology.preyNiches && ecology.preyNiches.length ? ecology.preyNiches.slice(0).sort(function (a, b){ return (b.weight || 0)-(a.weight || 0); })[0] : null;
-                    var smallPreyWorld = !!dominantNiche && (dominantNiche.species==='hare' || dominantNiche.species==='fox');
-                    var oversizeSmallPreyPenalty = smallPreyWorld ? Clamp(Math.pow(52 / mass, 1.35), 0.025, 1) : 1;
-                    // Encounter frequency derives from mass, individual energetic demand
-                    // and this world's prey productivity. There is deliberately no
-                    // campaign-round bonus and no unconditional giant acceptance floor.
-                    var abundanceChance = Clamp(Math.pow(35 / mass, 2.0) * localProductivity * demandPenalty * oversizeSmallPreyPenalty, 0.0005, 1);
-                    if (this.rng.nextFloat()>abundanceChance){
-                        continue;
-                    }
-                    candidate.applyThermalStatus(MonsterMetabolismSystem.thermalStatus(candidate, this.world, this.seasonNumber));
+                    candidate.applyThermalStatus(MonsterMetabolismSystem.thermalStatus(candidate,this.world,this.seasonNumber));
+                    candidate.localWorldSeed=this.world.seed;
+                    candidate.wildResident=true;
                     return candidate;
                 }
             }
-            return null;
+            // Extremely pathological custom climates still retain the population slot;
+            // the least-stressed evolved candidate is used rather than deleting it.
+            best.applyThermalStatus(MonsterMetabolismSystem.thermalStatus(best,this.world,this.seasonNumber));
+            best.localWorldSeed=this.world.seed;
+            best.wildResident=true;
+            return best;
+        }
+        ensureWildPopulation(){
+            if (this.gameState.wildPopulationWorldSeed!==this.world.seed){
+                this.gameState.wildPopulation=[];
+                this.gameState.wildPopulationWorldSeed=this.world.seed;
+                var expected=this.estimateWildMonsterCapacity();
+                var count=Math.floor(expected)+(this.rng.nextFloat()<expected-Math.floor(expected)?1:0);
+                count=Math.max(1,count);
+                this.gameState.wildPopulationCarryingCapacity=expected;
+                var femaleCount=count===1 ? (this.rng.nextFloat()<0.5 ? 1 : 0) : Math.floor(count / 2);
+                if (count>1 && count % 2===1 && this.rng.nextFloat()<0.5){ femaleCount+=1; }
+                var residentSexes=[];
+                for (var femaleIndex=0;femaleIndex<femaleCount;femaleIndex+=1){ residentSexes.push(MONSTER_SEX.FEMALE); }
+                for (var maleIndex=femaleCount;maleIndex<count;maleIndex+=1){ residentSexes.push(MONSTER_SEX.MALE); }
+                // Shuffle encounter identity while preserving the population sex ratio.
+                for (var shuffleIndex=residentSexes.length-1;shuffleIndex>0;shuffleIndex-=1){
+                    var swapIndex=this.rng.integer(0,shuffleIndex);
+                    var swapSex=residentSexes[shuffleIndex]; residentSexes[shuffleIndex]=residentSexes[swapIndex]; residentSexes[swapIndex]=swapSex;
+                }
+                for (var i=0;i<count;i+=1){
+                    var resident=this.createAnnuallyViableWildMonster(this.gameState.createMonsterId('wildresident'),null,residentSexes[i]);
+                    resident.wildOriginBiome=this.gameState.dominantBiomeForWorld(this.world);
+                    resident.wildAvailableFromSeason=1;
+                    resident.wildHomeRangeX=this.rng.range(0,ECOLOGICAL_UNIT_WIDTH);
+                    resident.wildHomeRangeY=this.rng.range(0,ECOLOGICAL_UNIT_HEIGHT);
+                    resident.wildHomeRangeRadius=this.rng.range(1500,3200) * Clamp(Math.sqrt(resident.bodyScale || 1),0.75,1.35);
+                    this.gameState.wildPopulation.push(resident);
+                }
+            }
         }
         createWildMonsters(){
-            var wildMonsters = [];
-            var expectedEncounters = this.estimateWildMonsterCapacity();
-            var count = Math.floor(expectedEncounters);
-            if (this.rng.nextFloat()<expectedEncounters-count){
-                count+=1;
+            this.ensureWildPopulation();
+            var free=this.gameState.getFreeWildResidents().filter(function(m){ return (m.wildAvailableFromSeason || 1)<=this.seasonNumber; },this);
+            var ecologicalArea=ECOLOGICAL_UNIT_WIDTH * ECOLOGICAL_UNIT_HEIGHT;
+            var mapArea=Math.max(1,this.world.width*this.world.height);
+            var interactiveFraction=Clamp(mapArea/ecologicalArea,0.005,0.75);
+            var mapLeft=(ECOLOGICAL_UNIT_WIDTH-this.world.width)*0.5;
+            var mapTop=(ECOLOGICAL_UNIT_HEIGHT-this.world.height)*0.5;
+            var mapRight=mapLeft+this.world.width;
+            var mapBottom=mapTop+this.world.height;
+            var selected=[];
+            for (var i=0;i<free.length;i+=1){
+                var resident=free[i];
+                var homeX=Number.isFinite(resident.wildHomeRangeX) ? resident.wildHomeRangeX : ECOLOGICAL_UNIT_WIDTH * 0.5;
+                var homeY=Number.isFinite(resident.wildHomeRangeY) ? resident.wildHomeRangeY : ECOLOGICAL_UNIT_HEIGHT * 0.5;
+                var radius=Number.isFinite(resident.wildHomeRangeRadius) ? resident.wildHomeRangeRadius : 2200;
+                var nearestX=Clamp(homeX,mapLeft,mapRight);
+                var nearestY=Clamp(homeY,mapTop,mapBottom);
+                var distanceToMap=Distance(homeX,homeY,nearestX,nearestY);
+                var overlapStrength=Clamp(1-distanceToMap/Math.max(1,radius),0,1);
+                // Every resident still makes an independent seasonal roll. Map size
+                // and persistent home-range overlap now calibrate that probability.
+                var encounterChance=Clamp(0.025+Math.sqrt(interactiveFraction)*0.16+overlapStrength*0.17,0.025,0.32);
+                if (this.rng.nextFloat()<encounterChance){ selected.push(resident); }
             }
-            var spawnTick = this.rng.integer(WILD_MONSTER_FIRST_SPAWN_TICK_MIN, WILD_MONSTER_FIRST_SPAWN_TICK_MAX);
-            for (var i = 0;
-            i<count;
-            i+=1){
-                var monster = this.createAnnuallyViableWildMonster(this.gameState.createMonsterId('wild'));
-                if (!monster){
-                    continue;
-                }
-                monster.wildOriginBiome = 'unknown';
-                monster.spawnTick = spawnTick;
-                monster.deployed = false;
-                monster.behaviourState = 'offMapWild';
-                wildMonsters.push(monster);
-                spawnTick+=this.rng.integer(WILD_MONSTER_SPAWN_GAP_MIN, WILD_MONSTER_SPAWN_GAP_MAX);
-            }
-            return wildMonsters;
+            // A player with no captive monsters must have at least one first-season
+            // opportunity, drawn from the real resident population.
+            if (this.seasonNumber===1 && this.gameState.getLivingOwnedMonsters().length===0 && selected.length===0 && free.length){ selected.push(this.rng.pick(free)); }
+            var spawnTick=this.rng.integer(WILD_MONSTER_FIRST_SPAWN_TICK_MIN,WILD_MONSTER_FIRST_SPAWN_TICK_MAX);
+            selected.forEach(function(monster){
+                monster.spawnTick=spawnTick;
+                monster.deployed=false; monster.escaped=false; monster.behaviourState='offMapWild';
+                spawnTick+=this.rng.integer(WILD_MONSTER_SPAWN_GAP_MIN,WILD_MONSTER_SPAWN_GAP_MAX);
+            },this);
+            return selected;
         }
         monsterMayFeedFromCarcass(monster, carcass){
             if (!monster || !carcass){
@@ -14581,6 +14639,8 @@ button:hover {
                     reason : 'That monster is already collared.'
                 } ;
             }
+            monster.localWorldSeed = this.world.seed;
+            monster.wildResident = false;
             this.gameState.addCapturedMonster(monster);
             this.addEvent(monster.name+' was collared and will join the captive monsters if it survives.');
             return {
@@ -15212,6 +15272,12 @@ button:hover {
                 } );
             } , this);
             this.currentRaid.finalizeOwnedMonsterPerformance();
+            this.gameState.currentSeasonNumber=this.seasonNumber;
+            var captivePreyFoodEaten=this.currentRaid.monsters.filter(function(m){ return m.owned; }).reduce(function(sum,m){ return sum+(m.foodEatenThisSeason || 0); },0);
+            var wildBirths=this.gameState.breedWildPopulation(this.currentRaid.rng,this.world,this.seasonNumber,captivePreyFoodEaten);
+            if (wildBirths.length){
+                this.pendingEvents.push({tickNumber:finishedTickNumber,text:'A new wild monster survived to recruitment in the surrounding ecological unit.'});
+            }
             var lifecycleResult = this.gameState.advanceLifecycleAfterSeason(this.currentRaid.rng, this.world, this.seasonNumber);
             lifecycleResult.events.forEach(function (eventText){
                 this.pendingEvents.push({
@@ -17448,7 +17514,7 @@ button:hover {
             variedEarlyTemperatures.push(World.createEnvironment(new SeededRng(430000+climateSeed), { campaignRound : 1 }).temperature);
         }
         AddRegressionResult(results, 'Early campaign climate has no mild hard-coded temperature band', Math.min.apply(null, variedEarlyTemperatures)<0.40 && Math.max.apply(null, variedEarlyTemperatures)>0.70, 'range='+Math.min.apply(null, variedEarlyTemperatures).toFixed(3)+'-'+Math.max.apply(null, variedEarlyTemperatures).toFixed(3));
-        AddRegressionResult(results, 'Wild capacity contains no early-round multiplier or minimum population', Raid.prototype.estimateWildMonsterCapacity.toString().indexOf('1.55')<0 && Raid.prototype.estimateWildMonsterCapacity.toString().indexOf('minimumEarlyCapacity')<0, 'capacity is ecology-only');
+        AddRegressionResult(results, 'Wild ecological unit has a hard minimum resident capacity of one', Raid.prototype.estimateWildMonsterCapacity.call({world:session.world,gameState:session.gameState})>=1, 'capacity='+Raid.prototype.estimateWildMonsterCapacity.call({world:session.world,gameState:session.gameState}).toFixed(2));
         var coolDesertWeights = MonsterMetabolismSystem.macrofaunaSpeciesWeightsForTerrain({ environment : { temperature : 0.35, campaignRound : 4 } }, TERRAIN_TYPE.DESERT);
         var hotDesertWeights = MonsterMetabolismSystem.macrofaunaSpeciesWeightsForTerrain({ environment : { temperature : 0.80, campaignRound : 4 } }, TERRAIN_TYPE.DESERT);
         AddRegressionResult(results, 'Cool and hot deserts have distinct small-prey ecology', coolDesertWeights.hare>hotDesertWeights.hare && coolDesertWeights.fox>hotDesertWeights.fox, 'cool='+JSON.stringify(coolDesertWeights)+', hot='+JSON.stringify(hotDesertWeights));
@@ -17822,6 +17888,9 @@ button:hover {
             protocolVersion : PROTOCOL_VERSION
         } , message));
     }
+    function PostGenerationProgress(progress, message){
+        Post({ type:'GENERATION_PROGRESS', payload:{ progress:progress, message:message } });
+    }
     function EnsureGameSession(){
         if (!gameSession){
             gameSession = new GameSession(123456789, {
@@ -17908,12 +17977,16 @@ button:hover {
         try{
             switch (command.type){
             case 'NEW_RAID' :
-            case 'NEW_WORLD' : gameSession = new GameSession(command.payload && Number.isFinite(command.payload.seed) ? command.payload.seed : Date.now(), {
+            case 'NEW_WORLD' :
+                PostGenerationProgress(5, 'Obtaining planning permission from the local badgers...');
+                gameSession = new GameSession(command.payload && Number.isFinite(command.payload.seed) ? command.payload.seed : Date.now(), {
                     mode : command.payload && command.payload.mode ? command.payload.mode : 'quick',
                     worldOptions : command.payload && command.payload.worldOptions ? command.payload.worldOptions : {
                     }
                 } );
+                PostGenerationProgress(82, 'Counting the monsters and pretending not to notice them counting back...');
                 StartTicker();
+                PostGenerationProgress(94, 'Folding the ecological unit around the playable map...');
                 Post({
                     replyTo : command.messageId,
                     type : 'COMMAND_ACCEPTED'
@@ -17922,7 +17995,16 @@ button:hover {
                 SendSnapshotAndEvents(command.messageId);
                 break;
             case 'START_SEASON' : EnsureGameSession();
+                var generatingNewRound = gameSession.phase==='roundEnded';
+                if (generatingNewRound){
+                    PostGenerationProgress(7, 'Releasing the previous climate back into the wild...');
+                    PostGenerationProgress(18, 'Choosing a biome by asking three unreliable frogs...');
+                }
                 var startResult = gameSession.startSeason(command.payload && command.payload.foodAllocations ? command.payload.foodAllocations : null);
+                if (generatingNewRound && startResult.ok){
+                    PostGenerationProgress(78, 'Checking the new food web for loose screws...');
+                    PostGenerationProgress(93, 'Issuing every shrub with a provisional address...');
+                }
                 Post(startResult.ok ? {
                     replyTo : command.messageId,
                     type : 'COMMAND_ACCEPTED'
@@ -18320,49 +18402,26 @@ button:hover {
     function EndWorldRenderTransform(){
         ctx.restore();
     }
-    var worldLoadingTimer = 0;
     var worldLoadingProgress = 0;
-    var worldLoadingMessages = [
-        'Reticulating splines...',
-        'Surveying imaginary watersheds...',
-        'Negotiating with local geology...',
-        'Distributing suspiciously convenient bushes...',
-        'Calibrating predator eyebrows...',
-        'Teaching rivers which way is downhill...',
-        'Counting prey twice, then correcting it...',
-        'Polishing treasure that nobody buried...',
-        'Asking the climate to remain coherent...',
-        'Finalising ecological paperwork...'
-    ];
-    function UpdateWorldLoading(progress){
-        worldLoadingProgress = Math.max(0, Math.min(100, progress));
+    var worldLoadingActive = false;
+    function UpdateWorldLoading(progress, message){
+        if (!worldLoadingOverlay){ return; }
+        worldLoadingProgress = Math.max(0, Math.min(100, Number.isFinite(progress) ? progress : 0));
         worldLoadingFill.style.width = worldLoadingProgress.toFixed(0)+'%';
         worldLoadingPercent.textContent = worldLoadingProgress.toFixed(0)+'%';
-        var index = Math.min(worldLoadingMessages.length-1, Math.floor(worldLoadingProgress / 10));
-        worldLoadingMessage.textContent = worldLoadingMessages[index];
+        if (message){ worldLoadingMessage.textContent = message; }
     }
-    function ShowWorldLoading(){
-        if (!worldLoadingOverlay){
-            return;
-        }
-        if (typeof clearInterval==='function'){ clearInterval(worldLoadingTimer); }
-        UpdateWorldLoading(1);
+    function ShowWorldLoading(progress, message){
+        if (!worldLoadingOverlay){ return; }
+        worldLoadingActive = true;
+        UpdateWorldLoading(Number.isFinite(progress) ? progress : 0, message || 'Waking the cartographer with a carefully aimed biscuit...');
         worldLoadingOverlay.classList.add('loadingVisible');
-        worldLoadingTimer = typeof setInterval==='function' ? setInterval(function(){
-            if (worldLoadingProgress<92){
-                UpdateWorldLoading(Math.min(92, worldLoadingProgress+Math.max(1, (94-worldLoadingProgress) * 0.08)));
-            }
-        }, 120) : 0;
     }
     function HideWorldLoading(){
-        if (typeof clearInterval==='function'){ clearInterval(worldLoadingTimer); }
-        worldLoadingTimer = 0;
-        UpdateWorldLoading(100);
-        if (typeof setTimeout==='function'){
-            setTimeout(function(){ worldLoadingOverlay.classList.remove('loadingVisible'); }, 220);
-        } else{
-            worldLoadingOverlay.classList.remove('loadingVisible');
-        }
+        if (!worldLoadingOverlay){ return; }
+        worldLoadingActive = false;
+        UpdateWorldLoading(100, 'Convincing the last shrub to face the correct way...');
+        worldLoadingOverlay.classList.remove('loadingVisible');
     }
     function SendCommand(type, payload){
         worker.postMessage({
@@ -22443,6 +22502,7 @@ button:hover {
         var message = 'Worker failed: '+event.message+' at '+event.filename+':'+event.lineno;
         statusBox.textContent = message;
         AppendLog(message);
+        if (worldLoadingActive){ HideWorldLoading(); }
         RenderPlaceholder('Worker failed. See status panel and browser console.');
     } ;
     worker.onmessage = function (event){
@@ -22456,7 +22516,7 @@ button:hover {
             RenderPlaceholder('Main menu');
             break;
         case 'COMMAND_REJECTED' :
-            HideWorldLoading();
+            if (worldLoadingActive){ HideWorldLoading(); }
             AppendLog('Command rejected: '+message.payload.reason);
             pendingSaveRequest = false;
             pendingLoadRequest = false;
@@ -22495,8 +22555,12 @@ button:hover {
             CloseSaveLoadDialog();
             RefreshSaveLoadButtons();
             break;
+        case 'GENERATION_PROGRESS' :
+            if (!worldLoadingActive){ ShowWorldLoading(message.payload.progress, message.payload.message); }
+            else{ UpdateWorldLoading(message.payload.progress, message.payload.message); }
+            break;
         case 'WORLD_SNAPSHOT' : latestWorldSnapshot = message.payload.snapshot;
-            HideWorldLoading();
+            if (worldLoadingActive){ HideWorldLoading(); }
             latestStaticObstacles = latestWorldSnapshot.obstacles || latestWorldSnapshot.terrainObjects || [];
             previousSnapshot = null;
             currentSnapshot = null;
@@ -22540,7 +22604,7 @@ button:hover {
             } );
             break;
         case 'WORKER_ERROR' :
-            HideWorldLoading();
+            if (worldLoadingActive){ HideWorldLoading(); }
             AppendLog('Worker error: '+message.payload.message);
             pendingSaveRequest = false;
             pendingLoadRequest = false;
@@ -22607,7 +22671,7 @@ button:hover {
         lastSnapshotPhase = null;
         HideMainMenu();
         HideCustomGamePanel();
-        ShowWorldLoading();
+        ShowWorldLoading(2, 'Locating a blank bit of reality...');
         selectedObject = null;
         UpdateSelectedObjectPanel();
         managementDrawerVisible = true;
@@ -22749,12 +22813,14 @@ button:hover {
         } );
     } );
     startSeasonButton.addEventListener('click', function (){
-        if (latestSnapshot && latestSnapshot.phase==='roundEnded'){
-            ShowWorldLoading();
-        }
         if (latestSnapshot && latestSnapshot.foodPlan && latestSnapshot.foodPlan.shortage>0){
+            // The shortage dialogue is modal. Never put the world-generation overlay
+            // above it: generation has not started until the player confirms a plan.
             ShowFoodShortageDialog();
             return;
+        }
+        if (latestSnapshot && latestSnapshot.phase==='roundEnded'){
+            ShowWorldLoading(2, 'Packing the old biome into a suspiciously small suitcase...');
         }
         managementDrawerVisible = false;
         lastManagementRenderKey = '';
@@ -22763,10 +22829,16 @@ button:hover {
         }
         SendCommand('START_SEASON');
     } );
-    cancelFoodShortageButton.addEventListener('click', HideFoodShortageDialog);
+    cancelFoodShortageButton.addEventListener('click', function(){
+        HideFoodShortageDialog();
+        if (worldLoadingActive){ HideWorldLoading(); }
+    });
     startUnderfedSeasonButton.addEventListener('click', function (){
         var allocations = CurrentFoodAllocations();
         HideFoodShortageDialog();
+        if (latestSnapshot && latestSnapshot.phase==='roundEnded'){
+            ShowWorldLoading(2, 'Selling treasure, counting sandwiches, and evicting the old weather...');
+        }
         managementDrawerVisible = false;
         lastManagementRenderKey = '';
         SendCommand('START_SEASON', { foodAllocations : allocations });
