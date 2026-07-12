@@ -1254,6 +1254,9 @@ button:hover {
     var WILD_MONSTER_SPAWN_GAP_MIN = 150;
     var WILD_MONSTER_SPAWN_GAP_MAX = 360;
     var OFF_MAP_ESCAPE_MARGIN = 90;
+    var WILD_MONSTER_RETURN_CHANCE = 0.35;
+    var WILD_MONSTER_RETURN_DELAY_TICKS_MIN = 180;
+    var WILD_MONSTER_RETURN_DELAY_TICKS_MAX = 600;
     var SEASONS_WITH_NO_RETURNING_ADVENTURERS_TO_WIN_ROUND = 4;
     var SEASONS_WITH_NO_RETURNING_TREASURE_TO_WIN_ROUND = 12;
     var DEFAULT_MONSTER_NUTRITION_REQUIREMENT = 10;
@@ -1541,7 +1544,7 @@ button:hover {
             canUseImprovisedWeapons : false,
             treasurePower : 1.04,
             treasureTierMin : 3,
-            deterrenceSensitivity : 0.2,
+            deterrenceSensitivity : 0.32,
             weaponName : 'long sword and lance',
             canMount : true
         }
@@ -8036,107 +8039,28 @@ button:hover {
         scale = 1+(scale-1) * distanceFactor;
         return Clamp(scale, 0.58, 1.22);
     }
-    class SkinProteinState{
-        constructor(){
-            this.verdine = 0;
-            this.jaunine = 0;
-            this.orgine = 0;
-            this.cerulene = 0;
-            this.rodine = 0;
-            this.negrine = 0;
-        }
-        add(amounts){
-            if (!amounts){
-                return;
-            }
-            this.verdine+=Number.isFinite(amounts.verdine) ? amounts.verdine : 0;
-            this.jaunine+=Number.isFinite(amounts.jaunine) ? amounts.jaunine : 0;
-            this.orgine+=Number.isFinite(amounts.orgine) ? amounts.orgine : 0;
-            this.cerulene+=Number.isFinite(amounts.cerulene) ? amounts.cerulene : 0;
-            this.rodine+=Number.isFinite(amounts.rodine) ? amounts.rodine : 0;
-            this.negrine+=Number.isFinite(amounts.negrine) ? amounts.negrine : 0;
-        }
-        cloneWith(other){
-            var result = new SkinProteinState();
-            result.add(this);
-            result.add(other);
-            return result;
-        }
-        clamp(){
-            this.verdine = ClampByte(this.verdine);
-            this.jaunine = ClampByte(this.jaunine);
-            this.orgine = ClampByte(this.orgine);
-            this.cerulene = ClampByte(this.cerulene);
-            this.rodine = ClampByte(this.rodine);
-            this.negrine = ClampByte(this.negrine);
-        }
+    function CreateSkinProteinState(values){
+        var state = Object.assign({ verdine:0, jaunine:0, orgine:0, cerulene:0, rodine:0, negrine:0 }, values || {});
+        state.add = function(amounts){ if (!amounts){ return; } ['verdine','jaunine','orgine','cerulene','rodine','negrine'].forEach(function(key){ state[key]+=(Number.isFinite(amounts[key]) ? amounts[key] : 0); }); };
+        state.cloneWith = function(other){ var result=CreateSkinProteinState(state); result.add(other); return result; };
+        state.clamp = function(){ ['verdine','jaunine','orgine','cerulene','rodine','negrine'].forEach(function(key){ state[key]=ClampByte(state[key]); }); };
+        return state;
     }
-    class MetabolicFactorState{
-        constructor(){
-            this.baseMetabolicRate = 0;
-            this.coldTolerance = 0;
-            this.heatTolerance = 0;
-            this.plumptin = 0;
-            this.energyConservation = 0;
-            this.satietyConservationEffect = 0;
-        }
-        add(amounts){
-            if (!amounts){
-                return;
-            }
-            this.baseMetabolicRate+=Number.isFinite(amounts.baseMetabolicRate) ? amounts.baseMetabolicRate : 0;
-            this.coldTolerance+=Number.isFinite(amounts.coldTolerance) ? amounts.coldTolerance : 0;
-            this.heatTolerance+=Number.isFinite(amounts.heatTolerance) ? amounts.heatTolerance : 0;
-            this.plumptin+=Number.isFinite(amounts.plumptin) ? amounts.plumptin : 0;
-            this.energyConservation+=Number.isFinite(amounts.energyConservation) ? amounts.energyConservation : 0;
-            this.satietyConservationEffect+=Number.isFinite(amounts.satietyConservationEffect) ? amounts.satietyConservationEffect : 0;
-        }
-        cloneWith(other){
-            var result = new MetabolicFactorState();
-            result.add(this);
-            result.add(other);
-            return result;
-        }
+
+    function CreateMetabolicFactorState(values){
+        var state=Object.assign({ baseMetabolicRate:0, coldTolerance:0, heatTolerance:0, plumptin:0, energyConservation:0, satietyConservationEffect:0 }, values || {});
+        state.add=function(amounts){ if (!amounts){ return; } Object.keys(state).forEach(function(key){ if (typeof state[key]==='number'){ state[key]+=(Number.isFinite(amounts[key]) ? amounts[key] : 0); } }); };
+        state.cloneWith=function(other){ var result=CreateMetabolicFactorState(state); result.add(other); return result; };
+        return state;
     }
-    class MorphologyFactorState{
-        constructor(){
-            this.frameScale = 0;
-            this.vertebralLength = 0;
-            this.torsoDepth = 0;
-            this.limbLength = 0;
-            this.forelimbMuscle = 0;
-            this.hindlimbMuscle = 0;
-            this.muscleGrowth = 0;
-            this.boneGrowth = 0;
-            this.boneMineralisation = 0;
-            this.spineSize = 0;
-            this.toothSize = 0;
-            this.growthRate = 0;
-        }
-        add(amounts){
-            if (!amounts){
-                return;
-            }
-            this.frameScale+=Number.isFinite(amounts.frameScale) ? amounts.frameScale : 0;
-            this.vertebralLength+=Number.isFinite(amounts.vertebralLength) ? amounts.vertebralLength : 0;
-            this.torsoDepth+=Number.isFinite(amounts.torsoDepth) ? amounts.torsoDepth : 0;
-            this.limbLength+=Number.isFinite(amounts.limbLength) ? amounts.limbLength : 0;
-            this.forelimbMuscle+=Number.isFinite(amounts.forelimbMuscle) ? amounts.forelimbMuscle : 0;
-            this.hindlimbMuscle+=Number.isFinite(amounts.hindlimbMuscle) ? amounts.hindlimbMuscle : 0;
-            this.muscleGrowth+=Number.isFinite(amounts.muscleGrowth) ? amounts.muscleGrowth : 0;
-            this.boneGrowth+=Number.isFinite(amounts.boneGrowth) ? amounts.boneGrowth : 0;
-            this.boneMineralisation+=Number.isFinite(amounts.boneMineralisation) ? amounts.boneMineralisation : 0;
-            this.spineSize+=Number.isFinite(amounts.spineSize) ? amounts.spineSize : 0;
-            this.toothSize+=Number.isFinite(amounts.toothSize) ? amounts.toothSize : 0;
-            this.growthRate+=Number.isFinite(amounts.growthRate) ? amounts.growthRate : 0;
-        }
-        cloneWith(other){
-            var result = new MorphologyFactorState();
-            result.add(this);
-            result.add(other);
-            return result;
-        }
+
+    function CreateMorphologyFactorState(values){
+        var state=Object.assign({ frameScale:0, vertebralLength:0, torsoDepth:0, limbLength:0, forelimbMuscle:0, hindlimbMuscle:0, muscleGrowth:0, boneGrowth:0, boneMineralisation:0, spineSize:0, toothSize:0, growthRate:0 }, values || {});
+        state.add=function(amounts){ if (!amounts){ return; } Object.keys(state).forEach(function(key){ if (typeof state[key]==='number'){ state[key]+=(Number.isFinite(amounts[key]) ? amounts[key] : 0); } }); };
+        state.cloneWith=function(other){ var result=CreateMorphologyFactorState(state); result.add(other); return result; };
+        return state;
     }
+
 
     function CreateBehaviourHormoneEffectBag(){
         return {
@@ -8181,20 +8105,20 @@ button:hover {
         }
         return result;
     }
-    class ReproductionFactorState{
-        constructor(values){
-            Object.assign(this, { follicleRecruitment : 0, yolkSynthesis : 0, shellDeposition : 0, shellPermeability : 0, developmentRate : 0, gameteMaintenance : 0, reproductiveRepair : 0, reproductiveSenescenceResistance : 0, sexHormone : 0, femaleBias : 0, maleBias : 0, tumourSuppression : 0 }, values || {});
-        }
-        add(values){ Object.keys(this).forEach(function(key){ this[key]+=(values && Number.isFinite(values[key])) ? values[key] : 0; }, this); }
-        cloneWith(values){ var result = new ReproductionFactorState(this); result.add(values); return result; }
+    function CreateReproductionFactorState(values){
+        var state=Object.assign({ follicleRecruitment:0, yolkSynthesis:0, shellDeposition:0, shellPermeability:0, developmentRate:0, gameteMaintenance:0, reproductiveRepair:0, reproductiveSenescenceResistance:0, sexHormone:0, femaleBias:0, maleBias:0, tumourSuppression:0 }, values || {});
+        state.add=function(amounts){ Object.keys(state).forEach(function(key){ if (typeof state[key]==='number'){ state[key]+=(amounts && Number.isFinite(amounts[key])) ? amounts[key] : 0; } }); };
+        state.cloneWith=function(other){ var result=CreateReproductionFactorState(state); result.add(other); return result; };
+        return state;
     }
-    class PerceptionFactorState{
-        constructor(values){
-            Object.assign(this, { photonSensitivity:0, brightnessTolerance:0, visualResolution:0, motionSensitivity:0, rodBias:0, colourDiscrimination:0, hearingSensitivity:0, highFrequencyBias:0, lowFrequencyBias:0, noiseRejection:0, sensoryGate:0, falsePositiveBias:0, socialResponseBias:0, socialIndependence:0, neuralCost:0, eyeRedness:0, junkHealth:0 }, values || {});
-        }
-        add(values){ Object.keys(this).forEach(function(key){ this[key]+=(values && Number.isFinite(values[key])) ? values[key] : 0; }, this); }
-        cloneWith(values){ var result=new PerceptionFactorState(this); result.add(values); return result; }
+
+    function CreatePerceptionFactorState(values){
+        var state=Object.assign({ photonSensitivity:0, brightnessTolerance:0, visualResolution:0, motionSensitivity:0, rodBias:0, colourDiscrimination:0, hearingSensitivity:0, highFrequencyBias:0, lowFrequencyBias:0, noiseRejection:0, sensoryGate:0, falsePositiveBias:0, socialResponseBias:0, socialIndependence:0, neuralCost:0, eyeRedness:0, junkHealth:0 }, values || {});
+        state.add=function(amounts){ Object.keys(state).forEach(function(key){ if (typeof state[key]==='number'){ state[key]+=(amounts && Number.isFinite(amounts[key])) ? amounts[key] : 0; } }); };
+        state.cloneWith=function(other){ var result=CreatePerceptionFactorState(state); result.add(other); return result; };
+        return state;
     }
+
     class MonsterPhenotypeExpressionContext{
         constructor(monster){
             this.monster = monster || null;
@@ -8216,38 +8140,38 @@ button:hover {
         }
 
         static createPerceptionEffectBag(){
-            return { basePerceptionFactors:new PerceptionFactorState(), codominantPerceptionLayers:[new PerceptionFactorState(),new PerceptionFactorState()], usedCodominantPerceptionLayers:false };
+            return { basePerceptionFactors:CreatePerceptionFactorState(), codominantPerceptionLayers:[CreatePerceptionFactorState(),CreatePerceptionFactorState()], usedCodominantPerceptionLayers:false };
         }
 
         static createColourEffectBag(){
             return {
-                baseSkinProteins : new SkinProteinState(),
-                codominantSkinLayers : [new SkinProteinState(),
-                new SkinProteinState()],
+                baseSkinProteins : CreateSkinProteinState(),
+                codominantSkinLayers : [CreateSkinProteinState(),
+                CreateSkinProteinState()],
                 usedCodominantSkinLayers : false
             } ;
         }
 
         static createMetabolismEffectBag(){
             return {
-                baseMetabolicFactors : new MetabolicFactorState(),
-                codominantMetabolicLayers : [new MetabolicFactorState(),
-                new MetabolicFactorState()],
+                baseMetabolicFactors : CreateMetabolicFactorState(),
+                codominantMetabolicLayers : [CreateMetabolicFactorState(),
+                CreateMetabolicFactorState()],
                 usedCodominantMetabolicLayers : false
             } ;
         }
 
         static createMorphologyEffectBag(){
             return {
-                baseMorphologyFactors : new MorphologyFactorState(),
-                codominantMorphologyLayers : [new MorphologyFactorState(),
-                new MorphologyFactorState()],
+                baseMorphologyFactors : CreateMorphologyFactorState(),
+                codominantMorphologyLayers : [CreateMorphologyFactorState(),
+                CreateMorphologyFactorState()],
                 usedCodominantMorphologyLayers : false
             } ;
         }
 
         static createReproductionEffectBag(){
-            return { baseReproductionFactors : new ReproductionFactorState(), codominantReproductionLayers : [new ReproductionFactorState(), new ReproductionFactorState()], usedCodominantReproductionLayers : false };
+            return { baseReproductionFactors : CreateReproductionFactorState(), codominantReproductionLayers : [CreateReproductionFactorState(), CreateReproductionFactorState()], usedCodominantReproductionLayers : false };
         }
 
         static createBehaviourEffectBag(){
@@ -8464,7 +8388,7 @@ button:hover {
     class ReproductionAllele extends Allele{
         constructor(dominanceIndex, reproductionFactors, options){
             super(dominanceIndex, { selectionSensitive : options && options.selectionSensitive!==undefined ? !!options.selectionSensitive : true, debugLabel : options && options.debugLabel ? options.debugLabel : 'reproduction allele' });
-            this.reproductionFactors = Object.assign(new ReproductionFactorState(), reproductionFactors || {});
+            this.reproductionFactors = Object.assign(CreateReproductionFactorState(), reproductionFactors || {});
         }
         phenotype(context, normalise){
             if (normalise!==true && normalise!==false){ throw new Error('ReproductionAllele.phenotype requires an explicit normalise boolean.'); }
@@ -8474,7 +8398,7 @@ button:hover {
     class PerceptionAllele extends Allele{
         constructor(dominanceIndex, factors, options){
             super(dominanceIndex,{selectionSensitive:options && options.selectionSensitive!==undefined ? !!options.selectionSensitive : true,debugLabel:options&&options.debugLabel?options.debugLabel:'perception allele'});
-            this.perceptionFactors=Object.assign(new PerceptionFactorState(),factors||{});
+            this.perceptionFactors=Object.assign(CreatePerceptionFactorState(),factors||{});
         }
         phenotype(context,normalise){ if(normalise!==true&&normalise!==false){throw new Error('PerceptionAllele.phenotype requires an explicit normalise boolean.');} context.addPerceptionFactors(this.perceptionFactors,normalise); }
     }
@@ -9289,7 +9213,7 @@ button:hover {
         constructor(){ super(GENETIC_TRAIT.PERCEPTION,PERCEPTION_CHROMOSOME_INDEX,PERCEPTION_CHROMOSOME_SLOT_COUNT); }
         createRandomChromosomePair(rng,genePool,world){ var profile=genePool.getWorldPerceptionSelectionProfile(world); var best=null; var bestFitness=-1; for(var i=0;i<5;i+=1){var pair=genePool.createProposedChromosomePair(this,rng,null); var fitness=genePool.scoreChromosomePairForTrait(this,pair,profile); if(fitness>bestFitness){bestFitness=fitness;best=pair;}} return best; }
         getSelectionAllelePools(genePool){ return genePool.perceptionChromosomeSlots; }
-        createSelectionAccumulator(){ return new PerceptionFactorState(); }
+        createSelectionAccumulator(){ return CreatePerceptionFactorState(); }
         addAllelePairSelectionContributionToAccumulator(a,x,y,scale){ var c=new MonsterPhenotypeExpressionContext(); ChromosomePair.expressAllelePair(x,y,c); var raw=PerceptionPhenotypeSystem.resolve(c).rawFactors; Object.keys(a).forEach(function(k){a[k]+=(raw[k]||0)*scale;}); }
         addSelectionAccumulatorToContext(c,a){c.addPerceptionFactors(a,false);}
         scoreSelectionContext(c,p,g){return g.getPerceptionPhenotypeFitness(PerceptionPhenotypeSystem.resolve(c),p);}
@@ -9325,7 +9249,7 @@ button:hover {
             var roll=rng.range(0,total), cumulative=0; for(i=0;i<candidates.length;i+=1){cumulative+=weights[i];if(roll<=cumulative){return candidates[i];}} return candidates[0];
         }
         getSelectionAllelePools(genePool){ return genePool.reproductionChromosomeSlots; }
-        createSelectionAccumulator(){ return new ReproductionFactorState(); }
+        createSelectionAccumulator(){ return CreateReproductionFactorState(); }
         addAllelePairSelectionContributionToAccumulator(accumulator,a,b,scale){ var c=new MonsterPhenotypeExpressionContext(); ChromosomePair.expressAllelePair(a,b,c); var raw=ReproductionPhenotypeSystem.resolve(c).rawFactors; Object.keys(accumulator).forEach(function(k){ accumulator[k]+=(raw[k]||0)*scale; }); }
         addSelectionAccumulatorToContext(context, accumulator){ context.addReproductionFactors(accumulator,false); }
         scoreSelectionContext(context, profile, genePool){ return genePool.getReproductionPhenotypeFitness(ReproductionPhenotypeSystem.resolve(context), profile); }
@@ -11150,6 +11074,12 @@ button:hover {
             }
             return true;
         }
+        schedulePossibleWildReturn(raid){
+            this.wildReturnTick = null;
+            if (raid.rng.nextFloat()<WILD_MONSTER_RETURN_CHANCE){
+                this.wildReturnTick = raid.tickNumber+raid.rng.integer(WILD_MONSTER_RETURN_DELAY_TICKS_MIN, WILD_MONSTER_RETURN_DELAY_TICKS_MAX);
+            }
+        }
         moveWildOffMap(raid){
             if (this.wildExitTargetX===null || this.wildExitTargetY===null){
                 this.chooseWildExitTarget(raid.world, raid.rng);
@@ -11161,7 +11091,8 @@ button:hover {
                 this.deployed = false;
                 this.x = Clamp(this.x, 0, raid.world.width);
                 this.y = Clamp(this.y, 0, raid.world.height);
-                raid.addEvent('An uncollared wild monster left the map while foraging.');
+                this.schedulePossibleWildReturn(raid);
+                raid.addEvent(this.wildReturnTick!==null ? 'An uncollared wild monster left the map while foraging, but may return later this season.' : 'An uncollared wild monster left the map while foraging.');
             }
         }
         rememberMacrofaunaTarget(target, raid){
@@ -11178,7 +11109,8 @@ button:hover {
                 this.deployed = false;
                 this.x = Clamp(this.x, 0, raid.world.width);
                 this.y = Clamp(this.y, 0, raid.world.height);
-                raid.addEvent('An uncollared wild monster pursued escaped macrofauna off the map.');
+                this.schedulePossibleWildReturn(raid);
+                raid.addEvent(this.wildReturnTick!==null ? 'An uncollared wild monster pursued escaped macrofauna off the map and may return later this season.' : 'An uncollared wild monster pursued escaped macrofauna off the map.');
             }
         }
         enterFromRight(world, rng){
@@ -13774,8 +13706,12 @@ button:hover {
                 counts.knight = Clamp(Math.round(((highestTier-2) * 0.45+pressure * 0.16) *(0.45+settlementFactor * 0.25)), highestTier>=4 ? 1 : 0, highestTier>=4 ? 4 : 2);
             }
             Object.keys(counts).forEach(function (className){
-                counts[className] = Math.max(0, Math.round(counts[className] *(deterrence[className] || 1)));
-            } );
+                var adjustedCount = Math.max(0, counts[className] *(deterrence[className] || 1));
+                // Seeded stochastic rounding preserves expected deterrence even when
+                // the unmodified class count is one, so a fully deterred knight raid
+                // has a real chance to contain no knights.
+                counts[className] = Math.floor(adjustedCount)+(this.rng.nextFloat()<adjustedCount-Math.floor(adjustedCount) ? 1 : 0);
+            } , this);
             if (counts.villager<=0 && counts.explorer<=0 && counts.warrior<=0 && counts.knight<=0){
                 counts.villager = 1;
             }
@@ -14131,6 +14067,28 @@ button:hover {
                 return null;
             }
             return this.rng.pick(candidates);
+        }
+        returnDepartedWildMonsters(){
+            for (var i = 0; i<this.wildMonsters.length; i+=1){
+                var monster = this.wildMonsters[i];
+                if (!monster.alive || monster.deployed || !monster.escaped || !Number.isFinite(monster.wildReturnTick) || monster.wildReturnTick>this.tickNumber){
+                    continue;
+                }
+                monster.wildReturnTick = null;
+                monster.wildExitTargetX = null;
+                monster.wildExitTargetY = null;
+                monster.path = [];
+                monster.pathKey = '';
+                monster.pathIntentKey = '';
+                if (monster.enterWildFromEdge(this.world, this.rng, null)){
+                    monster.behaviourState = 'roaming';
+                    this.addEvent('A previously departed wild uncollared monster wandered back onto the map.');
+                } else{
+                    monster.escaped = true;
+                    monster.deployed = false;
+                    monster.wildReturnTick = this.tickNumber+this.rng.integer(WILD_MONSTER_RETURN_DELAY_TICKS_MIN, WILD_MONSTER_RETURN_DELAY_TICKS_MAX);
+                }
+            }
         }
         spawnDueWildMonsters(){
             for (var i = this.pendingWildMonsters.length-1;
@@ -14686,6 +14644,7 @@ button:hover {
             }
             this.tickNumber+=1;
             this.spawnDueWildMonsters();
+            this.returnDepartedWildMonsters();
             this.spawnDueAdventurers();
             this.purgeDepartedMacrofaunaTrails();
             this.purgeExpiredThrownProjectiles();
@@ -15507,6 +15466,30 @@ button:hover {
                 insufficientTreasure : remainingCredits>0
             } ;
         }
+        previewFoodSaleForAllocations(requestedAllocations){
+            var plan = this.getSeasonFoodPlan();
+            var allocationById = {};
+            (requestedAllocations || []).forEach(function (allocation){
+                if (allocation && allocation.monsterId){
+                    allocationById[allocation.monsterId] = Math.max(0, Number(allocation.food) || 0);
+                }
+            } );
+            var allocations = plan.monsters.map(function (entry){
+                var requested = Object.prototype.hasOwnProperty.call(allocationById, entry.id) ? allocationById[entry.id] : entry.demand;
+                return {
+                    monsterId : entry.id,
+                    food : Clamp(Math.floor(requested), 0, entry.demand)
+                };
+            } );
+            var totalAllocated = allocations.reduce(function (sum, allocation){ return sum+allocation.food; }, 0);
+            var purchasedFoodNeeded = Math.max(0, totalAllocated-plan.availableWithoutSale);
+            var preview = this.previewTreasureSaleForFood(purchasedFoodNeeded);
+            preview.totalAllocated = totalAllocated;
+            preview.purchasedFoodNeeded = purchasedFoodNeeded;
+            preview.excessMeat = Math.max(0, preview.foodPurchased-purchasedFoodNeeded);
+            preview.insufficient = preview.insufficientTreasure;
+            return preview;
+        }
         prepareFoodForSeason(requestedAllocations){
             var plan = this.getSeasonFoodPlan();
             var allocationById = {};
@@ -15963,7 +15946,7 @@ button:hover {
             return allele===recombinationAllelesB[index];
         } );
         AddRegressionResult(results, 'Trait definitions control crossover cut counts for offspring chromosomes', noCrossoverMotherSideA || noCrossoverMotherSideB, 'minCuts='+noCrossoverTrait.minCrossoverCuts+', maxCuts='+noCrossoverTrait.maxCrossoverCuts);
-        AddRegressionResult(results, 'Phenotype context stores trait effects in registered effect bags', geneticsContext.getColourEffectBag().baseSkinProteins instanceof SkinProteinState && geneticsContext.effectBags[GENETIC_TRAIT.COLOUR]===geneticsContext.getColourEffectBag(), 'bags='+Object.keys(geneticsContext.effectBags).join(','));
+        AddRegressionResult(results, 'Phenotype context stores trait effects in registered effect bags', geneticsContext.getColourEffectBag().baseSkinProteins && typeof geneticsContext.getColourEffectBag().baseSkinProteins.add==='function' && geneticsContext.effectBags[GENETIC_TRAIT.COLOUR]===geneticsContext.getColourEffectBag(), 'bags='+Object.keys(geneticsContext.effectBags).join(','));
         var ooGenomeMonster = Object.create(Monster.prototype);
         ooGenomeMonster.genome = MonsterGenePool.createGenome(new SeededRng(6820), null);
         ooGenomeMonster.phenotype = null;
@@ -17585,6 +17568,13 @@ button:hover {
         var customHotDesert = World.createEnvironment(new SeededRng(440401), { biomeType:'hotDesert' });
         var customCoastalTemperate = World.createEnvironment(new SeededRng(440402), { biomeType:'coastalTemperate' });
         AddRegressionResult(results, 'Custom biome selection controls climate inputs', customHotDesert.climateClass==='hotDesert' && customHotDesert.aridity>=0.62 && customCoastalTemperate.climateClass==='coastalTemperate' && customCoastalTemperate.forceCoastline===true, 'hot='+customHotDesert.climateClass+'/'+customHotDesert.aridity.toFixed(2)+', coast='+customCoastalTemperate.climateClass+'/'+customCoastalTemperate.forceCoastline);
+        var wildReturnRegression = new Monster('wild_return_regression', 0, 0, new SeededRng(777001), { owned:false, collared:false, wild:true });
+        wildReturnRegression.alive = true;
+        wildReturnRegression.deployed = false;
+        wildReturnRegression.escaped = true;
+        wildReturnRegression.wildReturnTick = 1;
+        AddRegressionResult(results, 'Departed wild monsters retain an in-season return schedule', Number.isFinite(wildReturnRegression.wildReturnTick) && WILD_MONSTER_RETURN_CHANCE>0, 'returnTick='+wildReturnRegression.wildReturnTick+', chance='+WILD_MONSTER_RETURN_CHANCE);
+        AddRegressionResult(results, 'Knight deterrence can reduce a one-knight expectation below one before seeded rounding', ADVENTURER_PROFILE.knight.deterrenceSensitivity>0.20 && (1-ADVENTURER_PROFILE.knight.deterrenceSensitivity*0.65)<1, 'sensitivity='+ADVENTURER_PROFILE.knight.deterrenceSensitivity);
         var round8TreasureProbabilities = World.campaignTreasureTierProbabilities(8);
         var round9TreasureProbabilities = World.campaignTreasureTierProbabilities(9);
         var round12TreasureProbabilities = World.campaignTreasureTierProbabilities(12);
@@ -17705,11 +17695,6 @@ button:hover {
             Warrior : Warrior,
             Knight : Knight,
             MonsterDisease : MonsterDisease,
-            SkinProteinState : SkinProteinState,
-            MetabolicFactorState : MetabolicFactorState,
-            MorphologyFactorState : MorphologyFactorState,
-            ReproductionFactorState : ReproductionFactorState,
-            PerceptionFactorState : PerceptionFactorState,
             MonsterPhenotypeExpressionContext : MonsterPhenotypeExpressionContext,
             Allele : Allele,
             ColourAllele : ColourAllele,
@@ -17947,7 +17932,10 @@ button:hover {
         var msg = {
             type : 'WORLD_SNAPSHOT',
             payload : {
-                snapshot : gameSession.getStaticSnapshot()
+                snapshot : Object.assign(gameSession.getStaticSnapshot(), {
+                    treasureTypes : JSON.parse(JSON.stringify(TREASURE_TYPES)),
+                    treasureTypeOrder : TREASURE_TYPE_ORDER.slice(0)
+                })
             }
         } ;
         if (replyTo!==undefined){
@@ -18210,6 +18198,15 @@ button:hover {
                 SendWorldSnapshot(command.messageId);
                 SendSnapshotAndEvents(command.messageId);
                 break;
+            case 'PREVIEW_FOOD_SALE' : EnsureGameSession();
+                Post({
+                    replyTo : command.messageId,
+                    type : 'FOOD_SALE_PREVIEW',
+                    payload : {
+                        preview : gameSession.previewFoodSaleForAllocations(command.payload && command.payload.allocations)
+                    }
+                });
+                break;
             case 'RUN_HEADLESS_TESTS' : Post({
                     replyTo : command.messageId,
                     type : 'HEADLESS_TEST_RESULTS',
@@ -18279,33 +18276,8 @@ button:hover {
     TERRAIN_CLIFF_SLOPE = 9,
     TERRAIN_ESCARPMENT_SLOPE = 6,
     TERRAIN_STEEP_SLOPE = 5;
-    var TREASURE_TYPES = {
-        bronze : {
-            displayName : 'bronze coins',
-            unitValue : 10
-        } ,
-        silver : {
-            displayName : 'silver coins',
-            unitValue : 30
-        } ,
-        gold : {
-            displayName : 'gold coins',
-            unitValue : 100
-        } ,
-        rubies : {
-            displayName : 'rubies',
-            unitValue : 200
-        } ,
-        emeralds : {
-            displayName : 'emeralds',
-            unitValue : 350
-        }
-    } ;
-    var TREASURE_TYPE_ORDER = ['bronze',
-    'silver',
-    'gold',
-    'rubies',
-    'emeralds'];
+    var TREASURE_TYPES = {};
+    var TREASURE_TYPE_ORDER = [];
     var canvas = document.getElementById('raidCanvas'),
     ctx = canvas.getContext('2d'),
     statusBox = document.getElementById('statusBox'),
@@ -19666,42 +19638,6 @@ button:hover {
             selectedMonsterPanel.appendChild(releasePanel);
         }
     }
-    function FoodPlanSalePreview(plan, allocations){
-        var totalAllocated = allocations.reduce(function (sum, allocation){ return sum+allocation.food; }, 0);
-        var purchasedFoodNeeded = Math.max(0, totalAllocated-(plan.availableWithoutSale || 0));
-        var creditsNeeded = purchasedFoodNeeded * (plan.foodCostCredits || 0);
-        var remaining = creditsNeeded;
-        var sale = [];
-        var treasures = (latestSnapshot && latestSnapshot.treasures ? latestSnapshot.treasures : []).filter(function (treasure){ return (treasure.amountRemaining || 0)>0; }).slice(0);
-        var worldWidth = latestSnapshot ? latestSnapshot.mapWidth : 0;
-        var worldHeight = latestSnapshot ? latestSnapshot.mapHeight : 0;
-        var edge = latestWorldSnapshot && latestWorldSnapshot.world ? latestWorldSnapshot.world.adventurerEntryEdge : 'left';
-        function distanceFromEntry(treasure){
-            if (edge==='right'){ return worldWidth-treasure.x; }
-            if (edge==='top'){ return treasure.y; }
-            if (edge==='bottom'){ return worldHeight-treasure.y; }
-            return treasure.x;
-        }
-        treasures.sort(function (a, b){ return distanceFromEntry(a)-distanceFromEntry(b); });
-        treasures.forEach(function (treasure){
-            if (remaining<=0){ return; }
-            var units = Math.min(treasure.amountRemaining, Math.ceil(remaining / Math.max(1, treasure.unitValue || 1)));
-            if (units>0){
-                sale.push({ name : treasure.treasureDisplayName || treasure.treasureType, units : units, value : units * treasure.unitValue });
-                remaining-=units * treasure.unitValue;
-            }
-        } );
-        var saleValue = sale.reduce(function (sum, item){ return sum+item.value; }, 0);
-        return {
-            totalAllocated : totalAllocated,
-            purchasedFoodNeeded : purchasedFoodNeeded,
-            creditsNeeded : creditsNeeded,
-            sale : sale,
-            saleValue : saleValue,
-            excessMeat : Math.max(0, (plan.foodCostCredits || 0)>0 ? saleValue / plan.foodCostCredits-purchasedFoodNeeded : 0),
-            insufficient : remaining>0
-        } ;
-    }
     function CurrentFoodAllocations(){
         return Array.prototype.slice.call(foodAllocationList.querySelectorAll('input[data-monster-id]')).map(function (input){
             return {
@@ -19712,8 +19648,15 @@ button:hover {
     }
     function RefreshFoodSalePreview(){
         if (!latestSnapshot || !latestSnapshot.foodPlan){ return; }
-        var preview = FoodPlanSalePreview(latestSnapshot.foodPlan, CurrentFoodAllocations());
-        var saleLines = preview.sale.length>0 ? preview.sale.map(function (item){ return item.units+' '+item.name+' ('+FormatNumber(item.value)+' credits)'; }).join('\n') : 'No treasure will be sold.';
+        foodSalePreview.textContent = 'Calculating authoritative treasure sale preview...';
+        startUnderfedSeasonButton.disabled = true;
+        SendCommand('PREVIEW_FOOD_SALE', {
+            allocations : CurrentFoodAllocations()
+        });
+    }
+    function RenderAuthoritativeFoodSalePreview(preview){
+        if (!preview){ return; }
+        var saleLines = preview.sale.length>0 ? preview.sale.map(function (item){ return item.units+' '+item.displayName+' ('+FormatNumber(item.value)+' credits)'; }).join('\n') : 'No treasure will be sold.';
         foodSalePreview.textContent = 'Food allocated: '+FormatNumber(preview.totalAllocated)+'\nAdditional meat required: '+FormatNumber(preview.purchasedFoodNeeded)+'\nTreasure selected nearest the human entry: '+saleLines+'\nExcess purchased meat stored: '+FormatNumber(preview.excessMeat)+(preview.insufficient ? '\nNOT ENOUGH TREASURE FOR THIS ALLOCATION.' : '');
         startUnderfedSeasonButton.disabled = preview.insufficient;
     }
@@ -22602,6 +22545,8 @@ button:hover {
             else{ UpdateWorldLoading(message.payload.progress, message.payload.message); }
             break;
         case 'WORLD_SNAPSHOT' : latestWorldSnapshot = message.payload.snapshot;
+            TREASURE_TYPES = latestWorldSnapshot.treasureTypes || {};
+            TREASURE_TYPE_ORDER = latestWorldSnapshot.treasureTypeOrder || [];
             if (worldLoadingActive){ HideWorldLoading(); }
             latestStaticObstacles = latestWorldSnapshot.obstacles || latestWorldSnapshot.terrainObjects || [];
             previousSnapshot = null;
@@ -22640,6 +22585,9 @@ button:hover {
             // Do not automatically show the main menu at gameOver. The end-of-round
             // treasure statistics are displayed in the side panel when phase is
             // gameOver; showing the menu here would hide the quick-game stats screen.
+            break;
+        case 'FOOD_SALE_PREVIEW' :
+            RenderAuthoritativeFoodSalePreview(message.payload.preview);
             break;
         case 'RAID_EVENTS' : message.payload.events.forEach(function (e){
                 AppendLog('['+e.tickNumber+'] '+e.text);
