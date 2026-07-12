@@ -19691,9 +19691,10 @@ button:hover {
         var limbLength = geneticMorphology ? geneticMorphology.limbLength : (monster && monster.limbLength ? monster.limbLength : 1);
         var spineSize = geneticMorphology ? geneticMorphology.spineSize : (monster && monster.spineSize ? monster.spineSize : 0);
         var toothSize = geneticMorphology ? geneticMorphology.toothSize : (monster && monster.toothSize ? monster.toothSize : 1);
-        var torsoLengthScale = LocalClamp((1-Math.max(0, fatRatio-1) * 0.030+Math.max(0, 0.7-fatRatio) * 0.040) * geneticLength, 0.74, 1.34);
-        var torsoDepthScale = LocalClamp((1+(fatRatio-1) * 0.24) * geneticDepth, 0.58, 1.90);
-        var bellyDepthScale = LocalClamp(1+(fatRatio-1) * 0.34, 0.58, 1.95);
+        var torsoLengthScale = LocalClamp((1-Math.max(0, fatRatio-1) * 0.030+Math.max(0, 0.7-fatRatio) * 0.040) * geneticLength, 0.65, 1.50);
+        var safeFatRatio = Math.min(fatRatio, Math.max(1.20, 1.65-Math.max(0, geneticDepth-1) * 0.72));
+        var torsoDepthScale = LocalClamp((1+(safeFatRatio-1) * 0.24) * geneticDepth, 0.70, 1.40);
+        var bellyDepthScale = LocalClamp(1+(safeFatRatio-1) * 0.34, 0.20, 1.65);
         return {
             bodyScale : bodyScale,
             currentFatMass : fatMass,
@@ -19704,7 +19705,8 @@ button:hover {
             bodyWidthScale : torsoLengthScale,
             bodyHeightScale : torsoDepthScale,
             headScale : LocalClamp(0.92+bodyScale * 0.08, 0.85, 1.05),
-            legScale : LocalClamp((0.72+muscleRatio * 0.30) * limbLength, 0.50, 1.65),
+            legScale : LocalClamp(limbLength, 0.75, 1.30),
+            legThicknessScale : LocalClamp(0.72+muscleRatio * 0.30, 0.55, 1.70),
             spineScale : spineSize,
             toothScale : toothSize,
             label : fatRatio<0.55 ? 'wasted' : (fatRatio<0.82 ? 'lean' : (fatRatio>1.55 ? 'fat' : 'fit'))
@@ -19730,10 +19732,15 @@ button:hover {
         var mouthX1 = bodyRight+27;
         var mouthX2 = bodyRight+2;
         var collarPath = '<path d="M'+(bodyRight+2).toFixed(1)+' 68 Q'+(bodyRight+19).toFixed(1)+' 75 '+(bodyRight+32).toFixed(1)+' 70" stroke="'+collar+'" stroke-width="7" stroke-linecap="round" fill="none"/>';
-        var stripes = MonsterColourIsStriped(monster) ? '<path d="M54 48 L72 88 M82 36 L103 96 M112 40 L130 86" stroke="'+secondary+'" stroke-width="8" stroke-linecap="round" opacity="0.62"/>' : '';
+        var stripes = MonsterColourIsStriped(monster) ? '<path d="M52 48 C58 54 56 68 63 76 C68 81 72 82 76 80 C71 68 76 54 80 42 C72 38 60 40 52 48 Z M84 38 C91 47 88 64 96 78 C101 85 107 87 112 84 C105 70 111 53 116 41 C106 35 94 34 84 38 Z" fill="'+secondary+'" opacity="0.72"/>' : '';
+        var injurySvg = '';
+        if (monster.bodyHealth && monster.bodyHealth.maxEach){
+            var iconInjuries=[['head',bodyRight+18,48],['body',92,67],['frontLeftLeg',124,84],['rearLeftLeg',58,84]];
+            iconInjuries.forEach(function(item){var value=Number.isFinite(monster.bodyHealth[item[0]])?monster.bodyHealth[item[0]]:monster.bodyHealth.maxEach;if(value<monster.bodyHealth.maxEach*0.72){injurySvg+='<path d="M'+(item[1]-5)+' '+(item[2]+1)+' C'+(item[1]-2)+' '+(item[2]-4)+' '+(item[1]+2)+' '+(item[2]+4)+' '+(item[1]+6)+' '+item[2]+'" fill="none" stroke="#6b211c" stroke-width="3" stroke-linecap="round"/>';}});
+        }
         var diseaseTint =(monster.diseases && monster.diseases.length) ? '<circle cx="38" cy="34" r="7" fill="'+((monster.diseases[0].ui && monster.diseases[0].ui.tint) || '#f87171')+'" opacity="0.75"/>' : '';
         var spines = morphology.spineScale>0 ? '<path d="M69 42 L76 '+(30-Math.round(morphology.spineScale * 10))+' L84 43 Z M94 39 L103 '+(25-Math.round(morphology.spineScale * 12))+' L113 43 Z" fill="'+colour.spineColour+'" stroke="'+dark+'" stroke-width="3"/>' : '';
-        return '<svg viewBox="0 0 180 110" role="img" aria-label="Monster icon">'+'<ellipse cx="90" cy="82" rx="54" ry="11" fill="rgba(0,0,0,0.18)"/>'+'<g transform="translate(90 62) scale('+wholeScale.toFixed(2)+' '+wholeScale.toFixed(2)+') translate(-90 -62)">'+tailPath+'<g transform="'+bodyTransform+'">'+'<path d="M35 66 C44 38 86 29 126 42 C150 50 157 74 139 84 C109 100 58 94 35 66 Z" fill="'+body+'" stroke="'+dark+'" stroke-width="4"/>'+stripes+spines+'</g>'+headPath+'<circle cx="'+eyeX.toFixed(1)+'" cy="46" r="8" fill="'+eye+'"/><circle cx="'+pupilX.toFixed(1)+'" cy="47" r="4" fill="'+dark+'"/>'+'<path d="M'+mouthX1.toFixed(1)+' 58 Q'+(bodyRight+15).toFixed(1)+' 66 '+mouthX2.toFixed(1)+' 58" fill="none" stroke="'+dark+'" stroke-width="3" stroke-linecap="round"/>'+collarPath+'</g>'+diseaseTint+'</svg>';
+        return '<svg viewBox="0 0 180 110" role="img" aria-label="Monster icon">'+'<ellipse cx="90" cy="82" rx="54" ry="11" fill="rgba(0,0,0,0.18)"/>'+'<g transform="translate(90 62) scale('+wholeScale.toFixed(2)+' '+wholeScale.toFixed(2)+') translate(-90 -62)">'+tailPath+'<g transform="'+bodyTransform+'">'+'<path d="M35 66 C44 38 86 29 126 42 C150 50 157 74 139 84 C109 100 58 94 35 66 Z" fill="'+body+'" stroke="'+dark+'" stroke-width="4"/>'+stripes+spines+'</g>'+headPath+'<circle cx="'+eyeX.toFixed(1)+'" cy="46" r="10" fill="'+eye+'" stroke="'+dark+'" stroke-width="2"/><circle cx="'+pupilX.toFixed(1)+'" cy="46" r="6" fill="'+(monster.eyeColour||'#6f5b3e')+'"/><circle cx="'+(pupilX+1).toFixed(1)+'" cy="46" r="3" fill="#111"/>'+'<path d="M'+mouthX1.toFixed(1)+' 58 Q'+(bodyRight+15).toFixed(1)+' 66 '+mouthX2.toFixed(1)+' 58" fill="none" stroke="'+dark+'" stroke-width="3" stroke-linecap="round"/>'+collarPath+injurySvg+'</g>'+diseaseTint+'</svg>';
     }
     function MonsterSexLabel(monster){
         if (!monster || !monster.sex){
@@ -21017,66 +21024,135 @@ button:hover {
             snowy : snowy
         } ;
     }
+    // ============================================================================
+    // MODULE: PROCEDURAL VECTOR RENDERING
+    // ============================================================================
+    // Renderer-only vector helpers. These functions derive presentation geometry
+    // from snapshots and never modify authoritative simulation or save data.
+    function VectorShade(hex, amount){
+        return ShadeHexColour(hex || '#777777', amount);
+    }
+    function DrawVectorShadow(x, y, rx, ry, alpha){
+        ctx.save();
+        ctx.fillStyle = 'rgba(15,20,18,'+(alpha===undefined ? 0.22 : alpha)+')';
+        ctx.beginPath();
+        ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+    function DrawOrganicClosedPath(points, fill, stroke, lineWidth){
+        if (!points || points.length<3){
+            return;
+        }
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (var i=0; i<points.length; i+=1){
+            var current = points[i];
+            var next = points[(i+1)%points.length];
+            var following = points[(i+2)%points.length];
+            var controlX = next.x;
+            var controlY = next.y;
+            var endX = (next.x+following.x)*0.5;
+            var endY = (next.y+following.y)*0.5;
+            ctx.quadraticCurveTo(controlX, controlY, endX, endY);
+        }
+        ctx.closePath();
+        if (fill){
+            ctx.fillStyle = fill;
+            ctx.fill();
+        }
+        if (stroke){
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth = lineWidth || 2;
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+        }
+    }
+    function DrawTaperedVectorLimb(ax, ay, bx, by, cx, cy, upperWidth, lowerWidth, fill, outline, footLength){
+        var upperAngle = Math.atan2(by-ay, bx-ax);
+        var lowerAngle = Math.atan2(cy-by, cx-bx);
+        var uX = -Math.sin(upperAngle);
+        var uY = Math.cos(upperAngle);
+        var lX = -Math.sin(lowerAngle);
+        var lY = Math.cos(lowerAngle);
+        DrawOrganicClosedPath([
+            {x:ax+uX*upperWidth, y:ay+uY*upperWidth},
+            {x:bx+uX*upperWidth*0.72, y:by+uY*upperWidth*0.72},
+            {x:cx+lX*lowerWidth, y:cy+lY*lowerWidth},
+            {x:cx-lX*lowerWidth, y:cy-lY*lowerWidth},
+            {x:bx-uX*upperWidth*0.72, y:by-uY*upperWidth*0.72},
+            {x:ax-uX*upperWidth, y:ay-uY*upperWidth}
+        ], fill, outline, 1.7);
+        ctx.fillStyle = VectorShade(fill, -18);
+        ctx.beginPath();
+        ctx.ellipse(cx+Math.cos(lowerAngle)*(footLength || 3), cy+Math.sin(lowerAngle)*(footLength || 3), Math.max(2.2, lowerWidth*1.5), Math.max(1.2, lowerWidth*0.62), lowerAngle, 0, Math.PI*2);
+        ctx.fill();
+    }
+    function DrawVectorHighlight(cx, cy, rx, ry, rotation, alpha){
+        ctx.save();
+        ctx.globalAlpha = alpha===undefined ? 0.16 : alpha;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rx, ry, rotation || 0, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+    }
     function DrawTreeTrunk(o){
         var p = EntityScreenPoint(o.x, o.y);
-        ctx.fillStyle = '#6b4423';
-        ctx.fillRect(p.x-5, p.y-28, 10, 34);
+        var r = o.radius || 28;
+        var kind = o.treeKind || 'deciduous';
+        if (kind==='cactus' || kind==='desertScrub'){
+            return;
+        }
+        var trunkHeight = kind==='palm' ? r*2.45 : r*(1.35+StablePhase((o.id || 'tree')+'_height')*0.45);
+        var trunkWidth = kind==='palm' ? Math.max(4, r*0.16) : Math.max(6, r*0.27);
+        var lean = (StablePhase((o.id || 'tree')+'_lean')-0.5)*r*0.30;
+        ctx.save();
+        ctx.strokeStyle = kind==='palm' ? '#765435' : '#4d3826';
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = trunkWidth;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y+2);
+        ctx.bezierCurveTo(p.x-lean*0.2, p.y-trunkHeight*0.35, p.x+lean*0.55, p.y-trunkHeight*0.72, p.x+lean, p.y-trunkHeight);
+        ctx.stroke();
+        ctx.strokeStyle = kind==='palm' ? '#a07a4c' : '#79573a';
+        ctx.lineWidth = Math.max(1.4, trunkWidth*0.28);
+        ctx.beginPath();
+        ctx.moveTo(p.x-trunkWidth*0.18, p.y);
+        ctx.bezierCurveTo(p.x-lean*0.15, p.y-trunkHeight*0.35, p.x+lean*0.37, p.y-trunkHeight*0.72, p.x+lean-trunkWidth*0.18, p.y-trunkHeight);
+        ctx.stroke();
+        if (kind!=='palm'){
+            ctx.strokeStyle = '#5c402b';
+            ctx.lineWidth = Math.max(2, trunkWidth*0.42);
+            for (var branch=0; branch<5; branch+=1){
+                var side = branch%2 ? 1 : -1;
+                var t = 0.48+branch*0.085;
+                var bx = p.x+lean*t;
+                var by = p.y-trunkHeight*t;
+                ctx.beginPath();
+                ctx.moveTo(bx, by);
+                ctx.quadraticCurveTo(bx+side*r*0.30, by-r*0.15, bx+side*r*(0.55+branch*0.04), by-r*(0.30+branch*0.04));
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
     }
     function DrawTreeCanopy(o){
-        var p = EntityScreenPoint(o.x, o.y);
-        var treeState = TreeSnowState(o);
-        var season = treeState.season;
-        var snowy = treeState.snowy;
-        var evergreen = o.treeKind==='evergreen' || o.treeKind==='tropicalEvergreen' || o.treeKind==='palm' || o.treeKind==='cactus' || o.treeKind==='desertScrub';
-        if (o.treeKind==='desertScrub'){
-            ctx.fillStyle='#72734b'; ctx.beginPath(); ctx.ellipse(p.x,p.y-13,o.radius*0.58,o.radius*0.30,0,0,Math.PI*2); ctx.fill(); return;
+        var p=EntityScreenPoint(o.x,o.y);var r=o.radius||28;var state=TreeSnowState(o);var kind=o.treeKind||'deciduous';
+        if(kind==='desertScrub'){DrawOrganicClosedPath([{x:p.x-r*0.8,y:p.y-3},{x:p.x-r*0.5,y:p.y-r*0.45},{x:p.x,y:p.y-r*0.62},{x:p.x+r*0.72,y:p.y-r*0.36},{x:p.x+r*0.84,y:p.y-2}],'#74724b','#4f5035',1.7);return;}
+        if(kind==='cactus'){ctx.strokeStyle='#315f3b';ctx.lineCap='round';ctx.lineWidth=Math.max(8,r*0.34);ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x,p.y-r*2.1);ctx.stroke();ctx.lineWidth=Math.max(6,r*0.23);ctx.beginPath();ctx.moveTo(p.x,p.y-r*1.15);ctx.lineTo(p.x-r*0.65,p.y-r*1.15);ctx.lineTo(p.x-r*0.65,p.y-r*1.55);ctx.moveTo(p.x,p.y-r*0.85);ctx.lineTo(p.x+r*0.62,p.y-r*0.85);ctx.lineTo(p.x+r*0.62,p.y-r*1.25);ctx.stroke();return;}
+        var palette={winter:state.snowy?'#e7eef0':'#365039',spring:'#69aa55',summer:'#2f6b3a',autumn:'#b86b20'};var colour=(kind==='evergreen'||kind==='tropicalEvergreen'||kind==='palm')?palette.summer:(palette[state.season]||palette.summer);
+        if(kind==='palm'){
+            for(var f=0;f<8;f+=1){var a=-Math.PI+f*Math.PI*2/8;ctx.strokeStyle=f%2?colour:VectorShade(colour,12);ctx.lineWidth=Math.max(4,r*0.13);ctx.lineCap='round';ctx.beginPath();ctx.moveTo(p.x,p.y-r*2.40);ctx.quadraticCurveTo(p.x+Math.cos(a)*r*0.60,p.y-r*2.48+Math.sin(a)*r*0.18,p.x+Math.cos(a)*r*1.05,p.y-r*2.18+Math.sin(a)*r*0.42);ctx.stroke();}return;
         }
-        if (o.treeKind==='cactus'){
-            ctx.fillStyle='#4f7f43'; ctx.fillRect(p.x-5,p.y-58,10,62); ctx.fillRect(p.x-20,p.y-42,18,8); ctx.fillRect(p.x+2,p.y-30,18,8); return;
+        if(kind==='evergreen'){
+            for(var t=0;t<3;t+=1){var y=p.y-r*(1.90-t*0.43);var w=r*(0.46+t*0.22);ctx.fillStyle=t%2?colour:VectorShade(colour,-8);ctx.beginPath();ctx.moveTo(p.x,y-r*0.45);ctx.lineTo(p.x-w,y+r*0.48);ctx.quadraticCurveTo(p.x,y+r*0.32,p.x+w,y+r*0.48);ctx.closePath();ctx.fill();}return;
         }
-        if (o.treeKind==='palm'){
-            ctx.strokeStyle='#795839'; ctx.lineWidth=7; ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.quadraticCurveTo(p.x+5,p.y-35,p.x,p.y-68); ctx.stroke();
-            ctx.strokeStyle='#2f7d45'; ctx.lineWidth=6; for(var palmIndex=0;palmIndex<7;palmIndex+=1){var palmAngle=palmIndex*Math.PI*2/7;ctx.beginPath();ctx.moveTo(p.x,p.y-68);ctx.lineTo(p.x+Math.cos(palmAngle)*32,p.y-68+Math.sin(palmAngle)*16);ctx.stroke();} return;
-        }
-        var palette = {
-            winter : snowy ? ['#e5edf2',
-            '#dbeafe',
-            '#f8fafc'] : ['#315f38',
-            '#385b34',
-            '#45522f'],
-            spring : ['#58a85a',
-            '#6fbe61',
-            '#8ecf71'],
-            summer : ['#2f6b3a',
-            '#357a3f',
-            '#285a32'],
-            autumn : ['#b7791f',
-            '#c05621',
-            '#975a16']
-        } ;
-        ctx.fillStyle =(palette[evergreen ? 'summer' : season] || palette.summer)[o.variant % 3];
-        ctx.beginPath();
-        if ((o.variant || 0) % 3===0){
-            ctx.arc(p.x, p.y-42, o.radius * 0.72, 0, Math.PI * 2);
-        } else if ((o.variant || 0) % 3===1){
-            ctx.moveTo(p.x, p.y-70);
-            ctx.lineTo(p.x-o.radius * 0.72, p.y-25);
-            ctx.lineTo(p.x+o.radius * 0.72, p.y-25);
-            ctx.closePath();
-        } else{
-            ctx.ellipse(p.x, p.y-42, o.radius * 0.55, o.radius * 0.78, 0, 0, Math.PI * 2);
-        }
-        ctx.fill();
-        if (!evergreen && season==='spring'){
-            ctx.fillStyle = 'rgba(255,244,190,0.45)';
-        } else if (!evergreen && season==='autumn'){
-            ctx.fillStyle = 'rgba(255,214,120,0.28)';
-        } else{
-            ctx.fillStyle = snowy ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.12)';
-        }
-        ctx.beginPath();
-        ctx.arc(p.x-8, p.y-50, o.radius * 0.28, 0, Math.PI * 2);
-        ctx.fill();
+        // One coherent crown silhouette is cleaner than a pile of overlapping circles.
+        var crownY=kind==='tropicalEvergreen'?p.y-r*1.56:p.y-r*1.48;var width=kind==='tropicalEvergreen'?r*1.12:r*0.94;var depth=kind==='tropicalEvergreen'?r*0.82:r*0.72;
+        DrawOrganicClosedPath([{x:p.x-width,y:crownY+depth*0.32},{x:p.x-width*0.76,y:crownY-depth*0.40},{x:p.x-width*0.26,y:crownY-depth*0.78},{x:p.x+width*0.23,y:crownY-depth*0.72},{x:p.x+width*0.82,y:crownY-depth*0.34},{x:p.x+width,y:crownY+depth*0.24},{x:p.x+width*0.54,y:crownY+depth*0.67},{x:p.x-width*0.42,y:crownY+depth*0.70}],colour,'#24452d',1.4);
+        DrawOrganicClosedPath([{x:p.x-width*0.72,y:crownY+depth*0.12},{x:p.x-width*0.42,y:crownY-depth*0.45},{x:p.x+width*0.10,y:crownY-depth*0.58},{x:p.x+width*0.56,y:crownY-depth*0.18},{x:p.x+width*0.42,y:crownY+depth*0.22},{x:p.x-width*0.10,y:crownY+depth*0.32}],VectorShade(colour,10),null,0);
     }
     function DrawTree(o){
         DrawTreeTrunk(o);
@@ -21084,92 +21160,20 @@ button:hover {
     }
 
     function DrawBush(o){
-        var p = EntityScreenPoint(o.x, o.y);
-        var r = o.radius || 22;
-        var kind = o.bushKind || 'bush';
-        var primary = o.primaryColour || '#315f38';
-        var secondary = o.secondaryColour || '#406f3d';
-        var dark = o.darkColour || '#203f28';
-        var light = o.lightColour || '#5f8c4e';
-        var stem = o.stemColour || '#4b3328';
-        var variant = o.variant || 0;
-        var isReed = kind==='reed thicket';
-        ctx.save();
-        ctx.globalAlpha = 0.90;
-        function irregularBlob(cx, cy, rx, ry, colour, alpha, phaseKey){
-            var points = 11;
-            ctx.save();
-            ctx.globalAlpha = alpha;
-            ctx.fillStyle = colour;
-            ctx.beginPath();
-            for (var i = 0; i<points; i+=1){
-                var a = -Math.PI+i * Math.PI * 2 / points;
-                var phase = StablePhase((o.id || 'bush')+'_'+phaseKey+'_'+i);
-                var wobble = 0.82+phase * 0.34;
-                var x = cx+Math.cos(a) * rx * wobble;
-                var y = cy+Math.sin(a) * ry * (0.88+phase * 0.24);
-                if (i===0){
-                    ctx.moveTo(x, y);
-                } else{
-                    var prev = -Math.PI+(i-0.5) * Math.PI * 2 / points;
-                    var midPhase = StablePhase((o.id || 'bush')+'_'+phaseKey+'_mid_'+i);
-                    var mx = cx+Math.cos(prev) * rx * (0.92+midPhase * 0.22);
-                    var my = cy+Math.sin(prev) * ry * (0.92+midPhase * 0.22);
-                    ctx.quadraticCurveTo(mx, my, x, y);
-                }
-            }
-            ctx.closePath();
-            ctx.fill();
-            ctx.restore();
+        var p=EntityScreenPoint(o.x,o.y);var r=o.radius||22;var kind=o.bushKind||'bush';
+        var primary=o.primaryColour||'#315f38';var secondary=o.secondaryColour||'#406f3d';var dark=o.darkColour||'#203f28';var light=o.lightColour||'#5f8c4e';
+        ctx.save();DrawVectorShadow(p.x,p.y-1,r*0.86,r*0.18,0.14);
+        if(kind==='reed thicket'){
+            for(var i=0;i<9;i+=1){var f=i/8-0.5;var h=r*(0.72+StablePhase((o.id||'reed')+'_'+i)*0.34);ctx.strokeStyle=i%2?primary:secondary;ctx.lineWidth=2.3;ctx.beginPath();ctx.moveTo(p.x+f*r*1.15,p.y);ctx.quadraticCurveTo(p.x+f*r*1.07,p.y-h*0.55,p.x+f*r*0.95,p.y-h);ctx.stroke();}
+        }else{
+            DrawOrganicClosedPath([{x:p.x-r*0.96,y:p.y-2},{x:p.x-r*0.86,y:p.y-r*0.52},{x:p.x-r*0.46,y:p.y-r*0.86},{x:p.x-r*0.05,y:p.y-r*1.02},{x:p.x+r*0.48,y:p.y-r*0.82},{x:p.x+r*0.92,y:p.y-r*0.44},{x:p.x+r*0.98,y:p.y-1}],dark,null,0);
+            DrawOrganicClosedPath([{x:p.x-r*0.82,y:p.y-r*0.14},{x:p.x-r*0.65,y:p.y-r*0.58},{x:p.x-r*0.24,y:p.y-r*0.85},{x:p.x+r*0.12,y:p.y-r*0.92},{x:p.x+r*0.63,y:p.y-r*0.66},{x:p.x+r*0.84,y:p.y-r*0.20}],primary,null,0);
+            DrawOrganicClosedPath([{x:p.x-r*0.48,y:p.y-r*0.50},{x:p.x-r*0.18,y:p.y-r*0.89},{x:p.x+r*0.28,y:p.y-r*0.80},{x:p.x+r*0.58,y:p.y-r*0.45},{x:p.x+r*0.10,y:p.y-r*0.32}],secondary,null,0);
+            DrawVectorHighlight(p.x-r*0.24,p.y-r*0.72,r*0.30,r*0.10,-0.25,0.14);
+            if(kind==='holly brake'){ctx.fillStyle='#a92836';for(var b=0;b<5;b+=1){var a=b*2.35;ctx.beginPath();ctx.arc(p.x+Math.cos(a)*r*0.50,p.y-r*0.55+Math.sin(a)*r*0.28,2.2,0,Math.PI*2);ctx.fill();}}
+            if(kind==='gorse brake'){ctx.fillStyle='#dbc13c';for(var g=0;g<6;g+=1){var ga=g*2.1;ctx.beginPath();ctx.arc(p.x+Math.cos(ga)*r*0.58,p.y-r*0.52+Math.sin(ga)*r*0.30,2,0,Math.PI*2);ctx.fill();}}
+            if(kind==='hawthorn scrub'){ctx.fillStyle='#eee6cf';for(var h=0;h<5;h+=1){var ha=h*2.25;ctx.beginPath();ctx.arc(p.x+Math.cos(ha)*r*0.54,p.y-r*0.58+Math.sin(ha)*r*0.27,2,0,Math.PI*2);ctx.fill();}}
         }
-        if (isReed){
-            ctx.strokeStyle = stem;
-            ctx.lineWidth = 2;
-            ctx.lineCap = 'round';
-            for (var reed = 0; reed<9; reed+=1){
-                var f = reed / 8-0.5;
-                var phase = StablePhase((o.id || 'reed')+'_'+reed);
-                var baseX = p.x+f * r * 1.15;
-                var topX = baseX+(phase-0.5) * r * 0.20;
-                var topY = p.y-r * (0.72+phase * 0.36);
-                ctx.beginPath();
-                ctx.moveTo(baseX, p.y-2);
-                ctx.lineTo(topX, topY);
-                ctx.stroke();
-            }
-            irregularBlob(p.x, p.y-r * 0.36, r * 0.82, r * 0.38, primary, 0.74, 'reed_mass');
-            irregularBlob(p.x-r * 0.12, p.y-r * 0.56, r * 0.58, r * 0.28, secondary, 0.60, 'reed_top');
-        } else{
-            // Three overlapping, lumpy masses create a shrub silhouette without the
-            // artificial look of perfect circles or radial construction lines.
-            irregularBlob(p.x, p.y-r * 0.42, r * 1.08, r * 0.62, dark, 0.72, 'base_shadow');
-            irregularBlob(p.x-r * 0.26, p.y-r * 0.58, r * 0.74, r * 0.52, primary, 0.88, 'left_mass');
-            irregularBlob(p.x+r * 0.24, p.y-r * 0.54, r * 0.76, r * 0.50, secondary, 0.84, 'right_mass');
-            irregularBlob(p.x+(variant % 3-1) * r * 0.10, p.y-r * 0.85, r * 0.58, r * 0.42, light, 0.62, 'top_mass');
-            ctx.save();
-            ctx.globalAlpha = 0.34;
-            ctx.strokeStyle = stem;
-            ctx.lineWidth = 1.8;
-            ctx.lineCap = 'round';
-            for (var twig = 0; twig<3; twig+=1){
-                var t = twig / 2-0.5;
-                ctx.beginPath();
-                ctx.moveTo(p.x+t * r * 0.62, p.y-r * 0.12);
-                ctx.quadraticCurveTo(p.x+t * r * 0.74, p.y-r * 0.36, p.x+t * r * 0.38, p.y-r * 0.54);
-                ctx.stroke();
-            }
-            ctx.restore();
-        }
-        ctx.save();
-        ctx.globalAlpha = 0.26;
-        ctx.fillStyle = 'rgba(12,24,14,0.70)';
-        for (var gap = 0; gap<3; gap+=1){
-            var gp = StablePhase((o.id || 'bush')+'_gap_'+gap);
-            ctx.beginPath();
-            ctx.ellipse(p.x+(gp-0.5) * r * 1.0, p.y-r * (0.42+0.22 * gap), r * 0.12, r * 0.08, gp * 1.5, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        ctx.restore();
         ctx.restore();
     }
     function DrawMicrofaunaEmitter(o, now){
@@ -21516,15 +21520,48 @@ button:hover {
             ctx.stroke();
         }
     }
-    function DrawClaw(x, y, flip){
-        ctx.strokeStyle = '#e6d8a9';
-        ctx.lineWidth = 2;
+    function DrawMonsterFoot(x, y, facing, lift, thicknessScale){
+        // Feet must always orient to the monster's true facing direction, not
+        // a fixed left/right diagonal - otherwise toes point the wrong way
+        // for half of the 8 octants (whenever facingY flips sign).
+        var fx = facing.facingX, fy = facing.facingY * 0.5;
+        var flen = Math.hypot(fx, fy) || 1;
+        fx/=flen; fy/=flen;
+        var lx = -fy, ly = fx;
+        var grounded = lift<0.9;
+        var padF = 5.4 * thicknessScale, padL = 4 * thicknessScale;
+        var ang = Math.atan2(fy, fx);
+        ctx.save();
+        ctx.translate(x, y-lift * 0.55);
+        if (grounded){
+            ctx.fillStyle = 'rgba(0,0,0,0.18)';
+            ctx.beginPath();
+            ctx.ellipse(fx * 1.5, 2+lift * 0.55, padF * 0.85, padL * 0.5, ang, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.fillStyle = '#e6d8a9';
+        ctx.strokeStyle = '#1f2730';
+        ctx.lineWidth = 1.3;
         ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x+flip * 5, y+4);
-        ctx.moveTo(x+flip * 2, y+1);
-        ctx.lineTo(x+flip * 7, y+5);
+        ctx.ellipse(0, 0, padF *(grounded ? 1 : 0.85), padL *(grounded ? 1 : 0.8), ang, 0, Math.PI * 2);
+        ctx.fill();
         ctx.stroke();
+        var spreads = [-0.6, 0, 0.6];
+        for (var i = 0; i<spreads.length; i+=1){
+            var s = spreads[i];
+            var bx = fx * padF * 0.5+lx * s * padL * 0.7,
+            by = fy * padF * 0.5+ly * s * padL * 0.7;
+            var tx = fx * padF * 1.35+lx * s * padL * 1.05,
+            ty = fy * padF * 1.35+ly * s * padL * 1.05;
+            ctx.strokeStyle = '#1f2730';
+            ctx.lineWidth = 1.5;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(bx, by);
+            ctx.lineTo(tx, ty);
+            ctx.stroke();
+        }
+        ctx.restore();
     }
     function DrawGroundRemain(entity, kind){
         var p = EntityScreenPoint(entity.x, entity.y);
@@ -21666,6 +21703,42 @@ button:hover {
             ctx.stroke();
         }
     }
+    function DrawMountedHorse(a, facing, walk){
+        var body='#73513a'; var dark='#2f261f';
+        var fx=facing.facingX, fy=facing.facingY*0.42;
+        var length=Math.hypot(fx,fy)||1; fx/=length; fy/=length;
+        var lx=-fy, ly=fx;
+        var moving=!!a.renderMoving;
+        var stride=moving?Math.sin(walk)*8:0;
+        DrawVectorShadow(0,2,32,7,0.22);
+        ctx.strokeStyle=dark; ctx.lineCap='round'; ctx.lineWidth=7;
+        ctx.beginPath(); ctx.moveTo(-fx*25-lx*2,-20); ctx.quadraticCurveTo(-fx*39+lx*8,-28,-fx*48+lx*14,-16+Math.sin(walk)*4); ctx.stroke();
+        var legAnchors=[{x:-fx*15+lx*8,y:-15,p:0},{x:-fx*13-lx*8,y:-15,p:Math.PI},{x:fx*15+lx*8,y:-16,p:Math.PI},{x:fx*14-lx*8,y:-16,p:0}];
+        for(var i=0;i<legAnchors.length;i+=1){
+            var leg=legAnchors[i]; var s=Math.sin(walk+leg.p)*7; var lift=Math.max(0,Math.cos(walk+leg.p))*4;
+            DrawTaperedVectorLimb(leg.x,leg.y,leg.x+fx*s*0.45,leg.y+14-lift,leg.x+fx*s,leg.y+31-lift*0.25,4.2,2.4,body,dark,5);
+        }
+        DrawOrganicClosedPath([{x:-fx*31-lx*12,y:-22-ly*7},{x:-fx*19-lx*18,y:-34-ly*8},{x:fx*14-lx*17,y:-36-ly*7},{x:fx*31-lx*9,y:-27-ly*5},{x:fx*25+lx*12,y:-13+ly*6},{x:-fx*22+lx*15,y:-14+ly*7}],body,dark,2.2);
+        DrawVectorHighlight(-7,-29,18,4,-0.12,0.12);
+        var neckX=fx*23, neckY=-31;
+        ctx.strokeStyle=body; ctx.lineWidth=15; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(neckX,neckY); ctx.quadraticCurveTo(fx*32-lx*2,-48,fx*37-lx*2,-57); ctx.stroke();
+        ctx.strokeStyle=dark; ctx.lineWidth=2.2; ctx.stroke();
+        var headX=fx*43, headY=-57+fy*7;
+        DrawOrganicClosedPath([{x:headX-fx*12-lx*8,y:headY-7},{x:headX+fx*7-lx*7,y:headY-6},{x:headX+fx*14,y:headY+2},{x:headX+fx*5+lx*7,y:headY+7},{x:headX-fx*10+lx*8,y:headY+5}],body,dark,2);
+        ctx.fillStyle=dark; ctx.beginPath(); ctx.arc(headX+fx*5-lx*3,headY-2,1.8,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle=VectorShade(body,-18); ctx.beginPath(); ctx.moveTo(headX-fx*3-lx*7,headY-5); ctx.lineTo(headX-fx*8-lx*13,headY-18); ctx.lineTo(headX+fx*2-lx*6,headY-8); ctx.fill();
+        ctx.strokeStyle='#4a3428'; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(fx*24-lx*4,-38); ctx.quadraticCurveTo(fx*31-lx*9,-49,fx*36-lx*8,-63); ctx.stroke();
+    }
+    function AdventurerVectorProfile(className, mounted){
+        var profiles={
+            villager:{scale:0.73,shoulders:11,waist:9,torsoTop:-47,torsoBottom:-19,legLength:27,armLength:23,head:10,gait:0.92,bob:1.35,lean:0.06},
+            doubleVillager:{scale:0.62,shoulders:10,waist:9,torsoTop:-45,torsoBottom:-18,legLength:25,armLength:22,head:10,gait:0.82,bob:1.15,lean:0.04},
+            explorer:{scale:0.72,shoulders:10,waist:8,torsoTop:-49,torsoBottom:-18,legLength:30,armLength:24,head:9,gait:1.18,bob:1.65,lean:0.13},
+            warrior:{scale:0.80,shoulders:15,waist:11,torsoTop:-50,torsoBottom:-18,legLength:27,armLength:26,head:10,gait:0.94,bob:1.05,lean:0.09},
+            knight:{scale:mounted?0.82:0.78,shoulders:16,waist:12,torsoTop:-51,torsoBottom:-18,legLength:27,armLength:27,head:10,gait:0.84,bob:0.80,lean:0.05}
+        };
+        return profiles[className]||profiles.villager;
+    }
     function DrawAdventurer(a, now){
         if (!a.alive){
             DrawGroundRemain(a, 'adventurer');
@@ -21674,11 +21747,13 @@ button:hover {
         var p = EntityScreenPoint(a.x, a.y);
         var facing = FacingForEntity(a, 0);
         var moving = !!a.renderMoving && a.alive && !a.escaped;
-        var phaseBase = now * 0.014+StablePhase(a.id);
+        var cls = a.className || 'villager';
+        var adventurerProfile = AdventurerVectorProfile(cls, !!a.isMounted);
+        var phaseBase = now * 0.014 * adventurerProfile.gait+StablePhase(a.id);
         var walk = moving ? phaseBase : StablePhase(a.id) * 0.35;
         var action = a.behaviourState || '';
         var actionPulse = Math.sin(now * 0.03+StablePhase(a.id));
-        var bob = moving ? Math.sin(walk * 2) * 1.8 : Math.sin(now * 0.002+StablePhase(a.id)) * 0.45;
+        var bob = moving ? Math.sin(walk * 2) * adventurerProfile.bob : Math.sin(now * 0.002+StablePhase(a.id)) * 0.35;
         if (action==='pickingUpTreasure' || action==='droppingTreasure' || action==='armingSelf'){
             bob+=4;
         }
@@ -21686,7 +21761,6 @@ button:hover {
             bob+=actionPulse * 2.5;
         }
         var hurtRatio = a.maxHealth>0 ? a.health / a.maxHealth : 1;
-        var cls = a.className || 'villager';
         var dark = '#1f2730';
         var scale = 0.74;
         var tunic = '#64748b';
@@ -21723,6 +21797,7 @@ button:hover {
             weapon = 'long sword and lance';
             scale = a.isMounted ? 0.82 : 0.76;
         }
+        scale = adventurerProfile.scale;
         if (a.fleeing){
             tunic = '#6b7280';
         }
@@ -21730,6 +21805,12 @@ button:hover {
         ctx.save();
         ctx.translate(p.x, p.y+bob);
         ctx.scale(scale, scale);
+        if (!a.isMounted){
+            var movementLean = moving ? facing.facingX * adventurerProfile.lean : 0;
+            if (a.fleeing){ movementLean += facing.facingX * 0.13; }
+            if (action==='meleeAttacking'){ movementLean += facing.facingX * 0.16; }
+            ctx.transform(1, 0, movementLean, 1, 0, 0);
+        }
         ctx.fillStyle = 'rgba(0,0,0,0.18)';
         ctx.beginPath();
         ctx.ellipse(0, 3, cls==='doubleVillager' ? 28 : 18, cls==='knight' && a.isMounted ? 9 : 6, 0, 0, Math.PI * 2);
@@ -21744,34 +21825,19 @@ button:hover {
             return;
         }
         if (cls==='knight' && a.isMounted){
-            ctx.fillStyle = '#6b4f3a';
-            ctx.strokeStyle = dark;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.ellipse(0, -18, 31, 13, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
+            DrawMountedHorse(a, facing, walk);
             if (Number.isFinite(a.horseHealth) && Number.isFinite(a.horseMaxHealth) && a.horseHealth<a.horseMaxHealth * 0.72){
-                DrawInjuryMarker(0, -18, a.horseHealth<a.horseMaxHealth * 0.38 ? 2 : 1, 12, 7, 0.05);
+                DrawInjuryMarker(0, -23, a.horseHealth<a.horseMaxHealth * 0.38 ? 2 : 1, 12, 7, 0.05);
             }
-            ctx.beginPath();
-            ctx.ellipse(facing.facingX * 25, -25+facing.facingY * 4, 12, 8, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-            ctx.strokeStyle = '#3b2f2a';
-            ctx.lineWidth = 5;
-            for (var hl = -1;
-            hl<=1;
-            hl+=2){
-                ctx.beginPath();
-                ctx.moveTo(hl * 13, -11);
-                ctx.lineTo(hl * 18, -1+Math.sin(walk+hl) * 3);
-                ctx.stroke();
-            }
-            ctx.translate(0, -18);
+            ctx.translate(0, -24);
         }
+        ctx.save();
+        ctx.translate(0, -23);
+        ctx.scale(1, adventurerProfile.legLength / 27);
+        ctx.translate(0, 23);
         DrawHumanLeg(-5, -23, -1, walk+Math.PI, false, trouser, dark, facing, BodyPartSeverity(a, 'leftLeg'));
         DrawHumanLeg(6, -23, 1, walk, true, trouser, dark, facing, BodyPartSeverity(a, 'rightLeg'));
+        ctx.restore();
         var torsoLeanX = facing.facingX * 3;
         var headX = facing.facingX * 4;
         var headY = -61+facing.facingY * 2;
@@ -21792,12 +21858,12 @@ button:hover {
         ctx.strokeStyle = dark;
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(-12+torsoLeanX * 0.25, -48);
-        ctx.lineTo(12+torsoLeanX * 0.25, -48);
-        ctx.lineTo(15+torsoLeanX, -25);
-        ctx.lineTo(7+torsoLeanX * 0.35, -18);
-        ctx.lineTo(-8+torsoLeanX * 0.35, -18);
-        ctx.lineTo(-15+torsoLeanX, -25);
+        ctx.moveTo(-adventurerProfile.shoulders+torsoLeanX*0.25, adventurerProfile.torsoTop);
+        ctx.lineTo(adventurerProfile.shoulders+torsoLeanX*0.25, adventurerProfile.torsoTop);
+        ctx.lineTo(adventurerProfile.waist+3+torsoLeanX, -26);
+        ctx.lineTo(adventurerProfile.waist+torsoLeanX*0.35, adventurerProfile.torsoBottom);
+        ctx.lineTo(-adventurerProfile.waist+torsoLeanX*0.35, adventurerProfile.torsoBottom);
+        ctx.lineTo(-adventurerProfile.waist-3+torsoLeanX, -26);
         ctx.closePath();
         ctx.fill();
         DrawInjuryMarker(torsoLeanX * 0.5, -34, BodyPartSeverity(a, 'torso'), 9, 10, 0.08);
@@ -21818,9 +21884,9 @@ button:hover {
         var offSide = -weaponSide;
         var throwing = action==='throwing';
         var melee = action==='meleeAttacking';
-        var armPhase = throwing || melee ? walk+1.8 : walk;
-        DrawArm(weaponSide * 11+torsoLeanX * 0.35, -43, 24, armPhase, skin, dark, false, facing, weaponSide, BodyPartSeverity(a, weaponSide<0 ? 'leftArm' : 'rightArm'));
-        DrawArm(offSide * 11+torsoLeanX * 0.35, -43, 24, walk+Math.PI, skin, dark, false, facing, offSide, BodyPartSeverity(a, offSide<0 ? 'leftArm' : 'rightArm'));
+        var armPhase = throwing ? walk+2.45 : (melee ? walk+1.35+actionPulse*0.55 : walk);
+        DrawArm(weaponSide * adventurerProfile.shoulders+torsoLeanX * 0.35, -43, adventurerProfile.armLength, armPhase, skin, dark, false, facing, weaponSide, BodyPartSeverity(a, weaponSide<0 ? 'leftArm' : 'rightArm'));
+        DrawArm(offSide * adventurerProfile.shoulders+torsoLeanX * 0.35, -43, adventurerProfile.armLength, walk+Math.PI, skin, dark, false, facing, offSide, BodyPartSeverity(a, offSide<0 ? 'leftArm' : 'rightArm'));
         ctx.save();
         ctx.translate(weaponSide * 24+facing.facingX * 6, -43+facing.facingY * 4);
         ctx.rotate(throwing ? -0.8 : (melee ? 0.95 : 0.25));
@@ -21945,20 +22011,21 @@ button:hover {
     // ============================================================================
     // Draws current monster visuals. Future genotype-driven SVG/canvas appearance
     // should read phenotype data from snapshots rather than calculating gameplay.
-    function DrawMonsterLeg(hipX, hipY, side, phase, colour, outline, facing, scale){
-        scale = scale || 1;
-        var stride = Math.sin(phase) * 7 * scale;
-        var lift = Math.max(0, Math.cos(phase)) * 3.5 * scale;
+    function DrawMonsterLeg(hipX, hipY, side, phase, colour, outline, facing, lengthScale, thicknessScale, injurySeverity){
+        lengthScale = lengthScale || 1;
+        thicknessScale = thicknessScale || 1;
+        var stride = Math.sin(phase) * 7 * lengthScale;
+        var lift = Math.max(0, Math.cos(phase)) * 3.5 * lengthScale;
         var lateralX = facing.lateralX;
         var lateralY = facing.lateralY * 0.35;
         var forwardX = facing.facingX;
         var forwardY = facing.facingY * 0.35;
         var kneeX = hipX+lateralX * side * 2+forwardX * stride * 0.35;
-        var kneeY = hipY+10 * scale-lift+forwardY * stride * 0.2;
-        var footX = hipX+lateralX * side * 6 * scale+forwardX * stride;
-        var footY = hipY+22 * scale-lift * 0.2+forwardY * stride * 0.35;
-        DrawSegmentedLimb(hipX, hipY, kneeX, kneeY, footX, footY, 7 * scale, 4 * scale, colour, outline);
-        DrawClaw(footX, footY, side>=0 ? 1 : -1);
+        var kneeY = hipY+10 * lengthScale-lift+forwardY * stride * 0.2;
+        var footX = hipX+lateralX * side * 6 * thicknessScale+forwardX * stride;
+        var footY = hipY+22 * lengthScale-lift * 0.2+forwardY * stride * 0.35;
+        DrawSegmentedLimb(hipX, hipY, kneeX, kneeY, footX, footY, 7 * thicknessScale, 4 * thicknessScale, colour, outline, injurySeverity);
+        DrawMonsterFoot(footX, footY, facing, lift, thicknessScale);
     }
     function DrawMonster(m, now){
         if (!m.alive){
@@ -22005,7 +22072,8 @@ button:hover {
         var spineColour = phenotypeColour.spineColour || '#5b216e';
         var showStripes = MonsterColourIsStriped(m);
         var morphology = MonsterFatMorphology(m);
-        var legThicknessScale = morphology.legScale || 1;
+        var legLengthScale = morphology.legScale || 1;
+        var legThicknessScale = morphology.legThicknessScale || 1;
         var torsoLengthScale = morphology.torsoLengthScale || 1;
         var torsoDepthScale = morphology.torsoDepthScale || 1;
         var bellyDepthScale = morphology.bellyDepthScale || torsoDepthScale;
@@ -22043,8 +22111,8 @@ button:hover {
         ctx.moveTo(tailBaseX, tailBaseY);
         ctx.quadraticCurveTo(-fx * (38 * torsoLengthScale)+lx * 8, -38-fy * (12 * torsoDepthScale)+ly * 4, tailTipX, tailTipY);
         ctx.stroke();
-        DrawMonsterLeg(-fx * 14+lx * 13, -25+ly * 4, -1, walk+Math.PI, bodyDark, dark, facing, legThicknessScale);
-        DrawMonsterLeg(fx * 12-lx * 12, -24-ly * 4, 1, walk+0.65, bodyDark, dark, facing, legThicknessScale);
+        DrawMonsterLeg(-fx * 14+lx * 13, -25+ly * 4, -1, walk+Math.PI, bodyDark, dark, facing, legLengthScale, legThicknessScale, BodyPartSeverity(m, 'rearRightLeg'));
+        DrawMonsterLeg(fx * 12-lx * 12, -24-ly * 4, 1, walk+0.65, bodyDark, dark, facing, legLengthScale, legThicknessScale, BodyPartSeverity(m, 'frontRightLeg'));
         ctx.fillStyle = bodyDark;
         ctx.strokeStyle = dark;
         ctx.lineWidth = 2.5;
@@ -22058,16 +22126,22 @@ button:hover {
         ctx.fill();
         if (showStripes){
             ctx.save();
-            ctx.globalAlpha = 0.58;
-            ctx.strokeStyle = bodySecondary;
-            ctx.lineWidth = 5;
-            for (var stripe = -24;
-            stripe<=24;
-            stripe+=12){
+            ctx.beginPath();
+            ctx.ellipse(-fx * 4, -38-fy * 2, (28+breathe) * torsoLengthScale, (16+breathe * 0.25) * torsoDepthScale, rot, 0, Math.PI * 2);
+            ctx.clip();
+            ctx.fillStyle = bodySecondary;
+            ctx.globalAlpha = 0.72;
+            var stripeCentres = [-20,-8,5,17];
+            for (var stripeIndex=0; stripeIndex<stripeCentres.length; stripeIndex+=1){
+                var stripeX=stripeCentres[stripeIndex]*torsoLengthScale;
                 ctx.beginPath();
-                ctx.moveTo(stripe * 0.75-lx * 10, -54+ly * stripe * 0.06);
-                ctx.lineTo(stripe * 0.75+lx * 10, -23+ly * stripe * 0.06);
-                ctx.stroke();
+                ctx.moveTo(stripeX-6,-53);
+                ctx.bezierCurveTo(stripeX-11,-47,stripeX-9,-39,stripeX-5,-34);
+                ctx.bezierCurveTo(stripeX-2,-30,stripeX+2,-29,stripeX+5,-31);
+                ctx.bezierCurveTo(stripeX+1,-38,stripeX+4,-47,stripeX+8,-52);
+                ctx.bezierCurveTo(stripeX+3,-56,stripeX-2,-56,stripeX-6,-53);
+                ctx.closePath();
+                ctx.fill();
             }
             ctx.restore();
         }
@@ -22075,8 +22149,8 @@ button:hover {
         ctx.beginPath();
         ctx.ellipse(-fx * 4, -31, 15 * torsoLengthScale, 7 * bellyDepthScale, rot, 0, Math.PI * 2);
         ctx.fill();
-        DrawMonsterLeg(-fx * 8-lx * 14, -24-ly * 4, -1, walk, body, dark, facing, legThicknessScale);
-        DrawMonsterLeg(fx * 16+lx * 14, -24+ly * 4, 1, walk+Math.PI, body, dark, facing, legThicknessScale);
+        DrawMonsterLeg(-fx * 8-lx * 14, -24-ly * 4, -1, walk, body, dark, facing, legLengthScale, legThicknessScale, BodyPartSeverity(m, 'rearLeftLeg'));
+        DrawMonsterLeg(fx * 16+lx * 14, -24+ly * 4, 1, walk+Math.PI, body, dark, facing, legLengthScale, legThicknessScale, BodyPartSeverity(m, 'frontLeftLeg'));
         var headX = fx * (30 * torsoLengthScale);
         var headY = -48+fy * (11 * torsoDepthScale);
         var snoutX = headX+fx * 15;
@@ -22111,16 +22185,13 @@ button:hover {
             ctx.stroke();
         }
         if (!facing.away){
-            ctx.fillStyle = 'white';
-            ctx.beginPath();
-            ctx.ellipse(headX+lx * 6+fx * 2, headY-4+ly * 2, 5, 6, 0, 0, Math.PI * 2);
-            ctx.ellipse(headX-lx * 5+fx * 2, headY-5-ly * 2, 5, 6, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = m.eyeColour || '#6f5b3e';
-            ctx.beginPath();
-            ctx.ellipse(headX+lx * 6+fx * 4, headY-4+ly * 2, 2, 3, 0, 0, Math.PI * 2);
-            ctx.ellipse(headX-lx * 5+fx * 4, headY-5-ly * 2, 2, 3, 0, 0, Math.PI * 2);
-            ctx.fill();
+            var eyePoints=[{x:headX+lx*6+fx*2,y:headY-4+ly*2},{x:headX-lx*5+fx*2,y:headY-5-ly*2}];
+            for(var eyeIndex=0;eyeIndex<eyePoints.length;eyeIndex+=1){
+                var ep=eyePoints[eyeIndex];
+                ctx.fillStyle='#ffffff';ctx.strokeStyle=dark;ctx.lineWidth=1.6;ctx.beginPath();ctx.ellipse(ep.x,ep.y,7.2,8.4,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+                ctx.fillStyle=m.eyeColour||'#6f5b3e';ctx.beginPath();ctx.arc(ep.x+fx*2,ep.y,4.2,0,Math.PI*2);ctx.fill();
+                ctx.fillStyle='#111111';ctx.beginPath();ctx.arc(ep.x+fx*3,ep.y,2.1,0,Math.PI*2);ctx.fill();
+            }
             ctx.strokeStyle = dark;
             ctx.lineWidth = 2;
             ctx.beginPath();
@@ -22176,12 +22247,11 @@ button:hover {
                 var partCondition = Number.isFinite(m.bodyHealth[injury.part]) ? m.bodyHealth[injury.part] : m.bodyHealth.maxEach;
                 var permanentLoss = m.bodyHealth.permanentLoss && m.bodyHealth.permanentLoss[injury.part] ? m.bodyHealth.permanentLoss[injury.part] : 0;
                 if (partCondition<m.bodyHealth.maxEach * 0.72 || permanentLoss>0){
-                    ctx.beginPath();
-                    ctx.moveTo(injury.x-5, injury.y-4);
-                    ctx.lineTo(injury.x+5, injury.y+4);
-                    ctx.moveTo(injury.x+4, injury.y-5);
-                    ctx.lineTo(injury.x-4, injury.y+5);
-                    ctx.stroke();
+                    var severity = Math.max(0.25, 1-partCondition / Math.max(1, m.bodyHealth.maxEach));
+                    ctx.save();ctx.translate(injury.x,injury.y);ctx.rotate(-0.28);
+                    ctx.strokeStyle='#521a18';ctx.lineCap='round';ctx.lineWidth=2.2+severity*1.8;
+                    ctx.beginPath();ctx.moveTo(-6,-1);ctx.bezierCurveTo(-2,-4,2,3,6,0);ctx.stroke();
+                    ctx.strokeStyle='#c65c4a';ctx.lineWidth=1.1;ctx.beginPath();ctx.moveTo(-5,-2);ctx.bezierCurveTo(-1,-4,2,1,5,-1);ctx.stroke();ctx.restore();
                 }
             }
         }
@@ -22195,12 +22265,6 @@ button:hover {
             ctx.fillStyle = '#f2c14e';
             ctx.fillRect(headX-fx * 3-2, headY+10, 5, 6);
         }
-        if (hurtRatio<0.35){
-            ctx.fillStyle = 'rgba(190,39,39,0.18)';
-            ctx.beginPath();
-            ctx.ellipse(0, -34, 33 * torsoLengthScale, 20 * torsoDepthScale, rot, 0, Math.PI * 2);
-            ctx.fill();
-        }
         if (m.diseases && m.diseases.length){
             ctx.fillStyle =(m.diseases[0].ui && m.diseases[0].ui.tint) || 'rgba(248,113,113,0.30)';
             ctx.globalAlpha*=0.20;
@@ -22212,104 +22276,85 @@ button:hover {
         ctx.restore();
         ctx.globalAlpha = 1;
     }
-    function DrawFaunaLeg(hipX, hipY, side, phase, colour, outline, facing){
-        // Macrofauna are low quadrupeds. This deliberately avoids the humanoid
-        // leg helper, whose long shin/foot geometry makes deer/boar/hare legs
-        // extend far below the animal silhouette at the bottom of the viewport.
-        var stride = Math.sin(phase) * 5.2;
-        var lift = Math.max(0, Math.cos(phase)) * 2.2;
-        var lateralX = facing.lateralX;
-        var lateralY = facing.lateralY * 0.25;
-        var forwardX = facing.facingX;
-        var forwardY = facing.facingY * 0.22;
-        var kneeX = hipX+lateralX * side * 1.5+forwardX * stride * 0.28;
-        var kneeY = hipY+6-lift+forwardY * stride * 0.16;
-        var footX = hipX+lateralX * side * 3.8+forwardX * stride * 0.62;
-        var footY = hipY+13-lift * 0.25+forwardY * stride * 0.26;
-        DrawSegmentedLimb(hipX, hipY, kneeX, kneeY, footX, footY, 5.5, 3, colour, outline);
-        ctx.fillStyle = outline;
-        ctx.beginPath();
-        ctx.ellipse(footX+forwardX * 1.5, footY+0.8, 3.6, 1.6, Math.atan2(forwardY, forwardX), 0, Math.PI * 2);
-        ctx.fill();
+    function MacrofaunaVectorProfile(species){
+        var profiles={
+            deer:{family:'ungulate',scale:0.72,bodyLength:31,bodyDepth:12,legLength:25,neck:18,headLength:12,ear:8,tail:7,antlers:true},
+            fox:{family:'canid',scale:0.56,bodyLength:29,bodyDepth:10,legLength:17,neck:7,headLength:15,ear:10,tail:28,whiteTip:true},
+            boar:{family:'boar',scale:0.72,bodyLength:32,bodyDepth:17,legLength:13,neck:6,headLength:17,ear:6,tail:5,tusks:true},
+            peccary:{family:'boar',scale:0.58,bodyLength:29,bodyDepth:15,legLength:12,neck:5,headLength:15,ear:6,tail:3},
+            hare:{family:'rodent',scale:0.46,bodyLength:22,bodyDepth:12,legLength:15,neck:3,headLength:10,ear:18,tail:5,hindLeg:true},
+            agouti:{family:'rodent',scale:0.46,bodyLength:24,bodyDepth:12,legLength:12,neck:3,headLength:10,ear:5,tail:2},
+            capybara:{family:'rodent',scale:0.68,bodyLength:30,bodyDepth:16,legLength:11,neck:3,headLength:13,ear:4,tail:0},
+            tapir:{family:'tapir',scale:0.74,bodyLength:34,bodyDepth:18,legLength:16,neck:6,headLength:17,ear:6,tail:4,trunk:true},
+            bear:{family:'bear',scale:0.82,bodyLength:33,bodyDepth:21,legLength:15,neck:5,headLength:15,ear:5,tail:3},
+            polarBear:{family:'bear',scale:0.88,bodyLength:36,bodyDepth:20,legLength:17,neck:8,headLength:17,ear:4,tail:3},
+            pangolin:{family:'pangolin',scale:0.58,bodyLength:29,bodyDepth:13,legLength:10,neck:5,headLength:14,ear:0,tail:31,scales:true},
+            caiman:{family:'reptile',scale:0.75,bodyLength:35,bodyDepth:9,legLength:9,neck:3,headLength:19,ear:0,tail:38},
+            cassowary:{family:'bird',scale:0.70,bodyLength:20,bodyDepth:17,legLength:28,neck:22,headLength:8,ear:0,tail:7},
+            monkey:{family:'primate',scale:0.50,bodyLength:17,bodyDepth:12,legLength:18,neck:4,headLength:9,ear:4,tail:29},
+            sloth:{family:'primate',scale:0.56,bodyLength:22,bodyDepth:15,legLength:21,neck:3,headLength:10,ear:2,tail:3},
+            seal:{family:'pinniped',scale:0.66,bodyLength:38,bodyDepth:14,legLength:0,neck:5,headLength:12,ear:0,tail:9,aquatic:true},
+            walrus:{family:'pinniped',scale:0.86,bodyLength:40,bodyDepth:21,legLength:0,neck:4,headLength:17,ear:0,tail:8,aquatic:true,tusks:true}
+        };
+        return profiles[species]||profiles.deer;
+    }
+    function DrawMacrofaunaEye(x,y,fx,fy,lx,away,dark){
+        if(away){return;}
+        ctx.fillStyle='#f5f1df'; ctx.beginPath(); ctx.ellipse(x+fx*2+lx*3,y+fy*2,2.8,2.2,0,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle=dark; ctx.beginPath(); ctx.arc(x+fx*3+lx*3,y+fy*2,1.2,0,Math.PI*2); ctx.fill();
+    }
+    function DrawPinniped(animal, profile, facing, walk, body, dark, inWater){
+        var fx=facing.facingX, fy=facing.facingY*0.40; var len=Math.hypot(fx,fy)||1; fx/=len; fy/=len; var lx=-fy, ly=fx;
+        var tailWave=Math.sin(walk)*4;
+        DrawOrganicClosedPath([{x:-fx*profile.bodyLength-lx*profile.bodyDepth*0.35,y:-18-ly*4},{x:-fx*10-lx*profile.bodyDepth,y:-31-ly*4},{x:fx*profile.bodyLength*0.72-lx*profile.bodyDepth*0.7,y:-28-ly*3},{x:fx*profile.bodyLength,y:-20},{x:fx*profile.bodyLength*0.72+lx*profile.bodyDepth*0.7,y:-12+ly*3},{x:-fx*13+lx*profile.bodyDepth,y:-10+ly*4}],body,dark,2.2);
+        ctx.fillStyle=VectorShade(body,12); ctx.beginPath(); ctx.ellipse(fx*profile.bodyLength*0.69,-22+fy*6,profile.headLength,profile.headLength*0.75,Math.atan2(fy,fx),0,Math.PI*2);ctx.fill();ctx.stroke();
+        ctx.fillStyle=VectorShade(body,-16); for(var side=-1;side<=1;side+=2){ctx.beginPath();ctx.moveTo(fx*3+lx*side*7,-14+ly*side*3);ctx.quadraticCurveTo(-fx*5+lx*side*20,-5+ly*side*8,-fx*18+lx*side*17,-2+ly*side*5);ctx.quadraticCurveTo(-fx*5+lx*side*5,-9,fx*3+lx*side*7,-14+ly*side*3);ctx.fill();ctx.stroke();}
+        ctx.beginPath();ctx.moveTo(-fx*profile.bodyLength,-18);ctx.lineTo(-fx*(profile.bodyLength+profile.tail)-lx*8,-12+tailWave);ctx.lineTo(-fx*(profile.bodyLength+profile.tail)+lx*8,-12-tailWave);ctx.closePath();ctx.fill();ctx.stroke();
+        if(profile.tusks&&!facing.away){ctx.strokeStyle='#eee2c2';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(fx*(profile.bodyLength+5)+lx*5,-17);ctx.lineTo(fx*(profile.bodyLength+10)+lx*5,-5);ctx.moveTo(fx*(profile.bodyLength+5)-lx*5,-17);ctx.lineTo(fx*(profile.bodyLength+10)-lx*5,-5);ctx.stroke();}
+        DrawMacrofaunaEye(fx*profile.bodyLength*0.76,-25+fy*6,fx,fy,lx,facing.away,dark);
+        if(inWater){ctx.save();ctx.globalAlpha=0.42;ctx.strokeStyle='#d7f1f6';ctx.lineWidth=2;for(var w=-1;w<=1;w+=1){ctx.beginPath();ctx.arc(-fx*8+lx*w*10,-6,18+w*2,0.15,Math.PI-0.15);ctx.stroke();}ctx.restore();}
     }
     function DrawMacrofauna(animal, now){
-        if (!animal.alive){
-            DrawGroundRemain(animal, 'macrofauna');
-            return;
+        if(!animal.alive){DrawGroundRemain(animal,'macrofauna');return;}
+        var p=EntityScreenPoint(animal.x,animal.y); var facing=FacingForEntity(animal,0); var profile=MacrofaunaVectorProfile(animal.species);
+        var moving=!!animal.renderMoving; var walk=moving?now*0.014+StablePhase(animal.id):StablePhase(animal.id)*0.25; var body=animal.colour||'#8b5a2b'; var dark=VectorShade(body,-42);
+        var renderGrid=(currentSnapshot && currentSnapshot.world && currentSnapshot.world.terrainGrid) || (latestWorldSnapshot && latestWorldSnapshot.terrainGrid) || null;
+        // Terrain snapshots use the worker's compact numeric encoding. The main
+        // renderer deliberately does not import the worker-only TERRAIN_TYPE enum.
+        var terrain=0;
+        if(renderGrid && renderGrid.terrainTypes && renderGrid.cols && renderGrid.rows){
+            var tileSize=renderGrid.tileSize || TILE_SIZE;
+            var tx=Math.max(0,Math.min(renderGrid.cols-1,Math.floor(animal.x/tileSize)));
+            var ty=Math.max(0,Math.min(renderGrid.rows-1,Math.floor(animal.y/tileSize)));
+            terrain=renderGrid.terrainTypes[ty*renderGrid.cols+tx];
         }
-        var p = EntityScreenPoint(animal.x, animal.y);
-        var facing = FacingForEntity(animal, 0);
-        var moving = !!animal.renderMoving && animal.alive;
-        var phaseBase = now * 0.015+StablePhase(animal.id);
-        var walk = moving ? phaseBase : StablePhase(animal.id) * 0.2;
-        var bob = moving ? Math.sin(walk * 2) * 1.2 : 0;
-        var hurtRatio = animal.maxHealth>0 ? animal.health / animal.maxHealth : 1;
-        var body = animal.colour || '#8b5a2b';
-        var dark = '#2c2118';
-        var fx = facing.facingX;
-        var fy = facing.facingY * 0.45;
-        var len = Math.hypot(fx, fy) || 1;
-        fx/=len;
-        fy/=len;
-        var lx = -fy;
-        var ly = fx;
-        var rot = Math.atan2(fy, fx);
-        var scale = animal.species==='hare' ? 0.46 : (animal.species==='boar' ? 0.64 : 0.7);
-        ctx.globalAlpha = !animal.alive ? 0.32 : 1;
-        ctx.save();
-        ctx.translate(p.x, p.y+bob);
-        ctx.scale(scale, scale);
-        ctx.fillStyle = 'rgba(0,0,0,0.18)';
-        ctx.beginPath();
-        ctx.ellipse(0, 2, 24, 7, 0, 0, Math.PI * 2);
-        ctx.fill();
-        DrawFaunaLeg(-fx * 10+lx * 8, -18+ly * 2, -1, walk+Math.PI, body, dark, facing);
-        DrawFaunaLeg(fx * 9-lx * 8, -18-ly * 2, 1, walk, body, dark, facing);
-        ctx.fillStyle = body;
-        ctx.strokeStyle = dark;
-        ctx.lineWidth = 2.2;
-        ctx.beginPath();
-        ctx.ellipse(0, -27, 27, 15, rot, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        var headX = fx * 25;
-        var headY = -37+fy * 8;
-        ctx.beginPath();
-        ctx.ellipse(headX, headY, 12, 10, rot * 0.35, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        if (animal.species==='deer'){
-            ctx.strokeStyle = '#e6d8a9';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(headX-lx * 5, headY-8);
-            ctx.lineTo(headX-lx * 9, headY-23);
-            ctx.moveTo(headX+lx * 5, headY-8);
-            ctx.lineTo(headX+lx * 9, headY-23);
-            ctx.stroke();
+        var inWater=terrain===4||terrain===5;
+        var bob=moving?Math.sin(walk*2)*(profile.aquatic?0.35:1.0):0;
+        ctx.save();ctx.translate(p.x,p.y+bob);ctx.scale(profile.scale,profile.scale);DrawVectorShadow(0,2,profile.bodyLength*0.82,Math.max(3,profile.bodyDepth*0.34),profile.aquatic&&inWater?0.10:0.19);
+        if(profile.family==='pinniped'){DrawPinniped(animal,profile,facing,walk,body,dark,inWater);ctx.restore();return;}
+        var fx=facing.facingX,fy=facing.facingY*0.42,len=Math.hypot(fx,fy)||1;fx/=len;fy/=len;var lx=-fy,ly=fx;var rot=Math.atan2(fy,fx);
+        if(profile.family==='reptile'){
+            DrawOrganicClosedPath([{x:-fx*profile.bodyLength-lx*7,y:-16},{x:-fx*8-lx*profile.bodyDepth,y:-25},{x:fx*profile.bodyLength-lx*7,y:-21},{x:fx*(profile.bodyLength+profile.headLength),y:-16},{x:fx*profile.bodyLength+lx*7,y:-10},{x:-fx*8+lx*profile.bodyDepth,y:-8}],body,dark,2);
+            ctx.strokeStyle=dark;ctx.lineWidth=8;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-fx*profile.bodyLength,-15);ctx.quadraticCurveTo(-fx*(profile.bodyLength+profile.tail*0.5)+lx*7,-12,-fx*(profile.bodyLength+profile.tail),-7+Math.sin(walk)*4);ctx.stroke();
+        }else if(profile.family==='bird'){
+            for(var bl=-1;bl<=1;bl+=2){var stride=Math.sin(walk+(bl<0?0:Math.PI))*7;DrawTaperedVectorLimb(lx*bl*5,-15,lx*bl*5+fx*stride*0.3,1,lx*bl*6+fx*stride,profile.legLength,3.3,1.8,'#7b6b55',dark,5);}
+            ctx.fillStyle=body;ctx.strokeStyle=dark;ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(0,-30,profile.bodyLength,profile.bodyDepth,rot,0,Math.PI*2);ctx.fill();ctx.stroke();
+            ctx.strokeStyle='#255c75';ctx.lineWidth=11;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(fx*11,-38);ctx.lineTo(fx*23,-57);ctx.stroke();ctx.fillStyle='#23474f';ctx.beginPath();ctx.ellipse(fx*27,-61,profile.headLength,profile.headLength*0.82,rot,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#b34432';ctx.beginPath();ctx.moveTo(fx*25-lx*6,-67);ctx.lineTo(fx*31,-81);ctx.lineTo(fx*34+lx*6,-65);ctx.fill();
+        }else{
+            var anchors=[-profile.bodyLength*0.55,profile.bodyLength*0.55];
+            for(var pair=0;pair<anchors.length;pair+=1){for(var side=-1;side<=1;side+=2){var phase=walk+(pair+((side+1)/2))*Math.PI;var stride=Math.sin(phase)*(profile.hindLeg&&pair===0?9:6);var lift=Math.max(0,Math.cos(phase))*3;var ax=fx*anchors[pair]+lx*side*profile.bodyDepth*0.45;var ay=-17+ly*side*3;DrawTaperedVectorLimb(ax,ay,ax+fx*stride*0.35,ay+profile.legLength*0.52-lift,ax+fx*stride,ay+profile.legLength-lift*0.2,profile.family==='bear'?5:3.6,profile.family==='bear'?3.5:2.1,VectorShade(body,pair===0?-8:0),dark,4);}}
+            DrawOrganicClosedPath([{x:-fx*profile.bodyLength-lx*profile.bodyDepth*0.58,y:-24-ly*5},{x:-fx*profile.bodyLength*0.45-lx*profile.bodyDepth,y:-34-ly*5},{x:fx*profile.bodyLength*0.48-lx*profile.bodyDepth*0.92,y:-35-ly*4},{x:fx*profile.bodyLength-lx*profile.bodyDepth*0.54,y:-27-ly*3},{x:fx*profile.bodyLength*0.72+lx*profile.bodyDepth*0.78,y:-13+ly*4},{x:-fx*profile.bodyLength*0.65+lx*profile.bodyDepth*0.82,y:-12+ly*5}],body,dark,2.1);
+            if(profile.scales){ctx.save();ctx.strokeStyle=VectorShade(body,24);ctx.lineWidth=2;for(var sc=-18;sc<20;sc+=6){ctx.beginPath();ctx.arc(fx*sc,-28+fy*sc*0.2,6,Math.PI,Math.PI*2);ctx.stroke();}ctx.restore();}
+            var headX=fx*(profile.bodyLength+profile.headLength*0.45),headY=-32+fy*profile.bodyLength*0.38;
+            DrawOrganicClosedPath([{x:headX-fx*profile.headLength-lx*profile.headLength*0.55,y:headY-5},{x:headX+fx*profile.headLength*0.65-lx*profile.headLength*0.48,y:headY-4},{x:headX+fx*profile.headLength,y:headY+2},{x:headX+fx*profile.headLength*0.45+lx*profile.headLength*0.56,y:headY+7},{x:headX-fx*profile.headLength*0.75+lx*profile.headLength*0.52,y:headY+6}],VectorShade(body,3),dark,1.8);
+            if(profile.ear){for(var ear=-1;ear<=1;ear+=2){ctx.fillStyle=VectorShade(body,8);ctx.beginPath();ctx.moveTo(headX-fx*3+lx*ear*5,headY-4);ctx.lineTo(headX-fx*5+lx*ear*(5+profile.ear*0.6),headY-profile.ear);ctx.lineTo(headX+fx*2+lx*ear*5,headY-3);ctx.fill();ctx.stroke();}}
+            if(profile.antlers){ctx.strokeStyle='#cfbe94';ctx.lineWidth=2.2;for(var ant=-1;ant<=1;ant+=2){ctx.beginPath();ctx.moveTo(headX+lx*ant*5,headY-5);ctx.lineTo(headX-fx*3+lx*ant*10,headY-24);ctx.lineTo(headX+fx*4+lx*ant*14,headY-30);ctx.moveTo(headX-fx*2+lx*ant*9,headY-18);ctx.lineTo(headX-fx*9+lx*ant*15,headY-25);ctx.stroke();}}
+            if(profile.tusks&&!facing.away){ctx.strokeStyle='#eee0b9';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(headX+fx*profile.headLength*0.8+lx*4,headY+4);ctx.lineTo(headX+fx*(profile.headLength+7)+lx*5,headY-1);ctx.stroke();}
+            if(profile.tail){ctx.strokeStyle=profile.whiteTip?'#f0eadc':VectorShade(body,-12);ctx.lineWidth=profile.family==='canid'?10:5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-fx*profile.bodyLength,-24);ctx.quadraticCurveTo(-fx*(profile.bodyLength+profile.tail*0.55)+lx*8,-28,-fx*(profile.bodyLength+profile.tail),-20+Math.sin(walk)*4);ctx.stroke();}
+            DrawMacrofaunaEye(headX+fx*profile.headLength*0.35,headY-2,fx,fy,lx,facing.away,dark);
         }
-        if (animal.species==='hare'){
-            ctx.fillStyle = body;
-            ctx.beginPath();
-            ctx.ellipse(headX-lx * 4, headY-15, 4, 12, rot, 0, Math.PI * 2);
-            ctx.ellipse(headX+lx * 4, headY-15, 4, 12, rot, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-        }
-        if (!facing.away){
-            ctx.fillStyle = 'white';
-            ctx.beginPath();
-            ctx.arc(headX+lx * 4+fx * 2, headY-2, 3, 0, Math.PI * 2);
-            ctx.arc(headX-lx * 4+fx * 2, headY-2, 3, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = dark;
-            ctx.beginPath();
-            ctx.arc(headX+lx * 4+fx * 3, headY-2, 1.2, 0, Math.PI * 2);
-            ctx.arc(headX-lx * 4+fx * 3, headY-2, 1.2, 0, Math.PI * 2);
-            ctx.fill();
-        }
+        DrawVectorHighlight(-8,-31,profile.bodyLength*0.42,profile.bodyDepth*0.16,rot,0.12);
         ctx.restore();
-        ctx.globalAlpha = 1;
     }
     function Clamp01(value){
         return Math.max(0, Math.min(1, value));
