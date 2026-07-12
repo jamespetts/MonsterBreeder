@@ -1727,6 +1727,13 @@ button:hover {
             var heights = heightPackage.heights;
             var seaLevel = heightPackage.seaLevel;
             var coastalWorld = heightPackage.coastalWorld;
+            if (coastalWorld && environment.climateClass==='tropicalRainforest'){
+                environment.climateClass = 'coastalTropical';
+                environment.seasonalTemperatureAmplitudeC = Math.min(environment.seasonalTemperatureAmplitudeC, 2.4);
+            } else if (coastalWorld && (environment.climateClass==='oceanicTemperate' || environment.climateClass==='temperateContinental')){
+                environment.climateClass = 'coastalTemperate';
+                environment.seasonalTemperatureAmplitudeC = Math.min(environment.seasonalTemperatureAmplitudeC, 6.5);
+            }
             var climate = TerrainGrid.createClimateGrid(cols, rows, heights, environment, heightPackage.seedA ^ heightPackage.seedB);
             var hydrology = TerrainGrid.createHydrologyLayer(cols, rows, heights, environment, seaLevel, coastalWorld, climate, heightPackage.seedA+heightPackage.seedB);
             var biome = TerrainGrid.createBiomeLayer(cols, rows, heights, environment, hydrology, climate, seaLevel);
@@ -3158,16 +3165,21 @@ button:hover {
                     biomeName : 'ice'
                 } ;
             }
-            if (meanTemp<1 ||(height>46 && meanTemp<8)){
+            var aridClimate = environment.climateClass==='hotDesert' || environment.climateClass==='coolDesert';
+            if (meanTemp<1 ||(!aridClimate && height>46 && meanTemp<8)){
                 return {
                     terrainType : TERRAIN_TYPE.TUNDRA,
                     biomeName : 'tundra'
                 } ;
             }
-            if (wetness<0.34 && meanTemp>10 && height<42){
+            // A desert climate must produce predominantly desert land rather than
+            // falling through to temperate grassland. Streams and genuinely wet
+            // pockets remain riparian or marsh, and truly freezing high ground may
+            // still be tundra/ice.
+            if ((aridClimate && localWetness<0.58) || (wetness<0.34 && meanTemp>10 && height<42)){
                 return {
                     terrainType : TERRAIN_TYPE.DESERT,
-                    biomeName : 'desert'
+                    biomeName : environment.climateClass==='coolDesert' ? 'cool desert' : 'hot desert'
                 } ;
             }
             if (slope>=TERRAIN_STEEP_SLOPE ||(environment.ruggedness>0.34 && slope>=3)){
@@ -3180,7 +3192,7 @@ button:hover {
             if (ecotone>0.50 && localWetness>0.42 && height<36){
                 return {
                     terrainType : TERRAIN_TYPE.FOREST,
-                    biomeName : 'forest'
+                    biomeName : environment.climateClass==='tropicalRainforest' ? 'tropical rainforest' : 'forest'
                 } ;
             }
             return {
@@ -3296,7 +3308,7 @@ button:hover {
             var rockCount = densityCount('bigRocks', 0.20);
             var throwableRockCount = densityCount('smallRocks', 0.20);
             var stickCount = densityCount('sticks', 0.18);
-            var bushCount = densityCount('bushes', 0.20);
+            var bushCount = (environment.climateClass==='hotDesert' || environment.climateClass==='coolDesert') ? 0 : densityCount('bushes', 0.20);
             var microfaunaCount = densityCount('microfauna', 0.15);
             var i;
             var p;
@@ -3305,9 +3317,10 @@ button:hover {
             i+=1){
                 p = World.findOpenPointByTerrain(rng, grid, objects, 70, false, [TERRAIN_TYPE.FOREST,
                 TERRAIN_TYPE.GRASS,
-                TERRAIN_TYPE.MARSH]);
+                TERRAIN_TYPE.MARSH,
+                TERRAIN_TYPE.DESERT]);
                 if (p){
-                    objects.push(new Tree('tree_'+i, p.x, p.y, rng, environment));
+                    objects.push(new Tree('tree_'+i, p.x, p.y, rng, environment, grid.getTerrainTypeAtWorld(p.x, p.y)));
                 }
             }
             for (i = 0;
@@ -3359,7 +3372,9 @@ button:hover {
                 p = World.findOpenPoint(rng, grid, objects, 45, true);
                 if (p){
                     var terrainType = grid.getTerrainTypeAtWorld(p.x, p.y);
-                    var species = terrainType===TERRAIN_TYPE.MARSH ? 'marsh midges' : (terrainType===TERRAIN_TYPE.FOREST ? 'woodland insects' : 'field crickets');
+                    var polarClimate = environment.climateClass==='polar';
+                    var desertClimate = environment.climateClass==='hotDesert' || environment.climateClass==='coolDesert';
+                    var species = polarClimate ? 'arctic midges' : (desertClimate ? (terrainType===TERRAIN_TYPE.MARSH || terrainType===TERRAIN_TYPE.STREAM ? 'desert midges' : 'desert beetles') : ((environment.climateClass==='tropicalRainforest' || environment.climateClass==='coastalTropical') ? (terrainType===TERRAIN_TYPE.MARSH || environment.climateClass==='coastalTropical' ? 'Aedes mosquitoes' : 'Atta leafcutter ants') : (terrainType===TERRAIN_TYPE.MARSH ? (environment.climateClass==='coastalTemperate' ? 'coastal midges' : 'marsh midges') : (terrainType===TERRAIN_TYPE.FOREST ? 'woodland insects' : 'field crickets'))));
                     var emitter = new MicrofaunaEmitter('microfauna_'+i, species, p.x, p.y, rng.range(14, 28));
                     emitter.variant = rng.integer(0, 2);
                     objects.push(emitter);
@@ -3665,7 +3680,7 @@ button:hover {
         }
     }
     class Tree extends TerrainObject{
-        constructor(id, x, y, rng, environment){
+        constructor(id, x, y, rng, environment, terrainType){
             var radius = rng.range(20, 34+environment.vegetationDensity * 14);
             super(id, 'tree', x, y, radius, true);
             this.canopyDensity = Clamp(rng.range(0.25, 0.55)+environment.vegetationDensity * 0.45, 0.1, 0.95);
@@ -3676,10 +3691,14 @@ button:hover {
             this.trunkVisionRadius = this.blockingRadius;
             this.trunkVisionAmount = 0.34;
             this.variant = rng.integer(0, 2);
+            var tropical = environment.climateClass==='tropicalRainforest' || environment.climateClass==='coastalTropical';
+            var arid = terrainType===TERRAIN_TYPE.DESERT;
+            this.treeKind = tropical ? (rng.nextFloat()<0.28 ? 'palm' : 'tropicalEvergreen') : (arid ? (environment.climateClass==='hotDesert' ? (rng.nextFloat()<0.72 ? 'cactus' : 'palm') : 'desertScrub') : (environment.temperature<0.46 || environment.altitude>0.42 ? 'evergreen' : (rng.nextFloat()<0.38 ? 'evergreen' : 'deciduous')));
         }
         getSnapshot(){
             var s = super.getSnapshot();
             s.canopyDensity = this.canopyDensity;
+            s.treeKind = this.treeKind;
             return s;
         }
     }
@@ -3876,6 +3895,7 @@ button:hover {
                 var rng = new SeededRng(candidateSeed);
                 var environment = World.createEnvironment(rng, settings);
                 var grid = World.createTerrainGrid(rng, environment);
+                environment.dominantBiomeType = World.dominantBiomeType(environment, grid);
                 var campaignRound = Number.isFinite(settings.campaignRound) ? Math.max(1, Math.floor(settings.campaignRound)) : 0;
                 if (campaignRound>0 && World.campaignEcologyScore(environment, grid)<World.campaignEcologyMinimum(campaignRound)){
                     candidateSeed = rng.integer(1, 0x7fffffff);
@@ -3994,6 +4014,23 @@ button:hover {
             }
             return 'vast';
         }
+        static dominantBiomeType(environment, grid){
+            var counts = {};
+            var land = 0;
+            for (var i=0; i<grid.terrainTypes.length; i+=1){
+                var type=grid.terrainTypes[i];
+                if (type===TERRAIN_TYPE.LAKE || type===TERRAIN_TYPE.STREAM){ continue; }
+                counts[type]=(counts[type]||0)+1; land+=1;
+            }
+            var desertShare=(counts[TERRAIN_TYPE.DESERT]||0)/Math.max(1,land);
+            var forestShare=(counts[TERRAIN_TYPE.FOREST]||0)/Math.max(1,land);
+            var tundraShare=((counts[TERRAIN_TYPE.TUNDRA]||0)+(counts[TERRAIN_TYPE.ICE]||0))/Math.max(1,land);
+            if (desertShare>=0.50){ return environment.climateClass==='coolDesert' ? 'coolDesert' : 'hotDesert'; }
+            if (tundraShare>=0.42){ return 'polar'; }
+            if (forestShare>=0.38 && (environment.climateClass==='tropicalRainforest' || environment.climateClass==='coastalTropical')){ return environment.hasCoastline ? 'coastalTropical' : 'tropicalRainforest'; }
+            if (environment.hasCoastline){ return environment.temperature>=0.66 ? 'coastalTropical' : 'coastalTemperate'; }
+            return environment.climateClass;
+        }
         static campaignEcologyMinimum(roundNumber){
             var round = Math.max(1, Math.floor(roundNumber || 1));
             // Campaign progression chooses naturally productive early worlds; it must
@@ -4058,7 +4095,11 @@ button:hover {
             var ruggedness = Number.isFinite(settings.ruggedness) ? settings.ruggedness : rng.range(0.05, 0.55);
             var waterAbundance = Number.isFinite(settings.waterAbundance) ? settings.waterAbundance : Clamp(moisture+rng.range(-0.18, 0.22), 0, 1);
             var vegetationDensity = Number.isFinite(settings.vegetationDensity) ? settings.vegetationDensity : Clamp(moisture * 0.75+temperature * 0.2+rng.range(-0.12, 0.18), 0, 1);
+            var provisionalAridity = Clamp(1-moisture * 0.62-waterAbundance * 0.38, 0, 1);
+            var climateClass = temperature>=0.66 && moisture>=0.66 && provisionalAridity<0.38 ? 'tropicalRainforest' : (provisionalAridity>=0.62 ? (temperature>=0.58 ? 'hotDesert' : 'coolDesert') : (temperature<0.32 ? 'polar' : (altitude>0.48 || ruggedness>0.42 ? 'continentalHighland' : (waterAbundance>0.66 ? 'oceanicTemperate' : 'temperateContinental'))));
+            var climateAmplitude = climateClass==='tropicalRainforest' ? rng.range(1.2, 2.8) : (climateClass==='oceanicTemperate' ? rng.range(4.0, 7.0) : (climateClass==='hotDesert' ? rng.range(6.0, 10.0) : (climateClass==='coolDesert' ? rng.range(8.0, 14.0) : (climateClass==='polar' ? rng.range(9.0, 16.0) : (climateClass==='continentalHighland' ? rng.range(11.0, 18.0) : rng.range(7.0, 12.0))))));
             return {
+                climateClass : climateClass,
                 temperature : temperature,
                 moisture : moisture,
                 altitude : altitude,
@@ -4072,8 +4113,8 @@ button:hover {
                 // Dry continental climates have larger seasonal swings, while abundant
                 // water moderates them. This remains compositional climate simulation:
                 // aridity can produce hot or cold deserts rather than a desert heat bonus.
-                seasonalTemperatureAmplitudeC : 5+Math.abs(temperature-0.5) * 8+altitude * 3+Clamp((1-moisture * 0.62-waterAbundance * 0.38)-0.35, 0, 0.65) * 6-Clamp(waterAbundance-0.65, 0, 0.35) * 3,
-                aridity : Clamp(1-moisture * 0.62-waterAbundance * 0.38, 0, 1),
+                seasonalTemperatureAmplitudeC : climateAmplitude,
+                aridity : provisionalAridity,
                 windSpeed : Number.isFinite(settings.windSpeed) ? Clamp(settings.windSpeed,0,1) : rng.range(0.08,0.92),
                 windDirectionRadians : Number.isFinite(settings.windDirectionRadians) ? settings.windDirectionRadians : rng.range(-Math.PI,Math.PI),
                 campaignRound : campaignRound
@@ -8568,6 +8609,12 @@ button:hover {
             } ;
             var campaignRound = environment.campaignRound || 0;
             var earlyCampaign = campaignRound>0 && campaignRound<=2;
+            if (environment.climateClass==='tropicalRainforest' || environment.climateClass==='coastalTropical'){
+                var coastalTropical = environment.climateClass==='coastalTropical';
+                if (terrainType===TERRAIN_TYPE.FOREST){ weights.agouti=3.0; weights.monkey=2.0; weights.sloth=1.2; weights.pangolin=1.0; weights.peccary=1.4; weights.tapir=0.75; weights.cassowary=0.55; return weights; }
+                if (terrainType===TERRAIN_TYPE.MARSH || terrainType===TERRAIN_TYPE.STREAM || terrainType===TERRAIN_TYPE.LAKE){ weights.capybara=coastalTropical?2.8:2.0; weights.caiman=coastalTropical?1.25:0.75; weights.tapir=0.65; weights.peccary=0.55; weights.agouti=0.8; return weights; }
+                if (terrainType===TERRAIN_TYPE.GRASS){ weights.agouti=2.1; weights.capybara=1.1; weights.peccary=1.4; weights.tapir=0.55; weights.cassowary=0.65; weights.monkey=0.5; return weights; }
+            }
             if (terrainType===TERRAIN_TYPE.LAKE){
                 weights.seal = 3;
                 weights.walrus =(environment.temperature || 0.5)<0.42 ? 1.4 : 0.35;
@@ -12104,6 +12151,15 @@ button:hover {
             attackDamageMin : 0,
             attackDamageMax : 0
         } ,
+        agouti : { displayName:'agouti', radius:8, bodyMass:4.0, speedMin:122, speedMax:162, health:20, foodValue:2, colour:'#9a6638', fleesHumans:true, humanFleeChance:1, humanFear:0.02, humanThreatRange:80, attackHumans:false, attackChance:0, attackDamageMin:0, attackDamageMax:0 },
+        capybara : { displayName:'capybara', radius:13, bodyMass:50, speedMin:76, speedMax:104, health:55, foodValue:9, colour:'#8a6847', fleesHumans:true, humanFleeChance:0.98, humanFear:0.08, humanThreatRange:120, attackHumans:false, attackChance:0, attackDamageMin:0, attackDamageMax:0 },
+        tapir : { displayName:'tapir', radius:15, bodyMass:190, speedMin:68, speedMax:96, health:84, foodValue:14, colour:'#4b4038', fleesHumans:true, humanFleeChance:0.93, humanFear:0.18, humanThreatRange:150, attackHumans:false, attackChance:0, attackDamageMin:0, attackDamageMax:0 },
+        peccary : { displayName:'peccary', radius:11, bodyMass:28, speedMin:82, speedMax:112, health:47, foodValue:7, colour:'#51483e', fleesHumans:true, humanFleeChance:0.82, humanFear:0.36, humanThreatRange:165, attackHumans:true, attackChance:0.12, attackDamageMin:8, attackDamageMax:18 },
+        sloth : { displayName:'sloth', radius:9, bodyMass:6, speedMin:24, speedMax:38, health:25, foodValue:3, colour:'#766b55', fleesHumans:true, humanFleeChance:0.90, humanFear:0.04, humanThreatRange:70, attackHumans:false, attackChance:0, attackDamageMin:0, attackDamageMax:0 },
+        monkey : { displayName:'capuchin monkey', radius:8, bodyMass:3.5, speedMin:110, speedMax:150, health:22, foodValue:2, colour:'#70563f', fleesHumans:true, humanFleeChance:0.98, humanFear:0.05, humanThreatRange:105, attackHumans:false, attackChance:0, attackDamageMin:0, attackDamageMax:0 },
+        pangolin : { displayName:'pangolin', radius:10, bodyMass:12, speedMin:48, speedMax:70, health:38, foodValue:4, colour:'#75654b', fleesHumans:true, humanFleeChance:0.96, humanFear:0.06, humanThreatRange:90, attackHumans:false, attackChance:0, attackDamageMin:0, attackDamageMax:0 },
+        cassowary : { displayName:'cassowary', radius:13, bodyMass:44, speedMin:96, speedMax:132, health:61, foodValue:8, colour:'#253b3a', fleesHumans:true, humanFleeChance:0.72, humanFear:0.58, humanThreatRange:190, attackHumans:true, attackChance:0.18, attackDamageMin:12, attackDamageMax:25 },
+        caiman : { displayName:'caiman', radius:15, bodyMass:70, speedMin:62, speedMax:88, health:78, foodValue:11, colour:'#40543a', fleesHumans:true, humanFleeChance:0.54, humanFear:0.74, humanThreatRange:220, attackHumans:true, attackChance:0.24, attackDamageMin:15, attackDamageMax:31 },
         bear : {
             displayName : 'bear',
             radius : 18,
@@ -12755,7 +12811,7 @@ button:hover {
             // founder is merely sampled from the smaller viable end of that real
             // population. Never replace this with a hand-authored starter genome.
             var candidates = [];
-            for (var i = 0; i<3; i+=1){
+            for (var i = 0; i<48; i+=1){
                 candidates.push(new Monster('monster_1', RIGHT_EDGE_X, rng.range(120, MAP_HEIGHT-120), rng, {
                     owned : true,
                     name : 'Gribble',
@@ -12765,7 +12821,7 @@ button:hover {
             }
             candidates.sort(function (a, b){ return (a.currentBodyMass || 100)-(b.currentBodyMass || 100); });
             // Roughly the lower third: small and prevalent, but not the weakest tail.
-            return candidates[Math.min(candidates.length-1, Math.floor(candidates.length * 0.32))];
+            return candidates[Math.min(candidates.length-1, Math.floor(candidates.length * 0.20))];
         }
         constructor(rng, mode, world){
             this.mode = mode || 'campaign';
@@ -14597,6 +14653,7 @@ button:hover {
                 seasonNumber : this.seasonNumber,
                 seasonName : World.seasonNameForNumber(this.seasonNumber),
                 currentSeasonTemperatureC : this.world.getCurrentTemperatureC(this.seasonNumber),
+                biomeType : (this.world.environment.dominantBiomeType || this.world.environment.climateClass),
                 roundNumber : this.gameState && this.gameState.roundNumber ? this.gameState.roundNumber : undefined,
                 tickNumber : this.tickNumber,
                 raidEnded : this.raidEnded,
@@ -14662,6 +14719,7 @@ button:hover {
                 mapWidth : this.world.width,
                 mapHeight : this.world.height,
                 currentSeasonTemperatureC : this.world.getCurrentTemperatureC(this.seasonNumber),
+                biomeType : this.world.environment.climateClass,
                 world : this.world.getStaticSnapshot(),
                 obstacles : this.world.getObstacleSnapshots(),
                 terrainObjects : this.world.getObstacleSnapshots()
@@ -14676,6 +14734,7 @@ button:hover {
                 seasonNumber : this.seasonNumber,
                 seasonName : World.seasonNameForNumber(this.seasonNumber),
                 currentSeasonTemperatureC : this.world.getCurrentTemperatureC(this.seasonNumber),
+                biomeType : this.world.environment.climateClass,
                 roundNumber : this.gameState && this.gameState.roundNumber ? this.gameState.roundNumber : undefined,
                 mapWidth : this.world.width,
                 mapHeight : this.world.height,
@@ -15255,6 +15314,7 @@ button:hover {
                 mapWidth : this.world.width,
                 mapHeight : this.world.height,
                 currentSeasonTemperatureC : this.world.getCurrentTemperatureC(this.seasonNumber),
+                biomeType : this.world.environment.climateClass,
                 world : this.world.getStaticSnapshot(),
                 obstacles : this.world.getObstacleSnapshots(),
                 terrainObjects : this.world.getObstacleSnapshots()
@@ -15284,6 +15344,7 @@ button:hover {
                 seasonNumber : this.seasonNumber,
                 seasonName : World.seasonNameForNumber(this.seasonNumber),
                 currentSeasonTemperatureC : this.world.getCurrentTemperatureC(this.seasonNumber),
+                biomeType : this.world.environment.climateClass,
                 roundNumber : this.roundNumber,
                 phase : this.phase,
                 gameMode : this.mode,
@@ -17031,6 +17092,35 @@ button:hover {
         var coolDesertWeights = MonsterMetabolismSystem.macrofaunaSpeciesWeightsForTerrain({ environment : { temperature : 0.35, campaignRound : 4 } }, TERRAIN_TYPE.DESERT);
         var hotDesertWeights = MonsterMetabolismSystem.macrofaunaSpeciesWeightsForTerrain({ environment : { temperature : 0.80, campaignRound : 4 } }, TERRAIN_TYPE.DESERT);
         AddRegressionResult(results, 'Cool and hot deserts have distinct small-prey ecology', coolDesertWeights.hare>hotDesertWeights.hare && coolDesertWeights.fox>hotDesertWeights.fox, 'cool='+JSON.stringify(coolDesertWeights)+', hot='+JSON.stringify(hotDesertWeights));
+        var tropicalEnvironment = World.createEnvironment(new SeededRng(440001), { temperature:0.72, moisture:0.84, waterAbundance:0.80, altitude:0.12, ruggedness:0.15 });
+        AddRegressionResult(results, 'Tropical climate is warm humid and has low seasonal temperature variation', tropicalEnvironment.climateClass==='tropicalRainforest' && tropicalEnvironment.seasonalTemperatureAmplitudeC<=2.8, JSON.stringify(tropicalEnvironment));
+        var evergreenTree = new Tree('evergreen_test',0,0,new SeededRng(440002),{climateClass:'polar',vegetationDensity:0.5,temperature:0.3,altitude:0.2,aridity:0.2},TERRAIN_TYPE.FOREST);
+        AddRegressionResult(results, 'Trees explicitly distinguish deciduous evergreen palm cactus forms', ['deciduous','evergreen','tropicalEvergreen','palm','cactus'].indexOf(evergreenTree.treeKind)>=0 && evergreenTree.getSnapshot().treeKind===evergreenTree.treeKind, evergreenTree.treeKind);
+        AddRegressionResult(results, 'Founder sampling uses a substantial local population', GameState.createLocallySelectedFounder.toString().indexOf('i<48')>=0 && GameState.createLocallySelectedFounder.toString().indexOf('0.20')>=0, '48 candidates, lower 20 percent quantile');
+        var rainforestSpecies = ['agouti','capybara','tapir','peccary','sloth','monkey','pangolin','cassowary','caiman'];
+        AddRegressionResult(results, 'Rainforest macrofauna has the highest dedicated biodiversity', rainforestSpecies.every(function (species){ return !!MACROFAUNA_PROFILE[species]; }) && rainforestSpecies.length>=9, rainforestSpecies.join(','));
+        var coastalClimateTest = { climateClass:'oceanicTemperate', seasonalTemperatureAmplitudeC:9, waterAbundance:0.8, temperature:0.48, moisture:0.7, altitude:0.1, ruggedness:0.1, vegetationDensity:0.6, aridity:0.2 };
+        TerrainGrid.createTerrainGrid(new SeededRng(440101), coastalClimateTest);
+        AddRegressionResult(results, 'Actual coastlines classify coastal temperate or coastal tropical climates', !coastalClimateTest.hasCoastline || coastalClimateTest.climateClass==='coastalTemperate', 'coast='+coastalClimateTest.hasCoastline+', class='+coastalClimateTest.climateClass);
+        AddRegressionResult(results, 'Rainforest microfauna use a named genus rather than a generic label', TerrainGrid.createTerrainObjects.toString().indexOf('Atta leafcutter ants')>=0 && TerrainGrid.createTerrainObjects.toString().indexOf('rainforest insects')<0, 'Atta leafcutter ants');
+        var biomeSnapshotSession = new GameSession(440201, { mode : 'quick', worldOptions : { mapSizeKey : 'legacy', maxMapGenerationAttempts : 20 } });
+        var biomeManagementSnapshot = biomeSnapshotSession.getSnapshot();
+        var biomeStaticSnapshot = biomeSnapshotSession.getStaticSnapshot();
+        AddRegressionResult(results, 'Management and static snapshots expose authoritative biome type', biomeManagementSnapshot.biomeType===biomeSnapshotSession.world.environment.climateClass && biomeStaticSnapshot.biomeType===biomeSnapshotSession.world.environment.climateClass, 'management='+biomeManagementSnapshot.biomeType+', static='+biomeStaticSnapshot.biomeType);
+        biomeSnapshotSession.startSeason();
+        var biomeRaidSnapshot = biomeSnapshotSession.getSnapshot();
+        AddRegressionResult(results, 'Raid snapshots expose authoritative biome type', biomeRaidSnapshot.biomeType===biomeSnapshotSession.world.environment.climateClass, 'raid='+biomeRaidSnapshot.biomeType);
+        var hotDesertEnvironment = World.createEnvironment(new SeededRng(440301), { temperature:0.78, moisture:0.12, waterAbundance:0.08, altitude:0.12, ruggedness:0.12 });
+        var hotDesertGrid = TerrainGrid.createTerrainGrid(new SeededRng(440302), hotDesertEnvironment);
+        var hotDesertLand = hotDesertGrid.terrainTypes.filter(function (type){ return type!==TERRAIN_TYPE.LAKE && type!==TERRAIN_TYPE.STREAM; });
+        var hotDesertShare = hotDesertLand.filter(function (type){ return type===TERRAIN_TYPE.DESERT; }).length / Math.max(1, hotDesertLand.length);
+        AddRegressionResult(results, 'Hot desert climates produce predominantly desert land', hotDesertShare>=0.50, 'desertShare='+hotDesertShare.toFixed(3));
+        var desertObjectText = TerrainGrid.createTerrainObjects.toString();
+        AddRegressionResult(results, 'Desert microfauna never fall through to field crickets or arctic midges', desertObjectText.indexOf("desertClimate ?")>=0 && desertObjectText.indexOf("polarClimate ?")>=0, 'climate-first microfauna selection');
+        var coolDesertEnvironment = World.createEnvironment(new SeededRng(440303), { temperature:0.47, moisture:0.13, waterAbundance:0.10, altitude:0.18, ruggedness:0.18 });
+        var coolDesertGrid = TerrainGrid.createTerrainGrid(new SeededRng(440304), coolDesertEnvironment);
+        var coolDominant = World.dominantBiomeType(coolDesertEnvironment, coolDesertGrid);
+        AddRegressionResult(results, 'Displayed biome is derived from dominant generated terrain', coolDominant==='coolDesert', 'dominant='+coolDominant+', climate='+coolDesertEnvironment.climateClass);
         var failed = results.filter(function (result){
             return !result.passed;
         } );
@@ -18415,6 +18505,10 @@ button:hover {
         'autumn'];
         return names[((n-1) % 4+4) % 4];
     }
+    function FormatBiomeType(value){
+        var names = { tropicalRainforest:'Tropical rainforest', coastalTropical:'Coastal tropical', coastalTemperate:'Coastal temperate', oceanicTemperate:'Oceanic temperate', temperateContinental:'Temperate continental', continentalHighland:'Continental/highland', hotDesert:'Hot desert', coolDesert:'Cool desert', polar:'Polar' };
+        return names[value] || String(value || 'Unknown biome');
+    }
     function TemperatureForSnapshot(s){
         // The UI must display only the authoritative top-level value supplied by
         // the worker snapshot. Do not recalculate temperature from environment
@@ -18467,6 +18561,7 @@ button:hover {
         'Win/loss state: '+state,
         'Reason: '+reason,
         'Mode: '+mode+'  Round: '+(s.roundNumber || summary.roundNumber || 1)+'  Season: '+(s.seasonNumber || summary.seasonNumber || 1)+' ('+SeasonNameForSnapshot(s)+')',
+        'Biome: '+FormatBiomeType(s.biomeType),
         '',
         FormatTreasureSection('Treasure at round start', treasureBreakdown.starting),
         '',
@@ -18530,6 +18625,7 @@ button:hover {
         statusBox.textContent = ['Mode: '+mode,
         'Round: '+(s.roundNumber || 1)+'  Season: '+s.seasonNumber+' ('+SeasonNameForSnapshot(s)+')',
         'Phase: '+(s.phase || 'raid')+'  Paused: '+s.paused,
+        'Biome: '+FormatBiomeType(s.biomeType),
         'Temperature: '+FormatTemperatureForSnapshot(s),
         'Result: '+s.raidResult,
         'Treasure deposits remaining: '+tr+' / '+s.treasures.length,
@@ -19927,6 +20023,17 @@ button:hover {
         var treeState = TreeSnowState(o);
         var season = treeState.season;
         var snowy = treeState.snowy;
+        var evergreen = o.treeKind==='evergreen' || o.treeKind==='tropicalEvergreen' || o.treeKind==='palm' || o.treeKind==='cactus' || o.treeKind==='desertScrub';
+        if (o.treeKind==='desertScrub'){
+            ctx.fillStyle='#72734b'; ctx.beginPath(); ctx.ellipse(p.x,p.y-13,o.radius*0.58,o.radius*0.30,0,0,Math.PI*2); ctx.fill(); return;
+        }
+        if (o.treeKind==='cactus'){
+            ctx.fillStyle='#4f7f43'; ctx.fillRect(p.x-5,p.y-58,10,62); ctx.fillRect(p.x-20,p.y-42,18,8); ctx.fillRect(p.x+2,p.y-30,18,8); return;
+        }
+        if (o.treeKind==='palm'){
+            ctx.strokeStyle='#795839'; ctx.lineWidth=7; ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.quadraticCurveTo(p.x+5,p.y-35,p.x,p.y-68); ctx.stroke();
+            ctx.strokeStyle='#2f7d45'; ctx.lineWidth=6; for(var palmIndex=0;palmIndex<7;palmIndex+=1){var palmAngle=palmIndex*Math.PI*2/7;ctx.beginPath();ctx.moveTo(p.x,p.y-68);ctx.lineTo(p.x+Math.cos(palmAngle)*32,p.y-68+Math.sin(palmAngle)*16);ctx.stroke();} return;
+        }
         var palette = {
             winter : snowy ? ['#e5edf2',
             '#dbeafe',
@@ -19943,7 +20050,7 @@ button:hover {
             '#c05621',
             '#975a16']
         } ;
-        ctx.fillStyle =(palette[season] || palette.summer)[o.variant % 3];
+        ctx.fillStyle =(palette[evergreen ? 'summer' : season] || palette.summer)[o.variant % 3];
         ctx.beginPath();
         if ((o.variant || 0) % 3===0){
             ctx.arc(p.x, p.y-42, o.radius * 0.72, 0, Math.PI * 2);
@@ -19956,9 +20063,9 @@ button:hover {
             ctx.ellipse(p.x, p.y-42, o.radius * 0.55, o.radius * 0.78, 0, 0, Math.PI * 2);
         }
         ctx.fill();
-        if (season==='spring'){
+        if (!evergreen && season==='spring'){
             ctx.fillStyle = 'rgba(255,244,190,0.45)';
-        } else if (season==='autumn'){
+        } else if (!evergreen && season==='autumn'){
             ctx.fillStyle = 'rgba(255,214,120,0.28)';
         } else{
             ctx.fillStyle = snowy ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.12)';
@@ -20067,7 +20174,7 @@ button:hover {
         var phase = StablePhase(o.id)+now * 0.004;
         ctx.save();
         ctx.globalAlpha = 0.45;
-        ctx.fillStyle = o.species==='marsh midges' ? '#d9f99d' : (o.species==='woodland insects' ? '#bbf7d0' : '#fde68a');
+        ctx.fillStyle = o.species==='arctic midges' ? '#18181b' : ((o.species==='marsh midges' || o.species==='coastal midges') ? '#d9f99d' : (o.species==='woodland insects' || o.species==='Atta leafcutter ants' ? '#bbf7d0' : (o.species==='desert beetles' ? '#3f2d20' : '#fde68a')));
         for (var i = 0;
         i<5;
         i+=1){
