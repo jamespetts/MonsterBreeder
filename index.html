@@ -4500,6 +4500,49 @@ button:hover {
             World.ensureEntryEdgeLand(grid, adventurerEntryEdge);
             World.ensureEntryEdgeLand(grid, 'right');
         }
+        static campaignTreasureTierProbabilities(roundNumber){
+            var round = Math.max(1, Math.floor(roundNumber || 1));
+            // Gems enter the campaign later than coin treasure and remain uncertain.
+            // Rubies begin in round 9 and rise by five percentage points per round;
+            // emeralds begin in round 13 and rise by three percentage points per round.
+            // The explicit caps preserve a meaningful chance of coin-only late rounds.
+            var rubyProbability = round<9 ? 0 : Math.min(0.50, (round-8) * 0.05);
+            var emeraldProbability = round<13 ? 0 : Math.min(0.33, (round-12) * 0.03);
+            var coinOnlyProbability = Math.max(0, 1-rubyProbability-emeraldProbability);
+            var goldShareOfCoinOnly = round<5 ? 0 : Math.min(0.65, (round-4) * 0.12);
+            var silverShareAfterGold = round<3 ? 0 : Math.min(0.75, (round-2) * 0.18);
+            var goldProbability = coinOnlyProbability * goldShareOfCoinOnly;
+            var silverProbability = (coinOnlyProbability-goldProbability) * silverShareAfterGold;
+            var bronzeProbability = Math.max(0, coinOnlyProbability-goldProbability-silverProbability);
+            return {
+                bronze : bronzeProbability,
+                silver : silverProbability,
+                gold : goldProbability,
+                rubies : rubyProbability,
+                emeralds : emeraldProbability
+            };
+        }
+        static campaignHighestTreasureTierIndex(rng, roundNumber){
+            var probabilities = World.campaignTreasureTierProbabilities(roundNumber);
+            var roll = rng.nextFloat();
+            var boundary = probabilities.emeralds;
+            if (roll<boundary){
+                return 4;
+            }
+            boundary+=probabilities.rubies;
+            if (roll<boundary){
+                return 3;
+            }
+            boundary+=probabilities.gold;
+            if (roll<boundary){
+                return 2;
+            }
+            boundary+=probabilities.silver;
+            if (roll<boundary){
+                return 1;
+            }
+            return 0;
+        }
         static createTreasureDeposits(rng, grid, objects, settings, adventurerEntryEdge){
             var deposits = [];
             var types = ['bronze',
@@ -4542,17 +4585,7 @@ button:hover {
             var amountMin;
             var amountMax;
             if (campaignRound){
-                if (campaignRound<=2){
-                    highestTierIndex = 0;
-                } else if (campaignRound<=4){
-                    highestTierIndex = 1;
-                } else if (campaignRound<=6){
-                    highestTierIndex = 2;
-                } else if (campaignRound<=8){
-                    highestTierIndex = 3;
-                } else{
-                    highestTierIndex = 4;
-                }
+                highestTierIndex = World.campaignHighestTreasureTierIndex(rng, campaignRound);
                 var pressure = campaignRound-1;
                 amountMin = 10+pressure * 6;
                 amountMax = 22+pressure * 10;
@@ -17552,6 +17585,15 @@ button:hover {
         var customHotDesert = World.createEnvironment(new SeededRng(440401), { biomeType:'hotDesert' });
         var customCoastalTemperate = World.createEnvironment(new SeededRng(440402), { biomeType:'coastalTemperate' });
         AddRegressionResult(results, 'Custom biome selection controls climate inputs', customHotDesert.climateClass==='hotDesert' && customHotDesert.aridity>=0.62 && customCoastalTemperate.climateClass==='coastalTemperate' && customCoastalTemperate.forceCoastline===true, 'hot='+customHotDesert.climateClass+'/'+customHotDesert.aridity.toFixed(2)+', coast='+customCoastalTemperate.climateClass+'/'+customCoastalTemperate.forceCoastline);
+        var round8TreasureProbabilities = World.campaignTreasureTierProbabilities(8);
+        var round9TreasureProbabilities = World.campaignTreasureTierProbabilities(9);
+        var round12TreasureProbabilities = World.campaignTreasureTierProbabilities(12);
+        var round13TreasureProbabilities = World.campaignTreasureTierProbabilities(13);
+        var lateTreasureProbabilities = World.campaignTreasureTierProbabilities(100);
+        AddRegressionResult(results, 'Campaign rubies are excluded before round 9 and introduced gradually', round8TreasureProbabilities.rubies===0 && Math.abs(round9TreasureProbabilities.rubies-0.05)<0.000001, 'round8='+round8TreasureProbabilities.rubies+', round9='+round9TreasureProbabilities.rubies);
+        AddRegressionResult(results, 'Campaign emeralds are excluded before round 13 and introduced gradually', round12TreasureProbabilities.emeralds===0 && Math.abs(round13TreasureProbabilities.emeralds-0.03)<0.000001, 'round12='+round12TreasureProbabilities.emeralds+', round13='+round13TreasureProbabilities.emeralds);
+        AddRegressionResult(results, 'Late campaign gem probabilities respect ruby and emerald caps', Math.abs(lateTreasureProbabilities.rubies-0.50)<0.000001 && Math.abs(lateTreasureProbabilities.emeralds-0.33)<0.000001, 'rubies='+lateTreasureProbabilities.rubies+', emeralds='+lateTreasureProbabilities.emeralds);
+        AddRegressionResult(results, 'Late campaign retains coin-only treasure outcomes', lateTreasureProbabilities.bronze>0 && lateTreasureProbabilities.silver>0 && lateTreasureProbabilities.gold>0, 'bronze='+lateTreasureProbabilities.bronze.toFixed(4)+', silver='+lateTreasureProbabilities.silver.toFixed(4)+', gold='+lateTreasureProbabilities.gold.toFixed(4));
         var failed = results.filter(function (result){
             return !result.passed;
         } );
