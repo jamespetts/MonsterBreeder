@@ -7391,8 +7391,7 @@ button:hover {
                 displayName : 'Adipose fever',
                 description : 'A metabolic inflammatory illness in very over-fat monsters; severe cases leave the monster exhausted and infertile for a time.',
                 ui : {
-                    morphology : 'puffy',
-                    tint : '#f59e0b'
+                    morphology : 'puffy'
                 } ,
                 effects : {
                     speedMultiplier : 0.70,
@@ -7413,8 +7412,7 @@ button:hover {
                 displayName : 'Wasting chill',
                 description : 'A wasting metabolic disorder in very lean or cold-stressed monsters; severe cases cause fragility and base-bound weakness.',
                 ui : {
-                    morphology : 'gaunt',
-                    tint : '#93c5fd'
+                    morphology : 'gaunt'
                 } ,
                 effects : {
                     speedMultiplier : 0.76,
@@ -7434,7 +7432,7 @@ button:hover {
                 id : 'congenitalMuscleWasting',
                 displayName : 'Congenital muscle wasting',
                 description : 'A juvenile wasting disorder in monsters whose morphology cannot sustain enough muscle for their frame.',
-                ui : { morphology : 'wasted', tint : '#fca5a5' },
+                ui : { morphology : 'wasted' },
                 effects : { speedMultiplier : 0.62, foodMultiplier : 1.08, infertileAt : 0.50, incapacitatedAt : 0.70, deathAt : 0.82, deathChance : 0.34, juvenileDeathChance : 0.55, damageMultiplier : 1.30 },
                 geneticSelection : { riskModel : 'congenitalMuscleWastingMorphology', selectionPressure : 7.0 }
             } ,
@@ -7442,7 +7440,7 @@ button:hover {
                 id : 'brittleBoneSyndrome',
                 displayName : 'Brittle bone syndrome',
                 description : 'A skeletal mineralisation disorder causing severe injury vulnerability; only the most extreme juvenile cases are often fatal directly.',
-                ui : { morphology : 'fragile', tint : '#dbeafe' },
+                ui : { morphology : 'fragile' },
                 effects : { speedMultiplier : 0.82, foodMultiplier : 1.04, infertileAt : 0.70, incapacitatedAt : 0.86, deathAt : 0.96, deathChance : 0.08, juvenileDeathChance : 0.18, damageMultiplier : 1.65 },
                 geneticSelection : { riskModel : 'brittleBoneMorphology', selectionPressure : 6.6 }
             } ,
@@ -7450,16 +7448,16 @@ button:hover {
                 id : 'overmuscleStrain',
                 displayName : 'Over-muscle strain',
                 description : 'Excessive muscle on an under-built skeleton, causing sprains, tears and injury vulnerability.',
-                ui : { morphology : 'strained', tint : '#f97316' },
+                ui : { morphology : 'strained' },
                 effects : { speedMultiplier : 0.78, foodMultiplier : 1.14, infertileAt : 0.72, incapacitatedAt : 0.88, deathAt : 0.98, deathChance : 0.04, damageMultiplier : 1.42 },
                 geneticSelection : { riskModel : 'overmuscleStrainMorphology', selectionPressure : 5.8 }
             } ,
-            reproductiveTumour : { id:'reproductiveTumour', displayName:'Reproductive tumour', description:'An abnormal growth of reproductive tissue. Its internal cause is not observable, but swelling, weakness and impaired fertility are apparent.', ui:{morphology:'swollen',tint:'#a855f7'}, effects:{speedMultiplier:0.82,foodMultiplier:1.18,infertileAt:0.42,incapacitatedAt:0.82,deathAt:0.93,deathChance:0.16,damageMultiplier:1.18}, geneticSelection:{riskModel:'reproductiveTumourRepair',selectionPressure:7.0} },
+            reproductiveTumour : { id:'reproductiveTumour', displayName:'Reproductive tumour', description:'An abnormal growth of reproductive tissue. Its internal cause is not observable, but swelling, weakness and impaired fertility are apparent.', ui:{morphology:'swollen'}, effects:{speedMultiplier:0.82,foodMultiplier:1.18,infertileAt:0.42,incapacitatedAt:0.82,deathAt:0.93,deathChance:0.16,damageMultiplier:1.18}, geneticSelection:{riskModel:'reproductiveTumourRepair',selectionPressure:7.0} },
             giantGrowthFailure : {
                 id : 'giantGrowthFailure',
                 displayName : 'Giant growth failure',
                 description : 'A juvenile failure-to-thrive syndrome in very large, fast-growing monsters where food supply and skeletal growth cannot keep pace.',
-                ui : { morphology : 'stunted giant', tint : '#c084fc' },
+                ui : { morphology : 'stunted giant' },
                 effects : { speedMultiplier : 0.64, foodMultiplier : 1.24, infertileAt : 0.52, incapacitatedAt : 0.76, deathAt : 0.88, deathChance : 0.18, juvenileDeathChance : 0.45, damageMultiplier : 1.24 },
                 geneticSelection : { riskModel : 'giantGrowthFailureMorphology', selectionPressure : 6.8 }
             }
@@ -20308,9 +20306,8 @@ button:hover {
             var iconInjuries=[['head',bodyRight+18,48],['body',92,67],['frontLeftLeg',124,84],['rearLeftLeg',58,84]];
             iconInjuries.forEach(function(item){var value=Number.isFinite(monster.bodyHealth[item[0]])?monster.bodyHealth[item[0]]:monster.bodyHealth.maxEach;if(value<monster.bodyHealth.maxEach*0.72){injurySvg+='<path d="M'+(item[1]-5)+' '+(item[2]+1)+' C'+(item[1]-2)+' '+(item[2]-4)+' '+(item[1]+2)+' '+(item[2]+4)+' '+(item[1]+6)+' '+item[2]+'" fill="none" stroke="#6b211c" stroke-width="3" stroke-linecap="round"/>';}});
         }
-        var diseaseTint =(monster.diseases && monster.diseases.length) ? '<circle cx="38" cy="34" r="7" fill="'+((monster.diseases[0].ui && monster.diseases[0].ui.tint) || '#f87171')+'" opacity="0.75"/>' : '';
         var spines = morphology.spineScale>0 ? '<path d="M69 42 L76 '+(30-Math.round(morphology.spineScale * 10))+' L84 43 Z M94 39 L103 '+(25-Math.round(morphology.spineScale * 12))+' L113 43 Z" fill="'+colour.spineColour+'" stroke="'+dark+'" stroke-width="3"/>' : '';
-        return '<svg viewBox="0 0 180 110" role="img" aria-label="Monster icon">'+'<ellipse cx="90" cy="82" rx="54" ry="11" fill="rgba(0,0,0,0.18)"/>'+'<g transform="translate(90 62) scale('+wholeScale.toFixed(2)+' '+wholeScale.toFixed(2)+') translate(-90 -62)">'+tailPath+'<g transform="'+bodyTransform+'">'+'<path d="M35 66 C44 38 86 29 126 42 C150 50 157 74 139 84 C109 100 58 94 35 66 Z" fill="'+body+'" stroke="'+dark+'" stroke-width="4"/>'+stripes+spines+'</g>'+headPath+'<circle cx="'+eyeX.toFixed(1)+'" cy="46" r="10" fill="'+eye+'" stroke="'+dark+'" stroke-width="2"/><circle cx="'+pupilX.toFixed(1)+'" cy="46" r="6" fill="'+(monster.eyeColour||'#6f5b3e')+'"/><circle cx="'+(pupilX+1).toFixed(1)+'" cy="46" r="3" fill="#111"/>'+'<path d="M'+mouthX1.toFixed(1)+' 58 Q'+(bodyRight+15).toFixed(1)+' 66 '+mouthX2.toFixed(1)+' 58" fill="none" stroke="'+dark+'" stroke-width="3" stroke-linecap="round"/>'+collarPath+injurySvg+'</g>'+diseaseTint+'</svg>';
+        return '<svg viewBox="0 0 180 110" role="img" aria-label="Monster icon">'+'<ellipse cx="90" cy="82" rx="54" ry="11" fill="rgba(0,0,0,0.18)"/>'+'<g transform="translate(90 62) scale('+wholeScale.toFixed(2)+' '+wholeScale.toFixed(2)+') translate(-90 -62)">'+tailPath+'<g transform="'+bodyTransform+'">'+'<path d="M35 66 C44 38 86 29 126 42 C150 50 157 74 139 84 C109 100 58 94 35 66 Z" fill="'+body+'" stroke="'+dark+'" stroke-width="4"/>'+stripes+spines+'</g>'+headPath+'<circle cx="'+eyeX.toFixed(1)+'" cy="46" r="10" fill="'+eye+'" stroke="'+dark+'" stroke-width="2"/><circle cx="'+pupilX.toFixed(1)+'" cy="46" r="6" fill="'+(monster.eyeColour||'#6f5b3e')+'"/><circle cx="'+(pupilX+1).toFixed(1)+'" cy="46" r="3" fill="#111"/>'+'<path d="M'+mouthX1.toFixed(1)+' 58 Q'+(bodyRight+15).toFixed(1)+' 66 '+mouthX2.toFixed(1)+' 58" fill="none" stroke="'+dark+'" stroke-width="3" stroke-linecap="round"/>'+collarPath+injurySvg+'</g></svg>';
     }
     function MonsterSexLabel(monster){
         if (!monster || !monster.sex){
@@ -22943,14 +22940,6 @@ button:hover {
             ctx.stroke();
             ctx.fillStyle = '#f2c14e';
             ctx.fillRect(headX-fx * 3-2, headY+10, 5, 6);
-        }
-        if (m.diseases && m.diseases.length){
-            ctx.fillStyle =(m.diseases[0].ui && m.diseases[0].ui.tint) || 'rgba(248,113,113,0.30)';
-            ctx.globalAlpha*=0.20;
-            ctx.beginPath();
-            ctx.ellipse(0, -34, 36 * torsoLengthScale, 22 * torsoDepthScale, rot, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.globalAlpha = !m.alive ? 0.25 : !m.deployed ? 0.55 : 1;
         }
         ctx.restore();
         ctx.globalAlpha = 1;
