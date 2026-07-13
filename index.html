@@ -7932,9 +7932,57 @@ button:hover {
             gameState.excessMeatFood =(gameState.excessMeatFood || 0)+result.purchasedMeatStored+result.previousStoredMeatReturned;
             return result;
         } ,
-        applyBetweenSeasonFeeding : function (gameState, world, raidMonsters, rng){
+        provideEmergencyFoodForNewCaptures : function (gameState, world, monsters, raidTickNumber){
+            var result = { foodProvided : 0, storedFoodUsed : 0, purchasedFood : 0, expenditureCredits : 0, events : [] };
+            var price = this.getFoodCostCredits(world);
+            (monsters || []).forEach(function(monster){
+                if (!monster || !monster.alive || !monster.capturedThisRaid){ return; }
+                var captureTick = Number.isFinite(monster.captureTickNumber) ? monster.captureTickNumber : 0;
+                var elapsedFraction = Number.isFinite(raidTickNumber) && raidTickNumber>0 ? Clamp((raidTickNumber-captureTick)/raidTickNumber,0.10,1) : 0.50;
+                var fullRequirement = this.getMonsterRequirement(monster);
+                var proratedRequirement = Math.max(1, Math.ceil(fullRequirement * elapsedFraction));
+                var existingFood = this.getTotalFoodThisSeason(monster);
+                var needed = Math.max(0, proratedRequirement-existingFood);
+                if (needed<=0){ return; }
+                var fromStored = Math.min(needed, Math.max(0, gameState.excessMeatFood || 0));
+                gameState.excessMeatFood = Math.max(0, (gameState.excessMeatFood || 0)-fromStored);
+                monster.foodFromStoredMeatThisSeason=(monster.foodFromStoredMeatThisSeason || 0)+fromStored;
+                monster.foodBoughtThisSeason=(monster.foodBoughtThisSeason || 0)+fromStored;
+                needed-=fromStored;
+                result.storedFoodUsed+=fromStored;
+                var purchased=0;
+                if (needed>0 && world && Array.isArray(world.treasureDeposits)){
+                    var creditsNeeded=needed * price;
+                    var deposits=world.treasureDeposits.filter(function(d){return (d.amountRemaining || 0)>0;}).slice(0).sort(function(a,b){return (b.amountRemaining || 0)-(a.amountRemaining || 0);});
+                    for (var i=0;i<deposits.length && creditsNeeded>0;i+=1){
+                        var deposit=deposits[i];
+                        var unitValue=TREASURE_TYPES[deposit.treasureType].unitValue;
+                        var units=Math.min(deposit.amountRemaining,Math.ceil(creditsNeeded/unitValue));
+                        if (units<=0){continue;}
+                        deposit.amountRemaining-=units;
+                        var value=units*unitValue;
+                        creditsNeeded-=value;
+                        result.expenditureCredits+=value;
+                    }
+                    purchased=Math.min(needed,result.expenditureCredits/Math.max(1,price));
+                    monster.foodFromPurchasedMeatThisSeason=(monster.foodFromPurchasedMeatThisSeason || 0)+purchased;
+                    monster.foodBoughtThisSeason=(monster.foodBoughtThisSeason || 0)+purchased;
+                    monster.foodBoughtCostCreditsThisSeason=(monster.foodBoughtCostCreditsThisSeason || 0)+purchased*price;
+                    result.purchasedFood+=purchased;
+                    gameState.treasureSoldForFoodValue=(gameState.treasureSoldForFoodValue || 0)+result.expenditureCredits;
+                    gameState.roundTreasureSoldForFoodValue=(gameState.roundTreasureSoldForFoodValue || 0)+result.expenditureCredits;
+                    world.treasureSoldForFoodValue=(world.treasureSoldForFoodValue || 0)+result.expenditureCredits;
+                }
+                var supplied=fromStored+purchased;
+                result.foodProvided+=supplied;
+                if (supplied>0){ result.events.push(monster.name+' received '+Math.round(supplied*10)/10+' emergency food after capture.'); }
+            },this);
+            return result;
+        } ,
+        applyBetweenSeasonFeeding : function (gameState, world, raidMonsters, rng, raidTickNumber){
             var monsters = gameState.getLivingOwnedMonsters();
             var settlement = this.settleLairFoodAfterRaid(gameState, world, monsters);
+            var emergencyFeeding = this.provideEmergencyFoodForNewCaptures(gameState, world, monsters, raidTickNumber);
             var result = {
                 foodCostCredits : this.getFoodCostCredits(world),
                 foodEatenInRaid : 0,
@@ -7945,7 +7993,8 @@ button:hover {
                 monstersSeverelyMalnourished : 0,
                 monstersStarved : 0,
                 settlement : settlement,
-                events : []
+                emergencyFeeding : emergencyFeeding,
+                events : emergencyFeeding.events.slice(0)
             } ;
             monsters.forEach(function (monster){
                 result.foodEatenInRaid+=monster.foodEatenThisSeason || 0;
@@ -7954,7 +8003,13 @@ button:hover {
                 if ((monster.foodBoughtThisSeason || 0)>0){
                     result.monstersFed+=1;
                 }
+                var wasAliveBeforeNutrition = monster.alive;
                 var stateResult = NutritionSystem.applyNutritionStateFromSeason(monster, rng);
+                stateResult.died = !!stateResult.died || (wasAliveBeforeNutrition && !monster.alive);
+                if (stateResult.died){
+                    if (!monster.observableCauseOfDeath){ monster.observableCauseOfDeath = monster.nutritionState===NUTRITION_STATE.STARVED ? 'Starvation' : 'Malnutrition'; }
+                    result.events.push(monster.name+' died from '+monster.observableCauseOfDeath.toLowerCase()+'.');
+                }
                 if (monster.nutritionState===NUTRITION_STATE.MALNOURISHED){
                     result.monstersMalnourished+=1;
                 } else if (monster.nutritionState===NUTRITION_STATE.SEVERELY_MALNOURISHED){
@@ -7969,7 +8024,7 @@ button:hover {
             if (result.monstersMalnourished>0 || result.monstersSeverelyMalnourished>0){
                 result.events.push('Nutrition shortage left '+(result.monstersMalnourished+result.monstersSeverelyMalnourished)+' monster(s) underfed.');
             }
-            if (result.monstersStarved>0){
+            if (result.monstersStarved>0 && !result.events.some(function(text){ return text.indexOf(' died from ')>=0; })){
                 result.events.push(result.monstersStarved+' monster(s) starved.');
             }
             return result;
@@ -9219,6 +9274,135 @@ button:hover {
                 preyNiches : preyNiches
             } ;
             return world.macrofaunaEcologyProfile;
+        } ,
+        assessLongTermWildPopulationViability : function (monster, world){
+            if (!monster || !world || !monster.phenotype || !MonsterGenePool){
+                return { viable : false, score : 0, reasons : ['missing phenotype or world'] };
+            }
+            var ecology = this.macrofaunaEcologyProfile(world);
+            var metabolismProfile = MonsterGenePool.getWorldMetabolismSelectionProfile(world);
+            var morphologyProfile = MonsterGenePool.getWorldMorphologySelectionProfile(world);
+            var colourProfile = MonsterGenePool.getWorldColourSelectionProfile(world);
+            var behaviourProfile = MonsterGenePool.getWorldBehaviourSelectionProfile(world);
+            var perceptionProfile = MonsterGenePool.getWorldPerceptionSelectionProfile(world);
+            var reproductionProfile = MonsterGenePool.getWorldReproductionSelectionProfile(world);
+            var phenotype = monster.phenotype;
+            var reasons = [];
+            var worstThermalStress = 0;
+            var seasonallyActive = true;
+            for (var seasonNumber = 1; seasonNumber<=SEASON_NAMES.length; seasonNumber+=1){
+                var thermal = this.thermalStatus(monster, world, seasonNumber);
+                worstThermalStress = Math.max(worstThermalStress, thermal.stress || 0);
+                if (thermal.severe){
+                    seasonallyActive = false;
+                }
+            }
+            if (!seasonallyActive){
+                reasons.push('seasonally incapacitating thermal stress');
+            }
+            var metabolismFitness = MonsterGenePool.getMetabolismPhenotypeFitness(phenotype.metabolism, metabolismProfile);
+            var morphologyFitness = MonsterGenePool.getMorphologyPhenotypeFitness(phenotype.morphology, morphologyProfile);
+            var camouflageFitness = MonsterGenePool.getColourPhenotypeFitness(phenotype.colour, colourProfile);
+            var behaviourFitness = MonsterGenePool.getBehaviourPhenotypeFitness(phenotype.behaviour, behaviourProfile);
+            var perceptionFitness = MonsterGenePool.getPerceptionPhenotypeFitness(phenotype.perception, perceptionProfile);
+            var reproductionFitness = MonsterGenePool.getReproductionPhenotypeFitness(phenotype.reproduction, reproductionProfile);
+            var diseaseFitness = MonsterDiseaseSystem.geneticDiseaseSelectionFitnessMultiplier(phenotype, metabolismProfile);
+            var activeDiseaseCount = MonsterDiseaseSystem.activeDiseases(monster).length;
+            var niches = ecology.preyNiches || [];
+            var preyWeight = 0;
+            var preyBodyMassTotal = 0;
+            var bestNicheFitness = 0;
+            for (var nicheIndex = 0; nicheIndex<niches.length; nicheIndex+=1){
+                var niche = niches[nicheIndex];
+                var nicheWeight = Math.max(0, niche.expectedFood || 0);
+                if (nicheWeight<=0){
+                    continue;
+                }
+                preyWeight+=nicheWeight;
+                preyBodyMassTotal+=nicheWeight * Math.max(1, niche.preyBodyMass || 1);
+                bestNicheFitness = Math.max(bestNicheFitness, MonsterGenePool.morphologyNicheFitness(phenotype.morphology, niche, morphologyProfile));
+            }
+            var meanPreyBodyMass = preyWeight>0 ? preyBodyMassTotal / preyWeight : 4;
+            var expectedFood = Math.max(0, ecology.expectedFood || 0);
+            // Predator mass is constrained by the weighted prey community rather than
+            // by a campaign-round cap. Large bodies remain possible where genuinely
+            // large, abundant prey support them, but a rare heavy animal cannot make
+            // an otherwise small-prey biome support giant resident predators.
+            var supportedBodyMass = Clamp(90+meanPreyBodyMass * 2.0+expectedFood * 1.5, 114, 220);
+            var maintenanceDemand = MonsterGenePool.estimateMorphologySeasonFoodDemand(phenotype.morphology, morphologyProfile);
+            var weightedPursuitCost = 0;
+            var pursuitWeight = 0;
+            for (nicheIndex = 0; nicheIndex<niches.length; nicheIndex+=1){
+                niche = niches[nicheIndex];
+                nicheWeight = Math.max(0, niche.expectedFood || 0);
+                if (nicheWeight<=0){
+                    continue;
+                }
+                weightedPursuitCost+=nicheWeight * MonsterGenePool.estimateMorphologyPursuitFoodCost(phenotype.morphology, niche, morphologyProfile);
+                pursuitWeight+=nicheWeight;
+            }
+            var meanPursuitCost = pursuitWeight>0 ? weightedPursuitCost / pursuitWeight : 99;
+            var seasonalFoodDemand = maintenanceDemand+meanPursuitCost * 2.6;
+            var sustainableFoodBudget = 8.5+expectedFood;
+            if ((monster.currentBodyMass || 100)>supportedBodyMass){
+                reasons.push('body mass unsupported by the weighted prey community');
+            }
+            if (seasonalFoodDemand>sustainableFoodBudget * 1.15){
+                reasons.push('maintenance and pursuit costs exceed local food supply');
+            }
+            if (bestNicheFitness<0.12 || morphologyFitness<0.10){
+                reasons.push('cannot hunt any locally meaningful prey niche reliably');
+            }
+            if (metabolismFitness<0.012){
+                reasons.push('metabolism is not sustainable through the local annual cycle');
+            }
+            if (camouflageFitness<0.012){
+                reasons.push('camouflage is implausibly mismatched to local terrain');
+            }
+            if (behaviourFitness<0.18){
+                reasons.push('behaviour is maladaptive for local prey and danger');
+            }
+            if (perceptionFitness<0.32){
+                reasons.push('perception is maladaptive for local light, clutter and noise');
+            }
+            if (reproductionFitness<0.24){
+                reasons.push('reproductive phenotype cannot sustain a local breeding population');
+            }
+            if (diseaseFitness<0.10 || activeDiseaseCount>0){
+                reasons.push('constitutional disease burden is incompatible with a founding resident');
+            }
+            var componentFitness = [
+                Clamp(metabolismFitness, 0.0001, 1.5),
+                Clamp(morphologyFitness, 0.0001, 1.5),
+                Clamp(camouflageFitness, 0.0001, 1.5),
+                Clamp(behaviourFitness, 0.0001, 1.5),
+                Clamp(perceptionFitness, 0.0001, 1.5),
+                Clamp(reproductionFitness, 0.0001, 1.5),
+                Clamp(diseaseFitness, 0.0001, 1.5),
+                Clamp(bestNicheFitness, 0.0001, 1.5)
+            ];
+            var logScore = 0;
+            for (var componentIndex = 0; componentIndex<componentFitness.length; componentIndex+=1){
+                logScore+=Math.log(componentFitness[componentIndex]);
+            }
+            var score = Math.exp(logScore / componentFitness.length);
+            return {
+                viable : reasons.length===0,
+                score : score,
+                reasons : reasons,
+                worstThermalStress : worstThermalStress,
+                supportedBodyMass : supportedBodyMass,
+                seasonalFoodDemand : seasonalFoodDemand,
+                sustainableFoodBudget : sustainableFoodBudget,
+                metabolismFitness : metabolismFitness,
+                morphologyFitness : morphologyFitness,
+                camouflageFitness : camouflageFitness,
+                behaviourFitness : behaviourFitness,
+                perceptionFitness : perceptionFitness,
+                reproductionFitness : reproductionFitness,
+                diseaseFitness : diseaseFitness,
+                bestNicheFitness : bestNicheFitness
+            };
         }
     } ;
     class GeneticTraitDefinition{
@@ -10329,7 +10513,9 @@ button:hover {
             var preyRadius = niche.preyRadius || 10;
             var foodValue = niche.foodValue || 2;
             var danger = niche.danger || 0;
-            var targetFrame = Clamp(0.66+preyRadius / 24+danger * 0.025, 0.62, 1.34);
+            var preyBodyMass = Number.isFinite(niche.preyBodyMass) ? niche.preyBodyMass : preyRadius * 3;
+            var targetPredatorMass = Clamp(24+preyBodyMass * 1.4+danger * 3.0, 24, 205);
+            var targetFrame = Clamp(Math.cbrt(targetPredatorMass / 100), 0.62, 1.27);
             if (niche.species==='hare'){
                 targetFrame = 0.62;
             }
@@ -10923,6 +11109,7 @@ button:hover {
             this.wild = options && options.wild!==undefined ? options.wild : !this.owned;
             this.entryEdge = options && options.entryEdge ? options.entryEdge : null;
             this.capturedThisRaid = false;
+            this.captureTickNumber = options && Number.isFinite(options.captureTickNumber) ? Math.max(0, Math.floor(options.captureTickNumber)) : null;
             this.selectedForDeployment = options && options.selectedForDeployment!==undefined ? options.selectedForDeployment : this.owned;
             this.deployed = false;
             this.bodyHealth = new BodyHealth(20, 'quadrupedMonster');
@@ -11753,7 +11940,7 @@ button:hover {
         canDeploy(){
             return this.getDeploymentBlockReason()==='';
         }
-        capture(rng){
+        capture(rng, captureTickNumber){
             if (this.owned || !this.alive){
                 return false;
             }
@@ -11761,6 +11948,7 @@ button:hover {
             this.collared = true;
             this.wild = false;
             this.capturedThisRaid = true;
+            this.captureTickNumber = Number.isFinite(captureTickNumber) ? Math.max(0, Math.floor(captureTickNumber)) : 0;
             if (!this.name){
                 this.name = Monster.randomName(rng);
             }
@@ -11921,6 +12109,7 @@ button:hover {
                 this.alive = false;
                 this.corpseState = 'corpse';
                 this.behaviourState = 'dead';
+                this.observableCauseOfDeath = 'Malnutrition complicated by injuries';
                 this.edibleFoodRemaining = Math.max(this.edibleFoodRemaining || 0, Math.max(2, Math.round((this.currentBodyMass || 80) / 22)));
             }
             return part;
@@ -12489,6 +12678,7 @@ button:hover {
             s.wild = this.wild;
             s.entryEdge = this.entryEdge;
             s.capturedThisRaid = this.capturedThisRaid;
+            s.captureTickNumber = this.captureTickNumber;
             s.perception = this.perception;
             s.sightRange = this.sightRange;
             s.scentRange = this.scentRange;
@@ -13568,9 +13758,9 @@ button:hover {
                 var immigrantSex=existingFemales<existingMales ? MONSTER_SEX.FEMALE : (existingMales<existingFemales ? MONSTER_SEX.MALE : (rng.nextFloat()<0.5 ? MONSTER_SEX.FEMALE : MONSTER_SEX.MALE));
                 for (var immigrantAttempt=0;immigrantAttempt<1024;immigrantAttempt+=1){
                     var immigrant=new Monster(this.createMonsterId('wildimmigrant'),0,0,rng,{owned:false,collared:false,wild:true,selectedForDeployment:false,world:world,ageInSeasons:4,sex:immigrantSex});
-                    var viable=true;
-                    for (var immigrantSeason=1;immigrantSeason<=SEASON_NAMES.length;immigrantSeason+=1){ if (MonsterMetabolismSystem.thermalStatus(immigrant,world,immigrantSeason).severe){ viable=false; break; } }
-                    if (viable){
+                    var immigrantAssessment=MonsterMetabolismSystem.assessLongTermWildPopulationViability(immigrant,world);
+                    if (immigrantAssessment.viable){
+                        immigrant.wildPopulationViability=immigrantAssessment;
                         immigrant.wildResident=true; immigrant.localWorldSeed=world.seed;
                         immigrant.wildOriginBiome=this.dominantBiomeForWorld(world); immigrant.wildAvailableFromSeason=seasonNumber+1;
                         immigrant.wildHomeRangeX=rng.range(0,ECOLOGICAL_UNIT_WIDTH); immigrant.wildHomeRangeY=rng.range(0,ECOLOGICAL_UNIT_HEIGHT);
@@ -13597,9 +13787,9 @@ button:hover {
             var childFemaleChance=Clamp(0.5+parentSexBias * 0.5,0.12,0.88);
             var childSex=rng.nextFloat()<childFemaleChance ? MONSTER_SEX.FEMALE : MONSTER_SEX.MALE;
             var child=new Monster(this.createMonsterId('wildborn'),0,0,rng,{owned:false,collared:false,wild:true,selectedForDeployment:false,world:world,genome:childGenome,ageInSeasons:4,sex:childSex});
-            for (var childSeason=1;childSeason<=SEASON_NAMES.length;childSeason+=1){
-                if (MonsterMetabolismSystem.thermalStatus(child,world,childSeason).severe){ return []; }
-            }
+            var childAssessment=MonsterMetabolismSystem.assessLongTermWildPopulationViability(child,world);
+            if (!childAssessment.viable){ return []; }
+            child.wildPopulationViability=childAssessment;
             child.wildResident=true;
             child.localWorldSeed=world.seed;
             child.wildOriginBiome=mother.wildOriginBiome || father.wildOriginBiome || this.dominantBiomeForWorld(world);
@@ -13619,6 +13809,8 @@ button:hover {
             } );
             this.ownedMonsters.forEach(function (monster){
                 monster.resetForManagement();
+                monster.capturedThisRaid = false;
+                monster.captureTickNumber = null;
             } );
         }
         cullDeadOwnedMonsters(){
@@ -14183,33 +14375,30 @@ button:hover {
             return Clamp(capacity,1,Math.max(6,WILD_MONSTER_COUNT_MAX*IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR));
         }
         monsterCanRemainActiveThroughLocalYear(monster){
-            for (var seasonNumber=1;seasonNumber<=SEASON_NAMES.length;seasonNumber+=1){
-                if (MonsterMetabolismSystem.thermalStatus(monster,this.world,seasonNumber).severe){ return false; }
-            }
-            return true;
+            return MonsterMetabolismSystem.assessLongTermWildPopulationViability(monster, this.world).viable;
         }
         createAnnuallyViableWildMonster(monsterId, genome, requiredSex){
-            var best=null, bestWorstStress=Infinity;
-            // Population count is fixed before phenotype selection. Keep sampling until
-            // a resident able to deploy in every season when healthy is found.
-            for (var candidateIndex=0;candidateIndex<4096;candidateIndex+=1){
+            var attempts = genome ? 1 : 4096;
+            // Resident generation now has one authoritative whole-organism gate.
+            // Thermal tolerance alone is insufficient: trophic economics, camouflage,
+            // behaviour, perception, reproduction and inherited disease all have to
+            // describe an animal capable of surviving and breeding in this biome.
+            for (var candidateIndex=0;candidateIndex<attempts;candidateIndex+=1){
                 var candidate=new Monster(monsterId,0,0,this.rng,{owned:false,collared:false,wild:true,selectedForDeployment:false,world:this.world,genome:genome || undefined,sex:requiredSex || undefined});
-                var worst=0;
-                for (var season=1;season<=SEASON_NAMES.length;season+=1){ worst=Math.max(worst,MonsterMetabolismSystem.thermalStatus(candidate,this.world,season).stress || 0); }
-                if (worst<bestWorstStress){ best=candidate; bestWorstStress=worst; }
-                if (this.monsterCanRemainActiveThroughLocalYear(candidate)){
-                    candidate.applyThermalStatus(MonsterMetabolismSystem.thermalStatus(candidate,this.world,this.seasonNumber));
-                    candidate.localWorldSeed=this.world.seed;
-                    candidate.wildResident=true;
-                    return candidate;
+                var assessment=MonsterMetabolismSystem.assessLongTermWildPopulationViability(candidate,this.world);
+                if (!assessment.viable){
+                    continue;
                 }
+                candidate.wildPopulationViability=assessment;
+                candidate.applyThermalStatus(MonsterMetabolismSystem.thermalStatus(candidate,this.world,this.seasonNumber));
+                candidate.localWorldSeed=this.world.seed;
+                candidate.wildResident=true;
+                return candidate;
             }
-            // Extremely pathological custom climates still retain the population slot;
-            // the least-stressed evolved candidate is used rather than deleting it.
-            best.applyThermalStatus(MonsterMetabolismSystem.thermalStatus(best,this.world,this.seasonNumber));
-            best.localWorldSeed=this.world.seed;
-            best.wildResident=true;
-            return best;
+            // Never silently admit an ecologically impossible resident. World
+            // generation can retry with a different ecology; retaining a failed
+            // candidate would recreate the original thermal-only defect.
+            return null;
         }
         ensureWildPopulation(){
             if (this.gameState.wildPopulationWorldSeed!==this.world.seed){
@@ -14975,7 +15164,7 @@ button:hover {
                     reason : 'No active wild monster with that id is available to capture.'
                 } ;
             }
-            if (!monster.capture(this.rng)){
+            if (!monster.capture(this.rng, this.tickNumber)){
                 return {
                     ok : false,
                     reason : 'That monster is already collared.'
@@ -15681,7 +15870,7 @@ button:hover {
                 return;
             }
             this.currentRaid.recoverDroppedTreasureToWorld();
-            var nutritionResult = NutritionSystem.applyBetweenSeasonFeeding(this.gameState, this.world, this.currentRaid.monsters, this.currentRaid.rng);
+            var nutritionResult = NutritionSystem.applyBetweenSeasonFeeding(this.gameState, this.world, this.currentRaid.monsters, this.currentRaid.rng, this.currentRaid.tickNumber);
             this.capturePersistentRemains(this.currentRaid);
             var summary = this.currentRaid.getConclusionSummary();
             summary.nutritionResult = nutritionResult;
@@ -17881,6 +18070,18 @@ button:hover {
         var raidFoodSettlement = NutritionSystem.settleLairFoodAfterRaid(raidFoodEconomySession.gameState, raidFoodEconomySession.world, [raidFoodMonster]);
         AddRegressionResult(results, 'Raid food displaces purchased and stored lair meat before captive production', raidFoodMonster.foodBoughtThisSeason===raidFoodRequirement-4 && raidFoodMonster.foodFromPurchasedMeatThisSeason===0 && raidFoodMonster.foodFromStoredMeatThisSeason===0 && raidFoodMonster.foodFromCaptiveMacrofaunaThisSeason===raidFoodRequirement-4 && raidFoodEconomySession.gameState.excessMeatFood===4, 'lair='+raidFoodMonster.foodBoughtThisSeason+', stored='+raidFoodEconomySession.gameState.excessMeatFood+', released='+raidFoodSettlement.lairFoodReleased);
         raidFoodMonster.foodEatenThisSeason = 4;
+        var captureFoodState = new GameState(new SeededRng(880771), session.world, 'quick');
+        captureFoodState.ownedMonsters=[];
+        captureFoodState.excessMeatFood=50;
+        var captureFoodMonster = new Monster('capture_food_test',0,0,new SeededRng(880772),{owned:false,collared:false,wild:true,world:session.world});
+        captureFoodMonster.capture(new SeededRng(880773),800);
+        captureFoodState.addCapturedMonster(captureFoodMonster);
+        var captureFoodResult=NutritionSystem.applyBetweenSeasonFeeding(captureFoodState,session.world,[captureFoodMonster],new SeededRng(880774),1000);
+        AddRegressionResult(results,'Newly collared monsters draw emergency food from existing stocks before nutrition harm',captureFoodMonster.alive && captureFoodResult.emergencyFeeding.storedFoodUsed>0 && captureFoodMonster.nutritionState===NUTRITION_STATE.NOURISHED,'alive='+captureFoodMonster.alive+', stored='+captureFoodResult.emergencyFeeding.storedFoodUsed+', state='+captureFoodMonster.nutritionState);
+        var injuredNutritionMonster = new Monster('nutrition_death_test',0,0,new SeededRng(880775),{owned:true,world:session.world});
+        injuredNutritionMonster.bodyHealth.head=0.1; injuredNutritionMonster.currentFatMass=0; injuredNutritionMonster.foodBoughtThisSeason=0; injuredNutritionMonster.foodEatenThisSeason=0;
+        injuredNutritionMonster.applyNutritionBodyDamage(injuredNutritionMonster.bodyHealth.maxEach*0.18,new SeededRng(880776));
+        AddRegressionResult(results,'Nutrition damage deaths always receive an observable cause',!injuredNutritionMonster.alive && injuredNutritionMonster.observableCauseOfDeath==='Malnutrition complicated by injuries','alive='+injuredNutritionMonster.alive+', cause='+injuredNutritionMonster.observableCauseOfDeath);
         var raidFoodPlan = raidFoodEconomySession.getSeasonFoodPlan();
         AddRegressionResult(results, 'Live captive food balance credits food eaten during the raid', raidFoodPlan.foodEatenInRaid===4 && raidFoodPlan.netLairFoodDemand===Math.max(0, raidFoodPlan.totalDemand-4) && raidFoodPlan.baseFoodBalance===raidFoodPlan.captiveMacrofauna.foodProduced-raidFoodPlan.netLairFoodDemand, 'eaten='+raidFoodPlan.foodEatenInRaid+', net='+raidFoodPlan.netLairFoodDemand+', balance='+raidFoodPlan.baseFoodBalance);
 
@@ -17957,9 +18158,13 @@ button:hover {
             platedDamage+=armourMonster.getMeleeDamageAgainst(platedTarget, armourRng);
         }
         AddRegressionResult(results, 'Plate armour substantially reduces ordinary founder attack damage', platedDamage<unarmouredDamage * 0.58, 'plateRatio='+(platedDamage / Math.max(1, unarmouredDamage)).toFixed(3));
-        var mediumWildAcceptance = Clamp(Math.pow(35 / 80, 2.0), 0.025, 1);
-        var largeWildAcceptance = Clamp(Math.pow(35 / 120, 2.0), 0.025, 1);
-        AddRegressionResult(results, 'Trophic encounter filtering makes large wild monsters exceptional but still possible', mediumWildAcceptance>=0.15 && mediumWildAcceptance<=0.25 && largeWildAcceptance>=0.06 && largeWildAcceptance<=0.11, '80kg='+mediumWildAcceptance.toFixed(3)+', 120kg='+largeWildAcceptance.toFixed(3));
+        var viableWildAssessment = MonsterMetabolismSystem.assessLongTermWildPopulationViability(wildEntryMonster, session.world);
+        AddRegressionResult(results, 'Wild resident production uses the authoritative whole-organism viability assessment', typeof Raid.prototype.createAnnuallyViableWildMonster==='function' && viableWildAssessment && Array.isArray(viableWildAssessment.reasons), 'score='+(viableWildAssessment.score || 0).toFixed(3)+', reasons='+viableWildAssessment.reasons.join('|'));
+        var impossibleGiant = new Monster('impossible_wild_giant', 0, 0, new SeededRng(425901), { owned:false, collared:false, wild:true, world:session.world });
+        impossibleGiant.currentBodyMass = 1000;
+        impossibleGiant.recalculateBodyMassAndDerivedFields = function(){ return this.currentBodyMass; };
+        var impossibleGiantAssessment = MonsterMetabolismSystem.assessLongTermWildPopulationViability(impossibleGiant, session.world);
+        AddRegressionResult(results, 'Prey ecology prevents an unsupported giant from joining the resident breeding population', !impossibleGiantAssessment.viable && impossibleGiantAssessment.reasons.indexOf('body mass unsupported by the weighted prey community')>=0, 'supported='+impossibleGiantAssessment.supportedBodyMass.toFixed(1)+', actual='+impossibleGiant.currentBodyMass);
         var chatterRng = new SeededRng(424310);
         var chatterMonster = new Monster('state_chatter_monster', 300, 300, chatterRng, { owned : true });
         chatterMonster.deployed = true;
