@@ -1003,6 +1003,16 @@ button:hover {
         text-align: left;
     }
 }
+
+/* Campaign dashboard upgrade */
+#newRaidButton{order:10;margin-left:.6rem}.transportButton{width:2.8rem;height:2.55rem;padding:0;display:inline-flex;align-items:center;justify-content:center;gap:.2rem}.transportButton[aria-pressed=true]{background:#fff1a8;box-shadow:inset 0 2px 4px #0006}.playSymbol{width:0;height:0;border-top:.58rem solid transparent;border-bottom:.58rem solid transparent;border-left:.92rem solid #1f2730}.pauseSymbol,.fastForwardSymbol{display:inline-flex;gap:.2rem}.pauseSymbol span{width:.34rem;height:1.15rem;border-radius:.18rem;background:#1f2730}.fastForwardSymbol span{width:0;height:0;border-top:.48rem solid transparent;border-bottom:.48rem solid transparent;border-left:.72rem solid #1f2730;margin-left:-.09rem}
+#statusBox{white-space:normal}.campaignDashboard{display:grid;gap:.75rem}.dashboardCard{border:1px solid #263449;border-radius:.55rem;padding:.65rem;background:#0b1220}.climateCard{display:grid;grid-template-columns:2.7rem 1fr;gap:.75rem;align-items:center}.thermometer{position:relative;width:.78rem;height:4.4rem;margin:0 auto .55rem;border:2px solid #cbd5e1;border-radius:999px 999px .3rem .3rem;background:#172033}.thermometer:after{content:'';position:absolute;left:50%;bottom:-.62rem;width:1.35rem;height:1.35rem;transform:translateX(-50%);border:2px solid #cbd5e1;border-radius:50%;background:#dc2626}.thermometerFill{position:absolute;left:.13rem;right:.13rem;bottom:0;border-radius:999px;background:linear-gradient(0deg,#2563eb,#fbbf24 55%,#dc2626)}.climateValue{font-size:1.35rem;font-weight:900}.climateBiome{color:#bfdbfe;font-weight:800}.dashboardHeading{margin-bottom:.45rem;font-weight:900}.goalRow{display:grid;grid-template-columns:minmax(7rem,1fr) minmax(8.5rem,1.1fr);gap:.65rem;align-items:center;margin-top:.52rem}.progressTrack,.balanceTrack,.treasureTrack{position:relative;height:1.35rem;overflow:hidden;border-radius:999px;background:#1f2937;border:1px solid #475569}.progressFill{height:100%;background:linear-gradient(90deg,#1d4ed8,#38bdf8)}.progressText,.balanceValue{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.78rem;font-weight:900;text-shadow:0 1px 2px #000}.goalDescription{color:#dbeafe;font-size:.82rem}.balanceTrack{overflow:visible;background:#172033}.balanceTrack:after{content:'';position:absolute;left:50%;top:-.2rem;bottom:-.2rem;width:2px;background:#fff}.balanceBar{position:absolute;top:.12rem;bottom:.12rem;border-radius:999px}.balanceBar.surplus{left:50%;background:#16a34a}.balanceBar.deficit{right:50%;background:#dc2626}.treasureTrack{display:flex;height:1.75rem}.treasureSegment{display:flex;align-items:center;justify-content:center;overflow:hidden;color:#fff;font-size:.72rem;font-weight:900;text-shadow:0 1px 2px #000;white-space:nowrap}.treasureRemaining{background:#ca8a04}.treasureSold{background:#7c3aed}.treasureStolen{background:#b91c1c}.dashboardFootnote{color:#94a3b8;font-size:.76rem;margin-top:.35rem}
+#selectionSection{display:flex;flex-direction:column;overflow:hidden}#objectDetails{flex:0 1 auto;overflow:auto}#eventLogDisclosure{min-height:0;margin-top:.65rem;border-top:1px solid #1f2937;padding-top:.45rem}#eventLogDisclosure[open]{flex:1 1 14rem;display:flex;flex-direction:column}#eventLogDisclosure summary{cursor:pointer;color:#bfdbfe;font-weight:850}#eventLog{max-height:none;min-height:0;flex:1 1 auto}
+#roundHistoryOverlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:1rem;background:#020617f0;color:#f8fafc}#roundHistoryOverlay.dialogHidden{display:none}#roundHistoryPanel{width:min(980px,calc(100vw - 2rem));max-height:min(860px,calc(100vh - 2rem));overflow:auto;border:1px solid #475569;border-radius:.85rem;padding:1rem;background:#111827}#roundHistoryPanel h2{margin:0;color:#f2c14e}.roundHistoryTable{width:100%;border-collapse:collapse;font-size:.88rem}.roundHistoryTable th,.roundHistoryTable td{padding:.55rem;border-bottom:1px solid #334155;text-align:right;vertical-align:top}.roundHistoryTable th:nth-child(-n+3),.roundHistoryTable td:nth-child(-n+3){text-align:left}.roundResultBadge{display:inline-block;padding:.16rem .5rem;border-radius:999px;font-weight:900}.roundResultBadge.win{background:#166534}.roundResultBadge.loss{background:#991b1b}#roundHistoryActions{display:flex;justify-content:flex-end;margin-top:.8rem}@media(min-width:981px){#sidePanel{grid-template-rows:minmax(17rem,auto) minmax(13rem,1fr)}}@media(max-width:700px){.goalRow{grid-template-columns:1fr}}
+
+.dashboardCard.statClickable{cursor:pointer;transition:border-color .15s,transform .15s}.dashboardCard.statClickable:hover{border-color:#f2c14e;transform:translateY(-1px)}
+.thermometerFill{background:var(--thermometer-colour,#dc2626)!important}.treasureLegend{display:grid;grid-template-columns:repeat(3,1fr);gap:.35rem;margin-top:.45rem}.treasureLegendItem{display:flex;align-items:center;gap:.3rem;color:#dbeafe;font-size:.76rem}.legendSwatch{width:.72rem;height:.72rem;border-radius:.18rem;flex:none}
+#statDetailOverlay{position:fixed;inset:0;z-index:55;display:flex;align-items:center;justify-content:center;padding:1rem;background:#020617f2;color:#f8fafc}#statDetailOverlay.dialogHidden{display:none}#statDetailPanel{width:min(900px,calc(100vw - 2rem));max-height:min(850px,calc(100vh - 2rem));overflow:auto;border:1px solid #475569;border-radius:.85rem;padding:1rem;background:#111827;box-sizing:border-box}#statDetailPanel h2{margin:0 0 .7rem;color:#f2c14e}.statDetailActions{display:flex;justify-content:flex-end;margin-top:1rem}.statChart{width:100%;height:auto;background:#07101f;border:1px solid #334155;border-radius:.55rem}.statGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.65rem}.statTile{padding:.65rem;border:1px solid #334155;border-radius:.5rem;background:#0b1220}.statTile strong{display:block;color:#f2c14e;font-size:1.2rem}.iconRow{display:flex;align-items:center;gap:.55rem;margin:.45rem 0}.statIcon{width:2rem;height:2rem;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#263449;font-size:1.15rem;flex:none}.barRow{display:grid;grid-template-columns:minmax(7rem,1fr) 2fr 3.2rem;gap:.5rem;align-items:center;margin:.45rem 0}.barTrack{height:1rem;border-radius:999px;background:#1f2937;overflow:hidden}.barFill{height:100%;border-radius:999px}.typeGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.55rem;margin-top:.7rem}.typeTile{padding:.55rem;border-radius:.5rem;background:#0b1220;border:1px solid #334155}.typeColour{height:.45rem;border-radius:999px;margin:.35rem 0}
 </style>
 </head>
 <body>
@@ -1013,10 +1023,10 @@ button:hover {
 </div>
 <div id="seasonDisplay" aria-live="polite">Main Menu</div>
 <div id="controls">
+<button id="playPauseButton" class="transportButton" type="button" aria-label="Pause game" aria-pressed="false"><span class="pauseSymbol" aria-hidden="true"><span></span><span></span></span></button>
+<button id="fastForwardButton" class="transportButton" type="button" aria-label="Fast forward at four times speed" aria-pressed="false"><span class="fastForwardSymbol" aria-hidden="true"><span></span><span></span></span></button>
+<button id="roundHistoryButton" type="button">Round Results</button>
 <button id="newRaidButton" type="button">Main Menu</button>
-<button id="pauseButton" type="button">Pause</button>
-<button id="resumeButton" type="button">Resume</button>
-<button id="harnessButton" type="button">Run Harness</button>
 </div>
 </header>
 <main id="layout">
@@ -1062,9 +1072,8 @@ button:hover {
 <div id="objectDetails">Click any monster, adventurer, treasure, scenery object or terrain tile to inspect it.</div>
 <div id="monsterPortrait">
 </div>
-<h3>Event Log</h3>
-<ol id="eventLog">
-</ol>
+<details id="eventLogDisclosure" open><summary>Event Log</summary>
+<ol id="eventLog"></ol></details>
 </section>
 </aside>
 </main>
@@ -1213,6 +1222,8 @@ button:hover {
 </div>
 </div>
 </div>
+<div id="statDetailOverlay" class="dialogHidden" role="dialog" aria-modal="true" aria-labelledby="statDetailTitle"><div id="statDetailPanel"><h2 id="statDetailTitle">Statistics</h2><div id="statDetailBody"></div><div class="statDetailActions"><button id="closeStatDetailButton" type="button">Close</button></div></div></div>
+<div id="roundHistoryOverlay" class="dialogHidden" role="dialog" aria-modal="true" aria-labelledby="roundHistoryTitle"><div id="roundHistoryPanel"><h2 id="roundHistoryTitle">Round Results</h2><p>Completed rounds in this campaign, or the result of the current single game.</p><div id="roundHistoryBody"></div><div id="roundHistoryActions"><button id="closeRoundHistoryButton" type="button">Return to game</button></div></div></div>
 <div id="gameToast" role="status" aria-live="polite"></div>
 <script id="simulationWorkerSource" type="text/plain">
 // SPDX-License-Identifier: GPL-3.0-only
@@ -1288,7 +1299,7 @@ button:hover {
     // Save format versions are independent of the worker message protocol. Each
     // future incompatible state change must add a migration from the preceding
     // format instead of changing old save data in place.
-    var SAVE_FORMAT_VERSION = 2;
+    var SAVE_FORMAT_VERSION = 3;
     var MIN_SUPPORTED_SAVE_FORMAT_VERSION = 1;
     var REFERENCE_MAP_WIDTH = 1800;
     var REFERENCE_MAP_HEIGHT = 1200;
@@ -13664,9 +13675,12 @@ button:hover {
                 roundNumber : summary.roundNumber,
                 worldSeed : summary.worldSeed,
                 result : resultText,
+                winLossState : endingAfterFoodValue<=0 ? 'Loss' : 'Win',
+                reason : resultText,
                 startingTreasureValue : treasureBreakdown.starting.totalValue || 0,
                 endingTreasureValue : endingAfterFoodValue,
                 foodExpenditureCredits : treasureBreakdown.foodExpenditureCredits || 0,
+                treasureSoldForFoodValue : treasureBreakdown.foodExpenditureCredits || 0,
                 treasureLostValue : treasureBreakdown.stolen.totalValue || 0,
                 adventurersStartedByClass : Object.assign({
                 } , summary.adventurersStartedByClass || {
@@ -14672,7 +14686,16 @@ button:hover {
             } , this);
         }
         getTreasureBreakdown(){
-            return this.world.getTreasureBreakdown(this.droppedTreasure);
+            var onMapTreasure = this.droppedTreasure.slice(0);
+            this.adventurers.forEach(function (adventurer){
+                if (!adventurer.escaped && adventurer.carryingTreasure && adventurer.carryingAmount>0){
+                    onMapTreasure.push({
+                        treasureType : adventurer.carryingTreasureType,
+                        amountRemaining : adventurer.carryingAmount
+                    });
+                }
+            });
+            return this.world.getTreasureBreakdown(onMapTreasure);
         }
         hasTreasureRemaining(){
             return this.world.hasTreasureRemaining(this.droppedTreasure);
@@ -15669,6 +15692,12 @@ button:hover {
             var adventurersKilled = this.adventurers.filter(function (adventurer){
                 return !adventurer.alive;
             } ).length;
+            var adventurersFledWithoutTreasure = this.adventurers.filter(function (adventurer){
+                return adventurer.alive && adventurer.escaped && !adventurer.carryingTreasure;
+            }).length;
+            var adventurersFledWithInjuries = this.adventurers.filter(function (adventurer){
+                return adventurer.alive && adventurer.escaped && adventurer.health<adventurer.maxHealth;
+            }).length;
             var adventurersStartedByClass = {
             } ;
             var adventurersReturnedAliveByClass = {
@@ -15722,6 +15751,9 @@ button:hover {
                 adventurersReturnedAlive : adventurersReturnedAlive,
                 adventurersEscapedWithTreasure : adventurersEscapedWithTreasure,
                 adventurersKilled : adventurersKilled,
+                adventurersArrived : this.adventurers.length,
+                adventurersFledWithoutTreasure : adventurersFledWithoutTreasure,
+                adventurersFledWithInjuries : adventurersFledWithInjuries,
                 adventurersStartedByClass : adventurersStartedByClass,
                 adventurersReturnedAliveByClass : adventurersReturnedAliveByClass,
                 adventurersEscapedWithTreasureByClass : adventurersEscapedWithTreasureByClass,
@@ -15852,6 +15884,7 @@ button:hover {
             this.roundEnded = false;
             this.roundResult = 'Round in progress';
             this.lastRaidSummary = null;
+            this.roundSeasonHistory = [];
             this.world = World.createWorld(this.seed, this.getWorldOptions(this.baseWorldOptions));
             this.captiveMacrofaunaFoodPlan = this.calculateCaptiveMacrofaunaFoodPlan();
             this.gameState = new GameState(this.rng, this.mode, this.world);
@@ -16031,6 +16064,27 @@ button:hover {
             this.capturePersistentRemains(this.currentRaid);
             var summary = this.currentRaid.getConclusionSummary();
             summary.nutritionResult = nutritionResult;
+            summary.foodPlan = this.getSeasonFoodPlan();
+            summary.captiveFoodPopulations = summary.foodPlan && summary.foodPlan.captiveMacrofauna ? (summary.foodPlan.captiveMacrofauna.populations || []) : [];
+            summary.foodProduced = summary.foodPlan && summary.foodPlan.captiveMacrofauna ? (summary.foodPlan.captiveMacrofauna.foodProduced || 0) : 0;
+            summary.totalFoodConsumed = (summary.foodEatenInRaidTotal || 0)+(summary.foodFedAtBaseTotal || 0);
+            this.roundSeasonHistory.push({
+                seasonNumber : summary.seasonNumber,
+                seasonName : summary.seasonName,
+                temperatureC : summary.currentSeasonTemperatureC,
+                adventurersArrived : summary.adventurersArrived || 0,
+                adventurersFledWithoutTreasure : summary.adventurersFledWithoutTreasure || 0,
+                adventurersFledWithInjuries : summary.adventurersFledWithInjuries || 0,
+                adventurersFledWithTreasure : summary.adventurersEscapedWithTreasure || 0,
+                foodProduced : summary.foodProduced || 0,
+                totalFoodConsumed : summary.totalFoodConsumed || 0,
+                ownedNutrition : summary.ownedNutrition || [],
+                captiveFoodPopulations : summary.captiveFoodPopulations || [],
+                treasureStolenValue : summary.treasureLostValue || 0,
+                treasureSoldForFoodValue : summary.foodExpenditureCredits || 0,
+                treasureRemainingValue : summary.treasureRemainingAfterFoodValue || 0,
+                treasureBreakdown : summary.treasureBreakdown
+            });
             this.lastRaidSummary = summary;
             this.applyRoundProgression(summary);
             summary.roundEnded = this.roundEnded;
@@ -16125,6 +16179,7 @@ button:hover {
             this.roundEnded = false;
             this.roundResult = 'Round in progress';
             this.lastRaidSummary = null;
+            this.roundSeasonHistory = [];
             this.roundRemains = [];
             this.gameState.roundFoodExpenditureCredits = 0;
             this.gameState.roundTreasureSoldForFoodValue = 0;
@@ -16543,6 +16598,7 @@ button:hover {
                 raidSnapshot.roundEnded = this.roundEnded;
                 raidSnapshot.roundResult = this.roundResult;
                 raidSnapshot.latestRoundSummary = this.lastRaidSummary;
+                raidSnapshot.roundSeasonHistory = this.roundSeasonHistory.slice(0);
                 raidSnapshot.consecutiveSeasonsWithNoReturningAdventurers = this.consecutiveSeasonsWithNoReturningAdventurers;
                 raidSnapshot.consecutiveSeasonsWithNoReturningTreasure = this.consecutiveSeasonsWithNoReturningTreasure;
                 raidSnapshot.noReturningAdventurersWinTarget = SEASONS_WITH_NO_RETURNING_ADVENTURERS_TO_WIN_ROUND;
@@ -16573,6 +16629,7 @@ button:hover {
                 roundEnded : this.roundEnded,
                 roundResult : this.roundResult,
                 latestRoundSummary : this.lastRaidSummary,
+                roundSeasonHistory : this.roundSeasonHistory.slice(0),
                 consecutiveSeasonsWithNoReturningAdventurers : this.consecutiveSeasonsWithNoReturningAdventurers,
                 consecutiveSeasonsWithNoReturningTreasure : this.consecutiveSeasonsWithNoReturningTreasure,
                 noReturningAdventurersWinTarget : SEASONS_WITH_NO_RETURNING_ADVENTURERS_TO_WIN_ROUND,
@@ -18779,10 +18836,15 @@ button:hover {
         var migrated = saveRecord;
         while (migrated.formatVersion<SAVE_FORMAT_VERSION){
             if (migrated.formatVersion===1){
-                // Version 2 adds optional transfer provenance state. The object
-                // graph itself remains readable; missing fields are normalised
-                // after deserialisation rather than rewriting graph references.
+                // Version 2 adds optional transfer provenance state.
                 migrated = Object.assign({},migrated,{ formatVersion:2, minimumReaderVersion:1 });
+                continue;
+            }
+            if (migrated.formatVersion===2){
+                // Version 3 stores per-season round statistics. The object graph
+                // remains readable; NormaliseLoadedGameSession supplies an empty
+                // history for legacy saves without inventing historical results.
+                migrated = Object.assign({},migrated,{ formatVersion:3, minimumReaderVersion:1 });
                 continue;
             }
             throw new Error('No migration is registered for save format '+migrated.formatVersion+'.');
@@ -18842,6 +18904,9 @@ button:hover {
         if (!session.phase){ session.phase=session.currentRaid ? 'raid' : 'management'; }
         if (!session.captiveMacrofaunaFoodPlan){
             session.captiveMacrofaunaFoodPlan=session.calculateCaptiveMacrofaunaFoodPlan();
+        }
+        if (!Array.isArray(session.roundSeasonHistory)){
+            session.roundSeasonHistory=[];
         }
         session.gameState.mode=session.gameState.mode || session.mode;
         session.gameState.ownedMonsters.forEach(function(monster){
@@ -18949,6 +19014,8 @@ button:hover {
     }
     var gameSession = null;
     var intervalId = 0;
+    // Worker-owned playback rate. The UI changes this only through SET_SIMULATION_SPEED.
+    var simulationSpeedMultiplier = 1;
     function Post(message){
         self.postMessage(Object.assign({
             protocolVersion : PROTOCOL_VERSION
@@ -19014,7 +19081,7 @@ button:hover {
             if (!gameSession){
                 return;
             }
-            gameSession.tick();
+            for (var speedTick=0; speedTick<simulationSpeedMultiplier; speedTick+=1){ gameSession.tick(); }
             var events = gameSession.takeEvents();
             if (events.length>0){
                 Post({
@@ -19204,6 +19271,9 @@ button:hover {
                 } );
                 SendSnapshotAndEvents(command.messageId);
                 break;
+            case 'SET_SIMULATION_SPEED' : EnsureGameSession();
+                simulationSpeedMultiplier=command.payload && Number(command.payload.multiplier)===4 ? 4 : 1;
+                Post({replyTo:command.messageId,type:'COMMAND_ACCEPTED'}); SendSnapshotAndEvents(command.messageId); break;
             case 'PAUSE_RAID' : EnsureGameSession();
                 gameSession.pause();
                 Post({
@@ -19402,6 +19472,7 @@ button:hover {
     var latestWorldSnapshot = null,
     latestStaticObstacles = [];
     var latestSnapshot = null,
+    lastAutomaticallyShownRoundCount = 0,
     previousSnapshot = null,
     currentSnapshot = null,
     previousSnapshotTime = 0,
@@ -20128,85 +20199,78 @@ button:hover {
         '',
         FormatCampaignRoundHistory(stats, mode, s.roundNumber || summary.roundNumber || 0)].join('\n');
     }
-    function UpdateStatus(s){
-        var tr = s.treasures.filter(function (t){
-            return !t.stolen;
-        } ).length;
-        var adv = s.adventurers.filter(function (a){
-            return a.alive && !a.escaped;
-        } ).length;
-        var owned = s.monsters.filter(function (m){
-            return m.owned;
-        } );
-        var deployed = owned.filter(function (m){
-            return m.deployed && m.alive;
-        } ).length;
-        var wild = s.monsters.filter(function (m){
-            return !m.owned && m.alive;
-        } ).length;
-        var activeMacrofauna =(s.macrofauna || []).filter(function (animal){
-            return animal.alive && !animal.escaped;
-        } ).length;
-        var carrionFood =(s.macrofauna || []).reduce(function (sum, animal){
-            return sum+(animal.edibleFoodRemaining || 0);
-        } , 0);
-        var stats = s.campaignStats || {
-        } ;
-        var treasureBreakdown = s.treasureBreakdown || {
-            starting : {
-                byType : {
-                } ,
-                totalUnits : 0,
-                totalValue : 0
-            } ,
-            stolen : {
-                byType : {
-                } ,
-                totalUnits : 0,
-                totalValue : 0
-            } ,
-            remaining : {
-                byType : {
-                } ,
-                totalUnits : 0,
-                totalValue : 0
-            }
-        } ;
-        var mode = s.gameMode==='advancedCampaign' ? 'Advanced campaign' : (s.gameMode==='campaign' ? 'Campaign' : 'Single round game');
-        seasonDisplay.textContent = mode+' - Round '+(s.roundNumber || 1)+' Season '+s.seasonNumber+' ('+SeasonNameForSnapshot(s)+')';
-        if ((s.phase==='roundEnded' || s.phase==='gameOver' || s.roundEnded) && s.latestRoundSummary){
-            statusBox.textContent = FormatEndOfRoundStats(s);
-            return;
-        }
-        statusBox.textContent = ['Mode: '+mode,
-        'Round: '+(s.roundNumber || 1)+'  Season: '+s.seasonNumber+' ('+SeasonNameForSnapshot(s)+')',
-        'Phase: '+(s.phase || 'raid')+'  Paused: '+s.paused,
-        'Biome: '+FormatBiomeType(s.biomeType),
-        'Temperature: '+FormatTemperatureForSnapshot(s),
-        'Result: '+s.raidResult,
-        'No adventurer returned alive: '+FormatNumber(s.consecutiveSeasonsWithNoReturningAdventurers || 0)+' / '+FormatNumber(s.noReturningAdventurersWinTarget || 4)+' rounds ('+Math.round(100 * (s.consecutiveSeasonsWithNoReturningAdventurers || 0) / Math.max(1, s.noReturningAdventurersWinTarget || 4))+'% of win requirement)',
-        'No adventurer returned with treasure: '+FormatNumber(s.consecutiveSeasonsWithNoReturningTreasure || 0)+' / '+FormatNumber(s.noReturningTreasureWinTarget || 12)+' rounds ('+Math.round(100 * (s.consecutiveSeasonsWithNoReturningTreasure || 0) / Math.max(1, s.noReturningTreasureWinTarget || 12))+'% of win requirement)',
-        'Treasure deposits remaining: '+tr+' / '+s.treasures.length,
-        'Active adventurers: '+adv,
-        'Captive monsters: '+owned.length+'  Deployed: '+deployed+'  Wild: '+wild,
-        'Macrofauna: '+activeMacrofauna+' active; carrion food '+FormatNumber(carrionFood),
-        '',
-        FormatCaptiveFoodEconomy(s.foodPlan),
-        '',
-        'Campaign worlds completed: '+FormatNumber(stats.worldsCompleted || 0),
-        'Worlds won/lost: '+FormatNumber(stats.worldsWon || 0)+' / '+FormatNumber(stats.worldsLost || 0),
-        '',
-        FormatTreasureSection('Treasure at round start', treasureBreakdown.starting),
-        '',
-        FormatTreasureSection('Treasure stolen this round', treasureBreakdown.stolen),
-        '',
-        FormatTreasureSection('Treasure remaining', treasureBreakdown.remaining),
-        'Treasure sold for meat this round: '+FormatNumber(treasureBreakdown.foodExpenditureCredits || s.foodExpenditureCredits || 0)+' credits',
-        'Campaign treasure sold for meat: '+FormatNumber((s.management && s.management.foodExpenditureCredits) || 0)+' credits',
-        'Physical treasure remaining: '+FormatNumber(treasureBreakdown.remainingAfterFoodValue!==undefined ? treasureBreakdown.remainingAfterFoodValue : treasureBreakdown.remaining.totalValue),
-        '',
-        FormatCampaignRoundHistory(stats, mode, s.roundNumber || 0)].join('\n');
+    function UiClamp(value,min,max){return Math.max(min,Math.min(max,value));}
+    function E(tag,cls,value){var e=document.createElement(tag);if(cls)e.className=cls;if(value!==undefined)e.textContent=value;return e;}
+    function Goal(parent,current,target,description){var row=E('div','goalRow'),track=E('div','progressTrack'),fill=E('div','progressFill');fill.style.width=Math.round(100*UiClamp(current/Math.max(1,target),0,1))+'%';track.appendChild(fill);track.appendChild(E('div','progressText',FormatNumber(current)+' / '+FormatNumber(target)));row.appendChild(track);row.appendChild(E('div','goalDescription',description));parent.appendChild(row);}
+    function TemperatureColour(temperature){
+        if (!Number.isFinite(temperature)){ return '#94a3b8'; }
+        if (temperature<=-5){ return '#60a5fa'; }
+        if (temperature<=5){ return '#38bdf8'; }
+        if (temperature<=15){ return '#22c55e'; }
+        if (temperature<=25){ return '#facc15'; }
+        if (temperature<=35){ return '#f97316'; }
+        return '#dc2626';
     }
+    function MakeClickable(card, kind, label){card.classList.add('statClickable');card.tabIndex=0;card.setAttribute('role','button');card.setAttribute('aria-label','Open '+label+' details');card.addEventListener('pointerdown',function(e){if(e.pointerType==='mouse' && e.button!==0){return;}e.preventDefault();ShowStatDetail(kind);});card.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();ShowStatDetail(kind);}});}
+    function RenderCampaignDashboard(s){statusBox.innerHTML='';var d=E('div','campaignDashboard'),cl=E('section','dashboardCard climateCard'),th=E('div','thermometer'),tf=E('div','thermometerFill'),temp=TemperatureForSnapshot(s);tf.style.height=(Number.isFinite(temp)?UiClamp((temp+20)/70,0,1)*100:0)+'%';tf.style.background=TemperatureColour(temp);th.appendChild(tf);cl.appendChild(th);var ct=E('div');ct.appendChild(E('div','climateValue',FormatTemperatureForSnapshot(s)));ct.appendChild(E('div','climateBiome',FormatBiomeType(s.biomeType)));cl.appendChild(ct);MakeClickable(cl,'temperature','temperature');d.appendChild(cl);
+        var goals=E('section','dashboardCard');goals.appendChild(E('div','dashboardHeading','Victory progress'));Goal(goals,s.consecutiveSeasonsWithNoReturningAdventurers||0,s.noReturningAdventurersWinTarget||4,'No adventurer returned alive.');Goal(goals,s.consecutiveSeasonsWithNoReturningTreasure||0,s.noReturningTreasureWinTarget||12,'No adventurer returned with treasure.');MakeClickable(goals,'victory','victory progress');d.appendChild(goals);
+        var food=E('section','dashboardCard');food.appendChild(E('div','dashboardHeading','\ud83e\udd69 Food'));var fp=s.foodPlan||{},f=fp.captiveMacrofauna||{},b=Number.isFinite(fp.baseFoodBalance)?fp.baseFoodBalance:(f.foodProduced||0)-(fp.netLairFoodDemand||fp.totalDemand||0),scale=Math.max(10,Math.abs(b),fp.totalDemand||0,f.foodProduced||0),bt=E('div','balanceTrack'),bb=E('div','balanceBar '+(b>=0?'surplus':'deficit'));bb.style.width=UiClamp(Math.abs(b)/scale,0,1)*50+'%';bt.appendChild(bb);bt.appendChild(E('div','balanceValue',(b>=0?'+':'\u2212')+FormatNumber(Math.abs(b))));food.appendChild(bt);food.appendChild(E('div','dashboardFootnote',b>=0?'Seasonal food surplus':'Seasonal food deficit before new treasure sales'));MakeClickable(food,'food','food');d.appendChild(food);
+        var treasure=E('section','dashboardCard');treasure.appendChild(E('div','dashboardHeading','\ud83e\ude99 Treasure'));var x=s.treasureBreakdown||{},start=x.starting&&x.starting.totalValue||0,stolen=x.stolen&&x.stolen.totalValue||0,sold=Number.isFinite(x.foodExpenditureCredits)?x.foodExpenditureCredits:(s.foodExpenditureCredits||0),physical=x.remaining&&x.remaining.totalValue||0,remaining=x.remainingAfterFoodValue!==undefined?x.remainingAfterFoodValue:Math.max(0,physical-sold),total=Math.max(1,start,remaining+sold+stolen),track=E('div','treasureTrack');[[remaining,'treasureSegment treasureRemaining'],[sold,'treasureSegment treasureSold'],[stolen,'treasureSegment treasureStolen']].forEach(function(p){var q=E('div',p[1]);q.style.width=100*p[0]/total+'%';if(!p[0])q.style.display='none';track.appendChild(q);});treasure.appendChild(track);var legend=E('div','treasureLegend');[[remaining,'treasureRemaining','On map'],[sold,'treasureSold','Sold for food'],[stolen,'treasureStolen','Stolen']].forEach(function(p){var item=E('div','treasureLegendItem'),sw=E('span','legendSwatch '+p[1]);item.appendChild(sw);item.appendChild(E('span','',p[2]+' '+FormatNumber(p[0])));legend.appendChild(item);});treasure.appendChild(legend);MakeClickable(treasure,'treasure','treasure');d.appendChild(treasure);statusBox.appendChild(d);}
+    function CompletedRoundHistoryForSnapshot(s){return s&&s.campaignStats&&Array.isArray(s.campaignStats.roundHistory)?s.campaignStats.roundHistory:[];}
+    function SvgElement(name,attributes){var e=document.createElementNS('http://www.w3.org/2000/svg',name);Object.keys(attributes||{}).forEach(function(k){e.setAttribute(k,attributes[k]);});return e;}
+    function LineChart(series,labels,colours,yAxisLabel){
+        var svg=SvgElement('svg',{viewBox:'0 0 760 320',class:'statChart','aria-label':'Line chart'}),max=1;
+        series.forEach(function(s){s.forEach(function(v){max=Math.max(max,v||0);});});
+        [0,1,2,3,4].forEach(function(i){
+            var y=35+i*55;
+            svg.appendChild(SvgElement('line',{x1:70,y1:y,x2:730,y2:y,stroke:'#334155'}));
+            var valueText=SvgElement('text',{x:60,y:y+5,fill:'#cbd5e1',['text-anchor']:'end',['font-size']:12});
+            valueText.textContent=FormatNumber(max*(4-i)/4);
+            svg.appendChild(valueText);
+        });
+        series.forEach(function(values,si){
+            var points=values.map(function(v,i){return (70+i*(660/Math.max(1,values.length-1)))+','+(255-(v||0)/max*220);}).join(' ');
+            svg.appendChild(SvgElement('polyline',{points:points,fill:'none',stroke:colours[si],['stroke-width']:4,['stroke-linejoin']:'round'}));
+            values.forEach(function(v,i){svg.appendChild(SvgElement('circle',{cx:70+i*(660/Math.max(1,values.length-1)),cy:255-(v||0)/max*220,r:5,fill:colours[si]}));});
+        });
+        labels.forEach(function(label,i){var tx=SvgElement('text',{x:70+i*(660/Math.max(1,labels.length-1)),y:282,fill:'#cbd5e1',['text-anchor']:'middle',['font-size']:13});tx.textContent=label;svg.appendChild(tx);});
+        var xLabel=SvgElement('text',{x:400,y:308,fill:'#f8fafc',['text-anchor']:'middle',['font-size']:14,['font-weight']:'700'});xLabel.textContent='Season';svg.appendChild(xLabel);
+        var yLabel=SvgElement('text',{x:18,y:145,fill:'#f8fafc',['text-anchor']:'middle',['font-size']:14,['font-weight']:'700',transform:'rotate(-90 18 145)'});yLabel.textContent=yAxisLabel||'Value';svg.appendChild(yLabel);
+        return svg;
+    }
+    function AddLegend(parent,items){var row=E('div','treasureLegend');items.forEach(function(item){var x=E('div','treasureLegendItem'),sw=E('span','legendSwatch');sw.style.background=item[1];x.appendChild(sw);x.appendChild(E('span','',item[0]));row.appendChild(x);});parent.appendChild(row);}
+    function BarRows(parent,rows,colours){var max=1;rows.forEach(function(r){max=Math.max(max,r.value||0);});rows.forEach(function(r,i){var row=E('div','barRow');row.appendChild(E('div','',r.label));var track=E('div','barTrack'),fill=E('div','barFill');fill.style.width=(100*(r.value||0)/max)+'%';fill.style.background=colours[i%colours.length];track.appendChild(fill);row.appendChild(track);row.appendChild(E('div','',FormatNumber(r.value||0)));parent.appendChild(row);});}
+    function BiomeExplanation(type){var m={tropicalRainforest:'A hot, wet biome with dense evergreen vegetation and abundant biological productivity.',coastalTropical:'A warm maritime biome where ocean influence moderates a humid tropical climate.',coastalTemperate:'A mild maritime biome with moderate temperatures, frequent moisture and productive vegetation.',oceanicTemperate:'A cool-to-mild wet biome with small seasonal temperature extremes.',temperateContinental:'A seasonal inland biome with warm summers, cold winters and moderate rainfall.',continentalHighland:'An elevated, rugged biome with cooler temperatures and strong seasonal variation.',hotDesert:'A very dry, hot biome where sparse life is limited chiefly by water.',coolDesert:'A dry biome with cool winters, warm summers and sparse drought-adapted life.',polar:'A persistently cold biome with short growing seasons and little vegetation.'};return m[type]||'This biome is defined by its characteristic climate, terrain and ecological community.';}
+    function CaptiveAnimalIcon(population){
+        var key=((population && population.species)||'')+' '+((population && population.displayName)||'');
+        key=key.toLowerCase();
+        if (key.indexOf('hare')>=0 || key.indexOf('rabbit')>=0){ return '\ud83d\udc07'; }
+        if (key.indexOf('boar')>=0 || key.indexOf('pig')>=0){ return '\ud83d\udc17'; }
+        if (key.indexOf('goat')>=0 || key.indexOf('ibex')>=0){ return '\ud83d\udc10'; }
+        if (key.indexOf('sheep')>=0 || key.indexOf('mouflon')>=0){ return '\ud83d\udc11'; }
+        if (key.indexOf('bison')>=0 || key.indexOf('buffalo')>=0 || key.indexOf('cattle')>=0 || key.indexOf('ox')>=0){ return '\ud83d\udc02'; }
+        if (key.indexOf('horse')>=0 || key.indexOf('pony')>=0){ return '\ud83d\udc0e'; }
+        if (key.indexOf('camel')>=0){ return '\ud83d\udc2b'; }
+        if (key.indexOf('kangaroo')>=0){ return '\ud83e\udd98'; }
+        if (key.indexOf('turkey')>=0 || key.indexOf('pheasant')>=0 || key.indexOf('bird')>=0){ return '\ud83e\udd83'; }
+        if (key.indexOf('duck')>=0 || key.indexOf('goose')>=0){ return '\ud83e\udd86'; }
+        if (key.indexOf('fish')>=0){ return '\ud83d\udc1f'; }
+        if (key.indexOf('rat')>=0 || key.indexOf('mouse')>=0 || key.indexOf('rodent')>=0){ return '\ud83d\udc01'; }
+        if (key.indexOf('deer')>=0 || key.indexOf('stag')>=0 || key.indexOf('elk')>=0 || key.indexOf('moose')>=0 || key.indexOf('antelope')>=0){ return '\ud83e\udd8c'; }
+        return '\ud83d\udc3e';
+    }
+    function ShowStatDetail(kind){var s=latestSnapshot||{},body=document.getElementById('statDetailBody'),title=document.getElementById('statDetailTitle'),history=s.roundSeasonHistory||[];body.innerHTML='';
+        if(kind==='temperature'){title.textContent='Temperature and biome';body.appendChild(E('p','',BiomeExplanation(s.biomeType)));var env=s.world&&s.world.environment?s.world.environment:{},mean=Number(env.meanAnnualTemperatureC)||0,amp=Number(env.seasonalTemperatureAmplitudeC)||0,averages=[mean-amp,mean+amp*.15,mean+amp,mean-amp*.1].map(function(v){return Math.round(v*10)/10;});var grid=E('div','statGrid');['Winter','Spring','Summer','Autumn'].forEach(function(n,i){var tile=E('div','statTile');tile.appendChild(E('span','',n+' average'));tile.appendChild(E('strong','',averages[i].toFixed(1)+' C'));grid.appendChild(tile);});body.appendChild(grid);var actual=history.slice(0);if(!actual.some(function(r){return r.seasonNumber===s.seasonNumber;})&&Number.isFinite(s.currentSeasonTemperatureC)){actual.push({seasonNumber:s.seasonNumber,seasonName:s.seasonName,temperatureC:s.currentSeasonTemperatureC});}body.appendChild(E('h3','','Temperatures experienced this round'));body.appendChild(LineChart([actual.map(function(r){return r.temperatureC;})],actual.map(function(r){return String(r.seasonNumber);}),['#f97316'],'Temperature (C)'));}
+        if(kind==='victory'){title.textContent='Adventurer outcomes by season';var victoryHistory=history.slice(0),liveAdventurers=s.adventurers||[];if(!victoryHistory.some(function(r){return r.seasonNumber===s.seasonNumber;})){victoryHistory.push({seasonNumber:s.seasonNumber,adventurersArrived:liveAdventurers.length,adventurersFledWithoutTreasure:liveAdventurers.filter(function(a){return a.alive&&a.escaped&&!a.carryingTreasure;}).length,adventurersFledWithInjuries:liveAdventurers.filter(function(a){return a.alive&&a.escaped&&a.health<a.maxHealth;}).length,adventurersFledWithTreasure:liveAdventurers.filter(function(a){return a.alive&&a.escaped&&a.carryingTreasure;}).length});}body.appendChild(LineChart([victoryHistory.map(function(r){return r.adventurersArrived;}),victoryHistory.map(function(r){return r.adventurersFledWithoutTreasure;}),victoryHistory.map(function(r){return r.adventurersFledWithInjuries;}),victoryHistory.map(function(r){return r.adventurersFledWithTreasure;})],victoryHistory.map(function(r){return String(r.seasonNumber);}),['#60a5fa','#94a3b8','#f97316','#ef4444'],'Adventurers'));AddLegend(body,[['Arrived','#60a5fa'],['Fled without treasure','#94a3b8'],['Fled injured','#f97316'],['Fled with treasure','#ef4444']]);}
+        if(kind==='food'){title.textContent='Detailed food economy';var fp=s.foodPlan||{},fauna=fp.captiveMacrofauna||{},grid=E('div','statGrid');[['Food produced',fauna.foodProduced||0],['Total demand',fp.totalDemand||0],['Consumed this season',(s.monsters||[]).filter(function(m){return m.owned;}).reduce(function(sum,m){return sum+(m.foodEatenThisSeason||0)+(m.foodBoughtThisSeason||0);},0)]].forEach(function(x){var tile=E('div','statTile');tile.appendChild(E('span','',x[0]));tile.appendChild(E('strong','',FormatNumber(x[1])));grid.appendChild(tile);});body.appendChild(grid);body.appendChild(E('h3','','Captive food populations'));(fauna.populations||[]).forEach(function(p){var row=E('div','iconRow');row.appendChild(E('span','statIcon',CaptiveAnimalIcon(p)));row.appendChild(E('div','',(p.displayName||p.species)+': '+FormatNumber(p.animals)+' animals, '+FormatNumber(p.foodProduced)+' food'));body.appendChild(row);});body.appendChild(E('h3','','Food consumed per monster'));var monsters=(s.monsters||[]).filter(function(m){return m.owned;});BarRows(body,monsters.map(function(m){return{label:'\ud83d\udc32 '+(m.name||'Monster'),value:(m.foodEatenThisSeason||0)+(m.foodBoughtThisSeason||0)};}),['#22c55e','#84cc16','#14b8a6','#0ea5e9']);}
+        if(kind==='treasure'){title.textContent='Treasure history and composition';var h=history.slice(0),currentBreakdown=s.treasureBreakdown||{};if(!h.some(function(r){return r.seasonNumber===s.seasonNumber;})){h.push({seasonNumber:s.seasonNumber,treasureRemainingValue:currentBreakdown.remainingAfterFoodValue!==undefined?currentBreakdown.remainingAfterFoodValue:(currentBreakdown.remaining&&currentBreakdown.remaining.totalValue||0),treasureSoldForFoodValue:currentBreakdown.foodExpenditureCredits||s.foodExpenditureCredits||0,treasureStolenValue:currentBreakdown.stolen&&currentBreakdown.stolen.totalValue||0});}body.appendChild(LineChart([h.map(function(r){return r.treasureRemainingValue;}),h.map(function(r){return r.treasureSoldForFoodValue;}),h.map(function(r){return r.treasureStolenValue;})],h.map(function(r){return String(r.seasonNumber);}),['#ca8a04','#7c3aed','#b91c1c'],'Treasure value'));AddLegend(body,[['Remaining','#ca8a04'],['Sold for food','#7c3aed'],['Stolen','#b91c1c']]);body.appendChild(E('h3','','Treasure by type'));var x=s.treasureBreakdown||{},types=x.remaining&&x.remaining.byType?x.remaining.byType:{};var tg=E('div','typeGrid');Object.keys(types).forEach(function(k){var r=types[k],tile=E('div','typeTile');tile.appendChild(E('strong','',r.displayName||k));var colour=E('div','typeColour');var treasureTypeColours={bronze:'#b87333',silver:'#c0c0c0',gold:'#d4af37',rubies:'#dc2626',emeralds:'#16a34a'};colour.style.background=treasureTypeColours[k]||'#ca8a04';tile.appendChild(colour);tile.appendChild(E('div','',FormatNumber(r.amount)+' units'));tile.appendChild(E('div','',FormatNumber(r.value)+' credits'));tg.appendChild(tile);});body.appendChild(tg);}
+        document.getElementById('statDetailOverlay').classList.remove('dialogHidden');document.getElementById('closeStatDetailButton').focus();}
+    function HideStatDetail(){document.getElementById('statDetailOverlay').classList.add('dialogHidden');}
+    function RenderRoundHistory(s){var body=document.getElementById('roundHistoryBody');body.innerHTML='';var h=CompletedRoundHistoryForSnapshot(s);if(!h.length){body.appendChild(E('p','detailMuted','No round has been completed yet.'));return;}var table=E('table','roundHistoryTable'),thead=document.createElement('thead'),hr=document.createElement('tr');['Round','State','Reason','Start','End','Stolen','Sold for food'].forEach(function(a){hr.appendChild(E('th','',a));});thead.appendChild(hr);table.appendChild(thead);var tb=document.createElement('tbody');h.forEach(function(r){var tr=document.createElement('tr'),state=r.winLossState||((r.endingTreasureValue||0)>0?'Win':'Loss');tr.appendChild(E('td','',FormatNumber(r.roundNumber||1)));var sc=E('td');sc.appendChild(E('span','roundResultBadge '+(state.toLowerCase()==='win'?'win':'loss'),state));tr.appendChild(sc);tr.appendChild(E('td','',r.reason||r.result||'Result unavailable'));tr.appendChild(E('td','',FormatNumber(r.startingTreasureValue||0)));tr.appendChild(E('td','',FormatNumber(r.endingTreasureValue||0)));tr.appendChild(E('td','',FormatNumber(r.treasureLostValue||0)));tr.appendChild(E('td','',FormatNumber(r.treasureSoldForFoodValue!==undefined?r.treasureSoldForFoodValue:r.foodExpenditureCredits||0)));tb.appendChild(tr);});table.appendChild(tb);body.appendChild(table);}
+    function ShowRoundHistory(){RenderRoundHistory(latestSnapshot||{});document.getElementById('roundHistoryOverlay').classList.remove('dialogHidden');document.getElementById('closeRoundHistoryButton').focus();}
+    function HideRoundHistory(){document.getElementById('roundHistoryOverlay').classList.add('dialogHidden');}
+    function UpdateTransportControls(s){var b=document.getElementById('playPauseButton'),paused=!!s.paused;b.setAttribute('aria-pressed',paused?'true':'false');b.setAttribute('aria-label',paused?'Play game':'Pause game');b.innerHTML=paused?'<span class="playSymbol" aria-hidden="true"></span>':'<span class="pauseSymbol" aria-hidden="true"><span></span><span></span></span>';}
+    function UpdateStatus(s){var mode=s.gameMode==='advancedCampaign'?'Advanced campaign':(s.gameMode==='campaign'?'Campaign':'Single round game');seasonDisplay.textContent=mode+' - Round '+(s.roundNumber||1)+' Season '+s.seasonNumber+' ('+SeasonNameForSnapshot(s)+')';UpdateTransportControls(s);RenderCampaignDashboard(s);}
     function BuildManagementRenderKey(s, monsters){
         var eggs =(s.management && s.management.eggs) || [];
         return [s.phase || 'raid',
@@ -23933,6 +23997,8 @@ button:hover {
             currentSnapshotTime = performance.now();
             latestSnapshot = currentSnapshot;
             UpdateStatus(latestSnapshot);
+            var completedRoundCount=CompletedRoundHistoryForSnapshot(latestSnapshot).length;
+            if(completedRoundCount>lastAutomaticallyShownRoundCount){lastAutomaticallyShownRoundCount=completedRoundCount;ShowRoundHistory();}
             if (latestSnapshot.phase==='management' && lastSnapshotPhase==='raid'){
                 managementDrawerVisible = true;
                 lastManagementRenderKey = '';
@@ -24167,18 +24233,13 @@ button:hover {
             UpdateManagementDrawer(latestSnapshot);
         }
     } );
-    document.getElementById('pauseButton').addEventListener('click', function (){
-        SendCommand('PAUSE_RAID');
-    } );
-    document.getElementById('resumeButton').addEventListener('click', function (){
-        SendCommand('RESUME_RAID');
-    } );
-    document.getElementById('harnessButton').addEventListener('click', function (){
-        SendCommand('RUN_HEADLESS_TESTS', {
-            seed : 100000,
-            count : 3
-        } );
-    } );
+    document.getElementById('playPauseButton').addEventListener('click',function(){SendCommand(latestSnapshot&&latestSnapshot.paused?'RESUME_RAID':'PAUSE_RAID');});
+    document.getElementById('fastForwardButton').addEventListener('click',function(){var b=this,on=b.getAttribute('aria-pressed')!=='true';b.setAttribute('aria-pressed',on?'true':'false');SendCommand('SET_SIMULATION_SPEED',{multiplier:on?4:1});});
+    document.getElementById('roundHistoryButton').addEventListener('click',ShowRoundHistory);
+    document.getElementById('closeRoundHistoryButton').addEventListener('click',HideRoundHistory);
+    document.getElementById('roundHistoryOverlay').addEventListener('click',function(e){if(e.target===e.currentTarget)HideRoundHistory();});
+    document.getElementById('closeStatDetailButton').addEventListener('click',HideStatDetail);
+    document.getElementById('statDetailOverlay').addEventListener('click',function(e){if(e.target===e.currentTarget)HideStatDetail();});
     startSeasonButton.addEventListener('click', function (){
         if (latestSnapshot && latestSnapshot.foodPlan && latestSnapshot.foodPlan.shortage>0){
             // The shortage dialogue is modal. Never put the world-generation overlay
