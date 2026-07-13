@@ -11969,41 +11969,79 @@ button:hover {
             this.roamTargetX = null;
             this.roamTargetY = null;
             this.roamRetargetTick = -1;
+            this.roamHeading = null;
+            this.roamVisitedCells = {};
             this.applyAgeEffects();
             this.behaviourState = this.alive ? 'captive' : 'dead';
+        }
+        roamingExplorationCellKey(x, y){
+            // Foraging memory is deliberately coarse and sparse. It represents
+            // recently searched feeding ground, not perfect knowledge of the map.
+            var cellSize = Math.max(TILE_SIZE * 5, 500);
+            return Math.floor(x / cellSize)+'_'+Math.floor(y / cellSize);
+        }
+        rememberRoamingGround(x, y){
+            if (!this.roamVisitedCells){
+                this.roamVisitedCells = {};
+            }
+            this.roamVisitedCells[this.roamingExplorationCellKey(x, y)] = true;
         }
         setNewRoamingTarget(raid){
             var margin = 95;
             var world = raid.world;
             var best = null;
+            var bestScore = -Infinity;
+            var previousHeading = Number.isFinite(this.roamHeading) ? this.roamHeading : raid.rng.range(-Math.PI, Math.PI);
+            this.rememberRoamingGround(this.x, this.y);
             for (var attempt = 0;
             attempt<24;
             attempt+=1){
-                var distance = raid.rng.range(180, 520);
-                var angle = raid.rng.range(-Math.PI, Math.PI);
+                // Most forage legs continue broadly forwards, as a searching animal
+                // tends to do. Occasional wide turns prevent a rigid patrol line.
+                var persistentTurn = raid.rng.range(-Math.PI * 0.38, Math.PI * 0.38);
+                var angle = raid.rng.nextFloat()<0.76 ? previousHeading+persistentTurn : raid.rng.range(-Math.PI, Math.PI);
                 if (this.x>world.width-70){
                     angle = Math.PI+raid.rng.range(-0.8, 0.8);
                 }
+                var distance = raid.rng.range(420, 1050);
                 var x = Clamp(this.x+Math.cos(angle) * distance, margin, world.width-margin);
                 var y = Clamp(this.y+Math.sin(angle) * distance, margin, world.height-margin);
-                if (!this.isInsideObstacle(world, x, y)){
+                if (this.isInsideObstacle(world, x, y)){
+                    continue;
+                }
+                var actualDistance = Distance(this.x, this.y, x, y);
+                if (actualDistance<180){
+                    continue;
+                }
+                var cellKey = this.roamingExplorationCellKey(x, y);
+                var newGroundBonus = this.roamVisitedCells[cellKey] ? 0 : 3.2;
+                var directionDifference = Math.abs(Math.atan2(Math.sin(angle-previousHeading), Math.cos(angle-previousHeading)));
+                var persistenceBonus = 1-directionDifference / Math.PI;
+                var edgeClearance = Math.min(x-margin, y-margin, world.width-margin-x, world.height-margin-y);
+                var edgePenalty = edgeClearance<180 ? (180-edgeClearance) / 90 : 0;
+                var score = newGroundBonus+persistenceBonus+actualDistance / 900-edgePenalty+raid.rng.range(0, 0.35);
+                if (score>bestScore){
+                    bestScore = score;
                     best = {
                         x : x,
-                        y : y
+                        y : y,
+                        heading : angle
                     } ;
-                    break;
                 }
             }
             if (!best){
                 for (var fallback = 0;
                 fallback<24;
                 fallback+=1){
-                    var fx = raid.rng.range(margin, world.width-margin);
-                    var fy = raid.rng.range(margin, world.height-margin);
-                    if (!this.isInsideObstacle(world, fx, fy)){
+                    var fallbackAngle = previousHeading+raid.rng.range(-Math.PI * 0.65, Math.PI * 0.65);
+                    var fallbackDistance = raid.rng.range(240, 620);
+                    var fx = Clamp(this.x+Math.cos(fallbackAngle) * fallbackDistance, margin, world.width-margin);
+                    var fy = Clamp(this.y+Math.sin(fallbackAngle) * fallbackDistance, margin, world.height-margin);
+                    if (!this.isInsideObstacle(world, fx, fy) && Distance(this.x, this.y, fx, fy)>=120){
                         best = {
                             x : fx,
-                            y : fy
+                            y : fy,
+                            heading : fallbackAngle
                         } ;
                         break;
                     }
@@ -12012,12 +12050,15 @@ button:hover {
             if (!best){
                 best = {
                     x : world.width * 0.5,
-                    y : world.height * 0.5
+                    y : world.height * 0.5,
+                    heading : Math.atan2(world.height * 0.5-this.y, world.width * 0.5-this.x)
                 } ;
             }
             this.roamTargetX = best.x;
             this.roamTargetY = best.y;
-            this.roamRetargetTick = raid.tickNumber+raid.rng.integer(105, 245);
+            this.roamHeading = best.heading;
+            this.rememberRoamingGround(best.x, best.y);
+            this.roamRetargetTick = raid.tickNumber+raid.rng.integer(150, 330);
         }
         chooseRoamingTarget(raid){
             if (this.roamTargetX===null || this.roamTargetY===null || this.stuckTicks>35 || raid.tickNumber>=this.roamRetargetTick || Distance(this.x, this.y, this.roamTargetX, this.roamTargetY)<70){
@@ -21741,14 +21782,15 @@ button:hover {
         ctx.restore();
     }
     function TreasurePileState(t){
-        var amount = Math.max(0, t.amountRemaining || 0);
-        var reference = Math.max(1, t.startingAmount || amount || 1);
-        var ratio = Math.max(0, Math.min(1, amount / reference));
+        var amount = Math.max(0, Number(t.amountRemaining) || 0);
+        // Pile geometry is based solely on the absolute number of treasure units.
+        // A pile therefore keeps the same apparent size when picked up and dropped,
+        // regardless of the originating deposit's former starting amount.
         if (amount<=0)return 0;
-        if (ratio<=0.2)return 1;
-        if (ratio<=0.4)return 2;
-        if (ratio<=0.62)return 3;
-        if (ratio<=0.82)return 4;
+        if (amount<=3)return 1;
+        if (amount<=8)return 2;
+        if (amount<=18)return 3;
+        if (amount<=39)return 4;
         return 5;
     }
     function TreasureAccentColour(t){
