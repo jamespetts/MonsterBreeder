@@ -1503,8 +1503,9 @@ button:hover {
             className : 'villager',
             displayName : 'villager',
             speedMin : 82,
-            speedMax : 108,
+            speedMax : 129.6,
             bodyPartHealth : 12,
+            bodyPartHealthMax : 14.4,
             carryCapacity : 15,
             courageMin : 0.68,
             courageMax : 1.18,
@@ -1515,12 +1516,12 @@ button:hover {
             perceptionMin : 0.12,
             perceptionMax : 0.48,
             strengthMin : 0.25,
-            strengthMax : 0.6,
+            strengthMax : 0.72,
             cautionMin : 0.1,
             cautionMax : 0.4,
             armour : 0,
             meleeDamageMin : 4,
-            meleeDamageMax : 9,
+            meleeDamageMax : 10,
             meleeHitChance : 0.42,
             canUseImprovisedWeapons : true,
             treasurePower : 3.9,
@@ -6638,7 +6639,8 @@ button:hover {
             this.displayName = profile.displayName || profile.className;
             this.armour = profile.armour || 0;
             this.weaponName = profile.weaponName || '';
-            this.bodyHealth = new BodyHealth(profile.bodyPartHealth);
+            var bodyPartHealth = Number.isFinite(profile.bodyPartHealthMax) ? rng.range(profile.bodyPartHealth, profile.bodyPartHealthMax) : profile.bodyPartHealth;
+            this.bodyHealth = new BodyHealth(bodyPartHealth);
             this.maxHealth = this.bodyHealth.maxTotal();
             this.health = this.bodyHealth.total();
             this.carryCapacity = profile.carryCapacity;
@@ -17863,6 +17865,14 @@ button:hover {
         } );
         knightRaid.resolveAdventurerMorale();
         AddRegressionResult(results, 'Knights ignore lower-class adventurer deaths in phase-2 morale', Math.abs(knightMorale.currentCourage-knightMorale.courage)<0.0001, 'base='+knightMorale.courage.toFixed(3)+', current='+knightMorale.currentCourage.toFixed(3));
+        var villagerRangeRng = new SeededRng(730119);
+        var villagerMinSpeed=Infinity, villagerMaxSpeed=-Infinity, villagerMinDefence=Infinity, villagerMaxDefence=-Infinity;
+        for(var villagerRangeIndex=0;villagerRangeIndex<20000;villagerRangeIndex+=1){
+            var rangedVillager=new Villager('villager_range_'+villagerRangeIndex,0,0,villagerRangeRng);
+            villagerMinSpeed=Math.min(villagerMinSpeed,rangedVillager.speed); villagerMaxSpeed=Math.max(villagerMaxSpeed,rangedVillager.speed);
+            villagerMinDefence=Math.min(villagerMinDefence,rangedVillager.bodyHealth.maxEach); villagerMaxDefence=Math.max(villagerMaxDefence,rangedVillager.bodyHealth.maxEach);
+        }
+        AddRegressionResult(results,'Villager capability upper bounds increase without changing lower bounds',ADVENTURER_PROFILE.villager.speedMin===82 && ADVENTURER_PROFILE.villager.speedMax===129.6 && ADVENTURER_PROFILE.villager.bodyPartHealth===12 && ADVENTURER_PROFILE.villager.bodyPartHealthMax===14.4 && ADVENTURER_PROFILE.villager.strengthMin===0.25 && ADVENTURER_PROFILE.villager.strengthMax===0.72 && ADVENTURER_PROFILE.villager.meleeDamageMin===4 && ADVENTURER_PROFILE.villager.meleeDamageMax===10,'speed='+villagerMinSpeed.toFixed(2)+'-'+villagerMaxSpeed.toFixed(2)+', defence='+villagerMinDefence.toFixed(2)+'-'+villagerMaxDefence.toFixed(2));
         AddRegressionResult(results, 'Adventurer morale ranges strongly favour brave single-monster sightings after courage rebalance', ADVENTURER_PROFILE.villager.courageMin>=0.68 && ADVENTURER_PROFILE.villager.courageMax>=1.18 && ADVENTURER_PROFILE.doubleVillager.courageMin<ADVENTURER_PROFILE.villager.courageMin && ADVENTURER_PROFILE.warrior.courageMin>=1.08 && ADVENTURER_PROFILE.knight.courageMax>=1.58, 'villager='+ADVENTURER_PROFILE.villager.courageMin+'-'+ADVENTURER_PROFILE.villager.courageMax+', doubleVillager='+ADVENTURER_PROFILE.doubleVillager.courageMin+'-'+ADVENTURER_PROFILE.doubleVillager.courageMax+', warrior='+ADVENTURER_PROFILE.warrior.courageMin+'-'+ADVENTURER_PROFILE.warrior.courageMax+', knightMax='+ADVENTURER_PROFILE.knight.courageMax);
         var closeMonsterFearForMinimumVillager = Clamp(0.62-ADVENTURER_PROFILE.villager.courageMin+0.02, 0, 0.74);
         var closeMonsterFearForMinimumDoubleVillager = Clamp(0.62-ADVENTURER_PROFILE.doubleVillager.courageMin+0.02, 0, 0.74);
