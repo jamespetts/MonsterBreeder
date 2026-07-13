@@ -5289,6 +5289,9 @@ button:hover {
             this.visionObstacleSpatialBins = {
             } ;
             this.maxVisionObstacleRadius = 0;
+            this.terrainObjectSpatialCellSize = 160;
+            this.terrainObjectSpatialBins = {};
+            this.maxTerrainObjectRadius = 0;
             this.navColsValue = Math.floor(this.width / NAV_CELL_SIZE)+1;
             this.navRowsValue = Math.floor(this.height / NAV_CELL_SIZE)+1;
             this.navTerrainTypes = [];
@@ -5301,6 +5304,7 @@ button:hover {
             this.assignStaticEntityTerrainHeights();
             this.buildObstacleSpatialIndex();
             this.buildVisionObstacleSpatialIndex();
+            this.buildTerrainObjectSpatialIndex();
             this.buildNavCellData();
         
         }
@@ -5361,6 +5365,21 @@ button:hover {
                 this.visionObstacleSpatialBins[key].push(obstacle);
             }
         }
+        buildTerrainObjectSpatialIndex(){
+            this.terrainObjectSpatialBins = {};
+            this.maxTerrainObjectRadius = 0;
+            for (var i = 0; i<this.terrainObjects.length; i+=1){
+                var object = this.terrainObjects[i];
+                this.maxTerrainObjectRadius = Math.max(this.maxTerrainObjectRadius, object.radius || 0);
+                var cx = Math.floor(object.x / this.terrainObjectSpatialCellSize);
+                var cy = Math.floor(object.y / this.terrainObjectSpatialCellSize);
+                var key = this.obstacleCellKey(cx, cy);
+                if (!this.terrainObjectSpatialBins[key]){
+                    this.terrainObjectSpatialBins[key] = [];
+                }
+                this.terrainObjectSpatialBins[key].push(object);
+            }
+        }
         visionObstacleIndexIsCurrent(){
             for (var i = 0;
             i<this.visionBlockingTerrainObjects.length;
@@ -5410,14 +5429,21 @@ button:hover {
         }
         getNearbyTerrainObjects(x, y, queryRadius){
             var radius = Math.max(0, queryRadius || 0);
-            var objects = this.terrainObjects || [];
+            var margin = radius+(this.maxTerrainObjectRadius || 0);
+            var minCx = Math.floor((x-margin) / this.terrainObjectSpatialCellSize);
+            var maxCx = Math.floor((x+margin) / this.terrainObjectSpatialCellSize);
+            var minCy = Math.floor((y-margin) / this.terrainObjectSpatialCellSize);
+            var maxCy = Math.floor((y+margin) / this.terrainObjectSpatialCellSize);
             var result = [];
-            for (var i = 0;
-            i<objects.length;
-            i+=1){
-                var object = objects[i];
-                if (Distance(x, y, object.x, object.y)<=radius+(object.radius || 0)){
-                    result.push(object);
+            for (var cx = minCx; cx<=maxCx; cx+=1){
+                for (var cy = minCy; cy<=maxCy; cy+=1){
+                    var objects = this.terrainObjectSpatialBins[this.obstacleCellKey(cx, cy)] || [];
+                    for (var i = 0; i<objects.length; i+=1){
+                        var object = objects[i];
+                        if (Distance(x, y, object.x, object.y)<=radius+(object.radius || 0)){
+                            result.push(object);
+                        }
+                    }
                 }
             }
             return result;
@@ -6033,6 +6059,9 @@ button:hover {
             this.pathTargetX = null;
             this.pathTargetY = null;
             this.pathRepathCooldownTicks = 0;
+            this.pathDirectCheckCooldownTicks = 0;
+            this.pathDirectClear = false;
+            this.pathDirectCheckCount = 0;
             this.pathFindCount = 0;
             this.stuckTicks = 0;
             this.alive = true;
@@ -6066,6 +6095,9 @@ button:hover {
             }
             if (this.pathRepathCooldownTicks>0){
                 this.pathRepathCooldownTicks-=1;
+            }
+            if (this.pathDirectCheckCooldownTicks>0){
+                this.pathDirectCheckCooldownTicks-=1;
             }
         }
         getMapBoundaryPolicy(){
@@ -6437,16 +6469,31 @@ button:hover {
             var intentChanged = this.pathIntentKey!==intentKey;
             var emergencyRepath = this.stuckTicks>=PATH_STUCK_REPATH_TICKS || this.nextWaypointIsBlocked(world);
             var canUseThrottle = this.pathRepathCooldownTicks>0 && !emergencyRepath && !hasNoPath;
-            if (this.segmentIsClear(world, this.x, this.y, tx, ty)){
-                this.path = [];
-                this.pathKey = intentKey;
-                this.pathIntentKey = intentKey;
-                this.pathTargetX = tx;
-                this.pathTargetY = ty;
+            // Whole-route clearance checks scale with target distance. Once a valid
+            // path exists, recheck for a direct shortcut periodically rather than on
+            // every tick. Intent changes, missing paths and emergencies still check
+            // immediately, so target response and obstacle recovery are unchanged.
+            var shouldCheckDirectPath = intentChanged || targetMovedEnough || emergencyRepath || this.pathDirectCheckCooldownTicks<=0 || (hasNoPath && !this.pathDirectClear);
+            if (!shouldCheckDirectPath && this.pathDirectClear){
                 this.moveToward(world, tx, ty, distance);
                 return;
             }
+            if (shouldCheckDirectPath){
+                this.pathDirectCheckCount+=1;
+                this.pathDirectCheckCooldownTicks = 15;
+                if (this.segmentIsClear(world, this.x, this.y, tx, ty)){
+                    this.path = [];
+                    this.pathKey = intentKey;
+                    this.pathIntentKey = intentKey;
+                    this.pathTargetX = tx;
+                    this.pathTargetY = ty;
+                    this.pathDirectClear = true;
+                    this.moveToward(world, tx, ty, distance);
+                    return;
+                }
+            }
             if (hasNoPath || emergencyRepath ||((intentChanged || targetMovedEnough) && !canUseThrottle)){
+                this.pathDirectClear = false;
                 this.path = this.findPath(world, tx, ty);
                 this.pathKey = intentKey;
                 this.pathIntentKey = intentKey;
@@ -6463,10 +6510,14 @@ button:hover {
             if (Distance(this.x, this.y, waypoint.x, waypoint.y)<PATH_REACHED_DISTANCE){
                 this.path.shift();
                 waypoint = this.path[0];
+                // A completed waypoint is a useful opportunity to discover whether
+                // the remaining destination has become directly reachable.
+                this.pathDirectCheckCooldownTicks = 0;
             }
             if (waypoint){
                 if (!this.segmentIsClear(world, this.x, this.y, waypoint.x, waypoint.y)){
                     this.path = [];
+                    this.pathDirectClear = false;
                     this.pathKey = '';
                     this.pathIntentKey = '';
                     this.pathRepathCooldownTicks = 0;
@@ -12023,7 +12074,7 @@ button:hover {
                 if (this.x>world.width-70){
                     angle = Math.PI+raid.rng.range(-0.8, 0.8);
                 }
-                var distance = raid.rng.range(420, 1050);
+                var distance = raid.rng.range(420, 780);
                 var x = Clamp(this.x+Math.cos(angle) * distance, margin, world.width-margin);
                 var y = Clamp(this.y+Math.sin(angle) * distance, margin, world.height-margin);
                 if (this.isInsideObstacle(world, x, y)){
@@ -13867,6 +13918,13 @@ button:hover {
         }
         resetAllOwnedForManagement(){
             this.updateFamilyTree();
+            this.recentCaptiveDeaths = this.ownedMonsters.filter(function (monster){
+                return !monster.alive && !monster.deployed;
+            } ).map(function (monster){
+                var snapshot = monster.getSnapshot();
+                snapshot.displaySeasonsRemaining = 1;
+                return snapshot;
+            } );
             this.ownedMonsters = this.ownedMonsters.filter(function (monster){
                 return monster.alive;
             } );
@@ -13983,6 +14041,7 @@ button:hover {
         }
         advanceLifecycleAfterSeason(rng, world, seasonNumber){
             var events = [];
+            this.recentCaptiveDeaths = [];
             this.ownedMonsters.forEach(function (monster){
                 if (!monster.alive){
                     return;
@@ -14073,6 +14132,7 @@ button:hover {
                     }
                     return snapshot;
                 } ),
+                recentCaptiveDeaths : (this.recentCaptiveDeaths || []).slice(0),
                 eggs : this.eggs.map(function (brood){
                     return { id:brood.id,motherId:brood.motherId,motherName:brood.motherName,fatherId:brood.fatherId,fatherName:brood.fatherName,seasonMated:brood.seasonMated,incubationSeasonsRemaining:brood.incubationSeasonsRemaining,clutchSize:brood.clutchSize,eggs:brood.eggs.map(function(egg){return egg.getSnapshot();}) };
                 } ),
@@ -16506,23 +16566,25 @@ button:hover {
     // ============================================================================
     // MODULE: HEADLESS HARNESS AND WORKER PROTOCOL
     // ============================================================================
-    function RunSingleHeadlessRaid(seed, maxTicks){
+    function RunSingleHeadlessRaid(seed, maxTicks, mapSizeKey){
         var session = new GameSession(seed, {
             mode : 'quick',
             worldOptions : {
-                mapSizeKey : 'legacy'
+                mapSizeKey : mapSizeKey || 'legacy'
             }
         } );
         var releaseResult = session.startSeason();
         var ticksRun = 0;
         var tickTimeTotalMs = 0;
         var maxTickTimeMs = 0;
+        var tickTimesMs = [];
         var finalSummary = null;
         while (session.currentRaid && !session.currentRaid.raidEnded && ticksRun<maxTicks){
             var startMs = Date.now();
             session.tick();
             var elapsedMs = Date.now()-startMs;
             tickTimeTotalMs+=elapsedMs;
+            tickTimesMs.push(elapsedMs);
             maxTickTimeMs = Math.max(maxTickTimeMs, elapsedMs);
             ticksRun+=1;
         }
@@ -16584,11 +16646,34 @@ button:hover {
             navBlockedCacheEntries : finalSummary.navBlockedCacheEntries || 0,
             obstacleSpatialBins : finalSummary.obstacleSpatialBins || 0,
             averageTickTimeMs : ticksRun>0 ? tickTimeTotalMs / ticksRun : 0,
+            percentile95TickTimeMs : tickTimesMs.length>0 ? tickTimesMs.slice(0).sort(function (a, b){ return a-b; })[Math.min(tickTimesMs.length-1, Math.floor(tickTimesMs.length * 0.95))] : 0,
             maxTickTimeMs : maxTickTimeMs,
+            mapSizeKey : mapSizeKey || 'legacy',
             roundEnded : session.roundEnded,
             roundResult : session.roundResult,
             consecutiveSeasonsWithNoReturningAdventurers : session.consecutiveSeasonsWithNoReturningAdventurers
         } ;
+    }
+    function RunLargeMapPerformanceTests(payload){
+        var options = payload || {};
+        var profiles = Array.isArray(options.mapSizeKeys) && options.mapSizeKeys.length>0 ? options.mapSizeKeys : ['standard', 'large', 'huge'];
+        var allowedProfiles = World.mapSizeProfiles();
+        profiles = profiles.filter(function (key){ return !!allowedProfiles[key]; });
+        var maxTicks = Number.isFinite(options.maxTicks) ? Math.max(30, Math.min(300, Math.floor(options.maxTicks))) : 90;
+        var seed = Number.isFinite(options.seed) ? Math.floor(options.seed) : 780031;
+        var averageBudgetMs = Number.isFinite(options.averageBudgetMs) ? Math.max(1, options.averageBudgetMs) : TICK_MS;
+        var results = [];
+        for (var i = 0; i<profiles.length; i+=1){
+            results.push(RunSingleHeadlessRaid(seed+i, maxTicks, profiles[i]));
+        }
+        return {
+            passed : results.length>0 && results.every(function (result){
+                return result.averageTickTimeMs<=averageBudgetMs;
+            }),
+            averageBudgetMs : averageBudgetMs,
+            maxTicks : maxTicks,
+            results : results
+        };
     }
     function AddRegressionResult(results, name, passed, details){
         results.push({
@@ -19146,6 +19231,12 @@ button:hover {
                     payload : RunHeadlessTests(command.payload)
                 } );
                 break;
+            case 'RUN_PERFORMANCE_TESTS' : Post({
+                    replyTo : command.messageId,
+                    type : 'PERFORMANCE_TEST_RESULTS',
+                    payload : RunLargeMapPerformanceTests(command.payload)
+                } );
+                break;
             default : Post({
                     replyTo : command.messageId,
                     type : 'COMMAND_REJECTED',
@@ -20962,6 +21053,13 @@ button:hover {
             card.appendChild(meta);
             rosterList.appendChild(card);
         } );
+        (management.recentCaptiveDeaths || []).forEach(function(monster){
+            var card=document.createElement('div'); card.className='monsterCard eggCard unhatched dead';
+            var header=document.createElement('div'); header.className='monsterCardHeader'; var name=document.createElement('span'); name.className='monsterCardName'; name.textContent=monster.name+' - died in captivity'; header.appendChild(name);
+            var icon=document.createElement('div'); icon.innerHTML=MonsterIconSvg(monster);
+            var meta=document.createElement('div'); meta.className='monsterCardMeta'; var state=document.createElement('span'); state.textContent=monster.observableCauseOfDeath ? 'Cause: '+monster.observableCauseOfDeath : 'Cause of death was not externally observable.'; meta.appendChild(state);
+            card.appendChild(header); card.appendChild(icon); card.appendChild(meta); rosterList.appendChild(card);
+        });
         (management.eggs||[]).forEach(function(brood){ (brood.eggs||[]).forEach(function(egg){
             var card=document.createElement('div'); card.className='monsterCard eggCard'+(egg.status!=='incubating'?' unhatched':'')+(egg.status==='cracked'?' cracked':'');
             var header=document.createElement('div'); header.className='monsterCardHeader'; var name=document.createElement('span'); name.className='monsterCardName'; name.textContent=egg.status==='incubating'?'Egg':(egg.status==='cracked'?'Cracked egg':'Unhatched egg'); header.appendChild(name);
