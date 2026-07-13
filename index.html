@@ -1399,15 +1399,17 @@ button:hover {
     var MONSTER_MOTHER_BREEDING_HOLD_SEASONS = 1;
     var MONSTER_CLUTCH_SIZE_MIN = 1;
     var MONSTER_CLUTCH_SIZE_MAX = 6;
-    // One year is four seasons. The current genetic/lifecycle target is an
-    // average life expectancy of about ten years, with noticeable weakening in
-    // the last two years for monsters that live that long. These values describe
-    // seasonal ageing, not an absolute calendar date, so exported/imported
-    // monsters can move between games without date-conversion problems.
+    // One year is four seasons. The lifecycle is calibrated to a population
+    // average lifespan of about six years. Noticeable weakening begins around
+    // four years, while monsters surviving beyond seven years are senescent.
+    // Old-age mortality uses a smooth Weibull survival curve rather than a hard
+    // maximum age, so exceptional longevity remains possible but increasingly rare.
     var MONSTER_SEASONS_PER_YEAR = 4;
-    var MONSTER_AGEING_START_SEASONS = 8 * MONSTER_SEASONS_PER_YEAR;
-    var MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS = 10 * MONSTER_SEASONS_PER_YEAR;
-    var MONSTER_SENESCENT_START_SEASONS = 12 * MONSTER_SEASONS_PER_YEAR;
+    var MONSTER_AGEING_START_SEASONS = 4 * MONSTER_SEASONS_PER_YEAR;
+    var MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS = 6 * MONSTER_SEASONS_PER_YEAR;
+    var MONSTER_SENESCENT_START_SEASONS = 7 * MONSTER_SEASONS_PER_YEAR;
+    var MONSTER_OLD_AGE_WEIBULL_SHAPE = 4;
+    var MONSTER_OLD_AGE_WEIBULL_SCALE_SEASONS = MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS / 0.906402477055477;
     var SOUND_LOUDNESS = {
         EXTREMELY_QUIET : 6000,
         VERY_QUIET : 12000,
@@ -9061,6 +9063,9 @@ button:hover {
             } ;
             var campaignRound = environment.campaignRound || 0;
             var earlyCampaign = campaignRound>0 && campaignRound<=2;
+            var subarcticContinental = !earlyCampaign && environment.climateClass!=='polar' &&
+                (environment.climateClass==='temperateContinental' || environment.climateClass==='continentalHighland') &&
+                (environment.temperature || 0.5)<0.38 && (environment.seasonalTemperatureAmplitudeC || 0)>=10;
             if (environment.climateClass==='tropicalRainforest' || environment.climateClass==='coastalTropical'){
                 var coastalTropical = environment.climateClass==='coastalTropical';
                 if (terrainType===TERRAIN_TYPE.FOREST){ weights.agouti=3.0; weights.monkey=2.0; weights.sloth=1.2; weights.pangolin=1.0; weights.peccary=1.4; weights.tapir=0.75; weights.cassowary=0.55; return weights; }
@@ -9100,6 +9105,7 @@ button:hover {
                 weights.hare = 6.0;
                 weights.fox = 0.45;
                 weights.deer = 0.20;
+                weights.reindeer = subarcticContinental ? 0.85 : 0;
                 weights.polarBear = !earlyCampaign && (environment.temperature || 0.5)<0.36 ? 0.06 : 0.012;
                 return weights;
             }
@@ -9107,12 +9113,14 @@ button:hover {
                 weights.hare = earlyCampaign ? 4.6 : 2.4;
                 weights.fox = 0.42;
                 weights.deer = earlyCampaign ? 0.28 : 0.45;
+                weights.reindeer = subarcticContinental ? 0.38 : 0;
                 weights.bear = !earlyCampaign && (environment.ruggedness || 0)>0.42 ? 0.035 : 0.008;
                 return weights;
             }
             weights.hare = earlyCampaign ? 5.0 : 2.8;
             weights.fox = earlyCampaign ? 1.15 : 0.85;
             weights.deer = earlyCampaign ? 0.55 : 1.10;
+            weights.reindeer = subarcticContinental ? 0.48 : 0;
             weights.boar = earlyCampaign ? 0.08 : ((environment.moisture || 0)>0.50 ? 0.30 : 0.08);
             return weights;
         } ,
@@ -11518,25 +11526,28 @@ button:hover {
                 return 1;
             }
             if (age<MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS){
-                return Clamp(1-(age-MONSTER_AGEING_START_SEASONS) / 8 * 0.15, 0.85, 1);
+                var matureSpan = Math.max(1, MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS-MONSTER_AGEING_START_SEASONS);
+                return Clamp(1-(age-MONSTER_AGEING_START_SEASONS) / matureSpan * 0.15, 0.85, 1);
             }
             if (age<MONSTER_SENESCENT_START_SEASONS){
-                return Clamp(0.85-(age-MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS) / 8 * 0.20, 0.65, 0.85);
+                var oldSpan = Math.max(1, MONSTER_SENESCENT_START_SEASONS-MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS);
+                return Clamp(0.85-(age-MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS) / oldSpan * 0.20, 0.65, 0.85);
             }
-            return Clamp(0.65-(age-MONSTER_SENESCENT_START_SEASONS) / 12 * 0.20, 0.45, 0.65);
+            var senescentSpan = Math.max(1, MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS * 0.5);
+            return Clamp(0.65-(age-MONSTER_SENESCENT_START_SEASONS) / senescentSpan * 0.20, 0.45, 0.65);
         }
         getOldAgeMortalityChance(){
             if (!this.alive || this.lifeStage!==MONSTER_LIFE_STAGE.ADULT){
                 return 0;
             }
-            var age = this.ageInSeasons || 0;
-            if (age<MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS){
-                return 0;
-            }
-            if (age<MONSTER_SENESCENT_START_SEASONS){
-                return Clamp(0.035+(age-MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS) * 0.018, 0.035, 0.18);
-            }
-            return Clamp(0.20+(age-MONSTER_SENESCENT_START_SEASONS) * 0.035, 0.20, 0.58);
+            var age = Math.max(1, this.ageInSeasons || 0);
+            var previousAge = Math.max(0, age-1);
+            var currentPower = Math.pow(age / MONSTER_OLD_AGE_WEIBULL_SCALE_SEASONS, MONSTER_OLD_AGE_WEIBULL_SHAPE);
+            var previousPower = Math.pow(previousAge / MONSTER_OLD_AGE_WEIBULL_SCALE_SEASONS, MONSTER_OLD_AGE_WEIBULL_SHAPE);
+            // This is the conditional chance of dying during the season, given
+            // survival to its start. Across a healthy population it produces a
+            // mean lifespan of approximately six years without a cliff edge.
+            return Clamp(1-Math.exp(-(currentPower-previousPower)), 0, 0.95);
         }
         applyAgeEffects(){
             this.ageCategory = this.getAgeCategory();
@@ -12608,12 +12619,13 @@ button:hover {
     }
     var MACROFAUNA_PROFILE = {
         deer : {
-            displayName : 'deer',
-            radius : 12,
-            speedMin : 118,
-            speedMax : 154,
-            health : 42,
-            foodValue : 10,
+            displayName : 'small deer',
+            radius : 10,
+            bodyMass : 24,
+            speedMin : 122,
+            speedMax : 160,
+            health : 30,
+            foodValue : 5,
             colour : '#8b5a2b',
             fleesHumans : true,
             humanFleeChance : 0.98,
@@ -12623,6 +12635,25 @@ button:hover {
             attackChance : 0,
             attackDamageMin : 0,
             attackDamageMax : 0
+        } ,
+        reindeer : {
+            displayName : 'reindeer',
+            radius : 15,
+            bodyMass : 115,
+            speedMin : 104,
+            speedMax : 138,
+            health : 72,
+            foodValue : 13,
+            colour : '#8a735c',
+            fleesHumans : true,
+            humanFleeChance : 0.94,
+            humanFear : 0.20,
+            humanThreatRange : 165,
+            attackHumans : false,
+            attackChance : 0,
+            attackDamageMin : 0,
+            attackDamageMax : 0,
+            habitat : 'subarctic'
         } ,
         fox : {
             displayName : 'fox',
@@ -12793,7 +12824,7 @@ button:hover {
             this.wanderTargetY = y;
             this.wanderHeading = rng.range(0, Math.PI * 2);
             this.wanderRetargetTicks = rng.integer(MACROFAUNA_WANDER_RETARGET_TICKS_MIN, MACROFAUNA_WANDER_RETARGET_TICKS_MAX);
-            this.perception = this.species==='hare' ? 0.72 : (this.species==='deer' ? 0.62 : 0.48);
+            this.perception = this.species==='hare' ? 0.72 : ((this.species==='deer' || this.species==='reindeer') ? 0.62 : 0.48);
             this.eyeHeight = this.species==='bear' || this.species==='walrus' ? 4 : 3;
             this.sightRange = 1100+this.perception * 700;
             this.hearingThreshold = DEFAULT_HEARING_THRESHOLD;
@@ -16167,6 +16198,9 @@ button:hover {
                 raidSnapshot.roundResult = this.roundResult;
                 raidSnapshot.latestRoundSummary = this.lastRaidSummary;
                 raidSnapshot.consecutiveSeasonsWithNoReturningAdventurers = this.consecutiveSeasonsWithNoReturningAdventurers;
+                raidSnapshot.consecutiveSeasonsWithNoReturningTreasure = this.consecutiveSeasonsWithNoReturningTreasure;
+                raidSnapshot.noReturningAdventurersWinTarget = SEASONS_WITH_NO_RETURNING_ADVENTURERS_TO_WIN_ROUND;
+                raidSnapshot.noReturningTreasureWinTarget = SEASONS_WITH_NO_RETURNING_TREASURE_TO_WIN_ROUND;
                 raidSnapshot.management = this.gameState.getManagementSnapshot();
                 raidSnapshot.foodPlan = this.getSeasonFoodPlan();
                 raidSnapshot.remains = this.roundRemains.slice(0);
@@ -16194,6 +16228,9 @@ button:hover {
                 roundResult : this.roundResult,
                 latestRoundSummary : this.lastRaidSummary,
                 consecutiveSeasonsWithNoReturningAdventurers : this.consecutiveSeasonsWithNoReturningAdventurers,
+                consecutiveSeasonsWithNoReturningTreasure : this.consecutiveSeasonsWithNoReturningTreasure,
+                noReturningAdventurersWinTarget : SEASONS_WITH_NO_RETURNING_ADVENTURERS_TO_WIN_ROUND,
+                noReturningTreasureWinTarget : SEASONS_WITH_NO_RETURNING_TREASURE_TO_WIN_ROUND,
                 treasures : treasureSnapshots,
                 treasureDeposits : treasureSnapshots,
                 treasureBreakdown : this.world.getTreasureBreakdown(),
@@ -16753,7 +16790,12 @@ button:hover {
             ageInSeasons : MONSTER_SENESCENT_START_SEASONS+8
         } );
         senescentMonster.applyAgeEffects();
-        AddRegressionResult(results, 'Senescent monsters carry a substantial but non-certain old-age mortality risk', senescentMonster.getOldAgeMortalityChance()>0.35 && senescentMonster.getOldAgeMortalityChance()<0.60, 'risk='+senescentMonster.getOldAgeMortalityChance().toFixed(3));
+        AddRegressionResult(results, 'Senescent monsters carry a substantial but non-certain old-age mortality risk', senescentMonster.getOldAgeMortalityChance()>0.15 && senescentMonster.getOldAgeMortalityChance()<0.60, 'risk='+senescentMonster.getOldAgeMortalityChance().toFixed(3));
+        var expectedOldAgeLifeSeasons = 0;
+        for (var survivalAge=0; survivalAge<MONSTER_SEASONS_PER_YEAR * 30; survivalAge+=1){
+            expectedOldAgeLifeSeasons+=Math.exp(-Math.pow(survivalAge / MONSTER_OLD_AGE_WEIBULL_SCALE_SEASONS, MONSTER_OLD_AGE_WEIBULL_SHAPE));
+        }
+        AddRegressionResult(results, 'Old-age mortality is calibrated to an average lifespan of about six years', Math.abs(expectedOldAgeLifeSeasons / MONSTER_SEASONS_PER_YEAR-6)<=0.25, 'years='+(expectedOldAgeLifeSeasons / MONSTER_SEASONS_PER_YEAR).toFixed(3));
         var performanceMonster = new Monster('performance_regression', RIGHT_EDGE_X, 260, new SeededRng(7112), {
             owned : true,
             sex : MONSTER_SEX.MALE,
@@ -17987,6 +18029,11 @@ button:hover {
         }
         AddRegressionResult(results, 'Early campaign climate has no mild hard-coded temperature band', Math.min.apply(null, variedEarlyTemperatures)<0.40 && Math.max.apply(null, variedEarlyTemperatures)>0.70, 'range='+Math.min.apply(null, variedEarlyTemperatures).toFixed(3)+'-'+Math.max.apply(null, variedEarlyTemperatures).toFixed(3));
         AddRegressionResult(results, 'Wild ecological unit has a hard minimum resident capacity of one', Raid.prototype.estimateWildMonsterCapacity.call({world:session.world,gameState:session.gameState})>=1, 'capacity='+Raid.prototype.estimateWildMonsterCapacity.call({world:session.world,gameState:session.gameState}).toFixed(2));
+        var smallDeerProfile = MACROFAUNA_PROFILE.deer;
+        AddRegressionResult(results, 'Ordinary deer are small roe/muntjac-scale prey', smallDeerProfile.bodyMass>=18 && smallDeerProfile.bodyMass<=35 && smallDeerProfile.foodValue<=6, 'mass='+smallDeerProfile.bodyMass+', food='+smallDeerProfile.foodValue);
+        var subarcticWeights = MonsterMetabolismSystem.macrofaunaSpeciesWeightsForTerrain({ environment : { climateClass : 'temperateContinental', temperature : 0.30, seasonalTemperatureAmplitudeC : 13, campaignRound : 4 } }, TERRAIN_TYPE.TUNDRA);
+        var earlySubarcticWeights = MonsterMetabolismSystem.macrofaunaSpeciesWeightsForTerrain({ environment : { climateClass : 'temperateContinental', temperature : 0.30, seasonalTemperatureAmplitudeC : 13, campaignRound : 2 } }, TERRAIN_TYPE.TUNDRA);
+        AddRegressionResult(results, 'Reindeer occur only in cold continental non-early campaign ecology', (subarcticWeights.reindeer || 0)>0 && !(earlySubarcticWeights.reindeer>0), 'later='+(subarcticWeights.reindeer || 0)+', early='+(earlySubarcticWeights.reindeer || 0));
         var coolDesertWeights = MonsterMetabolismSystem.macrofaunaSpeciesWeightsForTerrain({ environment : { temperature : 0.35, campaignRound : 4 } }, TERRAIN_TYPE.DESERT);
         var hotDesertWeights = MonsterMetabolismSystem.macrofaunaSpeciesWeightsForTerrain({ environment : { temperature : 0.80, campaignRound : 4 } }, TERRAIN_TYPE.DESERT);
         AddRegressionResult(results, 'Cool and hot deserts have distinct small-prey ecology', coolDesertWeights.hare>hotDesertWeights.hare && coolDesertWeights.fox>hotDesertWeights.fox, 'cool='+JSON.stringify(coolDesertWeights)+', hot='+JSON.stringify(hotDesertWeights));
@@ -19736,6 +19783,8 @@ button:hover {
         'Biome: '+FormatBiomeType(s.biomeType),
         'Temperature: '+FormatTemperatureForSnapshot(s),
         'Result: '+s.raidResult,
+        'No adventurer returned alive: '+FormatNumber(s.consecutiveSeasonsWithNoReturningAdventurers || 0)+' / '+FormatNumber(s.noReturningAdventurersWinTarget || 4)+' rounds ('+Math.round(100 * (s.consecutiveSeasonsWithNoReturningAdventurers || 0) / Math.max(1, s.noReturningAdventurersWinTarget || 4))+'% of win requirement)',
+        'No adventurer returned with treasure: '+FormatNumber(s.consecutiveSeasonsWithNoReturningTreasure || 0)+' / '+FormatNumber(s.noReturningTreasureWinTarget || 12)+' rounds ('+Math.round(100 * (s.consecutiveSeasonsWithNoReturningTreasure || 0) / Math.max(1, s.noReturningTreasureWinTarget || 12))+'% of win requirement)',
         'Treasure deposits remaining: '+tr+' / '+s.treasures.length,
         'Active adventurers: '+adv,
         'Captive monsters: '+owned.length+'  Deployed: '+deployed+'  Wild: '+wild,
@@ -22521,7 +22570,8 @@ button:hover {
     }
     function MacrofaunaVectorProfile(species){
         var profiles={
-            deer:{family:'ungulate',scale:0.72,bodyLength:31,bodyDepth:12,legLength:25,neck:18,headLength:12,ear:8,tail:7,antlers:true},
+            deer:{family:'ungulate',scale:0.54,bodyLength:27,bodyDepth:10,legLength:22,neck:14,headLength:10,ear:8,tail:6,antlers:true},
+            reindeer:{family:'ungulate',scale:0.78,bodyLength:34,bodyDepth:15,legLength:27,neck:19,headLength:13,ear:7,tail:7,antlers:true},
             fox:{family:'canid',scale:0.56,bodyLength:29,bodyDepth:10,legLength:17,neck:7,headLength:15,ear:10,tail:28,whiteTip:true},
             boar:{family:'boar',scale:0.72,bodyLength:32,bodyDepth:17,legLength:13,neck:6,headLength:17,ear:6,tail:5,tusks:true},
             peccary:{family:'boar',scale:0.58,bodyLength:29,bodyDepth:15,legLength:12,neck:5,headLength:15,ear:6,tail:3},
