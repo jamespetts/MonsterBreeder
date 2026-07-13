@@ -4843,6 +4843,11 @@ button:hover {
             if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)){
                 return false;
             }
+            var width = World.mapWidthForGrid(grid);
+            var height = World.mapHeightForGrid(grid);
+            if (point.x<0 || point.y<0 || point.x>width || point.y>height){
+                return false;
+            }
             var terrainType = grid.getTerrainTypeAtWorld(point.x, point.y);
             if (terrainType===TERRAIN_TYPE.LAKE || terrainType===TERRAIN_TYPE.STREAM){
                 return false;
@@ -5258,6 +5263,15 @@ button:hover {
             this.distanceToSettlementMiles = distanceToSettlementMiles;
             this.terrainObjects = terrainObjects;
             this.treasureDeposits = treasureDeposits;
+            // Treasure must remain physical map state. This also repairs legacy save
+            // data containing a dropped pile recorded just beyond an escape edge.
+            for (var treasureIndex = 0;
+            treasureIndex<this.treasureDeposits.length;
+            treasureIndex+=1){
+                var boundedTreasure = this.treasureDeposits[treasureIndex];
+                boundedTreasure.x = Clamp(boundedTreasure.x, boundedTreasure.radius || 20, this.width-(boundedTreasure.radius || 20));
+                boundedTreasure.y = Clamp(boundedTreasure.y, boundedTreasure.radius || 20, this.height-(boundedTreasure.radius || 20));
+            }
             this.adventurerEntryEdge = adventurerEntryEdge || DEFAULT_ADVENTURER_ENTRY_EDGE;
             this.foodExpenditureCredits = 0;
             this.treasureSoldForFoodValue = 0;
@@ -7138,7 +7152,10 @@ button:hover {
             if (!this.carryingTreasure || this.carryingAmount<=0){
                 return;
             }
-            var dropped = new DroppedTreasure('dropped_'+raid.nextDroppedTreasureId, this.x, this.y, this.carryingTreasureType, this.carryingAmount, this.id);
+            var dropRadius = 12;
+            var dropX = Clamp(this.x, dropRadius, raid.world.width-dropRadius);
+            var dropY = Clamp(this.y, dropRadius, raid.world.height-dropRadius);
+            var dropped = new DroppedTreasure('dropped_'+raid.nextDroppedTreasureId, dropX, dropY, this.carryingTreasureType, this.carryingAmount, this.id);
             if (raid.world && raid.world.terrainGrid && raid.world.terrainGrid.getHeightAtWorld){
                 dropped.terrainHeight = raid.world.terrainGrid.getHeightAtWorld(dropped.x, dropped.y);
             }
@@ -7259,7 +7276,10 @@ button:hover {
                 return;
             }
             var excess = this.carryingAmount-capacity;
-            var dropped = new DroppedTreasure('dropped_'+raid.nextDroppedTreasureId, this.x, this.y, this.carryingTreasureType, excess, this.id);
+            var dropRadius = 12;
+            var dropX = Clamp(this.x, dropRadius, raid.world.width-dropRadius);
+            var dropY = Clamp(this.y, dropRadius, raid.world.height-dropRadius);
+            var dropped = new DroppedTreasure('dropped_'+raid.nextDroppedTreasureId, dropX, dropY, this.carryingTreasureType, excess, this.id);
             dropped.terrainHeight = raid.world.terrainGrid.getHeightAtWorld(dropped.x, dropped.y);
             raid.droppedTreasure.push(dropped);
             raid.nextDroppedTreasureId+=1;
@@ -14576,8 +14596,12 @@ button:hover {
                 if ((drop.amountRemaining || 0)<=0){
                     continue;
                 }
-                var deposit = new TreasureDeposit('recovered_'+this.seasonNumber+'_'+(i+1), drop.x, drop.y, drop.treasureType, drop.amountRemaining);
+                var depositRadius = 20;
+                var recoveredX = Clamp(drop.x, depositRadius, this.world.width-depositRadius);
+                var recoveredY = Clamp(drop.y, depositRadius, this.world.height-depositRadius);
+                var deposit = new TreasureDeposit('recovered_'+this.seasonNumber+'_'+(i+1), recoveredX, recoveredY, drop.treasureType, drop.amountRemaining);
                 deposit.startingAmount = 0;
+                deposit.terrainHeight = this.world.terrainGrid.getHeightAtWorld(recoveredX, recoveredY);
                 this.world.treasureDeposits.push(deposit);
                 recoveredCount+=drop.amountRemaining;
                 drop.amountRemaining = 0;
