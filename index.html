@@ -7582,6 +7582,21 @@ button:hover {
             } ;
             return new MonsterDisease(definition, snapshot.severity, snapshot.durationSeasons);
         } ,
+        observableDeathCauseForDisease : function (disease){
+            // Cause labels describe what a capable keeper could establish from
+            // outward symptoms and an ordinary examination of the body. They must
+            // not reveal the simulation's hidden medical diagnosis.
+            var observations = {
+                adiposeFever : 'Fever with severe swelling',
+                wastingChill : 'Severe wasting and cold weakness',
+                congenitalMuscleWasting : 'Severe wasting since youth',
+                brittleBoneSyndrome : 'Multiple fractures and a malformed skeleton',
+                overmuscleStrain : 'Severe muscular injuries',
+                reproductiveTumour : 'A large reproductive tumour',
+                giantGrowthFailure : 'Failure to thrive during growth'
+            };
+            return disease && observations[disease.id] ? observations[disease.id] : 'Unknown illness';
+        },
         activeDiseases : function (monster){
             return(monster && monster.diseases ? monster.diseases : []).filter(function (disease){
                 return disease && disease.durationSeasons>0 && disease.severity>0;
@@ -7714,8 +7729,12 @@ button:hover {
                     monster.selectedForDeployment = false;
                     monster.corpseState = 'corpse';
                     monster.behaviourState = 'dead';
+                    // The lair can examine the body after death, so the active
+                    // fatal disease is an observable cause even when no event list
+                    // was requested by the caller.
+                    monster.observableCauseOfDeath = this.observableDeathCauseForDisease(disease);
                     if (events){
-                        monster.observableCauseOfDeath=disease.displayName; events.push(monster.name+' died from '+disease.displayName+'.');
+                        events.push(monster.name+' died after showing '+monster.observableCauseOfDeath.toLowerCase()+'.');
                     }
                 }
             } );
@@ -7949,6 +7968,7 @@ button:hover {
                 if (rng.nextFloat()<0.18){
                     monster.alive = false;
                     monster.behaviourState = 'dead';
+                    monster.observableCauseOfDeath = 'Malnutrition';
                     return {
                         state : monster.nutritionState,
                         died : true
@@ -7961,6 +7981,7 @@ button:hover {
             }
             monster.nutritionState = NUTRITION_STATE.STARVED;
             monster.alive = false;
+            monster.observableCauseOfDeath = 'Starvation';
             if (monster.bodyHealth){
                 monster.bodyHealth.head = 0;
             }
@@ -12766,6 +12787,10 @@ button:hover {
                 this.alive = false;
                 this.corpseState = 'corpse';
                 this.behaviourState = 'dead';
+                // Fatal raid injuries are externally visible. Preserve a specific
+                // exhaustion cause for self-inflicted over-pursuit damage; all other
+                // fatal damage is reported as injuries sustained during the raid.
+                this.observableCauseOfDeath = attacker===this ? 'Fatal exhaustion' : 'Injuries sustained during the raid';
                 if (raid){
                     raid.addSound('monsterKilled', attacker || this, this.x, this.y, SOUND_LOUDNESS.VERY_LOUD, SOUND_DEFAULT_DURATION_TICKS, {
                         victimId : this.id,
@@ -12797,6 +12822,9 @@ button:hover {
             s.hearingThreshold = this.hearingThreshold;
             s.selectedForDeployment = this.selectedForDeployment;
             s.deployed = this.deployed;
+            // Death cards are built from snapshots after the raid. Preserve the
+            // keeper-observable cause set by fatal damage, disease or nutrition.
+            s.observableCauseOfDeath = this.observableCauseOfDeath || '';
             s.overallConditionPercent = Math.round(this.getOverallConditionRatio() * 100);
             s.bodyHealth = this.bodyHealth.getSnapshot();
             s.bodyScale = this.bodyScale || 1;
@@ -20315,6 +20343,19 @@ button:hover {
         }
         return monster.sex==='female' ? 'female' : 'male';
     }
+    function LowTechCauseOfDeathLabel(cause){
+        var technicalCauseLabels = {
+            'Adipose fever' : 'Fever with severe swelling',
+            'Wasting chill' : 'Severe wasting and cold weakness',
+            'Congenital muscle wasting' : 'Severe wasting since youth',
+            'Brittle bone syndrome' : 'Multiple fractures and a malformed skeleton',
+            'Over-muscle strain' : 'Severe muscular injuries',
+            'Reproductive tumour' : 'A large reproductive tumour',
+            'Giant growth failure' : 'Failure to thrive during growth',
+            'Cardiac disorder' : 'Unknown illness'
+        };
+        return technicalCauseLabels[cause] || cause || 'Unknown cause';
+    }
     function MonsterAgeLabel(monster){
         var seasons = Math.max(0, Math.floor(monster && monster.ageInSeasons || 0));
         var years = Math.floor(seasons / 4);
@@ -21061,7 +21102,7 @@ button:hover {
             name.textContent=monster.name+(diedDuringRaid ? ' - died during the raid' : ' - died in captivity'); header.appendChild(name);
             var icon=document.createElement('div'); icon.innerHTML=MonsterIconSvg(monster);
             var meta=document.createElement('div'); meta.className='monsterCardMeta'; var state=document.createElement('span');
-            var causeOfDeathText = monster.observableCauseOfDeath ? 'Cause: '+monster.observableCauseOfDeath : (diedDuringRaid ? 'Killed during the raid; the precise cause was not recorded.' : 'Cause of death was not externally observable.');
+            var causeOfDeathText = 'Observed cause: '+LowTechCauseOfDeathLabel(monster.observableCauseOfDeath);
             state.textContent='Age at death: '+MonsterAgeLabel(monster)+' | '+causeOfDeathText; meta.appendChild(state);
             card.appendChild(header); card.appendChild(icon); card.appendChild(meta); rosterList.appendChild(card);
         });
