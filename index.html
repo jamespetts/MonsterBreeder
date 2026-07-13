@@ -13919,9 +13919,13 @@ button:hover {
         resetAllOwnedForManagement(){
             this.updateFamilyTree();
             this.recentCaptiveDeaths = this.ownedMonsters.filter(function (monster){
-                return !monster.alive && !monster.deployed;
+                return !monster.alive;
             } ).map(function (monster){
                 var snapshot = monster.getSnapshot();
+                // Capture deployment status before resetForManagement changes it.
+                // This lets the next management season distinguish raid losses from
+                // deaths that occurred while the monster remained in captivity.
+                snapshot.deathContext = monster.deployed ? 'raid' : 'captivity';
                 snapshot.displaySeasonsRemaining = 1;
                 return snapshot;
             } );
@@ -21055,9 +21059,13 @@ button:hover {
         } );
         (management.recentCaptiveDeaths || []).forEach(function(monster){
             var card=document.createElement('div'); card.className='monsterCard eggCard unhatched dead';
-            var header=document.createElement('div'); header.className='monsterCardHeader'; var name=document.createElement('span'); name.className='monsterCardName'; name.textContent=monster.name+' - died in captivity'; header.appendChild(name);
+            var header=document.createElement('div'); header.className='monsterCardHeader'; var name=document.createElement('span'); name.className='monsterCardName';
+            var diedDuringRaid = monster.deathContext==='raid';
+            name.textContent=monster.name+(diedDuringRaid ? ' - died during the raid' : ' - died in captivity'); header.appendChild(name);
             var icon=document.createElement('div'); icon.innerHTML=MonsterIconSvg(monster);
-            var meta=document.createElement('div'); meta.className='monsterCardMeta'; var state=document.createElement('span'); state.textContent=monster.observableCauseOfDeath ? 'Cause: '+monster.observableCauseOfDeath : 'Cause of death was not externally observable.'; meta.appendChild(state);
+            var meta=document.createElement('div'); meta.className='monsterCardMeta'; var state=document.createElement('span');
+            var causeOfDeathText = monster.observableCauseOfDeath ? 'Cause: '+monster.observableCauseOfDeath : (diedDuringRaid ? 'Killed during the raid; the precise cause was not recorded.' : 'Cause of death was not externally observable.');
+            state.textContent='Age at death: '+MonsterAgeLabel(monster)+' | '+causeOfDeathText; meta.appendChild(state);
             card.appendChild(header); card.appendChild(icon); card.appendChild(meta); rosterList.appendChild(card);
         });
         (management.eggs||[]).forEach(function(brood){ (brood.eggs||[]).forEach(function(egg){
