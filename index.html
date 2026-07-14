@@ -1192,7 +1192,7 @@ button:hover {
 #roundHistoryOutcome{margin:.35rem 0 1rem;font-size:clamp(2.4rem,7vw,5.2rem);font-weight:1000;line-height:1;text-align:center;text-transform:uppercase;letter-spacing:.05em}#roundHistoryOutcome.victory{color:#86efac}#roundHistoryOutcome.loss{color:#fca5a5}.roundHistoryTable tr.mostRecentRound{background:#263449;outline:2px solid #f2c14e;outline-offset:-2px}.roundHistoryTable tr.mostRecentRound td{font-weight:800}
 
 /* Monster management layout correction: raid and between-season views share the same usable height. */
-#managementDrawer,#managementDrawer.raidDrawer{max-height:min(72%,calc(100% - 1.5rem))!important}
+#managementDrawer,#managementDrawer.raidDrawer{height:min(72%,calc(100% - 1.5rem))!important;max-height:min(72%,calc(100% - 1.5rem))!important}
 #managementBody{min-height:0!important;overflow:hidden!important}
 #cageViewport,#selectedMonsterPanel{min-height:0!important;height:100%!important;overflow-y:auto!important;overflow-x:hidden!important;scrollbar-gutter:stable}
 #selectedMonsterPanel{align-content:start!important}
@@ -1203,6 +1203,27 @@ button:hover {
 .monsterPortraitName{font-size:.74rem!important;line-height:1.05!important}
 .monsterPortraitStatus{font-size:.64rem!important;line-height:1.08!important;min-height:2.15em!important;padding:.04rem .1rem!important;overflow-wrap:anywhere}
 .monsterPortraitGrid{gap:.32rem!important}
+
+/* The compact roster visual row is 58px high. Reduce eggs only enough to fit,
+   including their border, without changing monster portraits or card spacing. */
+.monsterPortrait.egg .eggVisual{min-height:0!important;height:58px!important}
+.monsterPortrait.egg .eggShape{width:42px!important;height:52px!important;border-width:2px!important}
+
+.eggShape.cracked,.monsterPortrait.egg .eggShape.cracked{
+    background:linear-gradient(115deg,transparent 47%,#5b4633 48% 52%,transparent 53%),radial-gradient(circle at 34% 28%,#eee 0 10%,#bbb 48%,#777 100%)!important;
+}
+
+/* Keep the whole Deploy box as one reliable hit target and prevent its contents
+   from becoming the start of a breeding drag gesture. */
+.portraitDeployControl {
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+}
+.portraitDeployControl input,
+.portraitDeployControl span {
+    pointer-events: none;
+}
 </style>
 </head>
 <body>
@@ -1243,7 +1264,7 @@ button:hover {
 </aside>
 </div>
 <div id="managementActions"><div id="exportModeBar" class="exportModeBar hidden"><span id="exportModeStatus">Select monsters to export from the roster.</span><button id="confirmRosterExportButton" type="button" disabled>Export selected</button><button id="cancelRosterExportButton" type="button">Cancel</button></div>
-<button id="openMonsterTransferButton" type="button">Import / Export Monsters</button>
+<button id="openMonsterTransferButton" type="button">Import Monsters</button><input id="managementMonsterImportFile" type="file" accept="application/json,.json" multiple hidden>
 
 <span id="managementHint" class="hint">
 </span>
@@ -1363,30 +1384,6 @@ button:hover {
 <button id="cancelFoodShortageButton" type="button">Cancel</button>
 <button id="startUnderfedSeasonButton" type="button">Sell selected treasure and start season</button>
 </div>
-</div>
-</div>
-<div id="monsterTransferOverlay" class="dialogHidden" role="dialog" aria-modal="true" aria-labelledby="monsterTransferTitle">
-<div id="monsterTransferPanel">
-<h2 id="monsterTransferTitle">Import Monsters</h2>
-<p>Import complete versioned Monster Breeder records. Import is available only where the current game mode permits it and only between seasons.</p>
-<div class="monsterTransferGrid">
-<section id="monsterExportSection" class="monsterTransferSection">
-<h3>Export monsters</h3>
-<div id="monsterExportToolbar"><button id="selectAllMonsterExportsButton" type="button">Select all</button> <button id="clearMonsterExportsButton" type="button">Clear</button></div>
-<div id="monsterExportList" class="monsterExportList" role="group" aria-label="Monsters to export"></div>
-<button id="exportMonsterButton" type="button">Export selected monsters</button>
-<p id="monsterExportAvailabilityMessage">Select one or more monsters, then choose a destination folder.</p>
-</section>
-<section id="monsterImportSection" class="monsterTransferSection">
-<h3>Import monsters</h3>
-<label for="monsterImportFile">Choose one or more monster JSON files</label>
-<input id="monsterImportFile" type="file" accept="application/json,.json" multiple>
-<p>Choosing files immediately starts the import; no second button is required.</p>
-<p id="monsterImportAvailabilityMessage">The imported monster receives a new local identity, retaining its genome, age, health, fertility, pedigree summary and appearance-generating state.</p>
-</section>
-</div>
-<p id="monsterTransferStatus" aria-live="assertive"></p>
-<div id="monsterTransferActions"><button id="closeMonsterTransferButton" type="button">Return to Monster Management</button></div>
 </div>
 </div>
 <div id="saveLoadOverlay" class="dialogHidden" role="dialog" aria-modal="true" aria-labelledby="saveLoadTitle">
@@ -6958,6 +6955,19 @@ button:hover {
             this.carryingTreasure = false;
             this.carryingTreasureType = null;
             this.targetTreasureId = null;
+            this.treasureCollectionTargetId = null;
+            this.treasureCollectionTicksRemaining = 0;
+            var collectionSecondsByClass = {
+                explorer : 2.65,
+                warrior : 3.65,
+                knight : 4.35,
+                villager : 5.20,
+                doubleVillager : 6.15
+            };
+            var collectionBaseline = collectionSecondsByClass[this.className] || collectionSecondsByClass.villager;
+            var collectionVariation = ((rng.nextFloat()+rng.nextFloat()+rng.nextFloat()) / 3-0.5) * 2.4;
+            this.treasureCollectionSeconds = Clamp(collectionBaseline+collectionVariation, 2, 7);
+            this.treasureCollectionDurationTicks = Math.max(Math.round(2 / TICK_DT), Math.min(Math.round(7 / TICK_DT), Math.round(this.treasureCollectionSeconds / TICK_DT)));
             this.entryEdge = DEFAULT_ADVENTURER_ENTRY_EDGE;
             this.entryX = x;
             this.entryY = y;
@@ -7169,6 +7179,9 @@ button:hover {
             }
             this.updateMountedState(raid);
             this.tryPickupImprovisedWeapon(raid);
+            if (this.continueTreasureCollection(raid)){
+                return;
+            }
             var target = this.chooseTreasure(raid);
             this.targetTreasureId = target ? target.id : null;
             if (!target){
@@ -7179,8 +7192,45 @@ button:hover {
             this.behaviourState = 'seekingTreasure';
             this.moveWithPath(raid.world, target.x, target.y, this.speed * this.bodyHealth.movementMultiplier() * TICK_DT, this.id+'_'+target.id);
             if (this.distanceTo(target)<24){
-                this.collectTreasure(raid, target);
+                this.beginTreasureCollection(target);
             }
+        }
+        beginTreasureCollection(treasure){
+            if (!treasure || this.treasureCollectionTargetId===treasure.id){
+                return;
+            }
+            this.treasureCollectionTargetId = treasure.id;
+            this.treasureCollectionTicksRemaining = this.treasureCollectionDurationTicks;
+            this.behaviourState = 'collectingTreasure';
+        }
+        findTreasureById(raid, treasureId){
+            var candidates = raid.world.treasureDeposits.concat(raid.droppedTreasure);
+            for (var i=0; i<candidates.length; i+=1){
+                if (candidates[i].id===treasureId){
+                    return candidates[i];
+                }
+            }
+            return null;
+        }
+        continueTreasureCollection(raid){
+            if (!this.treasureCollectionTargetId){
+                return false;
+            }
+            var treasure = this.findTreasureById(raid, this.treasureCollectionTargetId);
+            var amountRemaining = treasure ? (treasure.amountRemaining!==undefined ? treasure.amountRemaining : treasure.amount) : 0;
+            if (!treasure || amountRemaining<=0 || this.distanceTo(treasure)>=ADVENTURER_PICKUP_RANGE){
+                this.treasureCollectionTargetId = null;
+                this.treasureCollectionTicksRemaining = 0;
+                return false;
+            }
+            this.targetTreasureId = treasure.id;
+            this.behaviourState = 'collectingTreasure';
+            this.treasureCollectionTicksRemaining-=1;
+            if (this.treasureCollectionTicksRemaining<=0){
+                this.treasureCollectionTargetId = null;
+                this.collectTreasure(raid, treasure);
+            }
+            return true;
         }
         getExitEdge(world){
             if (this.exitEdge){
@@ -7301,6 +7351,8 @@ button:hover {
                 treasure.amountRemaining-=amount;
             }
             if (amount>0){
+                this.treasureCollectionTargetId = null;
+                this.treasureCollectionTicksRemaining = 0;
                 this.carryingAmount = amount;
                 this.carryingTreasure = true;
                 this.carryingTreasureType = treasure.treasureType;
@@ -7489,6 +7541,8 @@ button:hover {
             s.carryingAmount = this.carryingAmount;
             s.carryingTreasure = this.carryingTreasure;
             s.carryingTreasureType = this.carryingTreasureType;
+            s.treasureCollectionSeconds = this.treasureCollectionSeconds;
+            s.treasureCollectionTicksRemaining = this.treasureCollectionTicksRemaining;
             s.targetTreasureId = this.targetTreasureId;
             s.entryEdge = this.entryEdge;
             s.entryX = this.entryX;
@@ -14934,9 +14988,12 @@ button:hover {
             return contenders.slice(0, 3).indexOf(monster)>=0;
         }
         getEdibleCarcasses(){
-            return this.adventurers.concat(this.macrofauna).concat(this.monsters).filter(function (agent){
+            var potentialCarcasses = this.adventurers.concat(this.macrofauna, this.monsters);
+            return potentialCarcasses.filter(function (agent){
+                // This deliberately includes dead monsters. canFeedOnCarcass rejects
+                // every living agent, so monsters scavenge corpses without cannibalistic combat.
                 return NutritionSystem.canFeedOnCarcass(agent);
-            } );
+            });
         }
         findEdibleCarcassById(id){
             var carcasses = this.getEdibleCarcasses();
@@ -16249,13 +16306,16 @@ button:hover {
             if (this.mode==='advancedCampaign' && !(this.roundNumber===1 && this.seasonNumber===1 && this.phase==='management')){
                 return { ok:false, reason:'Advanced campaign monsters can be imported only before the first season begins.' };
             }
+            if ((this.mode==='single' || this.mode==='quick') && !(this.roundNumber===1 && this.seasonNumber===1 && this.phase==='management')){
+                return { ok:false, reason:'Single-game monsters can be imported only before the first season begins.' };
+            }
             try{
                 var transferId=MonsterTransferFingerprint(transferRecord);
                 if (!Array.isArray(this.gameState.importedMonsterTransferIds)){
                     this.gameState.importedMonsterTransferIds=[];
                 }
-                if (this.mode==='advancedCampaign' && this.gameState.importedMonsterTransferIds.indexOf(transferId)>=0){
-                    return { ok:false, reason:'This monster has already been imported into this advanced campaign.' };
+                if (this.gameState.importedMonsterTransferIds.indexOf(transferId)>=0){
+                    return { ok:false, reason:'This exported monster has already been imported into this game.' };
                 }
                 var monster = RestoreMonsterTransferRecord(transferRecord);
                 // Thermal deployment status is current-world state, not portable
@@ -16265,9 +16325,7 @@ button:hover {
                 monster.applyThermalStatus(MonsterMetabolismSystem.thermalStatus(monster, this.world, this.seasonNumber));
                 var result = this.gameState.addImportedMonster(monster);
                 if (result.ok){
-                    if (this.mode==='advancedCampaign'){
-                        this.gameState.importedMonsterTransferIds.push(transferId);
-                    }
+                    this.gameState.importedMonsterTransferIds.push(transferId);
                     this.pendingEvents.push({ tickNumber:0, text:result.monsterName+' was imported into the captive brood.' });
                 }
                 return result;
@@ -16759,24 +16817,16 @@ button:hover {
             } ;
         }
         releaseOwnedMonster(monsterId){
-            var releasedDuringRaid = this.phase==='raid' && this.currentRaid;
-            var raidMonster = releasedDuringRaid ? this.gameState.ownedMonsters.find(function (monster){
-                return monster.id===monsterId;
-            } ) : null;
-            var result = this.gameState.releaseOwnedMonster(monsterId, this.world);
-            if (result.ok && releasedDuringRaid && raidMonster){
-                raidMonster.wild = true;
-                raidMonster.wildResident = true;
-                raidMonster.deployed = true;
-                raidMonster.capturedThisRaid = false;
-                raidMonster.behaviourState = 'wandering';
-                if (this.currentRaid.wildMonsters.indexOf(raidMonster)<0){
-                    this.currentRaid.wildMonsters.push(raidMonster);
-                }
+            if (this.phase==='raid'){
+                return {
+                    ok : false,
+                    reason : 'Owned monsters can be released into the wild only during inter-season management.'
+                } ;
             }
+            var result = this.gameState.releaseOwnedMonster(monsterId, this.world);
             if (result.ok){
                 this.pendingEvents.push({
-                    tickNumber : releasedDuringRaid ? this.currentRaid.tickNumber : 0,
+                    tickNumber : 0,
                     text : result.monsterName+' was uncollared and released into the wild. It no longer uses captive food.'
                 } );
             } else{
@@ -18575,6 +18625,31 @@ button:hover {
         catHuntRaid.resolveCombat();
         AddRegressionResult(results, 'A satiated monster still selects and attacks available live prey', satiatedPreyTarget===catHuntHare && catHuntHare.health<catHuntHealthBefore, 'target='+(satiatedPreyTarget ? satiatedPreyTarget.id : 'none')+', before='+catHuntHealthBefore+', after='+catHuntHare.health);
         AddRegressionResult(results, 'A satiated monster does not select or eat a carcass', satiatedHunter.chooseFoodTarget(catHuntRaid)===null && NutritionSystem.consumeOneFoodFromCarcass(satiatedHunter, catHuntHare)===0, 'hunger='+NutritionSystem.getHunger(satiatedHunter).toFixed(3)+', eaten='+(satiatedHunter.foodEatenThisSeason || 0));
+        var scavengingRaid = new Raid(session.world, session.gameState, 424275, 1, []);
+        var scavenger = new Monster('monster_corpse_scavenger', 300, 300, new SeededRng(424276), {owned:true, world:session.world});
+        var fallenMonster = new Monster('monster_corpse_food', 305, 300, new SeededRng(424277), {owned:false, world:session.world});
+        fallenMonster.alive = false;
+        fallenMonster.corpseState = 'corpse';
+        fallenMonster.edibleFoodRemaining = 4;
+        scavenger.foodEatenThisSeason = 0;
+        scavenger.foodBoughtThisSeason = 0;
+        scavenger.nutritionRequirement = Math.max(8, scavenger.nutritionRequirement || 8);
+        scavengingRaid.monsters = [scavenger, fallenMonster];
+        scavengingRaid.adventurers = [];
+        scavengingRaid.macrofauna = [];
+        AddRegressionResult(results, 'Hungry monsters can select dead monster corpses for scavenging', scavenger.chooseFoodTarget(scavengingRaid)===fallenMonster, 'target='+(scavenger.chooseFoodTarget(scavengingRaid)||{}).id);
+        AddRegressionResult(results, 'Living monsters are never edible carcasses', !NutritionSystem.canFeedOnCarcass(scavenger), 'alive='+scavenger.alive);
+        var collectionClasses = ['explorer','warrior','knight','villager','doubleVillager'];
+        var collectionDurations = collectionClasses.map(function(className){ return new Adventurer('collection_'+className,0,0,new SeededRng(550000+collectionClasses.indexOf(className)),ADVENTURER_PROFILE[className]).treasureCollectionSeconds; });
+        AddRegressionResult(results, 'Treasure collection durations remain within two to seven seconds', collectionDurations.every(function(seconds){ return seconds>=2 && seconds<=7; }), collectionDurations.join(','));
+        var explorerSamples=[], doubleVillagerSamples=[];
+        for(var collectionSample=0; collectionSample<40; collectionSample+=1){
+            explorerSamples.push(new Adventurer('explorer_sample_'+collectionSample,0,0,new SeededRng(551000+collectionSample),ADVENTURER_PROFILE.explorer).treasureCollectionSeconds);
+            doubleVillagerSamples.push(new Adventurer('double_sample_'+collectionSample,0,0,new SeededRng(552000+collectionSample),ADVENTURER_PROFILE.doubleVillager).treasureCollectionSeconds);
+        }
+        var explorerAverage=explorerSamples.reduce(function(sum,value){return sum+value;},0)/explorerSamples.length;
+        var doubleVillagerAverage=doubleVillagerSamples.reduce(function(sum,value){return sum+value;},0)/doubleVillagerSamples.length;
+        AddRegressionResult(results, 'Explorers collect treasure faster than double villagers across weighted individual variation', explorerAverage<doubleVillagerAverage, 'explorer='+explorerAverage.toFixed(3)+', doubleVillager='+doubleVillagerAverage.toFixed(3));
         satiatedHunter.hunger = 1.0;
         var fatFoodRequirement = NutritionSystem.getMonsterRequirement(satiatedHunter);
         satiatedHunter.foodBoughtThisSeason = fatFoodRequirement;
@@ -19792,17 +19867,13 @@ button:hover {
     monsterManagementTab = document.getElementById('monsterManagementTab'),
     closeManagementButton = document.getElementById('closeManagementButton'),
     openMonsterTransferButton = document.getElementById('openMonsterTransferButton'),
-    monsterTransferOverlay = document.getElementById('monsterTransferOverlay'),
-    monsterTransferPanel = document.getElementById('monsterTransferPanel'),
-    monsterExportList = document.getElementById('monsterExportList'),
-    selectAllMonsterExportsButton = document.getElementById('selectAllMonsterExportsButton'),
-    clearMonsterExportsButton = document.getElementById('clearMonsterExportsButton'),
-    exportMonsterButton = document.getElementById('exportMonsterButton'),
-    monsterExportAvailabilityMessage = document.getElementById('monsterExportAvailabilityMessage'),
-    monsterImportFile = document.getElementById('monsterImportFile'),
-    monsterImportAvailabilityMessage = document.getElementById('monsterImportAvailabilityMessage'),
-    monsterTransferStatus = document.getElementById('monsterTransferStatus'),
-    closeMonsterTransferButton = document.getElementById('closeMonsterTransferButton'),
+    monsterTransferStatus = document.createElement('span'),
+    monsterExportList = document.createElement('div'),
+    selectAllMonsterExportsButton = document.createElement('button'),
+    clearMonsterExportsButton = document.createElement('button'),
+    exportMonsterButton = document.createElement('button'),
+    monsterExportAvailabilityMessage = document.createElement('span'),
+    monsterImportFile = document.getElementById('managementMonsterImportFile'),
     seasonDisplay = document.getElementById('seasonDisplay'),
     mainMenuOverlay = document.getElementById('mainMenuOverlay'),
     worldLoadingOverlay = document.getElementById('worldLoadingOverlay'),
@@ -21467,7 +21538,20 @@ button:hover {
         var performance=document.createElement('section');performance.className='managementSection';performance.innerHTML='<h4>Observed performance and behaviour</h4>';var perfList=document.createElement('ul');perfList.className='performanceIconList';PerformanceItems(monster).forEach(function(item){var li=document.createElement('li');li.innerHTML='<span class="featureIcon">'+item.icon+'</span><span>'+item.text+'</span>';perfList.appendChild(li);});performance.appendChild(perfList);selectedMonsterPanel.appendChild(performance);
         var injuries=document.createElement('section');injuries.className='managementSection';injuries.innerHTML='<h4>Injuries</h4>';var injuryList=document.createElement('div');injuryList.className='injuryList';var current=InjuryRows(monster).filter(function(i){return i.severity!=='Uninjured'||i.permanent>0;});if(!current.length){injuryList.innerHTML='<p>No current or permanent injuries.</p>';}current.forEach(function(item){var row=document.createElement('div');row.className='injuryRow';row.innerHTML='<span>'+item.name+'</span><div class="injuryBar"><div class="injuryBarFill '+item.severity.toLowerCase()+'" style="width:'+(item.ratio*100).toFixed(1)+'%"></div></div><span>'+item.severity+(item.permanent?' permanent':'')+'</span>';injuryList.appendChild(row);});injuries.appendChild(injuryList);var history=monster.injuryHistory||[];if(history.length){var h=document.createElement('ul');h.className='iconBulletList historicInjuryList';history.slice().reverse().forEach(function(x){var li=document.createElement('li');li.innerHTML='<span class="featureIcon">&#129656;</span><span>'+TitleCase(x.context||'field')+': '+BodyPartDisplayName(x.part)+', '+Math.round(x.damage||0)+' damage'+(x.permanent?' (permanent)':'')+'</span>';h.appendChild(li);});injuries.appendChild(h);}selectedMonsterPanel.appendChild(injuries);
         var family=document.createElement('section');family.className='managementSection familySection';family.innerHTML='<h4>Family</h4>';var fb=document.createElement('button');fb.type='button';fb.className='openFamilyTreeButton';fb.textContent='Open family tree';fb.addEventListener('click',function(){OpenFamilyTreeDialog(monster);});family.appendChild(fb);selectedMonsterPanel.appendChild(family);
-        var management=document.createElement('section');management.className='managementSection releaseSection';management.innerHTML='<h4>Management</h4><p>'+MonsterOriginLabel(monster)+'</p>';selectedMonsterPanel.appendChild(management);
+        var management=document.createElement('section');management.className='managementSection releaseSection';management.innerHTML='<h4>Management</h4><p>'+MonsterOriginLabel(monster)+'</p>';
+        if(currentSnapshot&&currentSnapshot.phase!=='raid'&&monster.alive){
+            var releaseButton=document.createElement('button');
+            releaseButton.type='button';
+            releaseButton.textContent='Release into the wild';
+            releaseButton.title='Permanently remove the collar and release this monster from the captive population.';
+            releaseButton.addEventListener('click',function(){
+                releaseButton.disabled=true;
+                SendCommand('RELEASE_OWNED_MONSTER',{monsterId:monster.id});
+                lastManagementRenderKey='';
+            });
+            management.appendChild(releaseButton);
+        }
+        selectedMonsterPanel.appendChild(management);
     }
     var pendingMonsterTransferAction = '';
     var pendingMonsterExportDirectory = null;
@@ -21480,6 +21564,9 @@ button:hover {
     function MonsterImportAvailable(){
         if (!MonsterTransferAvailable() || currentSnapshot.gameMode==='campaign'){ return false; }
         if (currentSnapshot.gameMode==='advancedCampaign'){ return AdvancedCampaignSetupActive(); }
+        if (currentSnapshot.gameMode==='single' || currentSnapshot.gameMode==='quick'){
+            return currentSnapshot.roundNumber===1 && currentSnapshot.seasonNumber===1 && currentSnapshot.phase==='management';
+        }
         return true;
     }
     function MonsterExportAvailable(){
@@ -21492,43 +21579,13 @@ button:hover {
         exportMonsterButton.disabled=!MonsterExportAvailable() || SelectedMonsterExportIds().length===0 || pendingMonsterTransferAction!=='';
     }
     function RefreshMonsterTransferScreen(){
-        var management=currentSnapshot && currentSnapshot.management;
-        var monsters=management && management.ownedMonsters ? management.ownedMonsters.filter(function(monster){ return monster.alive; }) : [];
-        var selected={};
-        SelectedMonsterExportIds().forEach(function(id){ selected[id]=true; });
-        monsterExportList.innerHTML='';
-        monsters.forEach(function(monster){
-            var label=document.createElement('label'); label.className='monsterExportChoice';
-            var input=document.createElement('input'); input.type='checkbox'; input.value=monster.id; input.checked=!!selected[monster.id] || (!Object.keys(selected).length && monster.id===selectedRosterMonsterId);
-            input.addEventListener('change',RefreshMonsterExportButton);
-            var text=document.createElement('span'); text.textContent=monster.name+' - '+MonsterSexLabel(monster)+', '+MonsterAgeLabel(monster);
-            label.appendChild(input); label.appendChild(text); monsterExportList.appendChild(label);
-        });
-        var advancedSetup=AdvancedCampaignSetupActive();
-        monsterTransferPanel.classList.toggle('advancedCampaignSetup',advancedSetup);
-        var exportAvailable=MonsterExportAvailable();
-        selectAllMonsterExportsButton.disabled=!exportAvailable || monsters.length===0;
-        clearMonsterExportsButton.disabled=!exportAvailable || monsters.length===0;
-        monsterExportAvailabilityMessage.textContent='Select any number of monsters, then choose one destination folder for their JSON files.';
         var importAvailable=MonsterImportAvailable();
         monsterImportFile.disabled=!importAvailable || pendingMonsterTransferAction!=='';
-        if (currentSnapshot && currentSnapshot.gameMode==='campaign'){
-            monsterImportAvailabilityMessage.textContent='Monster import is disabled in a standard campaign to preserve campaign balance.';
-        } else if (currentSnapshot && currentSnapshot.gameMode==='advancedCampaign' && !importAvailable){
-            monsterImportAvailabilityMessage.textContent='Advanced campaign import is available only before the first season begins.';
-        } else if (currentSnapshot && currentSnapshot.gameMode==='advancedCampaign'){
-            monsterImportAvailabilityMessage.textContent='Choose one or more founding monsters. A particular exported monster can be imported only once into this campaign.';
-        } else{
-            monsterImportAvailabilityMessage.textContent='Choose one or more monster JSON files; valid monsters are imported immediately.';
-        }
         RefreshMonsterExportButton();
     }
     function OpenMonsterTransferScreen(){
-        if (!MonsterTransferAvailable()){ return; }
-        monsterTransferStatus.textContent=''; RefreshMonsterTransferScreen(); monsterExportSection.style.display='none'; monsterTransferOverlay.classList.remove('dialogHidden'); closeMonsterTransferButton.focus();
-    }
-    function CloseMonsterTransferScreen(){
-        monsterTransferOverlay.classList.add('dialogHidden'); monsterTransferStatus.textContent=''; openMonsterTransferButton.focus();
+        if(!MonsterImportAvailable() || pendingMonsterTransferAction!=='' ){ return; }
+        monsterImportFile.click();
     }
     function SafeMonsterFileName(name){
         var safe=String(name || 'monster').replace(/[^A-Za-z0-9_-]+/g,'_').replace(/^_+|_+$/g,''); return (safe || 'monster')+'.monster.json';
@@ -21705,7 +21762,7 @@ button:hover {
         var allSelectable=monsters.concat(recentDeaths.filter(function(dead){return !monsters.some(function(m){return m.id===dead.id;});}),eggRecords);
         if(!selectedRosterMonsterId&&allSelectable.length){selectedRosterMonsterId=allSelectable[0].id;} if(selectedRosterMonsterId&&!allSelectable.some(function(m){return m.id===selectedRosterMonsterId;})){selectedRosterMonsterId=allSelectable.length?allSelectable[0].id:null;}
         var renderKey=BuildManagementRenderKey(s,monsters)+'|deaths:'+recentDeaths.map(function(d){return d.id+':'+d.overallConditionPercent;}).join(',')+'|selected:'+selectedRosterMonsterId; if(renderKey===lastManagementRenderKey){return;} lastManagementRenderKey=renderKey;
-        managementSummary.textContent=phase==='raid'?'Raid in progress. Portraits show current availability; select any living or deceased monster for details.':'Select deployments with the portrait checkboxes. Drag an eligible adult onto an eligible adult of the other sex to breed.';
+        managementSummary.textContent=phase==='raid'?'Season in progress. Use Deploy on a reserve monster to send it in from the far right edge.':'Inter-season management. Set automatic deployment for next season, breed eligible adults, or release a selected monster into the wild.';
         rosterList.innerHTML='';
         var sections={};
         [['males','Males'],['females','Females'],['nursery','Nursery'],['mortuary','Mortuary']].forEach(function(pair){var section=document.createElement('section');section.className='monsterRosterSection';var heading=document.createElement('h3');heading.className='monsterRosterHeading';var headingText=document.createElement('span');headingText.textContent=pair[1];var countBadge=document.createElement('span');countBadge.className='monsterRosterCount';countBadge.textContent='0';heading.appendChild(headingText);heading.appendChild(countBadge);var grid=document.createElement('div');grid.className='monsterPortraitGrid';section.appendChild(heading);section.appendChild(grid);rosterList.appendChild(section);sections[pair[0]]={grid:grid,count:countBadge,total:0};});
@@ -21713,10 +21770,10 @@ button:hover {
             options=options||{};var section=sections[key],card=document.createElement('div');card.className='monsterPortrait '+(options.egg?'egg ':'')+(key==='mortuary'?'mortuary ':'')+((monster.breedingHoldSeasonsRemaining||0)>0?'brooding ':'')+(monster.id===selectedRosterMonsterId?'selected':'');card.tabIndex=0;card.setAttribute('role','button');card.setAttribute('data-monster-id',monster.id);
             var canDrag=phase!=='raid'&&MonsterCanBeDraggedForBreeding(monster);card.draggable=canDrag;
             var controls=document.createElement('div');controls.className='monsterPortraitControls';
-            if(exportSelectionMode&&key!=='mortuary'){var exportLabel=document.createElement('label');exportLabel.className='portraitExportControl';var exportCheck=document.createElement('input');exportCheck.type='checkbox';exportCheck.checked=!!rosterExportSelection[monster.id];exportCheck.addEventListener('click',function(event){event.stopPropagation();});exportCheck.addEventListener('change',function(event){event.stopPropagation();rosterExportSelection[monster.id]=exportCheck.checked;UpdateRosterExportStatus();});exportLabel.appendChild(exportCheck);var exportWord=document.createElement('span');exportWord.textContent='Export';exportLabel.appendChild(exportWord);controls.appendChild(exportLabel);}else if(!options.egg&&key!=='mortuary'&&phase!=='raid'){var label=document.createElement('label');label.className='portraitDeployControl';var checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=!!monster.selectedForDeployment&&!!monster.canDeploy;checkbox.disabled=!monster.canDeploy;checkbox.title=monster.canDeploy?'Select for deployment':ThermalDeploymentSimpleReason(monster.deploymentBlockReason);checkbox.addEventListener('click',function(event){event.stopPropagation();});checkbox.addEventListener('change',function(event){event.stopPropagation();checkbox.disabled=true;SendCommand('SET_MONSTER_DEPLOYMENT',{monsterId:monster.id,selected:checkbox.checked});lastManagementRenderKey='';});label.appendChild(checkbox);var deployWord=document.createElement('span');deployWord.textContent='Deploy';label.appendChild(deployWord);controls.appendChild(label);if(!monster.canDeploy){var block=document.createElement('span');var simpleReason=ThermalDeploymentSimpleReason(monster.deploymentBlockReason);block.className='deploymentBlockIcon'+(simpleReason.indexOf('Too cold')===0?' tooCold':(simpleReason.indexOf('Too hot')===0?' tooHot':''));block.textContent=DeploymentBlockIcon(monster.deploymentBlockReason);block.title=simpleReason;controls.appendChild(block);}}
+            if(exportSelectionMode&&key!=='mortuary'){var exportLabel=document.createElement('label');exportLabel.className='portraitExportControl';var exportCheck=document.createElement('input');exportCheck.type='checkbox';exportCheck.checked=!!rosterExportSelection[monster.id];exportCheck.addEventListener('click',function(event){event.stopPropagation();});exportCheck.addEventListener('change',function(event){event.stopPropagation();rosterExportSelection[monster.id]=exportCheck.checked;UpdateRosterExportStatus();});exportLabel.appendChild(exportCheck);var exportWord=document.createElement('span');exportWord.textContent='Export';exportLabel.appendChild(exportWord);controls.appendChild(exportLabel);}else if(!options.egg&&key!=='mortuary'){var label=document.createElement('div');label.className='portraitDeployControl';label.draggable=false;var checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.tabIndex=-1;var deployWord=document.createElement('span');if(phase==='raid'){label.setAttribute('role','button');checkbox.checked=!!monster.deployed;checkbox.disabled=!!monster.deployed||!monster.canDeploy;deployWord.textContent=monster.deployed?'Deployed':'Deploy';label.title=monster.deployed?'Already deployed this season':(monster.canDeploy?'Deploy now from the far right edge':ThermalDeploymentSimpleReason(monster.deploymentBlockReason));function deployNow(event){event.preventDefault();event.stopPropagation();if(checkbox.disabled){return;}checkbox.disabled=true;SendCommand('DEPLOY_CAPTIVE_MONSTER',{monsterId:monster.id});lastManagementRenderKey='';}label.addEventListener('pointerdown',deployNow);}else{label.setAttribute('role','checkbox');var checkboxChecked=!!monster.selectedForDeployment&&!!monster.canDeploy;checkbox.checked=checkboxChecked;label.setAttribute('aria-checked',checkboxChecked?'true':'false');checkbox.disabled=!monster.canDeploy;label.title=monster.canDeploy?'Select for automatic deployment at the start of the next season':ThermalDeploymentSimpleReason(monster.deploymentBlockReason);deployWord.textContent='Deploy';function toggleDeployment(event){event.preventDefault();event.stopPropagation();if(checkbox.disabled){return;}checkbox.checked=!checkbox.checked;label.setAttribute('aria-checked',checkbox.checked?'true':'false');checkbox.disabled=true;SendCommand('SET_MONSTER_DEPLOYMENT',{monsterId:monster.id,selected:checkbox.checked});lastManagementRenderKey='';}label.addEventListener('pointerdown',toggleDeployment);}label.appendChild(checkbox);label.appendChild(deployWord);label.addEventListener('mousedown',function(event){event.preventDefault();event.stopPropagation();});label.addEventListener('click',function(event){event.preventDefault();event.stopPropagation();});controls.appendChild(label);if(!monster.canDeploy&&!monster.deployed){var block=document.createElement('span');var simpleReason=ThermalDeploymentSimpleReason(monster.deploymentBlockReason);block.className='deploymentBlockIcon'+(simpleReason.indexOf('Too cold')===0?' tooCold':(simpleReason.indexOf('Too hot')===0?' tooHot':''));block.textContent=DeploymentBlockIcon(monster.deploymentBlockReason);block.title=simpleReason;controls.appendChild(block);}}
             card.appendChild(controls);var visual=document.createElement('div');visual.innerHTML=options.egg?('<div class="eggVisual"><div class="eggShape'+(monster.eggStatus==='cracked'?' cracked':'')+'"></div></div>'):MonsterIconSvg(monster);card.appendChild(visual);var name=document.createElement('div');name.className='monsterPortraitName';name.textContent=options.name||monster.name;card.appendChild(name);var status=document.createElement('div');status.className='monsterPortraitStatus';status.textContent=options.status||PortraitStatusText(monster);status.title=status.textContent;card.appendChild(status);card.title=(monster.ageInSeasons!==undefined?('Age: '+MonsterAgeLabel(monster)+'; food need: '+FormatNumber(GetFoodRequirement(monster))):status.textContent);
             function select(){selectedRosterMonsterId=monster.id;lastManagementRenderKey='';UpdateManagementDrawer(s);}card.addEventListener('click',select);card.addEventListener('keydown',function(event){if(event.key==='Enter'||event.key===' '){event.preventDefault();select();}});
-            if(canDrag){card.addEventListener('dragstart',function(event){draggedBreedingMonsterId=monster.id;event.dataTransfer.setData('text/plain',monster.id);card.classList.add('dragging');Array.prototype.forEach.call(document.querySelectorAll('.monsterPortrait'),function(other){var target=monsters.find(function(m){return m.id===other.getAttribute('data-monster-id');});if(target&&MonsterCanBeDraggedForBreeding(target)&&target.sex!==monster.sex){other.classList.add('compatibleBreedTarget');}else if(other!==card){other.classList.add('incompatibleBreedTarget');}});});card.addEventListener('dragend',ClearBreedingDragClasses);}
+            if(canDrag){card.addEventListener('dragstart',function(event){if(event.target.closest&&event.target.closest('.monsterPortraitControls')){event.preventDefault();return;}draggedBreedingMonsterId=monster.id;event.dataTransfer.setData('text/plain',monster.id);card.classList.add('dragging');Array.prototype.forEach.call(document.querySelectorAll('.monsterPortrait'),function(other){var target=monsters.find(function(m){return m.id===other.getAttribute('data-monster-id');});if(target&&MonsterCanBeDraggedForBreeding(target)&&target.sex!==monster.sex){other.classList.add('compatibleBreedTarget');}else if(other!==card){other.classList.add('incompatibleBreedTarget');}});});card.addEventListener('dragend',ClearBreedingDragClasses);}
             card.addEventListener('dragover',function(event){var source=monsters.find(function(m){return m.id===draggedBreedingMonsterId;});if(source&&MonsterCanBeDraggedForBreeding(source)&&MonsterCanBeDraggedForBreeding(monster)&&source.sex!==monster.sex){event.preventDefault();card.classList.add('dropBreedTarget');}});card.addEventListener('dragleave',function(){card.classList.remove('dropBreedTarget');});card.addEventListener('drop',function(event){event.preventDefault();var source=monsters.find(function(m){return m.id===event.dataTransfer.getData('text/plain');});ClearBreedingDragClasses();if(source&&source.id!==monster.id&&MonsterCanBeDraggedForBreeding(source)&&MonsterCanBeDraggedForBreeding(monster)&&source.sex!==monster.sex){OpenBreedingPairDialog(source,monster);}});
             section.grid.appendChild(card);section.total+=1;section.count.textContent=String(section.total);
         }
@@ -24454,8 +24511,6 @@ button:hover {
         pendingMonsterTransferAction='export';SendCommand('EXPORT_MONSTERS',{monsterIds:ids});SetExportMode(false);
     });
     openMonsterTransferButton.addEventListener('click',function(){var picker=document.getElementById('directMonsterImportFile');picker.value='';picker.accept='application/json,.json';picker.click();});
-    closeMonsterTransferButton.addEventListener('click', CloseMonsterTransferScreen);
-    monsterTransferOverlay.addEventListener('click', function(event){ if (event.target===monsterTransferOverlay){ CloseMonsterTransferScreen(); } });
     document.getElementById('closeFamilyTreeButton').addEventListener('click', CloseFamilyTreeDialog);
     document.getElementById('familyTreeOverlay').addEventListener('click', function(event){ if(event.target===this){ CloseFamilyTreeDialog(); } });
     document.getElementById('cancelBreedingPairButton').addEventListener('click', CloseBreedingPairDialog);
@@ -24537,7 +24592,7 @@ button:hover {
             if (imported.length){ selectedRosterMonsterId=imported[imported.length-1].monsterId; lastManagementRenderKey=''; ShowGameToast(imported.length+' monster'+(imported.length===1?'':'s')+' joined the captive brood.'); }
             var lines=[imported.length+' monster'+(imported.length===1?'':'s')+' imported.'];
             rejected.forEach(function(item){lines.push(item.name+': '+item.reason);}); localErrors.forEach(function(item){lines.push(item);});
-            monsterTransferStatus.textContent=lines.join('\n'); RefreshMonsterTransferScreen();
+            monsterTransferStatus.textContent=lines.join('\n');AppendLog(lines.join(' | '));RefreshMonsterTransferScreen();
             break;
         case 'SAVE_GAME_DATA' :
             PutSaveRecord(message.payload.saveRecord, pendingSaveSlotId, pendingSaveSlotName).then(function (storedRecord){
@@ -24611,10 +24666,6 @@ button:hover {
             }
             lastSnapshotPhase = latestSnapshot.phase || 'raid';
             UpdateManagementDrawer(latestSnapshot);
-            if (openAdvancedImportOnNextSnapshot && latestSnapshot.gameMode==='advancedCampaign' && latestSnapshot.phase==='management'){
-                openAdvancedImportOnNextSnapshot=false;
-                OpenMonsterTransferScreen();
-            }
             RefreshSelectedObjectFromSnapshot(latestSnapshot);
             UpdateSelectedObjectPanel();
             if (newGameMessagePending && latestSnapshot.phase!=='gameOver'){
@@ -24694,7 +24745,6 @@ button:hover {
         }
         return Math.floor(value);
     }
-    var openAdvancedImportOnNextSnapshot = false;
     function StartNewGame(mode, options){
         var startOptions = options || {
         } ;
@@ -24714,7 +24764,6 @@ button:hover {
         UpdateSelectedObjectPanel();
         managementDrawerVisible = true;
         lastManagementRenderKey = '';
-        openAdvancedImportOnNextSnapshot = mode==='advancedCampaign';
         SendCommand('NEW_WORLD', {
             seed : Number.isFinite(startOptions.seed) ? startOptions.seed : Date.now(),
             mode : mode,
