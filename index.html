@@ -1083,6 +1083,29 @@ button:hover {
 .treasureLegendItem{display:flex!important;width:auto!important;height:1.35rem!important;align-items:center!important;gap:.28rem!important;border:0!important;background:transparent!important}
 .treasureLegendIcon{width:1.1rem;height:1.1rem;display:block;flex:none}
 .treasureLegendItem .legendSwatch{width:.72rem!important;height:.72rem!important;border:1px solid #cbd5e1;border-radius:.14rem!important;flex:none}
+
+/* Selected-object card: concise, icon-led and consistent with dashboard headings. */
+.selectionTitle{display:flex;align-items:center;gap:.5rem!important;color:#f2c14e!important;font-size:1rem!important;font-weight:900!important}
+.selectionTitleIcon{display:inline-flex;width:1.7rem;height:1.7rem;align-items:center;justify-content:center;border-radius:50%;background:#263449;font-size:1.05rem;flex:none}
+.selectionCard{display:grid;gap:.52rem;color:#e5e7eb}
+.selectionRow{display:grid;grid-template-columns:1.55rem minmax(0,1fr);gap:.5rem;align-items:start;line-height:1.3}
+.selectionRowIcon{display:flex;width:1.45rem;height:1.45rem;align-items:center;justify-content:center;border-radius:.3rem;background:#172033;font-size:.95rem;line-height:1}
+.selectionLabel{color:#94a3b8;font-size:.74rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+.selectionValue{color:#f8fafc;font-size:.9rem}
+.selectionBarBlock{display:grid;gap:.28rem}
+.selectionBarHeader{display:flex;justify-content:space-between;gap:.6rem;color:#dbeafe;font-size:.84rem}
+.selectionBar{display:flex;height:1.35rem;overflow:hidden;border:1px solid #475569;border-radius:999px;background:#05070b}
+.selectionBarFill{height:100%;background:#ca8a04}
+.selectionBarRemoved{height:100%;background:#050505}
+.selectionBarText{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.76rem;font-weight:900;text-shadow:0 1px 2px #000}
+.selectionBarWrap{position:relative}
+.selectionStatusGood{color:#86efac}.selectionStatusWarning{color:#fca5a5}
+.selectionEmpty{color:#cbd5e1;line-height:1.42}
+.selectionClimateList{display:grid;gap:.28rem;margin-top:.08rem}
+.selectionClimateItem{display:flex;align-items:center;gap:.42rem;color:#f8fafc;font-size:.86rem}
+.selectionClimateIcon{width:1.3rem;text-align:center;font-size:1.05rem;flex:none}
+.selectionStickIcon{width:1.2rem;height:1.2rem;display:block}
+
 </style>
 </head>
 <body>
@@ -1141,7 +1164,7 @@ button:hover {
 <button id="recallModeButton" class="interactionModeButton" type="button" title="Recall captured monster to base &lt;B&gt;" aria-label="Recall captured monster to base &lt;B&gt;" aria-pressed="false"></button>
 <button id="releaseModeButton" class="interactionModeButton" type="button" title="Release captured monster &lt;R&gt;" aria-label="Release captured monster &lt;R&gt;" aria-pressed="false"></button>
 </div></section><section id="selectionSection">
-<h2>Selected Object</h2>
+<h2 id="selectionTitle" class="selectionTitle"><span class="selectionTitleIcon" aria-hidden="true">&#128269;</span><span>Inspect</span></h2>
 <div id="objectDetails">Click any monster, adventurer, treasure, scenery object or terrain tile to inspect it.</div>
 <div id="monsterPortrait">
 </div>
@@ -23832,129 +23855,208 @@ button:hover {
     function MonsterDisplayName(monster){
         return monster.name ||(monster.collared ? 'Collared monster' : 'Uncollared wild monster');
     }
-    function DescribeRemain(o, label){
-        var state = o.corpseState==='skeleton' ? 'Skeleton' : 'Corpse';
-        var lines = [label+': '+state];
-        if (o.corpseState==='skeleton'){
-            lines.push('Condition: bones only');
-            lines.push('Edible food remaining: 0');
-        } else{
-            lines.push('Condition: corpse');
-            lines.push('Edible food remaining: '+FormatNumber(o.edibleFoodRemaining || 0));
-        }
-        lines.push('State: '+(o.behaviourState || o.corpseState || 'dead'));
-        lines.push('Position: '+Math.round(o.x)+', '+Math.round(o.y));
-        return lines.join('\n');
-    }
-    function DescribeSelectedObject(selection){
-        if (!selection){
-            return 'Click any monster, adventurer, treasure, scenery object or terrain tile to inspect it.';
-        }
-        var o = selection.obj;
-        if (selection.kind==='monster'){
-            if (!o.alive){
-                return DescribeRemain(o, 'Monster '+MonsterDisplayName(o));
-            }
-            return ['Monster: '+MonsterDisplayName(o),
-            'Sex: '+MonsterSexLabel(o),
-            'Parentage: '+MonsterParentageLabel(o),
-            'Observed: '+MonsterPerformanceBrief(o),
-            'Health: '+Math.round(o.health)+' / '+Math.round(o.maxHealth),
-            'Nutrition: '+FormatNutritionLine(o),
-            'Season food requirement: '+FormatNumber(GetFoodRequirement(o)),
-            'Food eaten in raid: '+FormatNumber(o.foodEatenThisSeason || 0),
-            'Food fed at lair: '+FormatNumber(o.foodBoughtThisSeason || 0)+' (captive macrofauna '+FormatNumber(o.foodFromCaptiveMacrofaunaThisSeason || 0)+', stored '+FormatNumber(o.foodFromStoredMeatThisSeason || 0)+', purchased '+FormatNumber(o.foodFromPurchasedMeatThisSeason || 0)+')',
-            'Body reserves consumed: '+FormatNumber(o.foodFromBodyReservesThisSeason || 0),
-            'Base feeding cost: '+FormatNumber(o.foodBoughtCostCreditsThisSeason || 0)+' credits',
-            'Eating: '+(o.eatingTargetId ?('yes, '+FormatNumber(o.eatingTicksRemaining)+' ticks remaining') : 'no'),
-            'Ownership: '+(o.owned ? 'Captive/owned' : 'Wild'),
-            'Collar: '+(o.collared ? 'Collared' : 'Uncollared'),
-            'Map state: '+(o.deployed ? 'On map' : 'In cage/reserve'),
-            'Behaviour: '+(o.behaviourState || 'unknown'),
-            'Deployment order: '+(o.selectedForDeployment ? 'Deploy at season start' : 'Reserve'),
-            'Terrain height: '+FormatNumber(o.terrainHeight || 0)].join('\n');
-        }
-        if (selection.kind==='adventurer'){
-            if (!o.alive){
-                return DescribeRemain(o, 'Adventurer '+(o.className || 'unknown'));
-            }
-            return ['Adventurer: '+(o.className || 'unknown'),
-            'Health: '+Math.round(o.health)+' / '+Math.round(o.maxHealth),
-            'Edible food remaining: '+FormatNumber(o.edibleFoodRemaining || 0),
-            'State: '+(o.behaviourState || 'unknown'),
-            'Carrying treasure: '+(o.carryingTreasure ?(o.carryingAmount+' '+o.carryingTreasureType) : 'none'),
-            'Fleeing: '+(o.fleeing ? 'yes' : 'no'),
-            'Speed: '+FormatNumber(o.speed),
-            'Terrain height: '+FormatNumber(o.terrainHeight || 0)].join('\n');
-        }
-        if (selection.kind==='macrofauna'){
-            if (!o.alive){
-                return DescribeRemain(o, 'Macrofauna '+(o.displayName || o.species || 'animal'));
-            }
-            return ['Macrofauna: '+(o.displayName || o.species || 'animal'),
-            'Health: '+Math.round(o.health)+' / '+Math.round(o.maxHealth),
-            'Food value: '+FormatNumber(o.foodValue || 0),
-            'Edible food remaining: '+FormatNumber(o.edibleFoodRemaining || 0),
-            'State: '+(o.behaviourState || 'unknown'),
-            'Speed: '+FormatNumber(o.speed),
-            'Terrain height: '+FormatNumber(o.terrainHeight || 0),
-            'Position: '+Math.round(o.x)+', '+Math.round(o.y)].join('\n');
-        }
-        if (selection.kind==='treasure' || selection.kind==='droppedTreasure'){
-            return [(selection.kind==='treasure' ? 'Treasure deposit' : 'Dropped treasure'),
-            'Type: '+(o.treasureDisplayName || o.treasureType),
-            'Amount remaining: '+FormatNumber(o.amountRemaining),
-            'Value remaining: '+FormatNumber(o.value),
-            o.startingAmount!==undefined ? 'Starting amount: '+FormatNumber(o.startingAmount) : '',
-            'Position: '+Math.round(o.x)+', '+Math.round(o.y)].filter(Boolean).join('\n');
-        }
-        if (selection.kind==='worldObject'){
-            return ['World object: '+(o.type==='microfauna' ?(o.species || 'microfauna') : (o.type || 'object')),
-            'Blocks movement: '+(o.blocksMovement ? 'yes' : 'no'),
-            'Carryable: '+(o.carryable ? 'yes' : 'no'),
-            'Throwable: '+(o.throwable ? 'yes' : 'no'),
-            o.damage!==undefined ? 'Damage: '+FormatNumber(o.damage) : '',
-            'Position: '+Math.round(o.x)+', '+Math.round(o.y)].filter(Boolean).join('\n');
-        }
-        if (selection.kind==='terrain'){
-            return ['Terrain tile',
-            'Type: '+TerrainName(o.terrainType),
-            'Height: '+FormatNumber(o.height || 0),
-            'Slope: '+FormatNumber(o.slope || 0)+(o.slope>=9 ? ' (cliff / impassable)' : (o.slope>=5 ? ' (steep)' : '')),
-            'Tile: '+o.tileX+', '+o.tileY,
-            'World position: '+Math.round(o.x)+', '+Math.round(o.y)].join('\n');
-        }
-        return 'Selected object details unavailable.';
-    }
     function EscapeHtml(value){
         return String(value).replace(/[&<>"']/g, function (ch){
-            return {
-                '&' : '&amp;',
-                '<' : '&lt;',
-                '>' : '&gt;',
-                '"' : '&quot;',
-                "'" : '&#39;'
+            return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch];
+        });
+    }
+    function FriendlyLabel(value){
+        var textValue = String(value || 'unknown').replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ');
+        return textValue.charAt(0).toUpperCase()+textValue.slice(1);
+    }
+    function SelectionIcon(icon, label){
+        return '<span class="selectionRowIcon" aria-label="'+EscapeHtml(label || '')+'" title="'+EscapeHtml(label || '')+'">'+icon+'</span>';
+    }
+    function SelectionRow(icon, label, value, valueClass){
+        return '<div class="selectionRow">'+SelectionIcon(icon, label)+'<div><div class="selectionLabel">'+EscapeHtml(label)+'</div><div class="selectionValue '+(valueClass || '')+'">'+EscapeHtml(value)+'</div></div></div>';
+    }
+    function SelectionBar(icon, label, value, maximum, colour, suffix){
+        var safeMaximum = Math.max(1, Number(maximum) || 1);
+        var safeValue = Math.max(0, Math.min(safeMaximum, Number(value) || 0));
+        var percent = Math.max(0, Math.min(100, safeValue / safeMaximum * 100));
+        return '<div class="selectionRow">'+SelectionIcon(icon, label)+'<div class="selectionBarBlock"><div class="selectionBarHeader"><span>'+EscapeHtml(label)+'</span><strong>'+EscapeHtml(FormatNumber(value)+(suffix || ''))+'</strong></div><div class="selectionBarWrap"><div class="selectionBar"><div class="selectionBarFill" style="width:'+percent.toFixed(1)+'%;background:'+EscapeHtml(colour || '#22c55e')+'"></div><div class="selectionBarRemoved" style="width:'+(100-percent).toFixed(1)+'%"></div></div><div class="selectionBarText">'+EscapeHtml(FormatNumber(value)+' / '+FormatNumber(maximum)+(suffix || ''))+'</div></div></div></div>';
+    }
+    function SetSelectionHeading(icon, title){
+        var heading = document.getElementById('selectionTitle');
+        heading.innerHTML = '<span class="selectionTitleIcon" aria-hidden="true">'+icon+'</span><span>'+EscapeHtml(title)+'</span>';
+    }
+    function MonsterInjuryText(monster){
+        var health = monster && monster.bodyHealth;
+        if (!health || !Number.isFinite(health.maxEach)){
+            return monster && Number.isFinite(monster.health) && Number.isFinite(monster.maxHealth) && monster.health<monster.maxHealth ? 'Visible general injuries' : 'No visible injuries';
+        }
+        var labels = {head:'head',body:'body',frontLeftLeg:'front left leg',frontRightLeg:'front right leg',rearLeftLeg:'rear left leg',rearRightLeg:'rear right leg',leftArm:'left arm',rightArm:'right arm',leftLeg:'left leg',rightLeg:'right leg'};
+        var injuries = [];
+        Object.keys(labels).forEach(function (key){
+            if (!Number.isFinite(health[key]) || health[key]>=health.maxEach*0.92){ return; }
+            var ratio = health[key] / Math.max(1, health.maxEach);
+            injuries.push((ratio<0.35 ? 'Severe ' : (ratio<0.7 ? 'Moderate ' : 'Minor '))+labels[key]+' injury');
+        });
+        return injuries.length ? injuries.join('; ') : 'No visible injuries';
+    }
+    function ObservableDiseaseText(monster){
+        var diseases = monster && monster.diseases ? monster.diseases : [];
+        if (!diseases.length){ return 'No observable disease'; }
+        return diseases.map(function (disease){ return LowTechCauseOfDeathLabel(disease.displayName || disease.name || disease.id); }).join('; ');
+    }
+    function AdventurerInjuryText(adventurer){
+        return MonsterInjuryText(adventurer);
+    }
+    function TreeDescription(tree){
+        var kind = tree.treeKind || 'tree';
+        var names = {deciduous:'Broadleaf tree',evergreen:'Conifer',tropicalEvergreen:'Tropical evergreen',palm:'Palm',cactus:'Cactus',desertScrub:'Desert scrub'};
+        return names[kind] || FriendlyLabel(kind);
+    }
+    function TreeLeafType(tree){
+        var kind = tree.treeKind || '';
+        return (kind==='evergreen' || kind==='tropicalEvergreen' || kind==='palm' || kind==='cactus' || kind==='desertScrub') ? 'Evergreen' : 'Deciduous';
+    }
+    function ClimateKeysForSelectedObject(selection, object){
+        var allTemperate = ['coastalTemperate','oceanicTemperate','temperateContinental','continentalHighland'];
+        var allNonPolar = ['tropicalRainforest','coastalTropical'].concat(allTemperate,['hotDesert','coolDesert']);
+        if (selection.kind==='macrofauna'){
+            var tropicalOnly = ['tropicalRainforest','coastalTropical'];
+            var species = object.species || '';
+            var macrofaunaClimates = {
+                agouti:tropicalOnly, capybara:tropicalOnly, tapir:tropicalOnly, peccary:tropicalOnly,
+                sloth:tropicalOnly, monkey:tropicalOnly, pangolin:tropicalOnly, cassowary:tropicalOnly,
+                caiman:tropicalOnly, reindeer:['temperateContinental','continentalHighland'],
+                polarBear:['polar'], seal:allNonPolar.concat(['polar']), walrus:allNonPolar.concat(['polar']),
+                hare:allNonPolar.concat(['polar']), fox:allNonPolar.concat(['polar']),
+                deer:allNonPolar.concat(['polar']), boar:allNonPolar, bear:allTemperate.concat(['polar'])
+            };
+            return macrofaunaClimates[species] || allNonPolar;
+        }
+        if (object.type==='tree'){
+            var treeKind = object.treeKind || '';
+            if (treeKind==='tropicalEvergreen'){ return ['tropicalRainforest','coastalTropical']; }
+            if (treeKind==='palm'){ return ['tropicalRainforest','coastalTropical','hotDesert']; }
+            if (treeKind==='cactus'){ return ['hotDesert']; }
+            if (treeKind==='desertScrub'){ return ['coolDesert']; }
+            if (treeKind==='deciduous'){ return allTemperate; }
+            return allTemperate.concat(['polar']);
+        }
+        if (object.type==='bush'){
+            var bushKind = String(object.bushKind || '').toLowerCase();
+            if (bushKind.indexOf('reed')>=0 || bushKind.indexOf('willow')>=0){ return allTemperate; }
+            return allTemperate;
+        }
+        if (object.type==='microfauna'){
+            var name = String(object.species || '').toLowerCase();
+            if (name.indexOf('arctic')>=0){ return ['polar']; }
+            if (name.indexOf('desert')>=0){ return ['hotDesert','coolDesert']; }
+            if (name.indexOf('aedes')>=0 || name.indexOf('atta')>=0){ return ['tropicalRainforest','coastalTropical']; }
+            if (name.indexOf('coastal')>=0){ return ['coastalTemperate']; }
+            return allTemperate;
+        }
+        return [];
+    }
+    function ClimateListHtml(selection, object){
+        var climates = ClimateKeysForSelectedObject(selection, object);
+        var items = climates.map(function (climate){
+            return '<div class="selectionClimateItem"><span class="selectionClimateIcon" aria-hidden="true">'+BiomeIcon(climate)+'</span><span>'+EscapeHtml(FormatBiomeType(climate))+'</span></div>';
+        }).join('');
+        return '<div class="selectionRow">'+SelectionIcon('&#127758;', 'Climates')+'<div><div class="selectionLabel">Climates</div><div class="selectionClimateList">'+items+'</div></div></div>';
+    }
+    function StickIconSvg(){
+        return '<svg class="selectionStickIcon" viewBox="0 0 32 32" aria-hidden="true"><path d="M5 27L26 6" fill="none" stroke="#6b4423" stroke-width="5" stroke-linecap="round"/><path d="M14 18L9 12M20 12L25 15" fill="none" stroke="#6b4423" stroke-width="3.5" stroke-linecap="round"/></svg>';
+    }
+    function RemainIdentity(o){
+        var kind = o.agentKind || 'creature';
+        if (kind==='monster'){
+            return 'Monster'+(o.name ? ': '+o.name : '');
+        }
+        if (kind==='adventurer'){
+            return 'Adventurer: '+FriendlyLabel(o.displayName || o.className || 'unknown class');
+        }
+        if (kind==='macrofauna'){
+            return FriendlyLabel(o.displayName || o.species || 'animal');
+        }
+        return FriendlyLabel(kind);
+    }
+    function SelectedObjectPresentation(selection){
+        if (!selection){
+            return {icon:'&#128269;', title:'Inspect', html:'<div class="selectionEmpty">Click any monster, adventurer, treasure, scenery object or terrain tile to inspect it.</div>'};
+        }
+        var o = selection.obj;
+        var html = '<div class="selectionCard">';
+        if ((selection.kind==='monster' || selection.kind==='adventurer' || selection.kind==='macrofauna') && !o.alive){
+            var skeleton = o.corpseState==='skeleton';
+            return {icon:skeleton ? '&#9760;' : '&#128128;', title:skeleton ? 'Skeleton' : 'Corpse', html:html+SelectionRow(skeleton ? '&#9760;' : '&#128128;', 'Remains', RemainIdentity(o))+'</div>'};
+        }
+        if (selection.kind==='monster'){
+            var female = o.sex==='female';
+            var foodMaximum = 50;
+            html+=SelectionRow(female ? '&#9792;' : '&#9794;', 'Sex', female ? 'Female' : 'Male');
+            html+=SelectionRow(o.collared ? '&#128279;' : '&#127807;', 'Status', o.collared ? 'Collared' : 'Wild');
+            html+=SelectionRow('&#10148;', 'Current activity', FriendlyLabel(o.behaviourState || (o.deployed ? 'idle' : 'in reserve')));
+            html+=SelectionBar('&#127828;', 'Season food requirement', GetFoodRequirement(o), foodMaximum, '#84cc16', ' food');
+            html+=SelectionRow('&#128197;', 'Age', (Math.max(0, Number(o.ageInSeasons) || 0) / 4).toFixed(2).replace(/\.00$/, '')+' years');
+            var injuryText = MonsterInjuryText(o);
+            html+=SelectionRow('&#129656;', 'Injuries', injuryText, injuryText==='No visible injuries' ? 'selectionStatusGood' : 'selectionStatusWarning');
+            var diseaseText = ObservableDiseaseText(o);
+            html+=SelectionRow('&#129440;', 'Observable disease', diseaseText, diseaseText==='No observable disease' ? 'selectionStatusGood' : 'selectionStatusWarning');
+            return {icon:'&#128009;', title:o.name || 'Monster', html:html+'</div>'};
+        }
+        if (selection.kind==='adventurer'){
+            var adventurerClass = o.className==='doubleVillager' ? 'Villagers' : FriendlyLabel(o.displayName || o.className || 'unknown');
+            html+=SelectionRow('&#9876;', 'Class', adventurerClass);
+            if (o.className==='knight'){
+                html+=SelectionRow(o.isMounted ? '&#128014;' : '&#128694;', 'Mount', o.isMounted ? 'Mounted' : 'Unmounted');
             }
-            [ch];
-        } );
+            var treasureText = o.carryingTreasure && o.carryingAmount>0 ? FormatNumber(o.carryingAmount)+' '+FriendlyLabel(o.carryingTreasureType || 'treasure').toLowerCase()+(String(o.carryingTreasureType || '').indexOf('coin')<0 && ['bronze','silver','gold'].indexOf(o.carryingTreasureType)>=0 ? ' coins' : '') : 'None';
+            html+=SelectionRow('&#128176;', 'Treasure carried', treasureText);
+            var adventurerInjuries = AdventurerInjuryText(o);
+            html+=SelectionRow('&#129656;', 'Visible injuries', adventurerInjuries, adventurerInjuries==='No visible injuries' ? 'selectionStatusGood' : 'selectionStatusWarning');
+            return {icon:'&#9876;', title:'Adventurer', html:html+'</div>'};
+        }
+        if (selection.kind==='macrofauna'){
+            html+=ClimateListHtml(selection, o);
+            return {icon:CaptiveAnimalIcon(o), title:FriendlyLabel(o.displayName || o.species || 'Animal'), html:html+'</div>'};
+        }
+        if (selection.kind==='treasure' || selection.kind==='droppedTreasure'){
+            var treasureName = o.treasureDisplayName || FriendlyLabel(o.treasureType || 'treasure');
+            html+=SelectionRow('&#129689;', 'Type', FriendlyLabel(treasureName));
+            if (o.startingAmount!==undefined){
+                html+=SelectionBar('&#128176;', 'Amount remaining', o.amountRemaining, o.startingAmount, o.colour || '#ca8a04', '');
+            } else{
+                html+=SelectionRow('&#128176;', 'Amount remaining', FormatNumber(o.amountRemaining));
+            }
+            return {icon:'&#128176;', title:selection.kind==='treasure' ? 'Treasure' : 'Dropped treasure', html:html+'</div>'};
+        }
+        if (selection.kind==='worldObject'){
+            if (o.type==='bigRock'){ return {icon:'&#129704;', title:'Large rock', html:''}; }
+            if (o.type==='smallRock'){ return {icon:'&#129704;', title:'Small rock', html:''}; }
+            if (o.type==='tree'){
+                html+=SelectionRow('&#127795;', 'Species', TreeDescription(o));
+                html+=SelectionRow('&#127811;', 'Foliage', TreeLeafType(o));
+                html+=ClimateListHtml(selection, o);
+                return {icon:'&#127795;', title:'Tree', html:html+'</div>'};
+            }
+            if (o.type==='bush'){
+                html+=SelectionRow('&#127807;', 'Species', FriendlyLabel(o.bushKind || 'bush'));
+                html+=ClimateListHtml(selection, o);
+                return {icon:'&#127807;', title:'Bush', html:html+'</div>'};
+            }
+            if (o.type==='microfauna'){
+                html+=ClimateListHtml(selection, o);
+                return {icon:'&#128027;', title:FriendlyLabel(o.species || 'Insect'), html:html+'</div>'};
+            }
+            if (o.type==='stick'){
+                return {icon:StickIconSvg(), title:'Stick', html:''};
+            }
+            return {icon:'&#128204;', title:FriendlyLabel(o.type || 'Object'), html:''};
+        }
+        if (selection.kind==='terrain'){
+            html+=SelectionRow('&#127758;', 'Type', FriendlyLabel(TerrainName(o.terrainType)));
+            return {icon:'&#127758;', title:'Ground', html:html+'</div>'};
+        }
+        return {icon:'&#10067;', title:'Object', html:'<div class="selectionEmpty">No further observable information.</div>'};
     }
     function UpdateSelectedObjectPanel(){
-        objectDetails.innerHTML = '';
-        var details = document.createElement('div');
-        details.textContent = DescribeSelectedObject(selectedObject);
-        objectDetails.appendChild(details);
-        if (selectedObject && selectedObject.kind==='monster'){
-            var monster = selectedObject.obj;
-            var shortfall = GetFoodShortfall(monster);
-            if (shortfall>0){
-                var warning = document.createElement('div');
-                var warningText = document.createElement('span');
-                warningText.className = 'nutritionShortfall';
-                warningText.textContent = 'Food shortfall: '+FormatNumber(shortfall);
-                warning.appendChild(warningText);
-                objectDetails.appendChild(warning);
-            }
-        }
+        var presentation = SelectedObjectPresentation(selectedObject);
+        SetSelectionHeading(presentation.icon, presentation.title);
+        objectDetails.innerHTML = presentation.html;
     }
     function TreasureLegendIconSvg(kind){
         if (kind==='remaining'){
@@ -24419,7 +24521,20 @@ button:hover {
             UpdateManagementDrawer(latestSnapshot);
         }
     } );
-    document.getElementById('playPauseButton').addEventListener('click',function(){SendCommand(latestSnapshot&&latestSnapshot.paused?'RESUME_RAID':'PAUSE_RAID');});
+    function TogglePlayPause(){
+        SendCommand(latestSnapshot && latestSnapshot.paused ? 'RESUME_RAID' : 'PAUSE_RAID');
+    }
+    var playPauseButton = document.getElementById('playPauseButton');
+    playPauseButton.addEventListener('pointerdown', function (event){
+        if (event.button!==undefined && event.button!==0){ return; }
+        event.preventDefault();
+        TogglePlayPause();
+    });
+    playPauseButton.addEventListener('click', function (event){
+        // Keyboard activation has detail zero. Pointer activation is handled on
+        // pointerdown so touch/canvas gesture handling cannot swallow the command.
+        if (event.detail===0){ TogglePlayPause(); }
+    });
     inspectModeButton.addEventListener('click',function(){SetInteractionMode('inspect');});captureModeButton.addEventListener('click',function(){SetInteractionMode('capture');});recallModeButton.addEventListener('click',function(){SetInteractionMode('recall');});releaseModeButton.addEventListener('click',function(){SetInteractionMode('release');});InitialiseInteractionIcons();SetInteractionMode('inspect');
     document.getElementById('fastForwardButton').addEventListener('click',function(){var b=this,on=b.getAttribute('aria-pressed')!=='true';b.setAttribute('aria-pressed',on?'true':'false');SendCommand('SET_SIMULATION_SPEED',{multiplier:on?4:1});});
     document.getElementById('roundHistoryButton').addEventListener('click',ShowRoundHistory);
