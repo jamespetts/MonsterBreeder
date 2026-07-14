@@ -19302,7 +19302,13 @@ button:hover {
             if (!gameSession){
                 return;
             }
-            for (var speedTick=0; speedTick<simulationSpeedMultiplier; speedTick+=1){ gameSession.tick(); }
+            var phaseBeforeTicks = gameSession.phase;
+            for (var speedTick=0; speedTick<simulationSpeedMultiplier; speedTick+=1){
+                gameSession.tick();
+            }
+            if (phaseBeforeTicks==='raid' && gameSession.phase!=='raid'){
+                simulationSpeedMultiplier = 1;
+            }
             var events = gameSession.takeEvents();
             if (events.length>0){
                 Post({
@@ -19315,7 +19321,7 @@ button:hover {
             Post({
                 type : 'RAID_SNAPSHOT',
                 payload : {
-                    snapshot : gameSession.getSnapshot()
+                    snapshot : Object.assign(gameSession.getSnapshot(), { simulationSpeedMultiplier : simulationSpeedMultiplier })
                 }
             } );
         } , TICK_MS);
@@ -20517,7 +20523,7 @@ button:hover {
     function RenderRoundHistory(s){var body=document.getElementById('roundHistoryBody');body.innerHTML='';var h=CompletedRoundHistoryForSnapshot(s);if(!h.length){body.appendChild(E('p','detailMuted','No round has been completed yet.'));return;}var table=E('table','roundHistoryTable'),thead=document.createElement('thead'),hr=document.createElement('tr');['Round','State','Reason','Start','End','Stolen','Sold for food'].forEach(function(a){hr.appendChild(E('th','',a));});thead.appendChild(hr);table.appendChild(thead);var tb=document.createElement('tbody');h.forEach(function(r){var tr=document.createElement('tr'),state=r.winLossState||((r.endingTreasureValue||0)>0?'Win':'Loss');tr.appendChild(E('td','',FormatNumber(r.roundNumber||1)));var sc=E('td');sc.appendChild(E('span','roundResultBadge '+(state.toLowerCase()==='win'?'win':'loss'),state));tr.appendChild(sc);tr.appendChild(E('td','',r.reason||r.result||'Result unavailable'));tr.appendChild(E('td','',FormatNumber(r.startingTreasureValue||0)));tr.appendChild(E('td','',FormatNumber(r.endingTreasureValue||0)));tr.appendChild(E('td','',FormatNumber(r.treasureLostValue||0)));tr.appendChild(E('td','',FormatNumber(r.treasureSoldForFoodValue!==undefined?r.treasureSoldForFoodValue:r.foodExpenditureCredits||0)));tb.appendChild(tr);});table.appendChild(tb);body.appendChild(table);}
     function ShowRoundHistory(){RenderRoundHistory(latestSnapshot||{});document.getElementById('roundHistoryOverlay').classList.remove('dialogHidden');document.getElementById('closeRoundHistoryButton').focus();}
     function HideRoundHistory(){document.getElementById('roundHistoryOverlay').classList.add('dialogHidden');}
-    function UpdateTransportControls(s){var b=document.getElementById('playPauseButton'),paused=!!s.paused;b.setAttribute('aria-pressed',paused?'true':'false');b.setAttribute('aria-label','Toggle pause <SPACE>');b.title='Toggle pause <SPACE>';b.innerHTML=paused?'<span class="playSymbol" aria-hidden="true"></span>':'<span class="pauseSymbol" aria-hidden="true"><span></span><span></span></span>';}
+    function UpdateTransportControls(s){var b=document.getElementById('playPauseButton'),paused=!!s.paused,fastForwardButton=document.getElementById('fastForwardButton'),fastForward=Number(s.simulationSpeedMultiplier)===4;b.setAttribute('aria-pressed',paused?'true':'false');b.setAttribute('aria-label','Toggle pause <SPACE>');b.title='Toggle pause <SPACE>';b.innerHTML=paused?'<span class="playSymbol" aria-hidden="true"></span>':'<span class="pauseSymbol" aria-hidden="true"><span></span><span></span></span>';fastForwardButton.setAttribute('aria-pressed',fastForward?'true':'false');}
     function UpdateStatus(s){var mode=s.gameMode==='advancedCampaign'?'Advanced campaign':(s.gameMode==='campaign'?'Campaign':'Single round game');seasonDisplay.textContent=mode+' - Round '+(s.roundNumber||1)+' Season '+s.seasonNumber;UpdateTransportControls(s);RenderCampaignDashboard(s);}
     function BuildManagementRenderKey(s, monsters){
         var eggs =(s.management && s.management.eggs) || [];
