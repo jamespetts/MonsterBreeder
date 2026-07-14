@@ -460,7 +460,7 @@ button:hover {
 #sidePanel {
     margin-top: 0;
     display: grid;
-    grid-template-rows: 1fr 1fr;
+    grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
     gap: 0.75rem;
     min-height: 0;
     background: #020617;
@@ -478,7 +478,7 @@ button:hover {
     font-size: 0.92rem;
     color: #bfdbfe;
 }
-#campaignStatsSection, #selectionSection {
+#campaignStatsSection, #interactionModeSection, #selectionSection {
     min-width: 0;
     min-height: 0;
     overflow: auto;
@@ -1006,13 +1006,83 @@ button:hover {
 
 /* Campaign dashboard upgrade */
 #newRaidButton{order:10;margin-left:.6rem}.transportButton{width:2.8rem;height:2.55rem;padding:0;display:inline-flex;align-items:center;justify-content:center;gap:.2rem}.transportButton[aria-pressed=true]{background:#fff1a8;box-shadow:inset 0 2px 4px #0006}.playSymbol{width:0;height:0;border-top:.58rem solid transparent;border-bottom:.58rem solid transparent;border-left:.92rem solid #1f2730}.pauseSymbol,.fastForwardSymbol{display:inline-flex;gap:.2rem}.pauseSymbol span{width:.34rem;height:1.15rem;border-radius:.18rem;background:#1f2730}.fastForwardSymbol span{width:0;height:0;border-top:.48rem solid transparent;border-bottom:.48rem solid transparent;border-left:.72rem solid #1f2730;margin-left:-.09rem}
-#statusBox{white-space:normal}.campaignDashboard{display:grid;gap:.75rem}.dashboardCard{border:1px solid #263449;border-radius:.55rem;padding:.65rem;background:#0b1220}.climateCard{display:grid;grid-template-columns:2.7rem 1fr;gap:.75rem;align-items:center}.thermometer{position:relative;width:.78rem;height:4.4rem;margin:0 auto .55rem;border:2px solid #cbd5e1;border-radius:999px 999px .3rem .3rem;background:#172033}.thermometer:after{content:'';position:absolute;left:50%;bottom:-.62rem;width:1.35rem;height:1.35rem;transform:translateX(-50%);border:2px solid #cbd5e1;border-radius:50%;background:#dc2626}.thermometerFill{position:absolute;left:.13rem;right:.13rem;bottom:0;border-radius:999px;background:linear-gradient(0deg,#2563eb,#fbbf24 55%,#dc2626)}.climateValue{font-size:1.35rem;font-weight:900}.climateBiome{color:#bfdbfe;font-weight:800}.dashboardHeading{margin-bottom:.45rem;font-weight:900}.goalRow{display:grid;grid-template-columns:minmax(7rem,1fr) minmax(8.5rem,1.1fr);gap:.65rem;align-items:center;margin-top:.52rem}.progressTrack,.balanceTrack,.treasureTrack{position:relative;height:1.35rem;overflow:hidden;border-radius:999px;background:#1f2937;border:1px solid #475569}.progressFill{height:100%;background:linear-gradient(90deg,#1d4ed8,#38bdf8)}.progressText,.balanceValue{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.78rem;font-weight:900;text-shadow:0 1px 2px #000}.goalDescription{color:#dbeafe;font-size:.82rem}.balanceTrack{overflow:visible;background:#172033}.balanceTrack:after{content:'';position:absolute;left:50%;top:-.2rem;bottom:-.2rem;width:2px;background:#fff}.balanceBar{position:absolute;top:.12rem;bottom:.12rem;border-radius:999px}.balanceBar.surplus{left:50%;background:#16a34a}.balanceBar.deficit{right:50%;background:#dc2626}.treasureTrack{display:flex;height:1.75rem}.treasureSegment{display:flex;align-items:center;justify-content:center;overflow:hidden;color:#fff;font-size:.72rem;font-weight:900;text-shadow:0 1px 2px #000;white-space:nowrap}.treasureRemaining{background:#ca8a04}.treasureSold{background:#7c3aed}.treasureStolen{background:#b91c1c}.dashboardFootnote{color:#94a3b8;font-size:.76rem;margin-top:.35rem}
-#selectionSection{display:flex;flex-direction:column;overflow:hidden}#objectDetails{flex:0 1 auto;overflow:auto}#eventLogDisclosure{min-height:0;margin-top:.65rem;border-top:1px solid #1f2937;padding-top:.45rem}#eventLogDisclosure[open]{flex:1 1 14rem;display:flex;flex-direction:column}#eventLogDisclosure summary{cursor:pointer;color:#bfdbfe;font-weight:850}#eventLog{max-height:none;min-height:0;flex:1 1 auto}
+#statusBox{white-space:normal}.campaignDashboard{display:grid;gap:.75rem}.dashboardCard{border:1px solid #263449;border-radius:.55rem;padding:.65rem;background:#0b1220}.climateCard{display:grid;grid-template-columns:2.7rem 1fr;gap:.75rem;align-items:center}.thermometer{position:relative;width:.78rem;height:4.4rem;margin:0 auto .55rem;border:2px solid #cbd5e1;border-radius:999px 999px .3rem .3rem;background:#172033}.thermometer:after{content:'';position:absolute;left:50%;bottom:-.62rem;width:1.35rem;height:1.35rem;transform:translateX(-50%);border:2px solid #cbd5e1;border-radius:50%;background:currentColor}.thermometerFill{position:absolute;left:.13rem;right:.13rem;bottom:0;border-radius:999px;background:linear-gradient(0deg,#2563eb,#fbbf24 55%,#dc2626)}.climateValue{font-size:1.35rem;font-weight:900}.climateBiome{color:#bfdbfe;font-weight:800}.dashboardHeading{margin-bottom:.45rem;font-weight:900}.goalRow{display:grid;grid-template-columns:minmax(7rem,1fr) minmax(8.5rem,1.1fr);gap:.65rem;align-items:center;margin-top:.52rem}.progressTrack,.balanceTrack,.treasureTrack{position:relative;height:1.35rem;overflow:hidden;border-radius:999px;background:#1f2937;border:1px solid #475569}.progressFill{height:100%;background:linear-gradient(90deg,#1d4ed8,#38bdf8)}.progressText,.balanceValue{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.78rem;font-weight:900;text-shadow:0 1px 2px #000}.goalDescription{color:#dbeafe;font-size:.82rem}.balanceTrack{overflow:visible;background:#172033}.balanceTrack:after{content:'';position:absolute;left:50%;top:-.2rem;bottom:-.2rem;width:2px;background:#fff}.balanceBar{position:absolute;top:.12rem;bottom:.12rem;border-radius:999px}.balanceBar.surplus{left:50%;background:#16a34a}.balanceBar.deficit{right:50%;background:#dc2626}.treasureTrack{display:flex;height:1.75rem}.treasureSegment{display:flex;align-items:center;justify-content:center;overflow:hidden;color:#fff;font-size:.72rem;font-weight:900;text-shadow:0 1px 2px #000;white-space:nowrap}.treasureRemaining{background:#ca8a04}.treasureSold{background:#7c3aed}.treasureStolen{background:#b91c1c}.dashboardFootnote{color:#94a3b8;font-size:.76rem;margin-top:.35rem}
+#selectionSection{display:flex;flex-direction:column;overflow:hidden}#objectDetails{flex:0 1 auto;overflow:auto}#eventLogDisclosure{min-height:0;margin-top:.65rem;border-top:1px solid #1f2937;padding-top:.45rem}#eventLogDisclosure[open]{flex:1 1 14rem;display:flex;flex-direction:column}#eventLogDisclosure summary{cursor:pointer;color:#bfdbfe;font-weight:850}#eventLog{max-height:none;min-height:0;flex:1 1 auto;overflow-y:auto}
 #roundHistoryOverlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:1rem;background:#020617f0;color:#f8fafc}#roundHistoryOverlay.dialogHidden{display:none}#roundHistoryPanel{width:min(980px,calc(100vw - 2rem));max-height:min(860px,calc(100vh - 2rem));overflow:auto;border:1px solid #475569;border-radius:.85rem;padding:1rem;background:#111827}#roundHistoryPanel h2{margin:0;color:#f2c14e}.roundHistoryTable{width:100%;border-collapse:collapse;font-size:.88rem}.roundHistoryTable th,.roundHistoryTable td{padding:.55rem;border-bottom:1px solid #334155;text-align:right;vertical-align:top}.roundHistoryTable th:nth-child(-n+3),.roundHistoryTable td:nth-child(-n+3){text-align:left}.roundResultBadge{display:inline-block;padding:.16rem .5rem;border-radius:999px;font-weight:900}.roundResultBadge.win{background:#166534}.roundResultBadge.loss{background:#991b1b}#roundHistoryActions{display:flex;justify-content:flex-end;margin-top:.8rem}@media(min-width:981px){#sidePanel{grid-template-rows:minmax(17rem,auto) minmax(13rem,1fr)}}@media(max-width:700px){.goalRow{grid-template-columns:1fr}}
 
 .dashboardCard.statClickable{cursor:pointer;transition:border-color .15s,transform .15s}.dashboardCard.statClickable:hover{border-color:#f2c14e;transform:translateY(-1px)}
-.thermometerFill{background:var(--thermometer-colour,#dc2626)!important}.treasureLegend{display:grid;grid-template-columns:repeat(3,1fr);gap:.35rem;margin-top:.45rem}.treasureLegendItem{display:flex;align-items:center;gap:.3rem;color:#dbeafe;font-size:.76rem}.legendSwatch{width:.72rem;height:.72rem;border-radius:.18rem;flex:none}
+.thermometerFill{background:currentColor!important}.treasureLegend{display:grid;grid-template-columns:repeat(3,1fr);gap:.35rem;margin-top:.45rem}.treasureLegendItem{display:flex;align-items:center;gap:.3rem;color:#dbeafe;font-size:.76rem}.legendSwatch{width:.72rem;height:.72rem;border-radius:.18rem;flex:none}
 #statDetailOverlay{position:fixed;inset:0;z-index:55;display:flex;align-items:center;justify-content:center;padding:1rem;background:#020617f2;color:#f8fafc}#statDetailOverlay.dialogHidden{display:none}#statDetailPanel{width:min(900px,calc(100vw - 2rem));max-height:min(850px,calc(100vh - 2rem));overflow:auto;border:1px solid #475569;border-radius:.85rem;padding:1rem;background:#111827;box-sizing:border-box}#statDetailPanel h2{margin:0 0 .7rem;color:#f2c14e}.statDetailActions{display:flex;justify-content:flex-end;margin-top:1rem}.statChart{width:100%;height:auto;background:#07101f;border:1px solid #334155;border-radius:.55rem}.statGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.65rem}.statTile{padding:.65rem;border:1px solid #334155;border-radius:.5rem;background:#0b1220}.statTile strong{display:block;color:#f2c14e;font-size:1.2rem}.iconRow{display:flex;align-items:center;gap:.55rem;margin:.45rem 0}.statIcon{width:2rem;height:2rem;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#263449;font-size:1.15rem;flex:none}.barRow{display:grid;grid-template-columns:minmax(7rem,1fr) 2fr 3.2rem;gap:.5rem;align-items:center;margin:.45rem 0}.barTrack{height:1rem;border-radius:999px;background:#1f2937;overflow:hidden}.barFill{height:100%;border-radius:999px}.typeGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.55rem;margin-top:.7rem}.typeTile{padding:.55rem;border-radius:.5rem;background:#0b1220;border:1px solid #334155}.typeColour{height:.45rem;border-radius:999px;margin:.35rem 0}
+
+#sidePanel{grid-template-rows:minmax(0,1fr) auto minmax(15rem,1.45fr);gap:.35rem}
+#interactionModeSection{overflow:visible!important;padding:.35rem .65rem!important;min-height:auto!important}
+.interactionModeButtons{display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem}
+.interactionModeButton{height:2.65rem;padding:.25rem;display:flex;align-items:center;justify-content:center;background:#263449;color:#f8fafc;border:1px solid #475569}
+.interactionModeButton svg{width:1.75rem;height:1.75rem;display:block;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.interactionModeButton:hover{background:#334155}
+.interactionModeButton[aria-pressed=true]{background:#f2c14e;color:#1f2730;border-color:#fde68a;box-shadow:inset 0 2px 5px #0005}
+.climateCard{display:flex!important;flex-direction:column;align-items:stretch!important;gap:.55rem!important}
+.climateBiomeRow{display:flex;align-items:center;gap:.5rem;color:#bfdbfe;font-weight:800}
+.biomeIcon{font-size:1.45rem;line-height:1;flex:none}
+.seasonRow{display:flex;align-items:center;gap:.42rem;margin-top:.22rem;color:#dbeafe;font-weight:800}
+.seasonIcon{font-size:1.12rem;line-height:1;flex:none}
+.climateInstrument{display:grid;grid-template-columns:2.7rem 1fr;gap:.75rem;align-items:center}
+.goalIcon{width:2rem;height:2rem;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#263449;font-size:1.15rem;cursor:help}
+.goalRow{grid-template-columns:2rem minmax(7rem,1fr)!important}
+.dashboardCard.statClickable{position:relative;transform:none!important}
+.dashboardCard.statClickable:hover{transform:none!important}
+.dashboardCard.statClickable[data-tooltip]:hover:after,.dashboardCard.statClickable[data-tooltip]:focus-visible:after{content:attr(data-tooltip);position:absolute;z-index:20;right:.45rem;top:.35rem;padding:.25rem .45rem;border:1px solid #64748b;border-radius:.3rem;background:#111827;color:#f8fafc;font-size:.75rem;font-weight:700;line-height:1.2;white-space:nowrap;box-shadow:0 3px 10px #0008;pointer-events:none}
+#selectionSection{min-height:15rem!important;overflow:hidden!important}
+#objectDetails{flex:1 1 auto;min-height:4rem;overflow:auto}
+#eventLogDisclosure{flex:0 0 auto;min-height:0;max-height:11rem;overflow:hidden}
+#eventLogDisclosure[open]{display:block;flex:0 0 auto;min-height:7rem;max-height:11rem;overflow:hidden}
+#eventLog{display:block;height:6.8rem;max-height:6.8rem!important;overflow-y:scroll!important;overscroll-behavior:contain;scrollbar-gutter:stable;padding-right:.35rem}
+#raidCanvas.modeInspect{cursor:help}
+#raidCanvas.modeCapture{cursor:crosshair}
+#raidCanvas.modeRecall{cursor:pointer}
+#raidCanvas.modeRelease{cursor:cell}
+
+/* Final sidebar sizing: campaign always fully visible; interaction strip is compact;
+   selected-object area receives the remaining height. */
+#sidePanel{grid-template-rows:auto auto minmax(0,1fr)!important;gap:.35rem!important;overflow:visible}
+#campaignStatsSection{overflow:visible!important;min-height:max-content!important;height:auto!important}
+#campaignStatsSection .campaignDashboard{gap:.42rem}
+#campaignStatsSection .dashboardCard{padding:.48rem .58rem}
+#interactionModeSection{height:auto!important;min-height:0!important}
+#selectionSection{min-height:0!important;height:auto!important;overflow:hidden!important}
+#selectionSection #objectDetails{flex:1 1 auto;min-height:2.5rem;overflow:auto}
+#selectionSection #eventLogDisclosure:not([open]){flex:0 0 auto;max-height:none}
+#selectionSection #eventLogDisclosure[open]{display:flex;flex:3 1 18rem;min-height:14rem;max-height:none;overflow:hidden}
+#selectionSection #eventLogDisclosure[open] #eventLog{flex:1 1 auto;height:auto;max-height:none!important;min-height:11rem;overflow-y:scroll!important}
+.dashboardCard.statClickable[data-tooltip]:hover:after,.dashboardCard.statClickable[data-tooltip]:focus-visible:after{content:none!important;display:none!important}
+#raidCanvas.modeInspect{cursor:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2232%22%20viewBox%3D%220%200%2048%2048%22%3E%3Ccircle%20cx%3D%2218%22%20cy%3D%2218%22%20r%3D%2212%22%20fill%3D%22%23dbeafe%22%20stroke%3D%22%231e3a5f%22%20stroke-width%3D%224%22%2F%3E%3Cpath%20d%3D%22M27%2027l16%2016%22%20stroke%3D%22%236b4423%22%20stroke-width%3D%228%22%2F%3E%3C%2Fsvg%3E") 4 4, crosshair}
+#raidCanvas.modeCapture{cursor:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2232%22%20viewBox%3D%220%200%2048%2048%22%3E%3Cellipse%20cx%3D%2217%22%20cy%3D%2216%22%20rx%3D%2214%22%20ry%3D%2211%22%20fill%3D%22%23dbeafe%22%20stroke%3D%22%23275d47%22%20stroke-width%3D%224%22%2F%3E%3Cpath%20d%3D%22M6%2011l22%2010M6%2021L26%208M12%206l10%2021M4%2016h27%22%20stroke%3D%22%234f8f72%22%20stroke-width%3D%222%22%2F%3E%3Cpath%20d%3D%22M27%2024l16%2019%22%20stroke%3D%22%23704526%22%20stroke-width%3D%228%22%2F%3E%3C%2Fsvg%3E") 4 4, crosshair}
+#raidCanvas.modeRecall{cursor:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2232%22%20viewBox%3D%220%200%2048%2048%22%3E%3Cpath%20d%3D%22M9%2039c7-3%2010-8%2011-15l2-10c.4-2%204-1.5%203.6.8l-.5%209%202-16c.4-2%204-1.5%203.6.8l-1.2%2014%202-11c.5-2%204-1%203.5%201l-1.5%2011%202-7c.6-2%204-1%203.4%201.2l-2%2011C35%2038%2029%2043%2018%2043H9z%22%20fill%3D%22%23f4b183%22%20stroke%3D%22%23713f2f%22%20stroke-width%3D%222.5%22%2F%3E%3Cpath%20d%3D%22M4%2015C11%207%2020%205%2028%208M4%2015l2-9M4%2015l10-1%22%20fill%3D%22none%22%20stroke%3D%22%23f2c14e%22%20stroke-width%3D%223%22%2F%3E%3C%2Fsvg%3E") 4 4, crosshair}
+#raidCanvas.modeRelease{cursor:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2232%22%20viewBox%3D%220%200%2048%2048%22%3E%3Cpath%20d%3D%22M2%2031h19l5-3%2013%20.5c4%20.2%205%203%204%205-1%202-3%203-5%203l-12%201C20%2043%2013%2044%202%2042z%22%20fill%3D%22%23f4b183%22%20stroke%3D%22%23713f2f%22%20stroke-width%3D%222.5%22%2F%3E%3Cpath%20d%3D%22M22%2030l4-5%204-12M31%2024l4-10M35%2025l4-7%22%20fill%3D%22none%22%20stroke%3D%22%23713f2f%22%20stroke-width%3D%223%22%2F%3E%3Cpath%20d%3D%22M7%2016c5-5%2011-6%2016-3M19%209l4%204-5%203%22%20fill%3D%22none%22%20stroke%3D%22%2322c55e%22%20stroke-width%3D%223%22%2F%3E%3C%2Fsvg%3E") 4 4, crosshair}
+
+/* Event log: one explicit independently scrolling viewport. */
+#selectionSection.eventLogOpen{display:grid!important;grid-template-rows:auto minmax(2.5rem,7rem) minmax(14rem,1fr);min-height:0!important}
+#selectionSection.eventLogOpen>#objectDetails{min-height:0!important;max-height:7rem!important;overflow:auto!important}
+#selectionSection.eventLogOpen>#monsterPortrait{display:none!important}
+#selectionSection.eventLogOpen>#eventLogDisclosure{display:grid!important;grid-template-rows:auto minmax(0,1fr)!important;min-height:14rem!important;height:100%!important;max-height:none!important;overflow:hidden!important;margin-top:.25rem!important}
+#selectionSection.eventLogOpen #eventLog{display:block!important;box-sizing:border-box!important;width:100%!important;height:100%!important;min-height:0!important;max-height:none!important;overflow-x:hidden!important;overflow-y:auto!important;scrollbar-gutter:stable both-edges;scrollbar-width:auto;scrollbar-color:#64748b #111827;padding-right:.8rem!important;margin-bottom:0!important}
+#eventLog::-webkit-scrollbar{width:14px}
+#eventLog::-webkit-scrollbar-track{background:#111827;border-left:1px solid #334155}
+#eventLog::-webkit-scrollbar-thumb{background:#64748b;border:3px solid #111827;border-radius:999px}
+#campaignStatsSection{padding-top:.5rem!important}
+.interactionModeButton svg{width:2.15rem!important;height:2.15rem!important;stroke:none!important}
+
+.interactionModeButton svg{width:2.2rem!important;height:2.2rem!important;display:block;pointer-events:none;overflow:visible}
+.treasureLegend{display:flex!important;justify-content:center!important;gap:1rem!important;margin-top:.45rem!important}
+.treasureLegendItem{display:block!important;width:1.05rem!important;height:1.05rem!important;padding:0!important;border:2px solid #cbd5e1!important;border-radius:.25rem!important;box-sizing:border-box!important;cursor:help!important}
+.treasureLegendItem .legendSwatch{display:block!important;width:100%!important;height:100%!important;border-radius:.12rem!important}
+.treasureTrack{cursor:help}
+
+.victoryOrRow{display:grid;grid-template-columns:2rem minmax(7rem,1fr);gap:.65rem;align-items:center;margin:.15rem 0 -.15rem}
+.victoryOrText{grid-column:2;text-align:center;color:#94a3b8;font-size:.76rem;font-weight:900;letter-spacing:.08em}
+.treasureLegendItem{display:flex!important;width:auto!important;height:1.35rem!important;align-items:center!important;gap:.28rem!important;border:0!important;background:transparent!important}
+.treasureLegendIcon{width:1.1rem;height:1.1rem;display:block;flex:none}
+.treasureLegendItem .legendSwatch{width:.72rem!important;height:.72rem!important;border:1px solid #cbd5e1;border-radius:.14rem!important;flex:none}
 </style>
 </head>
 <body>
@@ -1023,10 +1093,10 @@ button:hover {
 </div>
 <div id="seasonDisplay" aria-live="polite">Main Menu</div>
 <div id="controls">
-<button id="playPauseButton" class="transportButton" type="button" aria-label="Pause game" aria-pressed="false"><span class="pauseSymbol" aria-hidden="true"><span></span><span></span></span></button>
-<button id="fastForwardButton" class="transportButton" type="button" aria-label="Fast forward at four times speed" aria-pressed="false"><span class="fastForwardSymbol" aria-hidden="true"><span></span><span></span></span></button>
-<button id="roundHistoryButton" type="button">Round Results</button>
-<button id="newRaidButton" type="button">Main Menu</button>
+<button id="playPauseButton" class="transportButton" type="button" aria-label="Toggle pause &lt;SPACE&gt;" title="Toggle pause &lt;SPACE&gt;" aria-pressed="false"><span class="pauseSymbol" aria-hidden="true"><span></span><span></span></span></button>
+<button id="fastForwardButton" class="transportButton" type="button" aria-label="Fast forward &lt;F&gt;" title="Fast forward &lt;F&gt;" aria-pressed="false"><span class="fastForwardSymbol" aria-hidden="true"><span></span><span></span></span></button>
+<button id="roundHistoryButton" type="button" title="Scoreboard &lt;S&gt;">Scoreboard</button>
+<button id="newRaidButton" type="button" title="Main menu &lt;ESC&gt;">Main Menu</button>
 </div>
 </header>
 <main id="layout">
@@ -1060,19 +1130,22 @@ button:hover {
 </canvas>
 <div id="monsterTooltip" class="tooltipHidden">
 </div>
-<p class="hint">Use WASD/arrow keys or drag the map to pan. Mouse wheel zooms the map around the pointer; pinch zoom works on touch screens.</p>
 </section>
 <aside id="sidePanel">
 <section id="campaignStatsSection">
-<h2>Campaign Stats</h2>
 <div id="statusBox">Open the main menu to start a campaign or single game.</div>
 </section>
-<section id="selectionSection">
+<section id="interactionModeSection"><div class="interactionModeButtons" role="toolbar" aria-label="Map interaction mode">
+<button id="inspectModeButton" class="interactionModeButton" type="button" title="Query &lt;Q&gt;" aria-label="Query &lt;Q&gt;" aria-pressed="true"></button>
+<button id="captureModeButton" class="interactionModeButton" type="button" title="Capture wild monster &lt;C&gt;" aria-label="Capture wild monster &lt;C&gt;" aria-pressed="false"></button>
+<button id="recallModeButton" class="interactionModeButton" type="button" title="Recall captured monster to base &lt;B&gt;" aria-label="Recall captured monster to base &lt;B&gt;" aria-pressed="false"></button>
+<button id="releaseModeButton" class="interactionModeButton" type="button" title="Release captured monster &lt;R&gt;" aria-label="Release captured monster &lt;R&gt;" aria-pressed="false"></button>
+</div></section><section id="selectionSection">
 <h2>Selected Object</h2>
 <div id="objectDetails">Click any monster, adventurer, treasure, scenery object or terrain tile to inspect it.</div>
 <div id="monsterPortrait">
 </div>
-<details id="eventLogDisclosure" open><summary>Event Log</summary>
+<details id="eventLogDisclosure"><summary title="Show or hide event log">Event Log</summary>
 <ol id="eventLog"></ol></details>
 </section>
 </aside>
@@ -1223,7 +1296,7 @@ button:hover {
 </div>
 </div>
 <div id="statDetailOverlay" class="dialogHidden" role="dialog" aria-modal="true" aria-labelledby="statDetailTitle"><div id="statDetailPanel"><h2 id="statDetailTitle">Statistics</h2><div id="statDetailBody"></div><div class="statDetailActions"><button id="closeStatDetailButton" type="button">Close</button></div></div></div>
-<div id="roundHistoryOverlay" class="dialogHidden" role="dialog" aria-modal="true" aria-labelledby="roundHistoryTitle"><div id="roundHistoryPanel"><h2 id="roundHistoryTitle">Round Results</h2><p>Completed rounds in this campaign, or the result of the current single game.</p><div id="roundHistoryBody"></div><div id="roundHistoryActions"><button id="closeRoundHistoryButton" type="button">Return to game</button></div></div></div>
+<div id="roundHistoryOverlay" class="dialogHidden" role="dialog" aria-modal="true" aria-labelledby="roundHistoryTitle"><div id="roundHistoryPanel"><h2 id="roundHistoryTitle">Scoreboard</h2><p>Completed rounds in this campaign, or the result of the current single game.</p><div id="roundHistoryBody"></div><div id="roundHistoryActions"><button id="closeRoundHistoryButton" type="button">Return to game</button></div></div></div>
 <div id="gameToast" role="status" aria-live="polite"></div>
 <script id="simulationWorkerSource" type="text/plain">
 // SPDX-License-Identifier: GPL-3.0-only
@@ -5828,8 +5901,14 @@ button:hover {
                 var remainingAmount = breakdown.remaining.byType[treasureType].amount;
                 addAmount('stolen', treasureType, Math.max(0, startingAmount-remainingAmount));
             } );
-            breakdown.foodExpenditureCredits = 0;
-            breakdown.treasureSoldForFoodValue = this.treasureSoldForFoodValue || 0;
+            var treasureSoldForFoodValue = Math.max(0, this.treasureSoldForFoodValue || this.foodExpenditureCredits || 0);
+            // Sold treasure has already been removed physically from its deposit.
+            // Report that removal as food expenditure, not as treasure stolen by
+            // adventurers. Legacy saves may not retain sale attribution by type,
+            // so the authoritative aggregate value is corrected here.
+            breakdown.foodExpenditureCredits = treasureSoldForFoodValue;
+            breakdown.treasureSoldForFoodValue = treasureSoldForFoodValue;
+            breakdown.stolen.totalValue = Math.max(0, breakdown.starting.totalValue-breakdown.remaining.totalValue-treasureSoldForFoodValue);
             breakdown.remainingAfterFoodValue = breakdown.remaining.totalValue;
             return breakdown;
         }
@@ -5838,7 +5917,7 @@ button:hover {
                 treasureDeposits : this.getTreasureSnapshots(),
                 remainingTreasureValue : this.getRemainingTreasureValue(),
                 treasureBreakdown : this.getTreasureBreakdown(extraLooseTreasure),
-                foodExpenditureCredits : this.foodExpenditureCredits || 0
+                foodExpenditureCredits : this.treasureSoldForFoodValue || this.foodExpenditureCredits || 0
             } ;
         }
         hasTreasureRemaining(extraLooseTreasure){
@@ -8033,10 +8112,11 @@ button:hover {
                 monster.foodBoughtCostCreditsThisSeason =(monster.foodFromPurchasedMeatThisSeason || 0) * NutritionSystem.getFoodCostCredits(world);
             } );
             gameState.excessMeatFood =(gameState.excessMeatFood || 0)+result.purchasedMeatStored+result.previousStoredMeatReturned;
+            gameState.currentSeasonCaptiveFoodRemaining = Math.max(0, gameState.currentSeasonCaptiveFoodRemaining || 0)+result.captiveFoodUnused;
             return result;
         } ,
         provideEmergencyFoodForNewCaptures : function (gameState, world, monsters, raidTickNumber){
-            var result = { foodProvided : 0, storedFoodUsed : 0, purchasedFood : 0, expenditureCredits : 0, events : [] };
+            var result = { foodProvided : 0, captiveFoodUsed : 0, storedFoodUsed : 0, purchasedFood : 0, expenditureCredits : 0, events : [] };
             var price = this.getFoodCostCredits(world);
             (monsters || []).forEach(function(monster){
                 if (!monster || !monster.alive || !monster.capturedThisRaid){ return; }
@@ -8047,6 +8127,16 @@ button:hover {
                 var existingFood = this.getTotalFoodThisSeason(monster);
                 var needed = Math.max(0, proratedRequirement-existingFood);
                 if (needed<=0){ return; }
+                // Consume the same authoritative fresh-food pool that was created
+                // when the season's ordinary allocations were committed. This
+                // prevents a new capture from buying meat while unallocated captive
+                // macrofauna food exists.
+                var fromCaptive = Math.min(needed, Math.max(0, gameState.currentSeasonCaptiveFoodRemaining || 0));
+                gameState.currentSeasonCaptiveFoodRemaining = Math.max(0, (gameState.currentSeasonCaptiveFoodRemaining || 0)-fromCaptive);
+                monster.foodFromCaptiveMacrofaunaThisSeason=(monster.foodFromCaptiveMacrofaunaThisSeason || 0)+fromCaptive;
+                monster.foodBoughtThisSeason=(monster.foodBoughtThisSeason || 0)+fromCaptive;
+                needed-=fromCaptive;
+                result.captiveFoodUsed+=fromCaptive;
                 var fromStored = Math.min(needed, Math.max(0, gameState.excessMeatFood || 0));
                 gameState.excessMeatFood = Math.max(0, (gameState.excessMeatFood || 0)-fromStored);
                 monster.foodFromStoredMeatThisSeason=(monster.foodFromStoredMeatThisSeason || 0)+fromStored;
@@ -8056,6 +8146,7 @@ button:hover {
                 var purchased=0;
                 if (needed>0 && world && Array.isArray(world.treasureDeposits)){
                     var creditsNeeded=needed * price;
+                    var expenditureBeforePurchase = result.expenditureCredits;
                     var deposits=world.treasureDeposits.filter(function(d){return (d.amountRemaining || 0)>0;}).slice(0).sort(function(a,b){return (b.amountRemaining || 0)-(a.amountRemaining || 0);});
                     for (var i=0;i<deposits.length && creditsNeeded>0;i+=1){
                         var deposit=deposits[i];
@@ -8067,18 +8158,26 @@ button:hover {
                         creditsNeeded-=value;
                         result.expenditureCredits+=value;
                     }
-                    purchased=Math.min(needed,result.expenditureCredits/Math.max(1,price));
+                    var purchaseExpenditure = result.expenditureCredits-expenditureBeforePurchase;
+                    purchased=Math.min(needed,purchaseExpenditure/Math.max(1,price));
                     monster.foodFromPurchasedMeatThisSeason=(monster.foodFromPurchasedMeatThisSeason || 0)+purchased;
                     monster.foodBoughtThisSeason=(monster.foodBoughtThisSeason || 0)+purchased;
                     monster.foodBoughtCostCreditsThisSeason=(monster.foodBoughtCostCreditsThisSeason || 0)+purchased*price;
                     result.purchasedFood+=purchased;
-                    gameState.treasureSoldForFoodValue=(gameState.treasureSoldForFoodValue || 0)+result.expenditureCredits;
-                    gameState.roundTreasureSoldForFoodValue=(gameState.roundTreasureSoldForFoodValue || 0)+result.expenditureCredits;
-                    world.treasureSoldForFoodValue=(world.treasureSoldForFoodValue || 0)+result.expenditureCredits;
+                    gameState.treasureSoldForFoodValue=(gameState.treasureSoldForFoodValue || 0)+purchaseExpenditure;
+                    gameState.roundTreasureSoldForFoodValue=(gameState.roundTreasureSoldForFoodValue || 0)+purchaseExpenditure;
+                    world.treasureSoldForFoodValue=(world.treasureSoldForFoodValue || 0)+purchaseExpenditure;
+                    world.foodExpenditureCredits = world.treasureSoldForFoodValue;
                 }
-                var supplied=fromStored+purchased;
+                var supplied=fromCaptive+fromStored+purchased;
                 result.foodProvided+=supplied;
-                if (supplied>0){ result.events.push(monster.name+' received '+Math.round(supplied*10)/10+' emergency food after capture.'); }
+                if (supplied>0){
+                    var sourceParts=[];
+                    if(fromCaptive>0){sourceParts.push(Math.round(fromCaptive*10)/10+' captive food');}
+                    if(fromStored>0){sourceParts.push(Math.round(fromStored*10)/10+' stored food');}
+                    if(purchased>0){sourceParts.push(Math.round(purchased*10)/10+' purchased food costing '+purchaseExpenditure+' credits');}
+                    result.events.push(monster.name+' received '+Math.round(supplied*10)/10+' emergency food after capture ('+sourceParts.join(', ')+').');
+                }
             },this);
             return result;
         } ,
@@ -8086,6 +8185,11 @@ button:hover {
             var monsters = gameState.getLivingOwnedMonsters();
             var settlement = this.settleLairFoodAfterRaid(gameState, world, monsters);
             var emergencyFeeding = this.provideEmergencyFoodForNewCaptures(gameState, world, monsters, raidTickNumber);
+            // Fresh captive production is seasonal and cannot be carried into the
+            // next management phase. Any remainder is discarded only after every
+            // existing allocation and new-capture requirement has been settled.
+            var unusedCaptiveFood = Math.max(0, gameState.currentSeasonCaptiveFoodRemaining || 0);
+            gameState.currentSeasonCaptiveFoodRemaining = 0;
             var result = {
                 foodCostCredits : this.getFoodCostCredits(world),
                 foodEatenInRaid : 0,
@@ -8097,6 +8201,7 @@ button:hover {
                 monstersStarved : 0,
                 settlement : settlement,
                 emergencyFeeding : emergencyFeeding,
+                unusedCaptiveFood : unusedCaptiveFood,
                 events : emergencyFeeding.events.slice(0)
             } ;
             monsters.forEach(function (monster){
@@ -11831,6 +11936,12 @@ button:hover {
                 return 0;
             }
             var age = Math.max(1, this.ageInSeasons || 0);
+            // Age-related mortality must not precede the onset of ageing. The
+            // Weibull tail is deliberately retained from that point onward so the
+            // established approximately six-year population lifespan is preserved.
+            if (age<MONSTER_AGEING_START_SEASONS){
+                return 0;
+            }
             var previousAge = Math.max(0, age-1);
             var currentPower = Math.pow(age / MONSTER_OLD_AGE_WEIBULL_SCALE_SEASONS, MONSTER_OLD_AGE_WEIBULL_SHAPE);
             var previousPower = Math.pow(previousAge / MONSTER_OLD_AGE_WEIBULL_SCALE_SEASONS, MONSTER_OLD_AGE_WEIBULL_SHAPE);
@@ -13740,6 +13851,10 @@ button:hover {
             this.foodExpenditureCredits = 0;
             this.roundFoodExpenditureCredits = 0;
             this.excessMeatFood = 0;
+            // Authoritative amount of this season's fresh captive-macrofauna food
+            // that has not been assigned to a monster. Allocations on monsters,
+            // this pool and excessMeatFood are the only food inventory records.
+            this.currentSeasonCaptiveFoodRemaining = 0;
             this.treasureSoldForFoodValue = 0;
             this.roundTreasureSoldForFoodValue = 0;
             this.wildMonsterHarvestByBiome = {};
@@ -14181,9 +14296,10 @@ button:hover {
                     return { id:brood.id,motherId:brood.motherId,motherName:brood.motherName,fatherId:brood.fatherId,fatherName:brood.fatherName,seasonMated:brood.seasonMated,incubationSeasonsRemaining:brood.incubationSeasonsRemaining,clutchSize:brood.clutchSize,eggs:brood.eggs.map(function(egg){return egg.getSnapshot();}) };
                 } ),
                 familyTree : Object.keys(this.familyTree).map(function(id){return this.familyTree[id].getSnapshot();},this),
-                foodExpenditureCredits : this.foodExpenditureCredits || 0,
+                foodExpenditureCredits : this.treasureSoldForFoodValue || this.foodExpenditureCredits || 0,
                 roundFoodExpenditureCredits : this.roundFoodExpenditureCredits || 0,
                 excessMeatFood : this.excessMeatFood || 0,
+                currentSeasonCaptiveFoodRemaining : this.currentSeasonCaptiveFoodRemaining || 0,
                 treasureSoldForFoodValue : this.treasureSoldForFoodValue || 0,
                 roundTreasureSoldForFoodValue : this.roundTreasureSoldForFoodValue || 0
             } ;
@@ -15852,7 +15968,7 @@ button:hover {
                 } ).map(function (animal){
                     return animal.getSnapshot();
                 } ),
-                foodExpenditureCredits : this.world.foodExpenditureCredits || 0,
+                foodExpenditureCredits : this.world.treasureSoldForFoodValue || this.world.foodExpenditureCredits || 0,
                 monsters : this.monsters.filter(function (monster){
                     return !monster.escaped && monster.deployed;
                 } ).map(function (monster){
@@ -16395,6 +16511,7 @@ button:hover {
                 }
             } , this);
             this.world.treasureSoldForFoodValue =(this.world.treasureSoldForFoodValue || 0)+salePreview.saleValue;
+            this.world.foodExpenditureCredits = this.world.treasureSoldForFoodValue;
             this.gameState.treasureSoldForFoodValue =(this.gameState.treasureSoldForFoodValue || 0)+salePreview.saleValue;
             this.gameState.roundTreasureSoldForFoodValue =(this.gameState.roundTreasureSoldForFoodValue || 0)+salePreview.saleValue;
             this.gameState.foodExpenditureCredits = this.gameState.treasureSoldForFoodValue;
@@ -16425,6 +16542,10 @@ button:hover {
             // Unused fresh captive production does not carry over; only meat obtained
             // by selling indivisible treasure units remains in cold storage.
             this.gameState.excessMeatFood = Math.max(0, purchasedRemaining);
+            // This is the sole authoritative pool of unallocated fresh food for
+            // the active season. It is consumed by later new captures and is never
+            // recomputed from the display plan.
+            this.gameState.currentSeasonCaptiveFoodRemaining = Math.max(0, captiveRemaining);
             this.pendingEvents.push({
                 tickNumber : 0,
                 text : 'Captive '+plan.captiveMacrofauna.displayName+' produced '+plan.captiveMacrofauna.foodProduced+' food. '+(salePreview.saleValue>0 ? 'Treasure worth '+salePreview.saleValue+' credits was sold for meat; '+this.gameState.excessMeatFood+' excess food remains stored.' : 'No treasure was sold for meat.')
@@ -16464,16 +16585,24 @@ button:hover {
             } ;
         }
         releaseOwnedMonster(monsterId){
-            if (this.phase==='raid'){
-                return {
-                    ok : false,
-                    reason : 'Captive monsters can be released into the wild only during management.'
-                } ;
-            }
+            var releasedDuringRaid = this.phase==='raid' && this.currentRaid;
+            var raidMonster = releasedDuringRaid ? this.gameState.ownedMonsters.find(function (monster){
+                return monster.id===monsterId;
+            } ) : null;
             var result = this.gameState.releaseOwnedMonster(monsterId, this.world);
+            if (result.ok && releasedDuringRaid && raidMonster){
+                raidMonster.wild = true;
+                raidMonster.wildResident = true;
+                raidMonster.deployed = true;
+                raidMonster.capturedThisRaid = false;
+                raidMonster.behaviourState = 'wandering';
+                if (this.currentRaid.wildMonsters.indexOf(raidMonster)<0){
+                    this.currentRaid.wildMonsters.push(raidMonster);
+                }
+            }
             if (result.ok){
                 this.pendingEvents.push({
-                    tickNumber : 0,
+                    tickNumber : releasedDuringRaid ? this.currentRaid.tickNumber : 0,
                     text : result.monsterName+' was uncollared and released into the wild. It no longer uses captive food.'
                 } );
             } else{
@@ -16637,7 +16766,7 @@ button:hover {
                 treasures : treasureSnapshots,
                 treasureDeposits : treasureSnapshots,
                 treasureBreakdown : this.world.getTreasureBreakdown(),
-                foodExpenditureCredits : this.world.foodExpenditureCredits || 0,
+                foodExpenditureCredits : this.world.treasureSoldForFoodValue || this.world.foodExpenditureCredits || 0,
                 droppedTreasure : [],
                 remains : this.roundRemains.slice(0),
                 macrofauna : [],
@@ -17200,6 +17329,15 @@ button:hover {
         var slowDurationCounts={1:0,2:0,3:0};
         for(var slowSeed=0;slowSeed<400;slowSeed+=1){slowDurationCounts[slowLifecycleEgg.calculateJuvenileMaturationSeasons(new SeededRng(89000+slowSeed))]+=1;}
         AddRegressionResult(results, 'Extreme slow development can produce two or three juvenile seasons', slowDurationCounts[2]>0 && slowDurationCounts[3]>0, 'one='+slowDurationCounts[1]+', two='+slowDurationCounts[2]+', three='+slowDurationCounts[3]);
+        var youngAdultMonster = new Monster('young_adult_mortality_regression', RIGHT_EDGE_X, 160, new SeededRng(71095), {
+            owned : true,
+            sex : MONSTER_SEX.FEMALE,
+            world : breedingWorld,
+            name : 'Young adult',
+            ageInSeasons : 2 * MONSTER_SEASONS_PER_YEAR
+        } );
+        youngAdultMonster.lifeStage = MONSTER_LIFE_STAGE.ADULT;
+        AddRegressionResult(results, 'Young adult monsters cannot die of old age before ageing begins', youngAdultMonster.getOldAgeMortalityChance()===0, 'ageSeasons='+youngAdultMonster.ageInSeasons+', risk='+youngAdultMonster.getOldAgeMortalityChance());
         var ageingMonster = new Monster('ageing_regression', RIGHT_EDGE_X, 180, new SeededRng(7110), {
             owned : true,
             sex : MONSTER_SEX.MALE,
@@ -17624,6 +17762,14 @@ button:hover {
         } );
         var knightPressure =(new Raid(knightSession.world, knightSession.gameState, 98772, 2)).getClassDeterrencePenalty();
         AddRegressionResult(results, 'Knights are not deterred by lower-class adventurers failing to return alive', knightPressure.knight===1, 'knight='+knightPressure.knight);
+        var accountingDeposit = new TreasureDeposit('accounting_deposit', 100, 100, 'bronze', 10);
+        accountingDeposit.amountRemaining = 7;
+        var accountingBreakdown = World.prototype.getTreasureBreakdown.call({
+            treasureDeposits : [accountingDeposit],
+            treasureSoldForFoodValue : 20,
+            foodExpenditureCredits : 0
+        }, []);
+        AddRegressionResult(results, 'Treasure sold for food is reported separately from stolen treasure', accountingBreakdown.foodExpenditureCredits===20 && accountingBreakdown.treasureSoldForFoodValue===20 && accountingBreakdown.stolen.totalValue===10 && accountingBreakdown.remainingAfterFoodValue===70, 'breakdown='+JSON.stringify(accountingBreakdown));
         var endScreenSession = new GameSession(54321, {
             mode : 'campaign',
             worldOptions : {
@@ -18325,6 +18471,25 @@ button:hover {
         captureFoodState.addCapturedMonster(captureFoodMonster);
         var captureFoodResult=NutritionSystem.applyBetweenSeasonFeeding(captureFoodState,session.world,[captureFoodMonster],new SeededRng(880774),1000);
         AddRegressionResult(results,'Newly collared monsters draw emergency food from existing stocks before nutrition harm',captureFoodMonster.alive && captureFoodResult.emergencyFeeding.storedFoodUsed>0 && captureFoodMonster.nutritionState===NUTRITION_STATE.NOURISHED,'alive='+captureFoodMonster.alive+', stored='+captureFoodResult.emergencyFeeding.storedFoodUsed+', state='+captureFoodMonster.nutritionState);
+
+        var surplusFoodWorld = new World(880780,{mapSizeKey:'legacy'});
+        var surplusFoodState = new GameState(new SeededRng(880781),'quick',surplusFoodWorld);
+        surplusFoodState.ownedMonsters=[];
+        surplusFoodState.excessMeatFood=0;
+        surplusFoodState.currentSeasonCaptiveFoodRemaining=50;
+        var surplusCapture = new Monster('surplus_capture_test',0,0,new SeededRng(880782),{owned:false,collared:false,wild:true,world:surplusFoodWorld});
+        surplusCapture.capture(new SeededRng(880783),800);
+        surplusFoodState.addCapturedMonster(surplusCapture);
+        var surplusTreasureBefore=surplusFoodWorld.getTreasureBreakdown([]).remaining.totalValue;
+        var surplusCaptureResult=NutritionSystem.applyBetweenSeasonFeeding(surplusFoodState,surplusFoodWorld,[surplusCapture],new SeededRng(880784),1000);
+        var surplusTreasureAfter=surplusFoodWorld.getTreasureBreakdown([]).remaining.totalValue;
+        AddRegressionResult(results,'New captures consume unallocated captive food before treasure and conserve the shared pool',surplusCaptureResult.emergencyFeeding.captiveFoodUsed>0 && surplusCaptureResult.emergencyFeeding.storedFoodUsed===0 && surplusCaptureResult.emergencyFeeding.expenditureCredits===0 && surplusTreasureAfter===surplusTreasureBefore && surplusFoodState.currentSeasonCaptiveFoodRemaining===0,'captive='+surplusCaptureResult.emergencyFeeding.captiveFoodUsed+', spent='+surplusCaptureResult.emergencyFeeding.expenditureCredits+', treasure='+surplusTreasureBefore+'/'+surplusTreasureAfter+', finalPool='+surplusFoodState.currentSeasonCaptiveFoodRemaining);
+
+        var allocationTruthSession = new GameSession(880790,{mode:'quick',worldOptions:{mapSizeKey:'legacy'}});
+        var allocationPlan = allocationTruthSession.getSeasonFoodPlan();
+        var deliberatelyLowAllocations = allocationPlan.monsters.map(function(entry){return {monsterId:entry.id,food:0};});
+        var allocationResult = allocationTruthSession.prepareFoodForSeason(deliberatelyLowAllocations);
+        AddRegressionResult(results,'Committed seasonal allocation creates exactly one authoritative unallocated captive-food pool',allocationResult.ok && allocationTruthSession.gameState.currentSeasonCaptiveFoodRemaining===allocationPlan.captiveMacrofauna.foodProduced && allocationTruthSession.gameState.getLivingOwnedMonsters().every(function(monster){return (monster.foodBoughtThisSeason||0)===0;}),'pool='+allocationTruthSession.gameState.currentSeasonCaptiveFoodRemaining+', produced='+allocationPlan.captiveMacrofauna.foodProduced);
         var injuredNutritionMonster = new Monster('nutrition_death_test',0,0,new SeededRng(880775),{owned:true,world:session.world});
         injuredNutritionMonster.bodyHealth.head=0.1; injuredNutritionMonster.currentFatMass=0; injuredNutritionMonster.foodBoughtThisSeason=0; injuredNutritionMonster.foodEatenThisSeason=0;
         injuredNutritionMonster.applyNutritionBodyDamage(injuredNutritionMonster.bodyHealth.maxEach*0.18,new SeededRng(880776));
@@ -18908,6 +19073,16 @@ button:hover {
         if (!Array.isArray(session.roundSeasonHistory)){
             session.roundSeasonHistory=[];
         }
+        if (!Number.isFinite(session.gameState.currentSeasonCaptiveFoodRemaining)){
+            // Old saves did not persist an unallocated fresh-food pool. Reconstruct
+            // nothing: assigned monster food and stored meat remain authoritative,
+            // avoiding accidental duplication on load.
+            session.gameState.currentSeasonCaptiveFoodRemaining=0;
+        }
+        if (!Number.isFinite(session.world.treasureSoldForFoodValue)){
+            session.world.treasureSoldForFoodValue = Math.max(0, session.world.foodExpenditureCredits || session.gameState.roundTreasureSoldForFoodValue || 0);
+        }
+        session.world.foodExpenditureCredits = session.world.treasureSoldForFoodValue;
         session.gameState.mode=session.gameState.mode || session.mode;
         session.gameState.ownedMonsters.forEach(function(monster){
             if (monster.importedSourceId===undefined){ monster.importedSourceId=null; }
@@ -19468,7 +19643,11 @@ button:hover {
     cancelUnsavedActionButton = document.getElementById('cancelUnsavedActionButton'),
     discardCurrentGameButton = document.getElementById('discardCurrentGameButton'),
     saveBeforeActionButton = document.getElementById('saveBeforeActionButton'),
-    gameToast = document.getElementById('gameToast');
+    gameToast = document.getElementById('gameToast'),
+    inspectModeButton = document.getElementById('inspectModeButton'),
+    captureModeButton = document.getElementById('captureModeButton'),
+    recallModeButton = document.getElementById('recallModeButton'),
+    releaseModeButton = document.getElementById('releaseModeButton');
     var latestWorldSnapshot = null,
     latestStaticObstacles = [];
     var latestSnapshot = null,
@@ -19524,7 +19703,8 @@ button:hover {
     selectionCycleIndex = 0,
     lastSnapshotPhase = null,
     gameStarted = false,
-    newGameMessagePending = false;
+    newGameMessagePending = false,
+    interactionMode = 'inspect';
     monsterPortrait.innerHTML = '<svg viewBox="0 0 180 120" role="img" aria-label="Purple starter monster"><ellipse cx="90" cy="70" rx="55" ry="30" fill="#6b2d83"/><circle cx="62" cy="57" r="8" fill="white"/><circle cx="118" cy="57" r="8" fill="white"/><circle cx="64" cy="58" r="4" fill="#1f2730"/><circle cx="116" cy="58" r="4" fill="#1f2730"/><rect x="52" y="68" width="76" height="8" rx="4" fill="#f2c14e"/></svg>';
     // ============================================================================
     // MODULE: VIEW TRANSFORMS AND WORKER COMMANDS
@@ -19989,8 +20169,13 @@ button:hover {
         var hint = mapPanel.querySelector('.hint');
         var sideAllowance = window.innerWidth>980 ? 365 : 24;
         var availableWidth = Math.max(360, window.innerWidth-sideAllowance);
-        var usedHeight = topBar.getBoundingClientRect().height+(hint ? hint.getBoundingClientRect().height : 0)+62;
+        var usedHeight = topBar.getBoundingClientRect().height+(hint ? hint.getBoundingClientRect().height : 0)+38;
         var availableHeight = Math.max(300, window.innerHeight-usedHeight);
+        if (window.innerWidth>980 && mapPanel.clientHeight>0){
+            var mapPanelStyle = window.getComputedStyle(mapPanel);
+            var verticalPadding = parseFloat(mapPanelStyle.paddingTop || 0)+parseFloat(mapPanelStyle.paddingBottom || 0);
+            availableHeight = Math.max(300, mapPanel.clientHeight-verticalPadding);
+        }
         var cssWidth = Math.floor(Math.max(360, availableWidth-24));
         var cssHeight = Math.floor(Math.max(300, availableHeight));
         canvas.style.width = '100%';
@@ -20150,7 +20335,7 @@ button:hover {
     function FormatTemperatureForSnapshot(s){
         var temperature = TemperatureForSnapshot(s);
         if (Number.isFinite(temperature)){
-            return FormatFixed(temperature, 1)+' C';
+            return FormatFixed(temperature, 1)+' \u00b0C';
         }
         return 'ERROR: missing authoritative temperature';
     }
@@ -20201,7 +20386,7 @@ button:hover {
     }
     function UiClamp(value,min,max){return Math.max(min,Math.min(max,value));}
     function E(tag,cls,value){var e=document.createElement(tag);if(cls)e.className=cls;if(value!==undefined)e.textContent=value;return e;}
-    function Goal(parent,current,target,description){var row=E('div','goalRow'),track=E('div','progressTrack'),fill=E('div','progressFill');fill.style.width=Math.round(100*UiClamp(current/Math.max(1,target),0,1))+'%';track.appendChild(fill);track.appendChild(E('div','progressText',FormatNumber(current)+' / '+FormatNumber(target)));row.appendChild(track);row.appendChild(E('div','goalDescription',description));parent.appendChild(row);}
+    function Goal(parent,current,target,icon,description){var row=E('div','goalRow'),symbol=E('span','goalIcon',icon),track=E('div','progressTrack'),fill=E('div','progressFill'),seasonWord=current===1?'season':'seasons',tooltip=description+' for the last '+FormatNumber(current)+' '+seasonWord+'. Reach '+FormatNumber(target)+' seasons to win this round.';symbol.title=description;symbol.setAttribute('aria-label',description);track.title=tooltip;track.setAttribute('aria-label',tooltip);fill.style.width=Math.round(100*UiClamp(current/Math.max(1,target),0,1))+'%';track.appendChild(fill);track.appendChild(E('div','progressText',FormatNumber(current)+' / '+FormatNumber(target)));row.appendChild(symbol);row.appendChild(track);parent.appendChild(row);}
     function TemperatureColour(temperature){
         if (!Number.isFinite(temperature)){ return '#94a3b8'; }
         if (temperature<=-5){ return '#60a5fa'; }
@@ -20211,27 +20396,44 @@ button:hover {
         if (temperature<=35){ return '#f97316'; }
         return '#dc2626';
     }
-    function MakeClickable(card, kind, label){card.classList.add('statClickable');card.tabIndex=0;card.setAttribute('role','button');card.setAttribute('aria-label','Open '+label+' details');card.addEventListener('pointerdown',function(e){if(e.pointerType==='mouse' && e.button!==0){return;}e.preventDefault();ShowStatDetail(kind);});card.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();ShowStatDetail(kind);}});}
-    function RenderCampaignDashboard(s){statusBox.innerHTML='';var d=E('div','campaignDashboard'),cl=E('section','dashboardCard climateCard'),th=E('div','thermometer'),tf=E('div','thermometerFill'),temp=TemperatureForSnapshot(s);tf.style.height=(Number.isFinite(temp)?UiClamp((temp+20)/70,0,1)*100:0)+'%';tf.style.background=TemperatureColour(temp);th.appendChild(tf);cl.appendChild(th);var ct=E('div');ct.appendChild(E('div','climateValue',FormatTemperatureForSnapshot(s)));ct.appendChild(E('div','climateBiome',FormatBiomeType(s.biomeType)));cl.appendChild(ct);MakeClickable(cl,'temperature','temperature');d.appendChild(cl);
-        var goals=E('section','dashboardCard');goals.appendChild(E('div','dashboardHeading','Victory progress'));Goal(goals,s.consecutiveSeasonsWithNoReturningAdventurers||0,s.noReturningAdventurersWinTarget||4,'No adventurer returned alive.');Goal(goals,s.consecutiveSeasonsWithNoReturningTreasure||0,s.noReturningTreasureWinTarget||12,'No adventurer returned with treasure.');MakeClickable(goals,'victory','victory progress');d.appendChild(goals);
-        var food=E('section','dashboardCard');food.appendChild(E('div','dashboardHeading','\ud83e\udd69 Food'));var fp=s.foodPlan||{},f=fp.captiveMacrofauna||{},b=Number.isFinite(fp.baseFoodBalance)?fp.baseFoodBalance:(f.foodProduced||0)-(fp.netLairFoodDemand||fp.totalDemand||0),scale=Math.max(10,Math.abs(b),fp.totalDemand||0,f.foodProduced||0),bt=E('div','balanceTrack'),bb=E('div','balanceBar '+(b>=0?'surplus':'deficit'));bb.style.width=UiClamp(Math.abs(b)/scale,0,1)*50+'%';bt.appendChild(bb);bt.appendChild(E('div','balanceValue',(b>=0?'+':'\u2212')+FormatNumber(Math.abs(b))));food.appendChild(bt);food.appendChild(E('div','dashboardFootnote',b>=0?'Seasonal food surplus':'Seasonal food deficit before new treasure sales'));MakeClickable(food,'food','food');d.appendChild(food);
-        var treasure=E('section','dashboardCard');treasure.appendChild(E('div','dashboardHeading','\ud83e\ude99 Treasure'));var x=s.treasureBreakdown||{},start=x.starting&&x.starting.totalValue||0,stolen=x.stolen&&x.stolen.totalValue||0,sold=Number.isFinite(x.foodExpenditureCredits)?x.foodExpenditureCredits:(s.foodExpenditureCredits||0),physical=x.remaining&&x.remaining.totalValue||0,remaining=x.remainingAfterFoodValue!==undefined?x.remainingAfterFoodValue:Math.max(0,physical-sold),total=Math.max(1,start,remaining+sold+stolen),track=E('div','treasureTrack');[[remaining,'treasureSegment treasureRemaining'],[sold,'treasureSegment treasureSold'],[stolen,'treasureSegment treasureStolen']].forEach(function(p){var q=E('div',p[1]);q.style.width=100*p[0]/total+'%';if(!p[0])q.style.display='none';track.appendChild(q);});treasure.appendChild(track);var legend=E('div','treasureLegend');[[remaining,'treasureRemaining','On map'],[sold,'treasureSold','Sold for food'],[stolen,'treasureStolen','Stolen']].forEach(function(p){var item=E('div','treasureLegendItem'),sw=E('span','legendSwatch '+p[1]);item.appendChild(sw);item.appendChild(E('span','',p[2]+' '+FormatNumber(p[0])));legend.appendChild(item);});treasure.appendChild(legend);MakeClickable(treasure,'treasure','treasure');d.appendChild(treasure);statusBox.appendChild(d);}
+    function SeasonIcon(seasonName){var icons={winter:'\u2744\ufe0f',spring:'\ud83c\udf31',summer:'\u2600\ufe0f',autumn:'\ud83c\udf42'};return icons[String(seasonName||'').toLowerCase()]||'\ud83c\udf0d';}
+    function BiomeIcon(type){var icons={tropicalRainforest:'\ud83c\udf34',coastalTropical:'\ud83c\udf0a',coastalTemperate:'\ud83c\udf27\ufe0f',oceanicTemperate:'\ud83c\udf2c\ufe0f',temperateContinental:'\ud83c\udf33',continentalHighland:'\u26f0\ufe0f',hotDesert:'\ud83c\udf35',coolDesert:'\ud83c\udfdc\ufe0f',polar:'\u2744\ufe0f'};return icons[type]||'\ud83c\udf0d';}
+    function MakeClickable(card,kind,label,shortcut){var tooltip=label+' <'+shortcut+'>';card.classList.add('statClickable');card.tabIndex=0;card.title=tooltip;card.setAttribute('aria-label',tooltip);card.addEventListener('pointerdown',function(e){if(e.pointerType==='mouse'&&e.button!==0)return;e.preventDefault();ShowStatDetail(kind);});card.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();ShowStatDetail(kind);}});}
+    var lastCampaignDashboardKey = '';
+    function RenderCampaignDashboard(s){var dashboardKey=JSON.stringify([s.biomeType,SeasonNameForSnapshot(s),TemperatureForSnapshot(s),s.consecutiveSeasonsWithNoReturningAdventurers,s.noReturningAdventurersWinTarget,s.consecutiveSeasonsWithNoReturningTreasure,s.noReturningTreasureWinTarget,s.foodPlan,s.treasureBreakdown,s.foodExpenditureCredits]);if(dashboardKey===lastCampaignDashboardKey){return;}lastCampaignDashboardKey=dashboardKey;statusBox.innerHTML='';var d=E('div','campaignDashboard'),cl=E('section','dashboardCard climateCard'),br=E('div','climateBiomeRow'),bi=E('span','biomeIcon',BiomeIcon(s.biomeType)),bt=E('span','climateBiome',FormatBiomeType(s.biomeType)),instrument=E('div','climateInstrument'),th=E('div','thermometer'),tf=E('div','thermometerFill'),temp=TemperatureForSnapshot(s),temperatureColour=TemperatureColour(temp);br.appendChild(bi);br.appendChild(bt);br.title=BiomeExplanation(s.biomeType);br.setAttribute('aria-label',FormatBiomeType(s.biomeType)+'. '+BiomeExplanation(s.biomeType));cl.appendChild(br);tf.style.height=(Number.isFinite(temp)?UiClamp((temp+20)/70,0,1)*100:0)+'%';tf.style.background=temperatureColour;th.style.color=temperatureColour;th.appendChild(tf);instrument.appendChild(th);var ct=E('div');ct.appendChild(E('div','climateValue',FormatTemperatureForSnapshot(s)));var seasonName=SeasonNameForSnapshot(s),seasonRow=E('div','seasonRow'),seasonIcon=E('span','seasonIcon',SeasonIcon(seasonName));seasonRow.appendChild(seasonIcon);seasonRow.appendChild(E('span','seasonName',seasonName.charAt(0).toUpperCase()+seasonName.slice(1)));ct.appendChild(seasonRow);instrument.appendChild(ct);cl.appendChild(instrument);MakeClickable(cl,'temperature','Environment','E');d.appendChild(cl);
+        var goals=E('section','dashboardCard');goals.appendChild(E('div','dashboardHeading','Victory progress'));Goal(goals,s.consecutiveSeasonsWithNoReturningAdventurers||0,s.noReturningAdventurersWinTarget||4,'\u2694\ufe0f','No adventurer returned alive');var victoryOr=E('div','victoryOrRow'),victoryOrText=E('div','victoryOrText','\u2014\u2014 OR \u2014\u2014');victoryOr.appendChild(victoryOrText);goals.appendChild(victoryOr);Goal(goals,s.consecutiveSeasonsWithNoReturningTreasure||0,s.noReturningTreasureWinTarget||12,'\ud83d\udcb0','No adventurer returned with treasure');MakeClickable(goals,'victory','Victory progress','V');d.appendChild(goals);
+        var food=E('section','dashboardCard');food.appendChild(E('div','dashboardHeading','\ud83e\udd69 Nutrition'));var fp=s.foodPlan||{},f=fp.captiveMacrofauna||{},b=Number.isFinite(fp.baseFoodBalance)?fp.baseFoodBalance:(f.foodProduced||0)-(fp.netLairFoodDemand||fp.totalDemand||0),scale=Math.max(10,Math.abs(b),fp.totalDemand||0,f.foodProduced||0),bt=E('div','balanceTrack'),bb=E('div','balanceBar '+(b>=0?'surplus':'deficit'));bb.style.width=UiClamp(Math.abs(b)/scale,0,1)*50+'%';bt.appendChild(bb);bt.appendChild(E('div','balanceValue',(b>=0?'+':'\u2212')+FormatNumber(Math.abs(b))));food.appendChild(bt);food.appendChild(E('div','dashboardFootnote',b>=0?'Seasonal food surplus':'Seasonal food deficit before new treasure sales'));MakeClickable(food,'food','Nutrition','N');d.appendChild(food);
+        var treasure=E('section','dashboardCard');treasure.appendChild(E('div','dashboardHeading','\ud83e\ude99 Treasure'));var x=s.treasureBreakdown||{},start=x.starting&&x.starting.totalValue||0,stolen=x.stolen&&x.stolen.totalValue||0,sold=Number.isFinite(x.foodExpenditureCredits)?x.foodExpenditureCredits:(s.foodExpenditureCredits||0),physical=x.remaining&&x.remaining.totalValue||0,remaining=x.remainingAfterFoodValue!==undefined?x.remainingAfterFoodValue:Math.max(0,physical-sold),total=Math.max(1,start,remaining+sold+stolen),track=E('div','treasureTrack'),treasureTooltip='On map: '+FormatNumber(remaining)+'. Sold for food: '+FormatNumber(sold)+'. Stolen: '+FormatNumber(stolen)+'.';track.title=treasureTooltip;track.setAttribute('aria-label',treasureTooltip);[[remaining,'treasureSegment treasureRemaining','On map'],[sold,'treasureSegment treasureSold','Sold for food'],[stolen,'treasureSegment treasureStolen','Stolen']].forEach(function(p){var q=E('div',p[1]);q.style.width=100*p[0]/total+'%';q.title=p[2]+': '+FormatNumber(p[0]);if(!p[0])q.style.display='none';track.appendChild(q);});treasure.appendChild(track);var legend=E('div','treasureLegend');[[remaining,'treasureRemaining','On map','remaining'],[sold,'treasureSold','Sold for food','sold'],[stolen,'treasureStolen','Stolen','stolen']].forEach(function(p){var item=E('span','treasureLegendItem'),sw=E('span','legendSwatch '+p[1]);item.title=p[2];item.setAttribute('aria-label',p[2]);item.innerHTML=TreasureLegendIconSvg(p[3]);item.appendChild(sw);legend.appendChild(item);});treasure.appendChild(legend);MakeClickable(treasure,'treasure','Treasure','T');d.appendChild(treasure);statusBox.appendChild(d);}
     function CompletedRoundHistoryForSnapshot(s){return s&&s.campaignStats&&Array.isArray(s.campaignStats.roundHistory)?s.campaignStats.roundHistory:[];}
     function SvgElement(name,attributes){var e=document.createElementNS('http://www.w3.org/2000/svg',name);Object.keys(attributes||{}).forEach(function(k){e.setAttribute(k,attributes[k]);});return e;}
     function LineChart(series,labels,colours,yAxisLabel){
-        var svg=SvgElement('svg',{viewBox:'0 0 760 320',class:'statChart','aria-label':'Line chart'}),max=1;
-        series.forEach(function(s){s.forEach(function(v){max=Math.max(max,v||0);});});
-        [0,1,2,3,4].forEach(function(i){
-            var y=35+i*55;
+        var svg=SvgElement('svg',{viewBox:'0 0 760 320',class:'statChart','aria-label':'Line chart'}),max=1,allValuesIntegral=true;
+        series.forEach(function(s){s.forEach(function(v){if(Number.isFinite(v)){max=Math.max(max,v);if(!Number.isInteger(v)){allValuesIntegral=false;}}});});
+        var tickValues=[];
+        if(allValuesIntegral){
+            var integerStep=Math.max(1,Math.ceil(max/4));
+            var axisMax=Math.max(1,Math.ceil(max/integerStep)*integerStep);
+            for(var integerTick=0;integerTick<=axisMax;integerTick+=integerStep){tickValues.push(integerTick);}
+        } else{
+            var axisMax=max;
+            [0,1,2,3,4].forEach(function(i){tickValues.push(axisMax*i/4);});
+        }
+        tickValues.forEach(function(tickValue){
+            var y=255-tickValue/axisMax*220;
             svg.appendChild(SvgElement('line',{x1:70,y1:y,x2:730,y2:y,stroke:'#334155'}));
             var valueText=SvgElement('text',{x:60,y:y+5,fill:'#cbd5e1',['text-anchor']:'end',['font-size']:12});
-            valueText.textContent=FormatNumber(max*(4-i)/4);
+            valueText.textContent=FormatNumber(tickValue);
             svg.appendChild(valueText);
         });
         series.forEach(function(values,si){
-            var points=values.map(function(v,i){return (70+i*(660/Math.max(1,values.length-1)))+','+(255-(v||0)/max*220);}).join(' ');
+            var points=values.map(function(v,i){return (70+i*(660/Math.max(1,values.length-1)))+','+(255-(v||0)/axisMax*220);}).join(' ');
             svg.appendChild(SvgElement('polyline',{points:points,fill:'none',stroke:colours[si],['stroke-width']:4,['stroke-linejoin']:'round'}));
-            values.forEach(function(v,i){svg.appendChild(SvgElement('circle',{cx:70+i*(660/Math.max(1,values.length-1)),cy:255-(v||0)/max*220,r:5,fill:colours[si]}));});
+            values.forEach(function(v,i){
+                var nodeValue=Number.isFinite(v)?v:0,node=SvgElement('circle',{cx:70+i*(660/Math.max(1,values.length-1)),cy:255-nodeValue/axisMax*220,r:5,fill:colours[si],tabindex:0,['aria-label']:'Season '+labels[i]+': '+String(nodeValue)}),nodeTitle=SvgElement('title');
+                nodeTitle.textContent=String(nodeValue);
+                node.appendChild(nodeTitle);
+                svg.appendChild(node);
+            });
         });
         labels.forEach(function(label,i){var tx=SvgElement('text',{x:70+i*(660/Math.max(1,labels.length-1)),y:282,fill:'#cbd5e1',['text-anchor']:'middle',['font-size']:13});tx.textContent=label;svg.appendChild(tx);});
         var xLabel=SvgElement('text',{x:400,y:308,fill:'#f8fafc',['text-anchor']:'middle',['font-size']:14,['font-weight']:'700'});xLabel.textContent='Season';svg.appendChild(xLabel);
@@ -20260,7 +20462,7 @@ button:hover {
         return '\ud83d\udc3e';
     }
     function ShowStatDetail(kind){var s=latestSnapshot||{},body=document.getElementById('statDetailBody'),title=document.getElementById('statDetailTitle'),history=s.roundSeasonHistory||[];body.innerHTML='';
-        if(kind==='temperature'){title.textContent='Temperature and biome';body.appendChild(E('p','',BiomeExplanation(s.biomeType)));var env=s.world&&s.world.environment?s.world.environment:{},mean=Number(env.meanAnnualTemperatureC)||0,amp=Number(env.seasonalTemperatureAmplitudeC)||0,averages=[mean-amp,mean+amp*.15,mean+amp,mean-amp*.1].map(function(v){return Math.round(v*10)/10;});var grid=E('div','statGrid');['Winter','Spring','Summer','Autumn'].forEach(function(n,i){var tile=E('div','statTile');tile.appendChild(E('span','',n+' average'));tile.appendChild(E('strong','',averages[i].toFixed(1)+' C'));grid.appendChild(tile);});body.appendChild(grid);var actual=history.slice(0);if(!actual.some(function(r){return r.seasonNumber===s.seasonNumber;})&&Number.isFinite(s.currentSeasonTemperatureC)){actual.push({seasonNumber:s.seasonNumber,seasonName:s.seasonName,temperatureC:s.currentSeasonTemperatureC});}body.appendChild(E('h3','','Temperatures experienced this round'));body.appendChild(LineChart([actual.map(function(r){return r.temperatureC;})],actual.map(function(r){return String(r.seasonNumber);}),['#f97316'],'Temperature (C)'));}
+        if(kind==='temperature'){title.textContent='Temperature and biome';var bh=E('div','climateBiomeRow');bh.appendChild(E('span','biomeIcon',BiomeIcon(s.biomeType)));bh.appendChild(E('strong','',FormatBiomeType(s.biomeType)));body.appendChild(bh);body.appendChild(E('p','',BiomeExplanation(s.biomeType)));var env=s.world&&s.world.environment?s.world.environment:{},mean=Number(env.meanAnnualTemperatureC)||0,amp=Number(env.seasonalTemperatureAmplitudeC)||0,averages=[mean-amp,mean+amp*.15,mean+amp,mean-amp*.1].map(function(v){return Math.round(v*10)/10;});var grid=E('div','statGrid');['Winter','Spring','Summer','Autumn'].forEach(function(n,i){var tile=E('div','statTile');tile.appendChild(E('span','',n+' average'));tile.appendChild(E('strong','',averages[i].toFixed(1)+' \u00b0C'));grid.appendChild(tile);});body.appendChild(grid);var actual=history.slice(0);if(!actual.some(function(r){return r.seasonNumber===s.seasonNumber;})&&Number.isFinite(s.currentSeasonTemperatureC)){actual.push({seasonNumber:s.seasonNumber,seasonName:s.seasonName,temperatureC:s.currentSeasonTemperatureC});}body.appendChild(E('h3','','Temperatures experienced this round'));body.appendChild(LineChart([actual.map(function(r){return r.temperatureC;})],actual.map(function(r){return String(r.seasonNumber);}),['#f97316'],'Temperature (C)'));}
         if(kind==='victory'){title.textContent='Adventurer outcomes by season';var victoryHistory=history.slice(0),liveAdventurers=s.adventurers||[];if(!victoryHistory.some(function(r){return r.seasonNumber===s.seasonNumber;})){victoryHistory.push({seasonNumber:s.seasonNumber,adventurersArrived:liveAdventurers.length,adventurersFledWithoutTreasure:liveAdventurers.filter(function(a){return a.alive&&a.escaped&&!a.carryingTreasure;}).length,adventurersFledWithInjuries:liveAdventurers.filter(function(a){return a.alive&&a.escaped&&a.health<a.maxHealth;}).length,adventurersFledWithTreasure:liveAdventurers.filter(function(a){return a.alive&&a.escaped&&a.carryingTreasure;}).length});}body.appendChild(LineChart([victoryHistory.map(function(r){return r.adventurersArrived;}),victoryHistory.map(function(r){return r.adventurersFledWithoutTreasure;}),victoryHistory.map(function(r){return r.adventurersFledWithInjuries;}),victoryHistory.map(function(r){return r.adventurersFledWithTreasure;})],victoryHistory.map(function(r){return String(r.seasonNumber);}),['#60a5fa','#94a3b8','#f97316','#ef4444'],'Adventurers'));AddLegend(body,[['Arrived','#60a5fa'],['Fled without treasure','#94a3b8'],['Fled injured','#f97316'],['Fled with treasure','#ef4444']]);}
         if(kind==='food'){title.textContent='Detailed food economy';var fp=s.foodPlan||{},fauna=fp.captiveMacrofauna||{},grid=E('div','statGrid');[['Food produced',fauna.foodProduced||0],['Total demand',fp.totalDemand||0],['Consumed this season',(s.monsters||[]).filter(function(m){return m.owned;}).reduce(function(sum,m){return sum+(m.foodEatenThisSeason||0)+(m.foodBoughtThisSeason||0);},0)]].forEach(function(x){var tile=E('div','statTile');tile.appendChild(E('span','',x[0]));tile.appendChild(E('strong','',FormatNumber(x[1])));grid.appendChild(tile);});body.appendChild(grid);body.appendChild(E('h3','','Captive food populations'));(fauna.populations||[]).forEach(function(p){var row=E('div','iconRow');row.appendChild(E('span','statIcon',CaptiveAnimalIcon(p)));row.appendChild(E('div','',(p.displayName||p.species)+': '+FormatNumber(p.animals)+' animals, '+FormatNumber(p.foodProduced)+' food'));body.appendChild(row);});body.appendChild(E('h3','','Food consumed per monster'));var monsters=(s.monsters||[]).filter(function(m){return m.owned;});BarRows(body,monsters.map(function(m){return{label:'\ud83d\udc32 '+(m.name||'Monster'),value:(m.foodEatenThisSeason||0)+(m.foodBoughtThisSeason||0)};}),['#22c55e','#84cc16','#14b8a6','#0ea5e9']);}
         if(kind==='treasure'){title.textContent='Treasure history and composition';var h=history.slice(0),currentBreakdown=s.treasureBreakdown||{};if(!h.some(function(r){return r.seasonNumber===s.seasonNumber;})){h.push({seasonNumber:s.seasonNumber,treasureRemainingValue:currentBreakdown.remainingAfterFoodValue!==undefined?currentBreakdown.remainingAfterFoodValue:(currentBreakdown.remaining&&currentBreakdown.remaining.totalValue||0),treasureSoldForFoodValue:currentBreakdown.foodExpenditureCredits||s.foodExpenditureCredits||0,treasureStolenValue:currentBreakdown.stolen&&currentBreakdown.stolen.totalValue||0});}body.appendChild(LineChart([h.map(function(r){return r.treasureRemainingValue;}),h.map(function(r){return r.treasureSoldForFoodValue;}),h.map(function(r){return r.treasureStolenValue;})],h.map(function(r){return String(r.seasonNumber);}),['#ca8a04','#7c3aed','#b91c1c'],'Treasure value'));AddLegend(body,[['Remaining','#ca8a04'],['Sold for food','#7c3aed'],['Stolen','#b91c1c']]);body.appendChild(E('h3','','Treasure by type'));var x=s.treasureBreakdown||{},types=x.remaining&&x.remaining.byType?x.remaining.byType:{};var tg=E('div','typeGrid');Object.keys(types).forEach(function(k){var r=types[k],tile=E('div','typeTile');tile.appendChild(E('strong','',r.displayName||k));var colour=E('div','typeColour');var treasureTypeColours={bronze:'#b87333',silver:'#c0c0c0',gold:'#d4af37',rubies:'#dc2626',emeralds:'#16a34a'};colour.style.background=treasureTypeColours[k]||'#ca8a04';tile.appendChild(colour);tile.appendChild(E('div','',FormatNumber(r.amount)+' units'));tile.appendChild(E('div','',FormatNumber(r.value)+' credits'));tg.appendChild(tile);});body.appendChild(tg);}
@@ -20269,8 +20471,8 @@ button:hover {
     function RenderRoundHistory(s){var body=document.getElementById('roundHistoryBody');body.innerHTML='';var h=CompletedRoundHistoryForSnapshot(s);if(!h.length){body.appendChild(E('p','detailMuted','No round has been completed yet.'));return;}var table=E('table','roundHistoryTable'),thead=document.createElement('thead'),hr=document.createElement('tr');['Round','State','Reason','Start','End','Stolen','Sold for food'].forEach(function(a){hr.appendChild(E('th','',a));});thead.appendChild(hr);table.appendChild(thead);var tb=document.createElement('tbody');h.forEach(function(r){var tr=document.createElement('tr'),state=r.winLossState||((r.endingTreasureValue||0)>0?'Win':'Loss');tr.appendChild(E('td','',FormatNumber(r.roundNumber||1)));var sc=E('td');sc.appendChild(E('span','roundResultBadge '+(state.toLowerCase()==='win'?'win':'loss'),state));tr.appendChild(sc);tr.appendChild(E('td','',r.reason||r.result||'Result unavailable'));tr.appendChild(E('td','',FormatNumber(r.startingTreasureValue||0)));tr.appendChild(E('td','',FormatNumber(r.endingTreasureValue||0)));tr.appendChild(E('td','',FormatNumber(r.treasureLostValue||0)));tr.appendChild(E('td','',FormatNumber(r.treasureSoldForFoodValue!==undefined?r.treasureSoldForFoodValue:r.foodExpenditureCredits||0)));tb.appendChild(tr);});table.appendChild(tb);body.appendChild(table);}
     function ShowRoundHistory(){RenderRoundHistory(latestSnapshot||{});document.getElementById('roundHistoryOverlay').classList.remove('dialogHidden');document.getElementById('closeRoundHistoryButton').focus();}
     function HideRoundHistory(){document.getElementById('roundHistoryOverlay').classList.add('dialogHidden');}
-    function UpdateTransportControls(s){var b=document.getElementById('playPauseButton'),paused=!!s.paused;b.setAttribute('aria-pressed',paused?'true':'false');b.setAttribute('aria-label',paused?'Play game':'Pause game');b.innerHTML=paused?'<span class="playSymbol" aria-hidden="true"></span>':'<span class="pauseSymbol" aria-hidden="true"><span></span><span></span></span>';}
-    function UpdateStatus(s){var mode=s.gameMode==='advancedCampaign'?'Advanced campaign':(s.gameMode==='campaign'?'Campaign':'Single round game');seasonDisplay.textContent=mode+' - Round '+(s.roundNumber||1)+' Season '+s.seasonNumber+' ('+SeasonNameForSnapshot(s)+')';UpdateTransportControls(s);RenderCampaignDashboard(s);}
+    function UpdateTransportControls(s){var b=document.getElementById('playPauseButton'),paused=!!s.paused;b.setAttribute('aria-pressed',paused?'true':'false');b.setAttribute('aria-label','Toggle pause <SPACE>');b.title='Toggle pause <SPACE>';b.innerHTML=paused?'<span class="playSymbol" aria-hidden="true"></span>':'<span class="pauseSymbol" aria-hidden="true"><span></span><span></span></span>';}
+    function UpdateStatus(s){var mode=s.gameMode==='advancedCampaign'?'Advanced campaign':(s.gameMode==='campaign'?'Campaign':'Single round game');seasonDisplay.textContent=mode+' - Round '+(s.roundNumber||1)+' Season '+s.seasonNumber;UpdateTransportControls(s);RenderCampaignDashboard(s);}
     function BuildManagementRenderKey(s, monsters){
         var eggs =(s.management && s.management.eggs) || [];
         return [s.phase || 'raid',
@@ -23355,7 +23557,7 @@ button:hover {
             var selectedForBrightness = IsSelectedRenderObject(SelectionKindForRenderable(r.kind), r.obj);
             if (selectedForBrightness){
                 ctx.save();
-                ctx.filter = 'brightness(1.5)';
+                ctx.filter = 'saturate(0.25) brightness(1.5)';
             }
             if (r.kind==='treeTrunk')DrawTreeTrunk(r.obj);
             else if (r.kind==='obstacle'){
@@ -23379,7 +23581,7 @@ button:hover {
             var selectedForBrightness = IsSelectedRenderObject(SelectionKindForRenderable('bushOverlay'), r.obj);
             if (selectedForBrightness){
                 ctx.save();
-                ctx.filter = 'brightness(1.5)';
+                ctx.filter = 'saturate(0.25) brightness(1.5)';
             }
             DrawBush(r.obj);
             if (selectedForBrightness){
@@ -23393,7 +23595,7 @@ button:hover {
             var selectedForBrightness = IsSelectedRenderObject(SelectionKindForRenderable('treeCanopy'), r.obj);
             if (selectedForBrightness){
                 ctx.save();
-                ctx.filter = 'brightness(1.5)';
+                ctx.filter = 'saturate(0.25) brightness(1.5)';
             }
             DrawTreeCanopy(r.obj);
             if (selectedForBrightness){
@@ -23752,78 +23954,62 @@ button:hover {
                 warning.appendChild(warningText);
                 objectDetails.appendChild(warning);
             }
-            var actions = document.createElement('div');
-            actions.className = 'selectionActions';
-            if (!monster.owned){
-                var collarButton = document.createElement('button');
-                collarButton.type = 'button';
-                collarButton.textContent = 'Collar wild monster';
-                var collarCommandSent = false;
-                function activateCollarButton(event){
-                    if (event){
-                        event.preventDefault();
-                        event.stopPropagation();
-                    }
-                    if (collarCommandSent){
-                        return;
-                    }
-                    collarCommandSent = true;
-                    collarButton.disabled = true;
-                    collarButton.textContent = 'Collaring...';
-                    SendCommand('CAPTURE_WILD_MONSTER', {
-                        monsterId : monster.id
-                    } );
-                }
-                collarButton.addEventListener('pointerdown', activateCollarButton);
-                collarButton.addEventListener('mousedown', activateCollarButton);
-                collarButton.addEventListener('click', activateCollarButton);
-                actions.appendChild(collarButton);
-            } else if (monster.collared && monster.deployed && monster.recallRequested){
-                var recallStatus = document.createElement('div');
-                recallStatus.className = 'detailMuted';
-                recallStatus.textContent = 'Recalling to base...';
-                actions.appendChild(recallStatus);
-            } else if (monster.collared && monster.deployed){
-                var recallButton = document.createElement('button');
-                recallButton.type = 'button';
-                recallButton.textContent = 'Recall to base';
-                var recallCommandSent = false;
-                function activateRecallButton(event){
-                    if (event){
-                        event.preventDefault();
-                        event.stopPropagation();
-                    }
-                    if (recallCommandSent){
-                        return;
-                    }
-                    recallCommandSent = true;
-                    recallButton.disabled = true;
-                    recallButton.textContent = 'Recalling...';
-                    SendCommand('RECALL_MONSTER', {
-                        monsterId : monster.id
-                    } );
-                }
-                recallButton.addEventListener('pointerdown', activateRecallButton);
-                recallButton.addEventListener('mousedown', activateRecallButton);
-                recallButton.addEventListener('click', activateRecallButton);
-                actions.appendChild(recallButton);
-            }
-            if (actions.children.length>0){
-                objectDetails.appendChild(actions);
-            }
         }
     }
+    function TreasureLegendIconSvg(kind){
+        if (kind==='remaining'){
+            return '<svg class="treasureLegendIcon" viewBox="0 0 32 32" aria-hidden="true"><path d="M4 26V11l12-7 12 7v15z" fill="#d6b56d" stroke="#5b4520" stroke-width="2"/><path d="M11 26V15h10v11M4 11h24" fill="none" stroke="#5b4520" stroke-width="2"/></svg>';
+        }
+        if (kind==='sold'){
+            return '<svg class="treasureLegendIcon" viewBox="0 0 32 32" aria-hidden="true"><circle cx="10" cy="12" r="7" fill="#f2c14e" stroke="#6b4d08" stroke-width="2"/><path d="M8 8h4M8 12h4M8 16h4" stroke="#6b4d08" stroke-width="1.5"/><path d="M17 24c3-7 8-9 12-7-1 6-5 10-12 10z" fill="#dc6b55" stroke="#702d25" stroke-width="2"/><path d="M19 20l7 4" stroke="#f8d9c7" stroke-width="1.5"/></svg>';
+        }
+        return '<svg class="treasureLegendIcon" viewBox="0 0 32 32" aria-hidden="true"><path d="M7 27c0-8 4-13 9-13s9 5 9 13z" fill="#8b5e3c" stroke="#3d281b" stroke-width="2"/><path d="M10 13c2-3 10-3 12 0l-2 3h-8z" fill="#d6b56d" stroke="#3d281b" stroke-width="2"/><path d="M19 6l7 7M26 6l-7 7" stroke="#b91c1c" stroke-width="3" stroke-linecap="round"/></svg>';
+    }
+    function InteractionIconSvg(mode, cursorSize){
+        var size = cursorSize || 64;
+        var body = '';
+        if (mode==='inspect'){
+            // Plain magnifying glass: open lens, narrow metal rim and a separate handle.
+            body = '<circle cx="23" cy="23" r="15" fill="#dff6ff" fill-opacity=".72" stroke="#173f59" stroke-width="5"/>'+
+                '<path d="M34 34L57 57" stroke="#5a351d" stroke-width="10" stroke-linecap="round"/>'+
+                '<path d="M36 36L55 55" stroke="#c58c4d" stroke-width="4" stroke-linecap="round"/>';
+        } else if (mode==='capture'){
+            // Landing net held by its pole: handle rises from the hoop while the deep bag hangs below it.
+            body = '<path d="M40 15L59 3" stroke="#5a351d" stroke-width="10" stroke-linecap="round"/>'+
+                '<path d="M41 14L58 4" stroke="#c58c4d" stroke-width="4" stroke-linecap="round"/>'+
+                '<ellipse cx="24" cy="18" rx="19" ry="11" fill="#eafff2" stroke="#174f39" stroke-width="5"/>'+
+                '<path d="M6 18C8 31 13 46 25 59C36 47 40 31 42 18" fill="#82cea7" fill-opacity=".78" stroke="#174f39" stroke-width="4" stroke-linejoin="round"/>'+
+                '<path d="M9 27L38 27M12 37L35 37M16 47L31 47M11 17L27 55M22 8L24 57M35 12L17 49" fill="none" stroke="#276e50" stroke-width="2"/>';
+        } else if (mode==='recall'){
+            // Verified side-profile beckoning hand: thumb extended, forefinger
+            // partly extended and curled, remaining fingers folded into a fist.
+            body = '<image href="data:image/png;base64,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" x="0" y="0" width="64" height="64" preserveAspectRatio="xMidYMid meet"/>';
+        } else{
+            // Front-facing open palm: four parallel fingers, splayed thumb and clearly visible palm.
+            body = '<path d="M20 60C12 52 9 43 10 34L11 22C11 18 17 18 18 22L19 34L19 10C19 5 26 5 26 10L27 32L29 7C29 2 36 2 36 7L36 32L39 10C40 5 46 6 46 11L44 34L48 18C49 13 55 15 54 20L51 43C49 55 41 62 29 63Z" fill="#f2b58b" stroke="#6f3527" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>'+
+                '<path d="M19 39C25 35 35 35 44 39M25 45C31 42 37 42 42 45" fill="none" stroke="#9a5838" stroke-width="2.5" stroke-linecap="round"/>'+
+                '<path d="M7 16C10 11 14 8 18 6M51 9C55 12 58 16 59 21" fill="none" stroke="#65d68a" stroke-width="4" stroke-linecap="round"/>';
+        }
+        return '<svg xmlns="http://www.w3.org/2000/svg" width="'+size+'" height="'+size+'" viewBox="0 0 64 64" aria-hidden="true">'+body+'</svg>';
+    }
+    function InteractionCursor(mode){
+        if (mode==='recall'){
+            return 'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAFm0lEQVR42u2UfWxUVRrGn3PumXvnzkfbaZmWNqClUARBYRlhKUFGi8Au7paEWFY+dhXIgvFr19WEKDHjJJslm9W4shuxdRcjIUsXCRhFVEDWUT4lswtRWAq4BUtpS5l+zLQzd+6957z+UUtqolmzf5lsf8n57zznffOe93mAEUYY4f8d9r+IiMDW3xERjcmkQ0SetbWRrSG/MbfXZY/89b2j+xrWRTzrG5POjqeWrBBS/sxx3bzGmA1Gh5b98d3XGGP0VW3i37VoLBbj0SgEAM4YqDGZdNbU1VUsnz1p9+r6+atijyyt5Ln0bwAg1FOlBlXeE7o/8Iy3KPyiMANbueYZt/3xn2x96bEfGUSDN8R3nBKPx+MSgAKAmqqqUp+w7iuk1MYnf72q4tbqivxAZ6dQUlnDdcuf//vn9fU7tSUV2170aihQXBwMFJQ0Zrs+VYyB/usXxGIxHo/HFQD89M5Z46i7477RpaEFo8vCM2oik0uiM2+FX5MuSPFtuz7gL+/86N4THT37olGIRALu8Le2P7n0ZuRzG4jI+djpeqq8OUDxROJrdxh9dQbHHRUA8MILO836WZOfj6+4J3Ok4WnqSbxK6pPXiY6+4mbf/4NMv7NJNT70Y5pfVfosAEQi8AAAAax+7vTw6nm3Ny6dUf3gUJEL256Y8E1LyIfGO5yXN22qOrnvb00PLFs4M3pXDcCU66SusWy6jxMRlJ2j3za8ZTUlmle22/abw6QGgPz9s6c+9NwvF205c+k6tjR98Jhp6mddlyZ7fYbnjjkLd2zcvLlzaAdUNBoTiUTcHAsEy8NFYU/QrEoe2Pm7jU/8fNL4KROcgSttws2mBUBgmgZyXEjbZvOmj9e9XuPZvEPrLrS0tek+nxmdfdvMTH+u++DHp9zWji53ad0c/p+Wy3/SDC+W3DML/b19aNhzeCWAmQIA1i6Y/UDId2Bj7aoFAdMwgqHCQGBUKIDIbdWoCBeo3nNnPYwRFBEY42CuAyc7AOlK1M6aLOb9YMKMAyebMW3iGKSzOVQU+7Gobg6mVo7C1l2HMG3iWMydPp5SfQOoKjHZe2eakc3mWm64wM6k12z41erqUaPDgOsCJAHlylymn2W6OjkXAj2pXli5LKTjwLXzKAgGYPp8UErh5JlL6vTnnVQzfSLNr5mCq91p/udte+nRXyxm6XSGnz9/CYYuaO8/knL/sbPHj59vf9Uc9/AOID7YQMD0hCjXpzIdebJthwNgDNDAGIQQICIUhgpRPKoYIIJl2bh+rRNOXxquAs619/E1yxYimx3A9r2HUXd3BLU/nII9b3+IAr9XBf1eR7qukWzpfeZk24XfAwC+iN9YPjDGDBA4AC6EYEIICN2Am88jb1lgnINxDiklpFLweg3cNK4S/lAIjuNAI4nWL67AJ4D19bU4kEhC5jJk6ppM9aR5c0u7sStxplsU+JtiAF8XiXiGDCAAQEppKUUEkALANA7iUGTqHI6VBXc4SPMwOdgwc6UEpESwqAhe3YNFwSD+svsjLJ47FUGvTkUBU+bztjh9vk27NuAeOteaekP6w/uP/fvS5WMAQzLpDNlFAMCAZWfy6R7m50HNyuZgWXlkBiz052zYUsJveBAuDiIY9MPwesGFrogxIpJQus7GjCnHo8trMba8hD48flbLWzlx5NPe7L5/tW6ouprakmBMAh1DtqfhVhcAYLnY88qeI9OExjOpTO56Juu09+fs1rxUVwms39B4eXHAuL20yLyltMhfflNZES8rDqIg4IPP1ME1DQBD4thnaNr/z5a2VOagLcyGZHt3MskYi0Yh7kpAxb8ha25E8c2FZZWX+zrTALq/PZxDhbcUyOqSQjG10KtPCvr1Sp+ulwnBPI5L6Ss9/UdTFGg4dfFiFwBEAZHA1yN5hBFGGOF7x5f3dn0C40pAdQAAAABJRU5ErkJggg==") 2 16, pointer';
+        }
+        return 'url("data:image/svg+xml,'+encodeURIComponent(InteractionIconSvg(mode,32))+'") 4 4, crosshair';
+    }
+    function InitialiseInteractionIcons(){
+        [['inspect',inspectModeButton],['capture',captureModeButton],['recall',recallModeButton],['release',releaseModeButton]].forEach(function(pair){
+            pair[1].innerHTML = InteractionIconSvg(pair[0],64);
+        });
+    }
+    function SetInteractionMode(mode){interactionMode=mode;[['inspect',inspectModeButton],['capture',captureModeButton],['recall',recallModeButton],['release',releaseModeButton]].forEach(function(pair){pair[1].setAttribute('aria-pressed',pair[0]===mode?'true':'false');});canvas.classList.remove('modeInspect','modeCapture','modeRecall','modeRelease');canvas.classList.add(mode==='capture'?'modeCapture':(mode==='recall'?'modeRecall':(mode==='release'?'modeRelease':'modeInspect')));canvas.style.cursor=InteractionCursor(mode);}
+    function ActivateInteractionAt(clientX,clientY){var picked=FindObjectAt(clientX,clientY);if(interactionMode==='inspect')return SelectObjectAt(clientX,clientY);if(!picked||picked.kind!=='monster')return false;var monster=picked.obj;selectedObject=picked;UpdateSelectedObjectPanel();if(interactionMode==='capture'&&!monster.owned){SendCommand('CAPTURE_WILD_MONSTER',{monsterId:monster.id});return true;}if(interactionMode==='recall'&&monster.owned&&monster.deployed){SendCommand('RECALL_MONSTER',{monsterId:monster.id});return true;}if(interactionMode==='release'&&monster.owned){SendCommand('RELEASE_OWNED_MONSTER',{monsterId:monster.id});return true;}return false;}
     function UpdateMonsterHover(clientX, clientY){
         var picked = FindObjectAt(clientX, clientY);
         hoveredMonster =(picked && picked.kind==='monster') ? picked.obj : null;
         hoveredMonsterId = hoveredMonster ? hoveredMonster.id : null;
-        if (hoveredMonster && !hoveredMonster.owned){
-            canvas.style.cursor = 'pointer';
-        } else if (picked){
-            canvas.style.cursor = 'crosshair';
-        } else{
-            canvas.style.cursor = isDragging ? 'grabbing' : 'grab';
-        }
+        canvas.style.cursor = InteractionCursor(interactionMode);
     }
     function SelectObjectAt(clientX, clientY){
         var matches = FindObjectsAt(clientX, clientY);
@@ -24234,10 +24420,15 @@ button:hover {
         }
     } );
     document.getElementById('playPauseButton').addEventListener('click',function(){SendCommand(latestSnapshot&&latestSnapshot.paused?'RESUME_RAID':'PAUSE_RAID');});
+    inspectModeButton.addEventListener('click',function(){SetInteractionMode('inspect');});captureModeButton.addEventListener('click',function(){SetInteractionMode('capture');});recallModeButton.addEventListener('click',function(){SetInteractionMode('recall');});releaseModeButton.addEventListener('click',function(){SetInteractionMode('release');});InitialiseInteractionIcons();SetInteractionMode('inspect');
     document.getElementById('fastForwardButton').addEventListener('click',function(){var b=this,on=b.getAttribute('aria-pressed')!=='true';b.setAttribute('aria-pressed',on?'true':'false');SendCommand('SET_SIMULATION_SPEED',{multiplier:on?4:1});});
     document.getElementById('roundHistoryButton').addEventListener('click',ShowRoundHistory);
     document.getElementById('closeRoundHistoryButton').addEventListener('click',HideRoundHistory);
     document.getElementById('roundHistoryOverlay').addEventListener('click',function(e){if(e.target===e.currentTarget)HideRoundHistory();});
+    var eventLogDisclosure = document.getElementById('eventLogDisclosure');
+    function UpdateEventLogLayout(){document.getElementById('selectionSection').classList.toggle('eventLogOpen',eventLogDisclosure.open);}
+    eventLogDisclosure.addEventListener('toggle',UpdateEventLogLayout);
+    UpdateEventLogLayout();
     document.getElementById('closeStatDetailButton').addEventListener('click',HideStatDetail);
     document.getElementById('statDetailOverlay').addEventListener('click',function(e){if(e.target===e.currentTarget)HideStatDetail();});
     startSeasonButton.addEventListener('click', function (){
@@ -24278,16 +24469,16 @@ button:hover {
             event.returnValue = '';
         }
     } );
-    window.addEventListener('keydown', function (e){
-        if (e.key==='Escape'){
-            ShowMainMenu();
-            e.preventDefault();
-            return;
-        }
-        keys.add(e.key.toLowerCase());
-    } );
+    window.addEventListener('keydown',function(e){if(e.key==='Escape'){ShowMainMenu();e.preventDefault();return;}var tag=e.target&&e.target.tagName?e.target.tagName.toLowerCase():'';if(tag==='input'||tag==='textarea'||tag==='select'||e.ctrlKey||e.metaKey||e.altKey)return;var key=e.key.toLowerCase();if(key==='q'){SetInteractionMode('inspect');e.preventDefault();return;}if(key==='c'){SetInteractionMode('capture');e.preventDefault();return;}if(key==='b'){SetInteractionMode('recall');e.preventDefault();return;}if(key==='r'){SetInteractionMode('release');e.preventDefault();return;}if(e.code==='Space'){document.getElementById('playPauseButton').click();e.preventDefault();return;}if(key==='f'){document.getElementById('fastForwardButton').click();e.preventDefault();return;}if(key==='s'){ShowRoundHistory();e.preventDefault();return;}if(key==='e'){ShowStatDetail('temperature');e.preventDefault();return;}if(key==='v'){ShowStatDetail('victory');e.preventDefault();return;}if(key==='n'){ShowStatDetail('food');e.preventDefault();return;}if(key==='t'){ShowStatDetail('treasure');e.preventDefault();return;}keys.add(key);});
     window.addEventListener('keyup', function (e){
         keys.delete(e.key.toLowerCase());
+    } );
+    canvas.addEventListener('contextmenu', function (e){
+        e.preventDefault();
+        selectedObject = null;
+        selectionCycleKey = '';
+        selectionCycleIndex = 0;
+        UpdateSelectedObjectPanel();
     } );
     canvas.addEventListener('wheel', function (e){
         e.preventDefault();
@@ -24304,6 +24495,9 @@ button:hover {
         passive : false
     } );
     canvas.addEventListener('pointerdown', function (e){
+        if (e.button===2){
+            return;
+        }
         activePointersForZoom[e.pointerId] = {
             x : e.clientX,
             y : e.clientY
@@ -24367,7 +24561,7 @@ button:hover {
         lastPinchDistance = 0;
         var clickDistance = Math.hypot(e.clientX-pointerDownX, e.clientY-pointerDownY);
         if (clickDistance<6){
-            TryCaptureWildMonsterAt(e.clientX, e.clientY);
+            ActivateInteractionAt(e.clientX, e.clientY);
         }
         isDragging = false;
         canvas.classList.remove('dragging');
@@ -24389,10 +24583,10 @@ button:hover {
     function UpdateCamera(dt){
         var dx = 0,
         dy = 0;
-        if (keys.has('arrowleft') || keys.has('a'))dx-=1;
-        if (keys.has('arrowright') || keys.has('d'))dx+=1;
-        if (keys.has('arrowup') || keys.has('w'))dy-=1;
-        if (keys.has('arrowdown') || keys.has('s'))dy+=1;
+        if (keys.has('arrowleft'))dx-=1;
+        if (keys.has('arrowright'))dx+=1;
+        if (keys.has('arrowup'))dy-=1;
+        if (keys.has('arrowdown'))dy+=1;
         camera.x+=dx * camera.speed * dt;
         camera.y+=dy * camera.speed * dt;
     }
