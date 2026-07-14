@@ -3646,7 +3646,7 @@ button:hover {
                 TERRAIN_TYPE.MARSH]);
                 if (p){
                     var bushTerrain = grid.getTerrainTypeAtWorld(p.x, p.y);
-                    objects.push(new Bush('bush_'+i, p.x, p.y, rng, bushTerrain));
+                    objects.push(new Bush('bush_'+i, p.x, p.y, rng, bushTerrain, environment.climateClass));
                 }
             }
             for (i = 0;
@@ -4026,7 +4026,30 @@ button:hover {
         }
     }
 
-    function BushVisualProfileForTerrain(terrainType, variant){
+    function BushVisualProfileForTerrain(terrainType, variant, climateClass){
+        var tropical = climateClass==='tropicalRainforest' || climateClass==='coastalTropical';
+        if (tropical){
+            if (terrainType===TERRAIN_TYPE.MARSH){
+                var tropicalMarshProfiles = [
+                    { kind : 'mangrove scrub', primary : '#2f6b4f', secondary : '#4f8b62', dark : '#1d4937', light : '#78ab70', stem : '#72513a', hide : 0.52, vision : 0.52 },
+                    { kind : 'pandanus thicket', primary : '#46733c', secondary : '#6f9048', dark : '#294d2b', light : '#93ad59', stem : '#71533a', hide : 0.50, vision : 0.50 }
+                ];
+                return tropicalMarshProfiles[variant % tropicalMarshProfiles.length];
+            }
+            if (terrainType===TERRAIN_TYPE.GRASS){
+                var tropicalGrassProfiles = [
+                    { kind : 'lantana scrub', primary : '#4f7a37', secondary : '#729345', dark : '#315529', light : '#b0836f', stem : '#67452d', hide : 0.59, vision : 0.36 },
+                    { kind : 'guava scrub', primary : '#4f7f43', secondary : '#71975b', dark : '#315b35', light : '#9ab970', stem : '#7a5638', hide : 0.57, vision : 0.38 }
+                ];
+                return tropicalGrassProfiles[variant % tropicalGrassProfiles.length];
+            }
+            var tropicalForestProfiles = [
+                { kind : 'heliconia thicket', primary : '#27643b', secondary : '#3f8050', dark : '#17442b', light : '#d65d45', stem : '#4d7335', hide : 0.47, vision : 0.58 },
+                { kind : 'tree fern thicket', primary : '#356f43', secondary : '#52885a', dark : '#214c31', light : '#79a66b', stem : '#684f39', hide : 0.49, vision : 0.54 },
+                { kind : 'ginger thicket', primary : '#2e6b39', secondary : '#4a8146', dark : '#1d4828', light : '#d88a4b', stem : '#587039', hide : 0.48, vision : 0.56 }
+            ];
+            return tropicalForestProfiles[variant % tropicalForestProfiles.length];
+        }
         if (terrainType===TERRAIN_TYPE.MARSH){
             var marshProfiles = [
                 { kind : 'reed thicket', primary : '#789347', secondary : '#9a9d4f', dark : '#465d2e', light : '#b8b866', stem : '#d1b66a', hide : 0.54, vision : 0.46 },
@@ -4051,11 +4074,11 @@ button:hover {
     }
 
     class Bush extends TerrainObject{
-        constructor(id, x, y, rng, terrainType){
+        constructor(id, x, y, rng, terrainType, climateClass){
             var variant = rng.integer(0, 8);
             var radius = terrainType===TERRAIN_TYPE.FOREST ? rng.range(20, 32) : (terrainType===TERRAIN_TYPE.MARSH ? rng.range(18, 28) : rng.range(15, 24));
             super(id, 'bush', x, y, radius, false);
-            var profile = BushVisualProfileForTerrain(terrainType, variant);
+            var profile = BushVisualProfileForTerrain(terrainType, variant, climateClass);
             this.blockingRadius = 0;
             this.terrainType = terrainType;
             this.bushKind = profile.kind;
