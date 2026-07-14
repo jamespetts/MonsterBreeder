@@ -1026,6 +1026,7 @@ button:hover {
 .biomeIcon{font-size:1.45rem;line-height:1;flex:none}
 .seasonRow{display:flex;align-items:center;gap:.42rem;margin-top:.22rem;color:#dbeafe;font-weight:800}
 .seasonIcon{font-size:1.12rem;line-height:1;flex:none}
+.settlementDistanceRow{display:flex;align-items:center;gap:.42rem;margin-top:.26rem;color:#dbeafe;font-size:.84rem;font-weight:800}.settlementDistanceIcon{font-size:1.12rem;line-height:1;flex:none}
 .climateInstrument{display:grid;grid-template-columns:2.7rem 1fr;gap:.75rem;align-items:center}
 .goalIcon{width:2rem;height:2rem;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#263449;font-size:1.15rem;cursor:help}
 .goalRow{grid-template-columns:2rem minmax(7rem,1fr)!important}
@@ -1118,7 +1119,7 @@ button:hover {
 .monsterRosterCount{padding:.08rem .35rem;border-radius:999px;background:#ffffff20;font-size:.72rem}
 .monsterPortraitGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:.4rem}
 .monsterPortrait{position:relative;min-width:0;height:120px;display:grid;grid-template-rows:72px auto auto;align-items:center;justify-items:center;padding:.25rem;border:2px solid #8b795b;border-radius:.48rem;background:#fffaf0;cursor:pointer;overflow:hidden}
-.monsterPortrait:hover{border-color:#394732;background:#fff5d6}.monsterPortrait.selected{outline:3px solid #f2c14e;border-color:#263238}.monsterPortrait[draggable=true]{cursor:grab}.monsterPortrait.dragging{opacity:.38}.monsterPortrait.compatibleBreedTarget{box-shadow:0 0 0 4px #22c55e88;border-color:#15803d}.monsterPortrait.incompatibleBreedTarget{opacity:.35}.monsterPortrait.dropBreedTarget{background:#dcfce7;transform:scale(1.03)}
+.monsterPortrait:hover{border-color:#394732;background:#fff5d6}.monsterPortrait.selected{outline:3px solid #f2c14e;border-color:#263238}.monsterPortrait.touchBreedingSelected{outline:4px solid #2563eb;outline-offset:-1px;border-color:#1d4ed8;background:#dbeafe}.monsterPortrait[draggable=true]{cursor:grab}.monsterPortrait.dragging{opacity:.38}.monsterPortrait.compatibleBreedTarget{box-shadow:0 0 0 4px #22c55e88;border-color:#15803d}.monsterPortrait.incompatibleBreedTarget{opacity:.35}.monsterPortrait.dropBreedTarget{background:#dcfce7;transform:scale(1.03)}
 .monsterPortrait svg{width:100%;height:70px}.monsterPortraitName{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;font-size:.75rem;font-weight:850}.monsterPortraitStatus{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;font-size:.65rem;color:#526052}
 .monsterPortraitControls{position:absolute;left:.22rem;right:.22rem;top:.18rem;display:flex;justify-content:space-between;align-items:center;pointer-events:none}.portraitDeployControl{display:flex;align-items:center;gap:.15rem;padding:.08rem .2rem;border:1px solid #8b795b;border-radius:.25rem;background:#fffffff2;font-size:.64rem;font-weight:800;pointer-events:auto}.portraitDeployControl input{margin:0}.deploymentBlockIcon{width:1.25rem;height:1.25rem;display:flex;align-items:center;justify-content:center;border:1px solid #991b1b;border-radius:50%;background:#fee2e2;color:#991b1b;font-size:.78rem;font-weight:900;pointer-events:auto}.portraitSex{padding:.08rem .25rem;border:1px solid #8b795b;border-radius:.25rem;background:#fffffff2;font-size:.68rem;font-weight:900}
 .monsterPortrait.mortuary{opacity:1;filter:none;background:#f4f0e7}.monsterPortrait.egg{background:#fff8dd}.monsterPortrait.brooding{background:#fff0c4}
@@ -1130,7 +1131,7 @@ button:hover {
 .performanceBehaviour{padding:.45rem;border-radius:.4rem;background:#f3eedf;font-size:.8rem}.openFamilyTreeButton{width:100%}
 #managementActions{display:flex;align-items:center;gap:.55rem}.managementPrimaryActions{margin-left:auto;display:flex;gap:.45rem}#managementHint{display:none!important}
 #familyTreeOverlay,#breedingPairOverlay{position:fixed;inset:0;z-index:58;display:flex;align-items:center;justify-content:center;padding:1rem;background:#020617ee;color:#f8fafc}#familyTreeOverlay.dialogHidden,#breedingPairOverlay.dialogHidden{display:none}
-.familyTreeDialog,.breedingPairDialog{width:min(1040px,calc(100vw - 2rem));max-height:calc(100vh - 2rem);overflow:auto;padding:1rem;border:1px solid #475569;border-radius:.85rem;background:#111827;box-shadow:0 18px 60px #000b}.familyTreeDialog h2,.breedingPairDialog h2{margin:0 0 .65rem;color:#f2c14e}.familyTreeGraph{display:flex;gap:1.2rem;align-items:stretch;min-width:max-content;padding:.8rem}.familyGeneration{position:relative;display:flex;flex-direction:column;justify-content:space-around;gap:.65rem;min-width:190px}.familyGeneration:not(:last-child):after{content:'';position:absolute;right:-.65rem;top:5%;bottom:5%;width:2px;background:#64748b}.familyGenerationTitle{text-align:center;color:#94a3b8;font-size:.72rem;font-weight:850;text-transform:uppercase}.familyTreeGraphNode{position:relative;padding:.45rem;border:1px solid #64748b;border-radius:.45rem;background:#0b1220;color:#f8fafc;text-align:left}.familyTreeGraphNode:after{content:'';position:absolute;right:-.65rem;top:50%;width:.65rem;height:2px;background:#64748b}.familyGeneration:last-child .familyTreeGraphNode:after{display:none}.familyTreeGraphNode.selected{border-color:#f2c14e;box-shadow:0 0 0 2px #f2c14e55}.familyTreeGraphNode.dead{color:#cbd5e1;background:#27272a}.familyNodeName{display:block;font-weight:900}.familyNodeMeta{display:block;margin-top:.12rem;color:#94a3b8;font-size:.72rem}.familyTreeRecordDetails{margin-top:.7rem;padding:.65rem;border:1px solid #334155;border-radius:.5rem;background:#080d18}.dialogActions{display:flex;justify-content:flex-end;gap:.45rem;margin-top:.75rem}.dialogSecondary{background:#475569;color:#fff}.breedingPairGrid{display:grid;grid-template-columns:1fr auto 1fr;gap:.7rem;align-items:center}.breedingParent{padding:.6rem;border:1px solid #475569;border-radius:.5rem;background:#0b1220}.breedingWarning{margin-top:.65rem;padding:.55rem;border:1px solid #f59e0b;border-radius:.45rem;background:#451a03;color:#fde68a}
+.familyTreeDialog,.breedingPairDialog{width:min(1040px,calc(100vw - 2rem));max-height:calc(100vh - 2rem);overflow:auto;padding:1rem;border:1px solid #475569;border-radius:.85rem;background:#111827;box-shadow:0 18px 60px #000b}.familyTreeDialog h2,.breedingPairDialog h2{margin:0 0 .65rem;color:#f2c14e}.familyTreeGraph{display:flex;gap:1.2rem;align-items:stretch;min-width:max-content;padding:.8rem}.familyGeneration{position:relative;display:flex;flex-direction:column;justify-content:space-around;gap:.65rem;min-width:190px}.familyGeneration:not(:last-child):after{content:'';position:absolute;right:-.65rem;top:5%;bottom:5%;width:2px;background:#64748b}.familyGenerationTitle{text-align:center;color:#94a3b8;font-size:.72rem;font-weight:850;text-transform:uppercase}.familyTreeGraphNode{position:relative;padding:.45rem;border:1px solid #64748b;border-radius:.45rem;background:#0b1220;color:#f8fafc;text-align:left}.familyTreeGraphNode:after{content:'';position:absolute;right:-.65rem;top:50%;width:.65rem;height:2px;background:#64748b}.familyGeneration:last-child .familyTreeGraphNode:after{display:none}.familyTreeGraphNode.selected{border-color:#f2c14e;box-shadow:0 0 0 2px #f2c14e55}.familyTreeGraphNode.dead{color:#cbd5e1;background:#27272a}.familyNodeName{display:block;font-weight:900}.familyNodeMeta{display:block;margin-top:.12rem;color:#94a3b8;font-size:.72rem}.familyTreeRecordDetails{margin-top:.7rem;padding:.65rem;border:1px solid #334155;border-radius:.5rem;background:#080d18}.dialogActions{display:flex;justify-content:flex-end;gap:.45rem;margin-top:.75rem}.dialogSecondary{background:#475569;color:#fff}.breedingPairGrid{display:grid;grid-template-columns:1fr auto 1fr;gap:.7rem;align-items:center}.breedingParent{padding:.6rem;border:1px solid #475569;border-radius:.5rem;background:#0b1220}.breedingWarning{margin-top:.65rem;padding:.55rem;border:1px solid #64748b;border-radius:.45rem;background:#172033;color:#dbeafe;font-weight:850}.breedingWarning.relationshipUnrelated{border-color:#3b82f6;background:#172554;color:#bfdbfe}.breedingWarning.relationshipCousin{border-color:#eab308;background:#422006;color:#fef08a}.breedingWarning.relationshipParent{border-color:#f59e0b;background:#451a03;color:#fde68a}.breedingWarning.relationshipSibling{border-color:#dc2626;background:#450a0a;color:#fecaca}
 @media(max-width:900px){#managementBody{grid-template-columns:1fr}.selectedMonsterHeader{grid-template-columns:1fr}.infoColumns{grid-template-columns:1fr}}
 
 
@@ -16087,6 +16088,7 @@ button:hover {
                 seasonName : World.seasonNameForNumber(this.seasonNumber),
                 currentSeasonTemperatureC : this.world.getCurrentTemperatureC(this.seasonNumber),
                 biomeType : (this.world.environment.dominantBiomeType || this.world.environment.climateClass),
+                distanceToSettlementMiles : this.world.distanceToSettlementMiles,
                 roundNumber : this.gameState && this.gameState.roundNumber ? this.gameState.roundNumber : undefined,
                 tickNumber : this.tickNumber,
                 raidEnded : this.raidEnded,
@@ -16156,6 +16158,7 @@ button:hover {
                 mapHeight : this.world.height,
                 currentSeasonTemperatureC : this.world.getCurrentTemperatureC(this.seasonNumber),
                 biomeType : this.world.environment.climateClass,
+                distanceToSettlementMiles : this.world.distanceToSettlementMiles,
                 world : this.world.getStaticSnapshot(),
                 obstacles : this.world.getObstacleSnapshots(),
                 terrainObjects : this.world.getObstacleSnapshots()
@@ -16171,6 +16174,7 @@ button:hover {
                 seasonName : World.seasonNameForNumber(this.seasonNumber),
                 currentSeasonTemperatureC : this.world.getCurrentTemperatureC(this.seasonNumber),
                 biomeType : this.world.environment.climateClass,
+                distanceToSettlementMiles : this.world.distanceToSettlementMiles,
                 roundNumber : this.gameState && this.gameState.roundNumber ? this.gameState.roundNumber : undefined,
                 mapWidth : this.world.width,
                 mapHeight : this.world.height,
@@ -16936,6 +16940,7 @@ button:hover {
                 mapHeight : this.world.height,
                 currentSeasonTemperatureC : this.world.getCurrentTemperatureC(this.seasonNumber),
                 biomeType : this.world.environment.climateClass,
+                distanceToSettlementMiles : this.world.distanceToSettlementMiles,
                 world : this.world.getStaticSnapshot(),
                 obstacles : this.world.getObstacleSnapshots(),
                 terrainObjects : this.world.getObstacleSnapshots()
@@ -16970,6 +16975,7 @@ button:hover {
                 seasonName : World.seasonNameForNumber(this.seasonNumber),
                 currentSeasonTemperatureC : this.world.getCurrentTemperatureC(this.seasonNumber),
                 biomeType : this.world.environment.climateClass,
+                distanceToSettlementMiles : this.world.distanceToSettlementMiles,
                 roundNumber : this.roundNumber,
                 phase : this.phase,
                 gameMode : this.mode,
@@ -20676,7 +20682,7 @@ button:hover {
     function BiomeIcon(type){var icons={tropicalRainforest:'\ud83c\udf34',coastalTropical:'\ud83c\udf0a',coastalTemperate:'\ud83c\udf27\ufe0f',oceanicTemperate:'\ud83c\udf2c\ufe0f',temperateContinental:'\ud83c\udf33',continentalHighland:'\u26f0\ufe0f',hotDesert:'\ud83c\udf35',coolDesert:'\ud83c\udfdc\ufe0f',polar:'\u2744\ufe0f'};return icons[type]||'\ud83c\udf0d';}
     function MakeClickable(card,kind,label,shortcut){var tooltip=label+' <'+shortcut+'>';card.classList.add('statClickable');card.tabIndex=0;card.title=tooltip;card.setAttribute('aria-label',tooltip);card.addEventListener('pointerdown',function(e){if(e.pointerType==='mouse'&&e.button!==0)return;e.preventDefault();ShowStatDetail(kind);});card.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();ShowStatDetail(kind);}});}
     var lastCampaignDashboardKey = '';
-    function RenderCampaignDashboard(s){var dashboardKey=JSON.stringify([s.biomeType,SeasonNameForSnapshot(s),TemperatureForSnapshot(s),s.consecutiveSeasonsWithNoReturningAdventurers,s.noReturningAdventurersWinTarget,s.consecutiveSeasonsWithNoReturningTreasure,s.noReturningTreasureWinTarget,s.foodPlan,s.treasureBreakdown,s.foodExpenditureCredits]);if(dashboardKey===lastCampaignDashboardKey){return;}lastCampaignDashboardKey=dashboardKey;statusBox.innerHTML='';var d=E('div','campaignDashboard'),cl=E('section','dashboardCard climateCard'),br=E('div','climateBiomeRow'),bi=E('span','biomeIcon',BiomeIcon(s.biomeType)),bt=E('span','climateBiome',FormatBiomeType(s.biomeType)),instrument=E('div','climateInstrument'),th=E('div','thermometer'),tf=E('div','thermometerFill'),temp=TemperatureForSnapshot(s),temperatureColour=TemperatureColour(temp);br.appendChild(bi);br.appendChild(bt);br.title=BiomeExplanation(s.biomeType);br.setAttribute('aria-label',FormatBiomeType(s.biomeType)+'. '+BiomeExplanation(s.biomeType));cl.appendChild(br);tf.style.height=(Number.isFinite(temp)?UiClamp((temp+20)/70,0,1)*100:0)+'%';tf.style.background=temperatureColour;th.style.color=temperatureColour;th.appendChild(tf);instrument.appendChild(th);var ct=E('div');ct.appendChild(E('div','climateValue',FormatTemperatureForSnapshot(s)));var seasonName=SeasonNameForSnapshot(s),seasonRow=E('div','seasonRow'),seasonIcon=E('span','seasonIcon',SeasonIcon(seasonName));seasonRow.appendChild(seasonIcon);seasonRow.appendChild(E('span','seasonName',seasonName.charAt(0).toUpperCase()+seasonName.slice(1)));ct.appendChild(seasonRow);instrument.appendChild(ct);cl.appendChild(instrument);MakeClickable(cl,'temperature','Environment','E');d.appendChild(cl);
+    function RenderCampaignDashboard(s){var dashboardKey=JSON.stringify([s.biomeType,SeasonNameForSnapshot(s),TemperatureForSnapshot(s),s.distanceToSettlementMiles,s.consecutiveSeasonsWithNoReturningAdventurers,s.noReturningAdventurersWinTarget,s.consecutiveSeasonsWithNoReturningTreasure,s.noReturningTreasureWinTarget,s.foodPlan,s.treasureBreakdown,s.foodExpenditureCredits]);if(dashboardKey===lastCampaignDashboardKey){return;}lastCampaignDashboardKey=dashboardKey;statusBox.innerHTML='';var d=E('div','campaignDashboard'),cl=E('section','dashboardCard climateCard'),br=E('div','climateBiomeRow'),bi=E('span','biomeIcon',BiomeIcon(s.biomeType)),bt=E('span','climateBiome',FormatBiomeType(s.biomeType)),instrument=E('div','climateInstrument'),th=E('div','thermometer'),tf=E('div','thermometerFill'),temp=TemperatureForSnapshot(s),temperatureColour=TemperatureColour(temp);br.appendChild(bi);br.appendChild(bt);br.title=BiomeExplanation(s.biomeType);br.setAttribute('aria-label',FormatBiomeType(s.biomeType)+'. '+BiomeExplanation(s.biomeType));cl.appendChild(br);tf.style.height=(Number.isFinite(temp)?UiClamp((temp+20)/70,0,1)*100:0)+'%';tf.style.background=temperatureColour;th.style.color=temperatureColour;th.appendChild(tf);instrument.appendChild(th);var ct=E('div');ct.appendChild(E('div','climateValue',FormatTemperatureForSnapshot(s)));var seasonName=SeasonNameForSnapshot(s),seasonRow=E('div','seasonRow'),seasonIcon=E('span','seasonIcon',SeasonIcon(seasonName));seasonRow.appendChild(seasonIcon);seasonRow.appendChild(E('span','seasonName',seasonName.charAt(0).toUpperCase()+seasonName.slice(1)));ct.appendChild(seasonRow);var settlementDistance=Number(s.distanceToSettlementMiles),settlementRow=E('div','settlementDistanceRow'),settlementIcon=E('span','settlementDistanceIcon','\ud83d\uded6'),settlementText=Number.isFinite(settlementDistance)?'Settlement: '+FormatNumber(settlementDistance)+' '+(settlementDistance===1?'mile':'miles')+' away':'Settlement distance unavailable';settlementRow.appendChild(settlementIcon);settlementRow.appendChild(E('span','settlementDistanceText',settlementText));settlementRow.title=Number.isFinite(settlementDistance)?'Distance from the lair to the nearest human settlement. Nearby settlements create greater raiding pressure.':'Distance to the nearest human settlement is unavailable.';settlementRow.setAttribute('aria-label',settlementText+'. '+settlementRow.title);ct.appendChild(settlementRow);instrument.appendChild(ct);cl.appendChild(instrument);MakeClickable(cl,'temperature','Environment','E');d.appendChild(cl);
         var goals=E('section','dashboardCard');goals.appendChild(E('div','dashboardHeading','Victory progress'));Goal(goals,s.consecutiveSeasonsWithNoReturningAdventurers||0,s.noReturningAdventurersWinTarget||4,'\u2694\ufe0f','No adventurer returned alive');var victoryOr=E('div','victoryOrRow'),victoryOrText=E('div','victoryOrText','\u2014\u2014 OR \u2014\u2014');victoryOr.appendChild(victoryOrText);goals.appendChild(victoryOr);Goal(goals,s.consecutiveSeasonsWithNoReturningTreasure||0,s.noReturningTreasureWinTarget||12,'\ud83d\udcb0','No adventurer returned with treasure');MakeClickable(goals,'victory','Victory progress','V');d.appendChild(goals);
         var food=E('section','dashboardCard');food.appendChild(E('div','dashboardHeading','\ud83e\udd69 Nutrition'));var fp=s.foodPlan||{},f=fp.captiveMacrofauna||{},b=Number.isFinite(fp.baseFoodBalance)?fp.baseFoodBalance:(f.foodProduced||0)-(fp.netLairFoodDemand||fp.totalDemand||0),scale=Math.max(10,Math.abs(b),fp.totalDemand||0,f.foodProduced||0),bt=E('div','balanceTrack'),bb=E('div','balanceBar '+(b>=0?'surplus':'deficit'));bb.style.width=UiClamp(Math.abs(b)/scale,0,1)*50+'%';bt.appendChild(bb);bt.appendChild(E('div','balanceValue',(b>=0?'+':'\u2212')+FormatNumber(Math.abs(b))));food.appendChild(bt);food.appendChild(E('div','dashboardFootnote',b>=0?'Seasonal food surplus':'Seasonal food deficit before new treasure sales'));MakeClickable(food,'food','Nutrition','N');d.appendChild(food);
         var treasure=E('section','dashboardCard');treasure.appendChild(E('div','dashboardHeading','\ud83e\ude99 Treasure'));var x=s.treasureBreakdown||{},start=x.starting&&x.starting.totalValue||0,stolen=x.stolen&&x.stolen.totalValue||0,sold=Number.isFinite(x.foodExpenditureCredits)?x.foodExpenditureCredits:(s.foodExpenditureCredits||0),physical=x.remaining&&x.remaining.totalValue||0,remaining=x.remainingAfterFoodValue!==undefined?x.remainingAfterFoodValue:Math.max(0,physical-sold),total=Math.max(1,start,remaining+sold+stolen),track=E('div','treasureTrack'),treasureTooltip='On map: '+FormatNumber(remaining)+'. Sold for food: '+FormatNumber(sold)+'. Stolen: '+FormatNumber(stolen)+'.';track.title=treasureTooltip;track.setAttribute('aria-label',treasureTooltip);[[remaining,'treasureSegment treasureRemaining','On map'],[sold,'treasureSegment treasureSold','Sold for food'],[stolen,'treasureSegment treasureStolen','Stolen']].forEach(function(p){var q=E('div',p[1]);q.style.width=100*p[0]/total+'%';q.title=p[2]+': '+FormatNumber(p[0]);if(!p[0])q.style.display='none';track.appendChild(q);});treasure.appendChild(track);var legend=E('div','treasureLegend');[[remaining,'treasureRemaining','On map','remaining'],[sold,'treasureSold','Sold for food','sold'],[stolen,'treasureStolen','Stolen','stolen']].forEach(function(p){var item=E('span','treasureLegendItem'),sw=E('span','legendSwatch '+p[1]);item.title=p[2];item.setAttribute('aria-label',p[2]);item.innerHTML=TreasureLegendIconSvg(p[3]);item.appendChild(sw);legend.appendChild(item);});treasure.appendChild(legend);MakeClickable(treasure,'treasure','Treasure','T');d.appendChild(treasure);statusBox.appendChild(d);}
@@ -21060,6 +21066,9 @@ button:hover {
 
     var pendingBreedingPair = null;
     var draggedBreedingMonsterId = null;
+    var touchBreedingMonsterId = null;
+    var lastTouchPortraitId = null;
+    var lastTouchPortraitTime = 0;
     function TitleCase(text){
         return String(text || '').replace(/\b\w/g, function(letter){ return letter.toUpperCase(); });
     }
@@ -21139,8 +21148,11 @@ button:hover {
             if(index===1){ var cross=document.createElement('div'); cross.textContent='\u00d7'; cross.style.fontSize='1.6rem'; cross.style.fontWeight='900'; grid.appendChild(cross); }
             var box=document.createElement('div'); box.className='breedingParent'; box.innerHTML=MonsterIconSvg(monster)+'<strong>'+monster.name+'</strong><div>'+MonsterSexWithSymbol(monster)+' \u00b7 '+MonsterAgeLabel(monster)+'</div><div>'+FormatNutritionLine(monster)+'</div>'; grid.appendChild(box);
         });
-        var related=father.motherId && father.motherId===mother.motherId || father.fatherId && father.fatherId===mother.fatherId || father.id===mother.fatherId || mother.id===father.motherId;
-        var records=((currentSnapshot&&currentSnapshot.management)||{}).familyTree||[]; document.getElementById('breedingPairWarning').textContent=RelationshipLabel(father,mother,records);
+        var records=((currentSnapshot&&currentSnapshot.management)||{}).familyTree||[];
+        var relationship=RelationshipLabel(father,mother,records);
+        var warning=document.getElementById('breedingPairWarning');
+        warning.textContent=relationship;
+        warning.className='breedingWarning '+RelationshipWarningClass(relationship);
         document.getElementById('breedingPairOverlay').classList.remove('dialogHidden');
     }
     function CloseBreedingPairDialog(){ pendingBreedingPair=null; document.getElementById('breedingPairOverlay').classList.add('dialogHidden'); }
@@ -21372,88 +21384,6 @@ button:hover {
         } );
         selectedMonsterPanel.appendChild(panel);
     }
-    function RenderBreedingPanel(monster){
-        var s = currentSnapshot || latestSnapshot;
-        if (!s || s.phase==='raid'){
-            return;
-        }
-        var management = s.management || {
-        } ;
-        var monsters = management.ownedMonsters || [];
-        var broods = management.eggs || [];
-        var panel = document.createElement('div');
-        panel.className = 'breedingPanel';
-        var heading = document.createElement('h4');
-        heading.textContent = 'Breeding';
-        panel.appendChild(heading);
-        var relatedBroods = broods.filter(function (brood){
-            return brood.motherId===monster.id || brood.fatherId===monster.id;
-        } );
-        if (relatedBroods.length>0){
-            relatedBroods.forEach(function (brood){
-                var broodLine = document.createElement('p');
-                broodLine.className = 'breedingStatus';
-                var pendingEggs=(brood.eggs||[]).filter(function(egg){return egg.status==='incubating';}).length; var failedEggs=(brood.eggs||[]).length-pendingEggs; broodLine.textContent=pendingEggs>0 ? ('Brood with '+pendingEggs+' incubating egg'+(pendingEggs===1?'':'s')+' from '+brood.motherName+' and '+brood.fatherName+'. Hatches after '+brood.incubationSeasonsRemaining+' season'+(brood.incubationSeasonsRemaining===1?'':'s')+'.') : (failedEggs+' failed egg'+(failedEggs===1?' remains':'s remain')+' from '+brood.motherName+' and '+brood.fatherName+'; these will be discarded after this management phase.');
-                panel.appendChild(broodLine);
-            } );
-        }
-        if (!monster.canBreed){
-            var blocked = document.createElement('p');
-            blocked.className = 'breedingBlocked';
-            blocked.textContent = monster.breedingBlockReason || 'This monster cannot breed now.';
-            panel.appendChild(blocked);
-            selectedMonsterPanel.appendChild(panel);
-            return;
-        }
-        var intro = document.createElement('p');
-        intro.textContent = 'Choose a mate. The mother will stay in the cage for the next season; hatchlings then need one further season to mature.';
-        panel.appendChild(intro);
-        var selectedIsFemale = monster.sex==='female';
-        var eligiblePartners = monsters.filter(function (candidate){
-            if (candidate.id===monster.id){
-                return false;
-            }
-            if (!candidate.canBreed){
-                return false;
-            }
-            return selectedIsFemale ? candidate.sex==='male' : candidate.sex==='female';
-        } );
-        if (eligiblePartners.length===0){
-            var none = document.createElement('p');
-            none.className = 'breedingBlocked';
-            none.textContent = selectedIsFemale ? 'No eligible sire is available. Capture or mature a male monster.' : 'No eligible mother is available. Capture or mature a female monster.';
-            panel.appendChild(none);
-            selectedMonsterPanel.appendChild(panel);
-            return;
-        }
-        var label = document.createElement('label');
-        label.textContent = selectedIsFemale ? 'Mate with sire' : 'Mate with mother';
-        var select = document.createElement('select');
-        eligiblePartners.forEach(function (partner){
-            var option = document.createElement('option');
-            option.value = partner.id;
-            option.textContent = partner.name+' - '+MonsterSexLabel(partner)+', '+MonsterLifeStageLabel(partner)+', '+MonsterAgeLabel(partner)+'; '+MonsterPerformanceBrief(partner);
-            select.appendChild(option);
-        } );
-        var button = document.createElement('button');
-        button.type = 'button';
-        button.textContent = selectedIsFemale ? 'Breed this mother' : 'Breed with this sire';
-        button.addEventListener('click', function (){
-            var partnerId = select.value;
-            SendCommand('BREED_MONSTERS', selectedIsFemale ? {
-                motherId : monster.id,
-                fatherId : partnerId
-            }
-            : {
-                motherId : partnerId,
-                fatherId : monster.id
-            } );
-        } );
-        panel.appendChild(label);
-        panel.appendChild(select);
-        panel.appendChild(button);
-        selectedMonsterPanel.appendChild(panel);
-    }
     function MonsterArmourRelevantFeatures(monster){
         var morphology = monster && monster.phenotype && monster.phenotype.morphology ? monster.phenotype.morphology : null;
         if (!morphology){ return 'Anatomy not yet observed'; }
@@ -21506,6 +21436,14 @@ button:hover {
         {icon:'&#129656;',text:Math.round(totals.damageTaken||0)+' damage taken'},
         {icon:'&#128062;',text:MonsterBehaviourObservation(monster)}
     ];}
+    function RelationshipWarningClass(label){
+        var relationship=String(label||'').toLowerCase();
+        if(relationship==='unrelated'){return 'relationshipUnrelated';}
+        if(relationship.indexOf('first cousin')>=0){return 'relationshipCousin';}
+        if(relationship.indexOf('sibling')>=0){return 'relationshipSibling';}
+        if(relationship.indexOf('mother')>=0||relationship.indexOf('father')>=0||relationship.indexOf('parent')>=0){return 'relationshipParent';}
+        return 'relationshipCousin';
+    }
     function RelationshipLabel(a,b,records){
         if(!a||!b){return 'Relationship unknown';} if(a.id===b.id){return 'Same monster';}
         if(a.motherId===b.id||a.fatherId===b.id){return (b.sex==='female'?'Mother':'Father');}
@@ -21767,12 +21705,38 @@ button:hover {
         var sections={};
         [['males','Males'],['females','Females'],['nursery','Nursery'],['mortuary','Mortuary']].forEach(function(pair){var section=document.createElement('section');section.className='monsterRosterSection';var heading=document.createElement('h3');heading.className='monsterRosterHeading';var headingText=document.createElement('span');headingText.textContent=pair[1];var countBadge=document.createElement('span');countBadge.className='monsterRosterCount';countBadge.textContent='0';heading.appendChild(headingText);heading.appendChild(countBadge);var grid=document.createElement('div');grid.className='monsterPortraitGrid';section.appendChild(heading);section.appendChild(grid);rosterList.appendChild(section);sections[pair[0]]={grid:grid,count:countBadge,total:0};});
         function appendPortrait(monster,key,options){
-            options=options||{};var section=sections[key],card=document.createElement('div');card.className='monsterPortrait '+(options.egg?'egg ':'')+(key==='mortuary'?'mortuary ':'')+((monster.breedingHoldSeasonsRemaining||0)>0?'brooding ':'')+(monster.id===selectedRosterMonsterId?'selected':'');card.tabIndex=0;card.setAttribute('role','button');card.setAttribute('data-monster-id',monster.id);
+            options=options||{};var section=sections[key],card=document.createElement('div');card.className='monsterPortrait '+(options.egg?'egg ':'')+(key==='mortuary'?'mortuary ':'')+((monster.breedingHoldSeasonsRemaining||0)>0?'brooding ':'')+(monster.id===selectedRosterMonsterId?'selected ':'')+(monster.id===touchBreedingMonsterId?'touchBreedingSelected':'');card.tabIndex=0;card.setAttribute('role','button');card.setAttribute('data-monster-id',monster.id);
             var canDrag=phase!=='raid'&&MonsterCanBeDraggedForBreeding(monster);card.draggable=canDrag;
             var controls=document.createElement('div');controls.className='monsterPortraitControls';
             if(exportSelectionMode&&key!=='mortuary'){var exportLabel=document.createElement('label');exportLabel.className='portraitExportControl';var exportCheck=document.createElement('input');exportCheck.type='checkbox';exportCheck.checked=!!rosterExportSelection[monster.id];exportCheck.addEventListener('click',function(event){event.stopPropagation();});exportCheck.addEventListener('change',function(event){event.stopPropagation();rosterExportSelection[monster.id]=exportCheck.checked;UpdateRosterExportStatus();});exportLabel.appendChild(exportCheck);var exportWord=document.createElement('span');exportWord.textContent='Export';exportLabel.appendChild(exportWord);controls.appendChild(exportLabel);}else if(!options.egg&&key!=='mortuary'){var label=document.createElement('div');label.className='portraitDeployControl';label.draggable=false;var checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.tabIndex=-1;var deployWord=document.createElement('span');if(phase==='raid'){label.setAttribute('role','button');checkbox.checked=!!monster.deployed;checkbox.disabled=!!monster.deployed||!monster.canDeploy;deployWord.textContent=monster.deployed?'Deployed':'Deploy';label.title=monster.deployed?'Already deployed this season':(monster.canDeploy?'Deploy now from the far right edge':ThermalDeploymentSimpleReason(monster.deploymentBlockReason));function deployNow(event){event.preventDefault();event.stopPropagation();if(checkbox.disabled){return;}checkbox.disabled=true;SendCommand('DEPLOY_CAPTIVE_MONSTER',{monsterId:monster.id});lastManagementRenderKey='';}label.addEventListener('pointerdown',deployNow);}else{label.setAttribute('role','checkbox');var checkboxChecked=!!monster.selectedForDeployment&&!!monster.canDeploy;checkbox.checked=checkboxChecked;label.setAttribute('aria-checked',checkboxChecked?'true':'false');checkbox.disabled=!monster.canDeploy;label.title=monster.canDeploy?'Select for automatic deployment at the start of the next season':ThermalDeploymentSimpleReason(monster.deploymentBlockReason);deployWord.textContent='Deploy';function toggleDeployment(event){event.preventDefault();event.stopPropagation();if(checkbox.disabled){return;}checkbox.checked=!checkbox.checked;label.setAttribute('aria-checked',checkbox.checked?'true':'false');checkbox.disabled=true;SendCommand('SET_MONSTER_DEPLOYMENT',{monsterId:monster.id,selected:checkbox.checked});lastManagementRenderKey='';}label.addEventListener('pointerdown',toggleDeployment);}label.appendChild(checkbox);label.appendChild(deployWord);label.addEventListener('mousedown',function(event){event.preventDefault();event.stopPropagation();});label.addEventListener('click',function(event){event.preventDefault();event.stopPropagation();});controls.appendChild(label);if(!monster.canDeploy&&!monster.deployed){var block=document.createElement('span');var simpleReason=ThermalDeploymentSimpleReason(monster.deploymentBlockReason);block.className='deploymentBlockIcon'+(simpleReason.indexOf('Too cold')===0?' tooCold':(simpleReason.indexOf('Too hot')===0?' tooHot':''));block.textContent=DeploymentBlockIcon(monster.deploymentBlockReason);block.title=simpleReason;controls.appendChild(block);}}
             card.appendChild(controls);var visual=document.createElement('div');visual.innerHTML=options.egg?('<div class="eggVisual"><div class="eggShape'+(monster.eggStatus==='cracked'?' cracked':'')+'"></div></div>'):MonsterIconSvg(monster);card.appendChild(visual);var name=document.createElement('div');name.className='monsterPortraitName';name.textContent=options.name||monster.name;card.appendChild(name);var status=document.createElement('div');status.className='monsterPortraitStatus';status.textContent=options.status||PortraitStatusText(monster);status.title=status.textContent;card.appendChild(status);card.title=(monster.ageInSeasons!==undefined?('Age: '+MonsterAgeLabel(monster)+'; food need: '+FormatNumber(GetFoodRequirement(monster))):status.textContent);
             function select(){selectedRosterMonsterId=monster.id;lastManagementRenderKey='';UpdateManagementDrawer(s);}card.addEventListener('click',select);card.addEventListener('keydown',function(event){if(event.key==='Enter'||event.key===' '){event.preventDefault();select();}});
+            card.addEventListener('pointerup',function(event){
+                if(event.pointerType!=='touch'||phase==='raid'||exportSelectionMode||!canDrag){return;}
+                if(event.target.closest&&event.target.closest('.monsterPortraitControls')){return;}
+                var now=Date.now();
+                var doubleTap=lastTouchPortraitId===monster.id&&now-lastTouchPortraitTime<=500;
+                lastTouchPortraitId=monster.id;
+                lastTouchPortraitTime=now;
+                if(!doubleTap){return;}
+                event.preventDefault();
+                lastTouchPortraitId=null;
+                lastTouchPortraitTime=0;
+                var first=monsters.find(function(candidate){return candidate.id===touchBreedingMonsterId;});
+                if(!first||first.id===monster.id){
+                    touchBreedingMonsterId=monster.id;
+                    Array.prototype.forEach.call(document.querySelectorAll('.monsterPortrait'),function(other){other.classList.toggle('touchBreedingSelected',other.getAttribute('data-monster-id')===monster.id);});
+                    return;
+                }
+                if(MonsterCanBeDraggedForBreeding(first)&&first.sex!==monster.sex){
+                    touchBreedingMonsterId=null;
+                    Array.prototype.forEach.call(document.querySelectorAll('.monsterPortrait'),function(other){other.classList.remove('touchBreedingSelected');});
+                    OpenBreedingPairDialog(first,monster);
+                }else{
+                    touchBreedingMonsterId=monster.id;
+                    Array.prototype.forEach.call(document.querySelectorAll('.monsterPortrait'),function(other){other.classList.toggle('touchBreedingSelected',other.getAttribute('data-monster-id')===monster.id);});
+                }
+            });
             if(canDrag){card.addEventListener('dragstart',function(event){if(event.target.closest&&event.target.closest('.monsterPortraitControls')){event.preventDefault();return;}draggedBreedingMonsterId=monster.id;event.dataTransfer.setData('text/plain',monster.id);card.classList.add('dragging');Array.prototype.forEach.call(document.querySelectorAll('.monsterPortrait'),function(other){var target=monsters.find(function(m){return m.id===other.getAttribute('data-monster-id');});if(target&&MonsterCanBeDraggedForBreeding(target)&&target.sex!==monster.sex){other.classList.add('compatibleBreedTarget');}else if(other!==card){other.classList.add('incompatibleBreedTarget');}});});card.addEventListener('dragend',ClearBreedingDragClasses);}
             card.addEventListener('dragover',function(event){var source=monsters.find(function(m){return m.id===draggedBreedingMonsterId;});if(source&&MonsterCanBeDraggedForBreeding(source)&&MonsterCanBeDraggedForBreeding(monster)&&source.sex!==monster.sex){event.preventDefault();card.classList.add('dropBreedTarget');}});card.addEventListener('dragleave',function(){card.classList.remove('dropBreedTarget');});card.addEventListener('drop',function(event){event.preventDefault();var source=monsters.find(function(m){return m.id===event.dataTransfer.getData('text/plain');});ClearBreedingDragClasses();if(source&&source.id!==monster.id&&MonsterCanBeDraggedForBreeding(source)&&MonsterCanBeDraggedForBreeding(monster)&&source.sex!==monster.sex){OpenBreedingPairDialog(source,monster);}});
             section.grid.appendChild(card);section.total+=1;section.count.textContent=String(section.total);
