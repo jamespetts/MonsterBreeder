@@ -495,16 +495,8 @@ button:hover {
 #monsterPortrait {
     display: none;
 }
-#eventLog {
-    max-height: 8rem;
-    overflow: auto;
-    padding-left: 1.4rem;
-    margin-top: 0.35rem;
-    color: #d1d5db;
-}
-#eventLog li {
-    margin-bottom: 0.35rem;
-}
+
+
 .selectionActions {
     margin-top: 0.6rem;
     display: flex;
@@ -1006,9 +998,9 @@ button:hover {
 
 /* Campaign dashboard upgrade */
 #newRaidButton{order:10;margin-left:.6rem}.transportButton{width:2.8rem;height:2.55rem;padding:0;display:inline-flex;align-items:center;justify-content:center;gap:.2rem}.transportButton[aria-pressed=true]{background:#fff1a8;box-shadow:inset 0 2px 4px #0006}.playSymbol{width:0;height:0;border-top:.58rem solid transparent;border-bottom:.58rem solid transparent;border-left:.92rem solid #1f2730}.pauseSymbol,.fastForwardSymbol{display:inline-flex;gap:.2rem}.pauseSymbol span{width:.34rem;height:1.15rem;border-radius:.18rem;background:#1f2730}.fastForwardSymbol span{width:0;height:0;border-top:.48rem solid transparent;border-bottom:.48rem solid transparent;border-left:.72rem solid #1f2730;margin-left:-.09rem}
-#statusBox{white-space:normal}.campaignDashboard{display:grid;gap:.75rem}.dashboardCard{border:1px solid #263449;border-radius:.55rem;padding:.65rem;background:#0b1220}.climateCard{display:grid;grid-template-columns:2.7rem 1fr;gap:.75rem;align-items:center}.thermometer{position:relative;width:.78rem;height:4.4rem;margin:0 auto .55rem;border:2px solid #cbd5e1;border-radius:999px 999px .3rem .3rem;background:#172033}.thermometer:after{content:'';position:absolute;left:50%;bottom:-.62rem;width:1.35rem;height:1.35rem;transform:translateX(-50%);border:2px solid #cbd5e1;border-radius:50%;background:currentColor}.thermometerFill{position:absolute;left:.13rem;right:.13rem;bottom:0;border-radius:999px;background:linear-gradient(0deg,#2563eb,#fbbf24 55%,#dc2626)}.climateValue{font-size:1.35rem;font-weight:900}.climateBiome{color:#bfdbfe;font-weight:800}.dashboardHeading{margin-bottom:.45rem;font-weight:900}.goalRow{display:grid;grid-template-columns:minmax(7rem,1fr) minmax(8.5rem,1.1fr);gap:.65rem;align-items:center;margin-top:.52rem}.progressTrack,.balanceTrack,.treasureTrack{position:relative;height:1.35rem;overflow:hidden;border-radius:999px;background:#1f2937;border:1px solid #475569}.progressFill{height:100%;background:linear-gradient(90deg,#1d4ed8,#38bdf8)}.progressText,.balanceValue{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.78rem;font-weight:900;text-shadow:0 1px 2px #000}.goalDescription{color:#dbeafe;font-size:.82rem}.balanceTrack{overflow:visible;background:#172033}.balanceTrack:after{content:'';position:absolute;left:50%;top:-.2rem;bottom:-.2rem;width:2px;background:#fff}.balanceBar{position:absolute;top:.12rem;bottom:.12rem;border-radius:999px}.balanceBar.surplus{left:50%;background:#16a34a}.balanceBar.deficit{right:50%;background:#dc2626}.treasureTrack{display:flex;height:1.75rem}.treasureSegment{display:flex;align-items:center;justify-content:center;overflow:hidden;color:#fff;font-size:.72rem;font-weight:900;text-shadow:0 1px 2px #000;white-space:nowrap}.treasureRemaining{background:#ca8a04}.treasureSold{background:#7c3aed}.treasureStolen{background:#b91c1c}.dashboardFootnote{color:#94a3b8;font-size:.76rem;margin-top:.35rem}
-#selectionSection{display:flex;flex-direction:column;overflow:hidden}#objectDetails{flex:0 1 auto;overflow:auto}#eventLogDisclosure{min-height:0;margin-top:.65rem;border-top:1px solid #1f2937;padding-top:.45rem}#eventLogDisclosure[open]{flex:1 1 14rem;display:flex;flex-direction:column}#eventLogDisclosure summary{cursor:pointer;color:#bfdbfe;font-weight:850}#eventLog{max-height:none;min-height:0;flex:1 1 auto;overflow-y:auto}
-#roundHistoryOverlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:1rem;background:#020617f0;color:#f8fafc}#roundHistoryOverlay.dialogHidden{display:none}#roundHistoryPanel{width:min(980px,calc(100vw - 2rem));max-height:min(860px,calc(100vh - 2rem));overflow:auto;border:1px solid #475569;border-radius:.85rem;padding:1rem;background:#111827}#roundHistoryPanel h2{margin:0;color:#f2c14e}.roundHistoryTable{width:100%;border-collapse:collapse;font-size:.88rem}.roundHistoryTable th,.roundHistoryTable td{padding:.55rem;border-bottom:1px solid #334155;text-align:right;vertical-align:top}.roundHistoryTable th:nth-child(-n+3),.roundHistoryTable td:nth-child(-n+3){text-align:left}.roundResultBadge{display:inline-block;padding:.16rem .5rem;border-radius:999px;font-weight:900}.roundResultBadge.win{background:#166534}.roundResultBadge.loss{background:#991b1b}#roundHistoryActions{display:flex;justify-content:flex-end;margin-top:.8rem}@media(min-width:981px){#sidePanel{grid-template-rows:minmax(17rem,auto) minmax(13rem,1fr)}}@media(max-width:700px){.goalRow{grid-template-columns:1fr}}
+#statusBox{white-space:normal}.campaignDashboard{display:grid;gap:.75rem}.dashboardCard{border:1px solid #263449;border-radius:.55rem;padding:.65rem;background:#0b1220}.climateCard{display:grid;grid-template-columns:2.7rem 1fr;gap:.75rem;align-items:center}.thermometer{position:relative;width:.78rem;height:4.4rem;margin:0 auto .55rem;border:2px solid #cbd5e1;border-radius:999px 999px .3rem .3rem;background:#172033}.thermometer:after{content:"";position:absolute;left:50%;bottom:-.62rem;width:1.35rem;height:1.35rem;transform:translateX(-50%);border:2px solid #cbd5e1;border-radius:50%;background:currentColor}.thermometerFill{position:absolute;left:.13rem;right:.13rem;bottom:0;border-radius:999px;background:linear-gradient(0deg,#2563eb,#fbbf24 55%,#dc2626)}.climateValue{font-size:1.35rem;font-weight:900}.climateBiome{color:#bfdbfe;font-weight:800}.dashboardHeading{margin-bottom:.45rem;font-weight:900}.goalRow{display:grid;grid-template-columns:minmax(7rem,1fr) minmax(8.5rem,1.1fr);gap:.65rem;align-items:center;margin-top:.52rem}.progressTrack,.balanceTrack,.treasureTrack{position:relative;height:1.35rem;overflow:hidden;border-radius:999px;background:#1f2937;border:1px solid #475569}.progressFill{height:100%;background:linear-gradient(90deg,#1d4ed8,#38bdf8)}.progressText,.balanceValue{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.78rem;font-weight:900;text-shadow:0 1px 2px #000}.goalDescription{color:#dbeafe;font-size:.82rem}.balanceTrack{overflow:visible;background:#172033}.balanceTrack:after{content:"";position:absolute;left:50%;top:-.2rem;bottom:-.2rem;width:2px;background:#fff}.balanceBar{position:absolute;top:.12rem;bottom:.12rem;border-radius:999px}.balanceBar.surplus{left:50%;background:#16a34a}.balanceBar.deficit{right:50%;background:#dc2626}.treasureTrack{display:flex;height:1.75rem}.treasureSegment{display:flex;align-items:center;justify-content:center;overflow:hidden;color:#fff;font-size:.72rem;font-weight:900;text-shadow:0 1px 2px #000;white-space:nowrap}.treasureRemaining{background:#ca8a04}.treasureSold{background:#7c3aed}.treasureStolen{background:#b91c1c}.dashboardFootnote{color:#94a3b8;font-size:.76rem;margin-top:.35rem}
+#selectionSection{display:flex;flex-direction:column;overflow:hidden}#objectDetails{flex:0 1 auto;overflow:auto}
+#roundHistoryOverlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:1rem;background:#020617f0;color:#f8fafc}#roundHistoryOverlay.dialogHidden{display:none}#roundHistoryPanel{width:min(980px,calc(100vw - 2rem));max-height:min(860px,calc(100vh - 2rem));overflow:auto;border:1px solid #475569;border-radius:.85rem;padding:1rem;background:#111827}#roundHistoryPanel h2{margin:0;color:#f2c14e}.roundHistoryTable{width:100%;border-collapse:collapse;font-size:.88rem}.roundHistoryTable th,.roundHistoryTable td{padding:.55rem;border-bottom:1px solid #334155;text-align:right;vertical-align:top}.roundHistoryTable th:nth-child(-n/**/+3),.roundHistoryTable td:nth-child(-n/**/+3){text-align:left}.roundResultBadge{display:inline-block;padding:.16rem .5rem;border-radius:999px;font-weight:900}.roundResultBadge.win{background:#166534}.roundResultBadge.loss{background:#991b1b}#roundHistoryActions{display:flex;justify-content:flex-end;margin-top:.8rem}@media(min-width:981px){#sidePanel{grid-template-rows:minmax(17rem,auto) minmax(13rem,1fr)}}@media(max-width:700px){.goalRow{grid-template-columns:1fr}}
 
 .dashboardCard.statClickable{cursor:pointer;transition:border-color .15s,transform .15s}.dashboardCard.statClickable:hover{border-color:#f2c14e;transform:translateY(-1px)}
 .thermometerFill{background:currentColor!important}.treasureLegend{display:grid;grid-template-columns:repeat(3,1fr);gap:.35rem;margin-top:.45rem}.treasureLegendItem{display:flex;align-items:center;gap:.3rem;color:#dbeafe;font-size:.76rem}.legendSwatch{width:.72rem;height:.72rem;border-radius:.18rem;flex:none}
@@ -1035,9 +1027,9 @@ button:hover {
 .dashboardCard.statClickable[data-tooltip]:hover:after,.dashboardCard.statClickable[data-tooltip]:focus-visible:after{content:attr(data-tooltip);position:absolute;z-index:20;right:.45rem;top:.35rem;padding:.25rem .45rem;border:1px solid #64748b;border-radius:.3rem;background:#111827;color:#f8fafc;font-size:.75rem;font-weight:700;line-height:1.2;white-space:nowrap;box-shadow:0 3px 10px #0008;pointer-events:none}
 #selectionSection{min-height:15rem!important;overflow:hidden!important}
 #objectDetails{flex:1 1 auto;min-height:4rem;overflow:auto}
-#eventLogDisclosure{flex:0 0 auto;min-height:0;max-height:11rem;overflow:hidden}
-#eventLogDisclosure[open]{display:block;flex:0 0 auto;min-height:7rem;max-height:11rem;overflow:hidden}
-#eventLog{display:block;height:6.8rem;max-height:6.8rem!important;overflow-y:scroll!important;overscroll-behavior:contain;scrollbar-gutter:stable;padding-right:.35rem}
+
+
+
 #raidCanvas.modeInspect{cursor:help}
 #raidCanvas.modeCapture{cursor:crosshair}
 #raidCanvas.modeRecall{cursor:pointer}
@@ -1052,9 +1044,9 @@ button:hover {
 #interactionModeSection{height:auto!important;min-height:0!important}
 #selectionSection{min-height:0!important;height:auto!important;overflow:hidden!important}
 #selectionSection #objectDetails{flex:1 1 auto;min-height:2.5rem;overflow:auto}
-#selectionSection #eventLogDisclosure:not([open]){flex:0 0 auto;max-height:none}
-#selectionSection #eventLogDisclosure[open]{display:flex;flex:3 1 18rem;min-height:14rem;max-height:none;overflow:hidden}
-#selectionSection #eventLogDisclosure[open] #eventLog{flex:1 1 auto;height:auto;max-height:none!important;min-height:11rem;overflow-y:scroll!important}
+
+
+
 .dashboardCard.statClickable[data-tooltip]:hover:after,.dashboardCard.statClickable[data-tooltip]:focus-visible:after{content:none!important;display:none!important}
 #raidCanvas.modeInspect{cursor:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2232%22%20viewBox%3D%220%200%2048%2048%22%3E%3Ccircle%20cx%3D%2218%22%20cy%3D%2218%22%20r%3D%2212%22%20fill%3D%22%23dbeafe%22%20stroke%3D%22%231e3a5f%22%20stroke-width%3D%224%22%2F%3E%3Cpath%20d%3D%22M27%2027l16%2016%22%20stroke%3D%22%236b4423%22%20stroke-width%3D%228%22%2F%3E%3C%2Fsvg%3E") 4 4, crosshair}
 #raidCanvas.modeCapture{cursor:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2232%22%20viewBox%3D%220%200%2048%2048%22%3E%3Cellipse%20cx%3D%2217%22%20cy%3D%2216%22%20rx%3D%2214%22%20ry%3D%2211%22%20fill%3D%22%23dbeafe%22%20stroke%3D%22%23275d47%22%20stroke-width%3D%224%22%2F%3E%3Cpath%20d%3D%22M6%2011l22%2010M6%2021L26%208M12%206l10%2021M4%2016h27%22%20stroke%3D%22%234f8f72%22%20stroke-width%3D%222%22%2F%3E%3Cpath%20d%3D%22M27%2024l16%2019%22%20stroke%3D%22%23704526%22%20stroke-width%3D%228%22%2F%3E%3C%2Fsvg%3E") 4 4, crosshair}
@@ -1062,14 +1054,14 @@ button:hover {
 #raidCanvas.modeRelease{cursor:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2232%22%20viewBox%3D%220%200%2048%2048%22%3E%3Cpath%20d%3D%22M2%2031h19l5-3%2013%20.5c4%20.2%205%203%204%205-1%202-3%203-5%203l-12%201C20%2043%2013%2044%202%2042z%22%20fill%3D%22%23f4b183%22%20stroke%3D%22%23713f2f%22%20stroke-width%3D%222.5%22%2F%3E%3Cpath%20d%3D%22M22%2030l4-5%204-12M31%2024l4-10M35%2025l4-7%22%20fill%3D%22none%22%20stroke%3D%22%23713f2f%22%20stroke-width%3D%223%22%2F%3E%3Cpath%20d%3D%22M7%2016c5-5%2011-6%2016-3M19%209l4%204-5%203%22%20fill%3D%22none%22%20stroke%3D%22%2322c55e%22%20stroke-width%3D%223%22%2F%3E%3C%2Fsvg%3E") 4 4, crosshair}
 
 /* Event log: one explicit independently scrolling viewport. */
-#selectionSection.eventLogOpen{display:grid!important;grid-template-rows:auto minmax(2.5rem,7rem) minmax(14rem,1fr);min-height:0!important}
-#selectionSection.eventLogOpen>#objectDetails{min-height:0!important;max-height:7rem!important;overflow:auto!important}
-#selectionSection.eventLogOpen>#monsterPortrait{display:none!important}
-#selectionSection.eventLogOpen>#eventLogDisclosure{display:grid!important;grid-template-rows:auto minmax(0,1fr)!important;min-height:14rem!important;height:100%!important;max-height:none!important;overflow:hidden!important;margin-top:.25rem!important}
-#selectionSection.eventLogOpen #eventLog{display:block!important;box-sizing:border-box!important;width:100%!important;height:100%!important;min-height:0!important;max-height:none!important;overflow-x:hidden!important;overflow-y:auto!important;scrollbar-gutter:stable both-edges;scrollbar-width:auto;scrollbar-color:#64748b #111827;padding-right:.8rem!important;margin-bottom:0!important}
-#eventLog::-webkit-scrollbar{width:14px}
-#eventLog::-webkit-scrollbar-track{background:#111827;border-left:1px solid #334155}
-#eventLog::-webkit-scrollbar-thumb{background:#64748b;border:3px solid #111827;border-radius:999px}
+
+
+
+
+
+
+
+
 #campaignStatsSection{padding-top:.5rem!important}
 .interactionModeButton svg{width:2.15rem!important;height:2.15rem!important;stroke:none!important}
 
@@ -1131,7 +1123,7 @@ button:hover {
 .performanceBehaviour{padding:.45rem;border-radius:.4rem;background:#f3eedf;font-size:.8rem}.openFamilyTreeButton{width:100%}
 #managementActions{display:flex;align-items:center;gap:.55rem}.managementPrimaryActions{margin-left:auto;display:flex;gap:.45rem}#managementHint{display:none!important}
 #familyTreeOverlay,#breedingPairOverlay{position:fixed;inset:0;z-index:58;display:flex;align-items:center;justify-content:center;padding:1rem;background:#020617ee;color:#f8fafc}#familyTreeOverlay.dialogHidden,#breedingPairOverlay.dialogHidden{display:none}
-.familyTreeDialog,.breedingPairDialog{width:min(1040px,calc(100vw - 2rem));max-height:calc(100vh - 2rem);overflow:auto;padding:1rem;border:1px solid #475569;border-radius:.85rem;background:#111827;box-shadow:0 18px 60px #000b}.familyTreeDialog h2,.breedingPairDialog h2{margin:0 0 .65rem;color:#f2c14e}.familyTreeGraph{display:flex;gap:1.2rem;align-items:stretch;min-width:max-content;padding:.8rem}.familyGeneration{position:relative;display:flex;flex-direction:column;justify-content:space-around;gap:.65rem;min-width:190px}.familyGeneration:not(:last-child):after{content:'';position:absolute;right:-.65rem;top:5%;bottom:5%;width:2px;background:#64748b}.familyGenerationTitle{text-align:center;color:#94a3b8;font-size:.72rem;font-weight:850;text-transform:uppercase}.familyTreeGraphNode{position:relative;padding:.45rem;border:1px solid #64748b;border-radius:.45rem;background:#0b1220;color:#f8fafc;text-align:left}.familyTreeGraphNode:after{content:'';position:absolute;right:-.65rem;top:50%;width:.65rem;height:2px;background:#64748b}.familyGeneration:last-child .familyTreeGraphNode:after{display:none}.familyTreeGraphNode.selected{border-color:#f2c14e;box-shadow:0 0 0 2px #f2c14e55}.familyTreeGraphNode.dead{color:#cbd5e1;background:#27272a}.familyNodeName{display:block;font-weight:900}.familyNodeMeta{display:block;margin-top:.12rem;color:#94a3b8;font-size:.72rem}.familyTreeRecordDetails{margin-top:.7rem;padding:.65rem;border:1px solid #334155;border-radius:.5rem;background:#080d18}.dialogActions{display:flex;justify-content:flex-end;gap:.45rem;margin-top:.75rem}.dialogSecondary{background:#475569;color:#fff}.breedingPairGrid{display:grid;grid-template-columns:1fr auto 1fr;gap:.7rem;align-items:center}.breedingParent{padding:.6rem;border:1px solid #475569;border-radius:.5rem;background:#0b1220}.breedingWarning{margin-top:.65rem;padding:.55rem;border:1px solid #64748b;border-radius:.45rem;background:#172033;color:#dbeafe;font-weight:850}.breedingWarning.relationshipUnrelated{border-color:#3b82f6;background:#172554;color:#bfdbfe}.breedingWarning.relationshipCousin{border-color:#eab308;background:#422006;color:#fef08a}.breedingWarning.relationshipParent{border-color:#f59e0b;background:#451a03;color:#fde68a}.breedingWarning.relationshipSibling{border-color:#dc2626;background:#450a0a;color:#fecaca}
+.familyTreeDialog,.breedingPairDialog{width:min(1040px,calc(100vw - 2rem));max-height:calc(100vh - 2rem);overflow:auto;padding:1rem;border:1px solid #475569;border-radius:.85rem;background:#111827;box-shadow:0 18px 60px #000b}.familyTreeDialog h2,.breedingPairDialog h2{margin:0 0 .65rem;color:#f2c14e}.familyGeneration{position:relative;display:flex;flex-direction:column;justify-content:space-around;gap:.65rem;min-width:190px}.familyGeneration:not(:last-child):after{content:"";position:absolute;right:-.65rem;top:5%;bottom:5%;width:2px;background:#64748b}.familyGenerationTitle{text-align:center;color:#94a3b8;font-size:.72rem;font-weight:850;text-transform:uppercase}.familyTreeGraphNode{position:relative;padding:.45rem;border:1px solid #64748b;border-radius:.45rem;background:#0b1220;color:#f8fafc;text-align:left}.familyTreeGraphNode:after{content:"";position:absolute;right:-.65rem;top:50%;width:.65rem;height:2px;background:#64748b}.familyGeneration:last-child .familyTreeGraphNode:after{display:none}.familyTreeGraphNode.selected{border-color:#f2c14e;box-shadow:0 0 0 2px #f2c14e55}.familyTreeGraphNode.dead{color:#cbd5e1;background:#27272a}.familyNodeName{display:block;font-weight:900}.familyNodeMeta{display:block;margin-top:.12rem;color:#94a3b8;font-size:.72rem}.familyTreeRecordDetails{margin-top:.7rem;padding:.65rem;border:1px solid #334155;border-radius:.5rem;background:#080d18}.dialogActions{display:flex;justify-content:flex-end;gap:.45rem;margin-top:.75rem}.dialogSecondary{background:#475569;color:#fff}.breedingPairGrid{display:grid;grid-template-columns:1fr auto 1fr;gap:.7rem;align-items:center}.breedingParent{padding:.6rem;border:1px solid #475569;border-radius:.5rem;background:#0b1220}.breedingWarning{margin-top:.65rem;padding:.55rem;border:1px solid #64748b;border-radius:.45rem;background:#172033;color:#dbeafe;font-weight:850}.breedingWarning.relationshipUnrelated{border-color:#3b82f6;background:#172554;color:#bfdbfe}.breedingWarning.relationshipCousin{border-color:#eab308;background:#422006;color:#fef08a}.breedingWarning.relationshipParent{border-color:#f59e0b;background:#451a03;color:#fde68a}.breedingWarning.relationshipSibling{border-color:#dc2626;background:#450a0a;color:#fecaca}
 @media(max-width:900px){#managementBody{grid-template-columns:1fr}.selectedMonsterHeader{grid-template-columns:1fr}.infoColumns{grid-template-columns:1fr}}
 
 
@@ -1150,8 +1142,8 @@ button:hover {
 .nutritionComparisonRows{display:grid;gap:.28rem}.nutritionComparisonRow{display:grid;grid-template-columns:7.3rem minmax(0,1fr) 3.5rem;gap:.35rem;align-items:center;font-size:.72rem}.nutritionBar{height:1rem;border:1px solid #8b795b;border-radius:.25rem;background:#ece8df;overflow:hidden}.nutritionBarFill{height:100%}.nutritionNeedFill{background:#355f8a}.nutritionProductionFill{background:#d59b35}.nutritionStatusLine{margin-top:.25rem;font-weight:800}
 .performanceIconList{list-style:none;margin:.2rem 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:.2rem .55rem}.performanceIconList li{display:grid;grid-template-columns:1.3rem minmax(0,1fr);gap:.3rem;font-size:.75rem}
 .injuryList{gap:.18rem}.injuryRow{grid-template-columns:6.8rem 1fr auto;font-size:.7rem}.historicInjuryList{max-height:4.2rem;overflow:auto}
-.eggSelectedVisual{width:92px;height:118px;border:5px solid #6b4f2d;border-radius:52% 48% 47% 53% / 61% 61% 39% 39%;background:radial-gradient(circle at 34% 28%,#fffdf2 0 10%,#e8d5a5 48%,#9c7a4b 100%);position:relative}.eggSelectedVisual.cracked:after{content:'';position:absolute;left:46%;top:3%;width:4px;height:74%;background:#5b3a21;transform:rotate(10deg);clip-path:polygon(0 0,100% 0,35% 17%,100% 34%,25% 52%,100% 70%,25% 87%,100% 100%,0 100%,60% 84%,0 68%,65% 50%,0 31%,60% 15%)}
-.familyTreeDialog{height:min(88vh,820px);display:grid;grid-template-rows:auto minmax(0,1fr) 120px auto}.familyTreeGraph{min-width:0;display:flex;flex-direction:column-reverse;gap:1rem;overflow:auto;align-items:stretch}.familyGeneration{min-width:0;display:flex;flex-direction:row;justify-content:center;flex-wrap:wrap;gap:.65rem}.familyGeneration:not(:last-child):after{display:none}.familyGenerationTitle{display:none}.familyTreeGraphNode{width:170px}.familyTreeGraphNode:after{display:none}.familyNodeIcon{display:block;height:54px}.familyNodeIcon svg{width:100%;height:54px}.familyTreeRecordDetails{height:120px;overflow:auto;margin:0}
+.eggSelectedVisual{width:92px;height:118px;border:5px solid #6b4f2d;border-radius:52% 48% 47% 53% / 61% 61% 39% 39%;background:radial-gradient(circle at 34% 28%,#fffdf2 0 10%,#e8d5a5 48%,#9c7a4b 100%);position:relative}.eggSelectedVisual.cracked:after{content:"";position:absolute;left:46%;top:3%;width:4px;height:74%;background:#5b3a21;transform:rotate(10deg);clip-path:polygon(0 0,100% 0,35% 17%,100% 34%,25% 52%,100% 70%,25% 87%,100% 100%,0 100%,60% 84%,0 68%,65% 50%,0 31%,60% 15%)}
+.familyTreeDialog{height:min(88vh,820px);display:grid;grid-template-rows:auto minmax(0,1fr) 120px auto}.familyGeneration{min-width:0;display:flex;flex-direction:row;justify-content:center;flex-wrap:wrap;gap:.65rem}.familyGeneration:not(:last-child):after{display:none}.familyGenerationTitle{display:none}.familyTreeGraphNode{width:170px}.familyTreeGraphNode:after{display:none}.familyNodeIcon{display:block;height:54px}.familyNodeIcon svg{width:100%;height:54px}.familyTreeRecordDetails{height:120px;overflow:auto;margin:0}
 #monsterExportSection{display:none!important}.exportModeActive .monsterPortrait{cursor:pointer}.portraitExportControl{position:absolute;left:.22rem;bottom:.22rem;z-index:3;padding:.12rem .25rem;border:1px solid #1d4ed8;border-radius:.3rem;background:#eff6ff;font-size:.66rem;font-weight:850}.exportModeBar{display:flex;align-items:center;gap:.4rem;padding:.35rem .5rem;border:1px solid #60a5fa;border-radius:.4rem;background:#eff6ff;color:#1e3a8a;font-size:.75rem}.exportModeBar.hidden{display:none}.managementPrimaryActions{align-items:center}
 @media(max-width:1100px){#selectedMonsterPanel{font-size:.76rem;gap:.35rem}.selectedMonsterHeader{grid-template-columns:110px 1fr}.selectedMonsterPortrait{min-height:92px}.selectedMonsterPortrait svg{height:90px}}
 
@@ -1161,16 +1153,16 @@ button:hover {
 .nutritionOverlayBar{position:relative;height:1.15rem;border:1px solid #64748b;border-radius:.28rem;background:#ece8df;overflow:hidden}.nutritionOverlayProduction,.nutritionOverlayNeed{position:absolute;left:0;top:0;bottom:0}.nutritionOverlayProduction{background:#d9a441}.nutritionOverlayNeed{background:#355f8a;opacity:.94}.nutritionOverlayLegend{display:flex;justify-content:space-between;gap:.4rem;margin-top:.25rem;font-size:.7rem}.nutritionLegendSwatch{display:inline-block;width:.8rem;height:.8rem;margin-right:.22rem;vertical-align:-.1rem;border-radius:.15rem}.nutritionLegendNeed{background:#355f8a}.nutritionLegendProduction{background:#d9a441}
 .deploymentBlockIcon.tooCold{border-color:#1d4ed8;background:#dbeafe;color:#1d4ed8}.deploymentBlockIcon.tooHot{border-color:#b91c1c;background:#fee2e2;color:#b91c1c}
 #cageViewport.exportModeActive,#rosterList.exportModeActive{background:#dbeafe!important}.exportModeActive .monsterRosterHeading{background:#355f8a}.portraitExportControl{position:static;padding:.08rem .2rem;border:1px solid #1d4ed8;border-radius:.25rem;background:#eff6ff;color:#1e3a8a;font-size:.64rem;font-weight:850;pointer-events:auto}.portraitExportControl input{margin:0}.exportModeBar{position:static!important;outline:none!important;box-shadow:none!important;flex:1 1 auto;min-width:0}.managementPrimaryActions{flex:0 0 auto}#managementActions{position:relative;z-index:3;background:#fffdf2;padding-top:.35rem}
-.familyTreeGraph{position:relative}.familyTreeConnections{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;z-index:0}.familyGeneration,.familyTreeGraphNode{z-index:1}.familyTreeGraphNode{position:relative}
+.familyGeneration,.familyTreeGraphNode{z-index:1}.familyTreeGraphNode{position:relative}
 
 
 /* Monster management revision 4: pedigree geometry, image containment and direct import. */
 .familyTreeDialog{width:min(1500px,calc(100vw - 1rem))!important;height:calc(100vh - 1rem)!important;max-height:none!important;box-sizing:border-box;grid-template-rows:auto minmax(0,1fr) 150px auto!important}
-.familyTreeGraph{position:relative!important;display:flex!important;flex-direction:column!important;gap:0!important;min-width:1180px!important;min-height:100%!important;padding:48px 64px!important;box-sizing:border-box;overflow:auto!important;align-items:stretch!important}
+
 .familyGeneration{position:relative!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-around!important;flex-wrap:nowrap!important;gap:34px!important;min-height:174px!important;padding:36px 10px!important;box-sizing:border-box}
 .familyTreeGraphNode{width:174px!important;min-width:174px!important;height:116px!important;box-sizing:border-box;overflow:hidden;display:grid;grid-template-rows:56px auto auto;align-content:center}
 .familyNodeIcon{display:flex!important;align-items:center;justify-content:center;height:54px!important;overflow:hidden!important}.familyNodeIcon svg{display:block;width:100%!important;height:100%!important;max-width:150px;max-height:50px;overflow:visible!important;transform:scale(.74);transform-origin:center}
-.familyTreeConnections{position:absolute!important;left:0!important;top:0!important;pointer-events:none;z-index:0;overflow:visible!important}.familyGeneration,.familyTreeGraphNode{z-index:1}
+.familyGeneration,.familyTreeGraphNode{z-index:1}
 .familyTreeRecordDetails{height:150px!important;min-height:150px!important;box-sizing:border-box}
 .monsterPortrait>div:not(.monsterPortraitControls){width:100%;height:70px;display:flex;align-items:center;justify-content:center;overflow:hidden}.monsterPortrait svg{display:block!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:68px!important;overflow:visible!important;transform:scale(.74);transform-origin:center}
 .breedingParent{min-width:0;min-height:174px;display:grid;grid-template-rows:92px auto auto auto;align-content:start;overflow:hidden}.breedingParent svg{display:block;width:100%!important;height:88px!important;max-width:100%!important;max-height:88px!important;overflow:visible!important;transform:scale(.70);transform-origin:center}
@@ -1178,15 +1170,15 @@ button:hover {
 
 
 /* Monster management revision 5: deterministic ancestry layout. */
-.familyTreeGraph{display:block!important;position:relative!important;min-width:100%!important;min-height:100%!important;padding:0!important;overflow:auto!important;box-sizing:border-box}
-.familyTreeCanvas{position:relative;min-width:100%;min-height:100%;box-sizing:border-box}
-.familyTreeCanvas .familyTreeGraphNode{position:absolute!important;margin:0!important;width:174px!important;min-width:174px!important;height:116px!important;z-index:2}
-.familyTreeCanvas .familyTreeConnections{position:absolute!important;left:0!important;top:0!important;z-index:1!important;pointer-events:none}
+
+
+
+
 
 
 /* Family-tree DAG layout: one rendered node per monster ID. */
-.familyTreeCanvas{min-width:0!important;min-height:0!important;box-sizing:content-box!important;overflow:visible!important}
-.familyTreeCanvas>.familyTreeConnections{inset:auto!important;right:auto!important;bottom:auto!important;width:auto!important;height:auto!important;max-width:none!important;max-height:none!important;display:block!important;transform:none!important;overflow:visible!important}
+
+
 
 #optionsOverlay{position:fixed;inset:0;z-index:65;display:flex;align-items:center;justify-content:center;background:rgba(2,6,23,.94);color:#f9fafb}#optionsOverlay.dialogHidden{display:none}#optionsPanel{width:min(440px,calc(100vw - 2rem));border:1px solid #475569;border-radius:.85rem;padding:1rem;background:#111827;box-shadow:0 18px 60px #000a;box-sizing:border-box}#optionsPanel h2{margin:0 0 .8rem;color:#f2c14e}.optionsControl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.7rem;align-items:center;margin:.7rem 0}.optionsControl label{font-weight:800}#musicVolumeInput{width:min(240px,48vw)}#musicVolumeValue{display:inline-block;min-width:3.5rem;text-align:right;color:#cbd5e1;font-variant-numeric:tabular-nums}#optionsActions{display:flex;justify-content:flex-end;margin-top:1rem}
 #preMenuOverlay{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;background:#020617;color:#f8fafc;cursor:pointer;text-align:center}#preMenuOverlay.preMenuHidden{display:none}#preMenuPanel{padding:2rem;max-width:42rem}#preMenuPanel h1{margin:0 0 .65rem;color:#f2c14e;font-size:clamp(2.8rem,8vw,6rem);line-height:1}#preMenuPanel p{margin:0 0 1.7rem;color:#cbd5e1;font-size:clamp(1rem,2.3vw,1.35rem)}#preMenuPanel strong{display:block;margin-top:1.7rem;font-size:1.15rem;animation:preMenuPulse 1.5s ease-in-out infinite}@keyframes preMenuPulse{50%{opacity:.45}}
@@ -1225,6 +1217,723 @@ button:hover {
 .portraitDeployControl span {
     pointer-events: none;
 }
+
+/* ========================================================================== */
+/* NON-DIEGETIC UI THEME TOKENS                                               */
+/* Change these custom properties to create later UI themes without editing   */
+/* component rules. Canvas and in-world graphical rendering remain separate.  */
+/* ========================================================================== */
+:root {
+    --ui-font-body: Georgia, "Times New Roman", serif;
+    --ui-font-display: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --ui-font-utility: "Trebuchet MS", Arial, sans-serif;
+
+    --ui-ink: #30291d;
+    --ui-ink-muted: #685f4c;
+    --ui-ink-inverse: #f1e8c9;
+    --ui-ink-faint-inverse: #d4c9a7;
+    --ui-heading: #40371f;
+    --ui-heading-inverse: #e3d495;
+
+    --ui-parchment: #d8c99e;
+    --ui-parchment-light: #eadfbd;
+    --ui-parchment-bright: #f3e9c9;
+    --ui-parchment-dark: #b9a878;
+    --ui-parchment-recessed: #c9ba8e;
+
+    --ui-green-deep: #303b24;
+    --ui-green: #4f5d35;
+    --ui-green-light: #69764b;
+    --ui-green-yellow: #7d8250;
+    --ui-green-muted: #626d49;
+
+    --ui-brown-deep: #34271b;
+    --ui-brown: #57422c;
+    --ui-brown-light: #806744;
+    --ui-border: #665338;
+    --ui-border-dark: #33281b;
+    --ui-border-light: #9c8b61;
+
+    --ui-accent: #b79a43;
+    --ui-accent-hover: #cbb35d;
+    --ui-accent-pressed: #927a34;
+    --ui-focus: #d6c26c;
+    --ui-good: #627a3f;
+    --ui-warning: #a56d2a;
+    --ui-danger: #873f2d;
+    --ui-info: #596f69;
+
+    --ui-overlay: rgba(27, 22, 14, 0.91);
+    --ui-overlay-strong: rgba(23, 19, 12, 0.96);
+    --ui-shadow: rgba(31, 23, 13, 0.42);
+    --ui-shadow-heavy: rgba(20, 15, 9, 0.66);
+    --ui-highlight: rgba(255, 247, 210, 0.28);
+
+    --ui-border-width: 2px;
+    --ui-border-width-heavy: 3px;
+    --ui-radius-small: 2px;
+    --ui-radius-medium: 4px;
+    --ui-radius-large: 6px;
+    --ui-shadow-small: 2px 3px 0 var(--ui-shadow);
+    --ui-shadow-medium: 4px 5px 0 var(--ui-shadow);
+    --ui-shadow-large: 7px 9px 0 var(--ui-shadow-heavy);
+    --ui-inset: inset 0 0 0 1px var(--ui-highlight);
+    --ui-letter-spacing: 0.025em;
+}
+
+/* Shared typography and controls. */
+html, body {
+    font-family: var(--ui-font-body);
+    color: var(--ui-ink);
+    background: var(--ui-parchment-dark);
+}
+button, input, select, textarea {
+    font: inherit;
+}
+button {
+    border: var(--ui-border-width) solid var(--ui-border-dark);
+    border-radius: var(--ui-radius-small);
+    background: var(--ui-accent);
+    color: var(--ui-ink);
+    box-shadow: var(--ui-shadow-small), var(--ui-inset);
+    font-family: var(--ui-font-utility);
+    font-weight: 800;
+    letter-spacing: var(--ui-letter-spacing);
+    text-shadow: 0 1px rgba(255, 244, 204, 0.35);
+}
+button:hover {
+    background: var(--ui-accent-hover);
+}
+button:active, button[aria-pressed="true"] {
+    background: var(--ui-accent-pressed);
+    box-shadow: inset 2px 2px 0 var(--ui-shadow-heavy), var(--ui-inset);
+    transform: translate(1px, 1px);
+}
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible {
+    outline: var(--ui-border-width-heavy) solid var(--ui-focus);
+    outline-offset: 2px;
+}
+button:disabled {
+    border-color: var(--ui-border);
+    background: var(--ui-parchment-recessed);
+    color: var(--ui-ink-muted);
+    box-shadow: none;
+    text-shadow: none;
+}
+input, select, textarea {
+    border: var(--ui-border-width) solid var(--ui-border);
+    border-radius: var(--ui-radius-small);
+    background: var(--ui-parchment-bright);
+    color: var(--ui-ink);
+    box-shadow: inset 2px 2px 0 rgba(58, 43, 25, 0.14);
+}
+h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
+    font-family: var(--ui-font-display);
+    letter-spacing: var(--ui-letter-spacing);
+}
+
+/* Primary frame. */
+#topBar {
+    border-bottom: var(--ui-border-width-heavy) solid var(--ui-border-dark);
+    background: var(--ui-green-deep);
+    color: var(--ui-ink-inverse);
+    box-shadow: 0 3px 0 var(--ui-brown-deep);
+}
+#topBar h1 { color: var(--ui-heading-inverse); text-shadow: 2px 2px 0 var(--ui-brown-deep); }
+#topBar p { color: var(--ui-ink-faint-inverse); }
+#seasonDisplay {
+    border: var(--ui-border-width) solid var(--ui-border-light);
+    border-radius: var(--ui-radius-small);
+    background: var(--ui-brown);
+    color: var(--ui-ink-inverse);
+    box-shadow: var(--ui-inset);
+    font-family: var(--ui-font-display);
+}
+#layout { background: var(--ui-parchment-dark); }
+#mapPanel, #sidePanel {
+    border: var(--ui-border-width-heavy) solid var(--ui-border-dark);
+    border-radius: var(--ui-radius-medium);
+    box-shadow: var(--ui-shadow-medium), var(--ui-inset);
+}
+#mapPanel { background: var(--ui-parchment); }
+
+/* Sidebar and dashboard: parchment rather than near-black blue. */
+#sidePanel {
+    background: var(--ui-parchment);
+    color: var(--ui-ink);
+}
+#sidePanel h2, #sidePanel h3, .selectionTitle,
+.dashboardHeading, .statTile strong, #statDetailPanel h2,
+#roundHistoryPanel h2, #optionsPanel h2 {
+    color: var(--ui-heading);
+}
+#campaignStatsSection, #interactionModeSection, #selectionSection,
+.dashboardCard, .statTile, .typeTile {
+    border-color: var(--ui-border);
+    border-radius: var(--ui-radius-small);
+    background: var(--ui-parchment-light);
+    color: var(--ui-ink);
+    box-shadow: var(--ui-inset);
+}
+
+.selectionValue, .selectionClimateItem { color: var(--ui-ink); }
+.selectionTitleIcon, .selectionRowIcon, .goalIcon, .statIcon {
+    background: var(--ui-green-muted);
+    color: var(--ui-ink-inverse);
+    border: 1px solid var(--ui-border-dark);
+    border-radius: var(--ui-radius-small);
+}
+.interactionModeButton {
+    border-color: var(--ui-border-dark);
+    background: var(--ui-green);
+    color: var(--ui-ink-inverse);
+}
+.interactionModeButton:hover { background: var(--ui-green-light); }
+.interactionModeButton[aria-pressed="true"] {
+    border-color: var(--ui-border-dark);
+    background: var(--ui-accent);
+    color: var(--ui-ink);
+}
+.progressTrack, .balanceTrack, .treasureTrack, .selectionBar, .barTrack {
+    border-color: var(--ui-border-dark);
+    background: var(--ui-brown-deep);
+    border-radius: var(--ui-radius-small);
+}
+.progressFill { background: var(--ui-green-light); }
+.balanceTrack:after { background: var(--ui-parchment-bright); }
+.treasureLegendItem .legendSwatch { border-color: var(--ui-border-dark); }
+
+
+
+
+/* Management frame and cards. Generated monster/egg artwork is intentionally unchanged. */
+#managementDrawer {
+    border-color: var(--ui-border-dark);
+    border-radius: var(--ui-radius-medium);
+    background: var(--ui-parchment-light);
+    color: var(--ui-ink);
+    box-shadow: var(--ui-shadow-large), var(--ui-inset);
+}
+#monsterManagementTab, #viewportTopControls #startSeasonButton {
+    border-color: var(--ui-border-dark);
+    border-radius: 0 0 var(--ui-radius-medium) var(--ui-radius-medium);
+    background: var(--ui-green);
+    color: var(--ui-ink-inverse);
+}
+#monsterManagementTab:hover, #viewportTopControls #startSeasonButton:hover { background: var(--ui-green-light); }
+#closeManagementButton {
+    border-color: var(--ui-border);
+    background: var(--ui-parchment-recessed);
+    color: var(--ui-ink);
+}
+#cageViewport {
+    border-color: var(--ui-border-dark);
+    border-radius: var(--ui-radius-small);
+    background: var(--ui-parchment-recessed);
+    box-shadow: inset 3px 3px 0 rgba(49, 36, 20, 0.16);
+}
+#selectedMonsterPanel, .managementSection, .performanceBehaviour,
+.familyTreeRecordDetails, .breedingParent {
+    border-color: var(--ui-border);
+    border-radius: var(--ui-radius-small);
+    background: var(--ui-parchment-bright);
+    color: var(--ui-ink);
+}
+.monsterRosterHeading {
+    border: 1px solid var(--ui-border-dark);
+    border-radius: var(--ui-radius-small);
+    background: var(--ui-green-deep);
+    color: var(--ui-ink-inverse);
+    box-shadow: var(--ui-inset);
+}
+.monsterRosterCount, .managementBadge, .featureIcon {
+    background: var(--ui-parchment-recessed);
+    color: var(--ui-ink);
+}
+.monsterPortrait {
+    border-color: var(--ui-border);
+    border-radius: var(--ui-radius-small);
+    background: var(--ui-parchment-bright);
+    color: var(--ui-ink);
+    box-shadow: 1px 2px 0 rgba(49, 36, 20, 0.2);
+}
+.monsterPortrait:hover { border-color: var(--ui-green-deep); background: #f7ebc5; }
+.monsterPortrait.selected { outline-color: var(--ui-focus); border-color: var(--ui-border-dark); }
+.monsterPortraitName { font-family: var(--ui-font-display); }
+.monsterPortraitStatus, .rosterMeta, .monsterCardMeta, .breedingStatus,
+.performanceMuted, .ageLegend, .nutritionLegend { color: var(--ui-ink-muted); }
+.portraitDeployControl, .portraitSex {
+    border-color: var(--ui-border);
+    border-radius: var(--ui-radius-small);
+    background: var(--ui-parchment-bright);
+    color: var(--ui-ink);
+}
+#managementActions { background: var(--ui-parchment-light); }
+.managementSection h4 { color: var(--ui-green-deep); }
+
+/* Menus, dialogs, overlays and transient feedback. */
+#preMenuOverlay, #mainMenuOverlay, #worldLoadingOverlay, #saveLoadOverlay,
+#monsterTransferOverlay, #unsavedActionOverlay, #foodShortageOverlay,
+#roundHistoryOverlay, #statDetailOverlay, #familyTreeOverlay,
+#breedingPairOverlay, #optionsOverlay {
+    background: var(--ui-overlay-strong);
+    color: var(--ui-ink-inverse);
+}
+#preMenuPanel h1 {
+    color: var(--ui-heading-inverse);
+    font-family: var(--ui-font-display);
+    text-shadow: 4px 4px 0 var(--ui-brown-deep);
+}
+#preMenuPanel p, #mainMenuPanel p, #saveLoadDescription,
+#unsavedActionPanel p, #treasureSpendHint { color: var(--ui-ink-faint-inverse); }
+#mainMenuPanel, #worldLoadingPanel, #saveLoadPanel, #monsterTransferPanel,
+#unsavedActionPanel, #foodShortagePanel, #roundHistoryPanel,
+#statDetailPanel, .familyTreeDialog, .breedingPairDialog, #optionsPanel {
+    border: var(--ui-border-width-heavy) solid var(--ui-border-dark);
+    border-radius: var(--ui-radius-medium);
+    background: var(--ui-parchment-light);
+    color: var(--ui-ink);
+    box-shadow: var(--ui-shadow-large), var(--ui-inset);
+}
+#mainMenuPanel h2, #worldLoadingPanel h2, #saveLoadPanel h2,
+#monsterTransferPanel h2, #monsterTransferPanel h3,
+#unsavedActionPanel h2, #foodShortagePanel h2, #foodShortagePanel h3,
+.familyTreeDialog h2, .breedingPairDialog h2 {
+    color: var(--ui-heading);
+}
+#mainMenuPanel p, #saveLoadDescription, #unsavedActionPanel p,
+#foodShortageSummary, #treasureSpendHint { color: var(--ui-ink-muted); }
+#customGamePanel { border-top-color: var(--ui-border); }
+#customGamePanel h3 { color: var(--ui-green-deep); }
+.customGameGrid label { color: var(--ui-ink); }
+.customGameGrid input, .customGameGrid select,
+#treasureSpendInput, .foodAllocationRow input {
+    border-color: var(--ui-border);
+    background: var(--ui-parchment-bright);
+    color: var(--ui-ink);
+}
+.saveSlotRow, .monsterTransferSection, .monsterExportList,
+.foodAllocationRow, #treasureSpendControl, #foodSalePreview,
+.statChart, .familyTreeGraphNode {
+    border-color: var(--ui-border);
+    border-radius: var(--ui-radius-small);
+    background: var(--ui-parchment-bright);
+    color: var(--ui-ink);
+}
+.saveSlotName, .familyTreeGraphNode, .selectionCard { color: var(--ui-ink); }
+.saveSlotMetadata, .familyNodeMeta, #musicVolumeValue { color: var(--ui-ink-muted); }
+.monsterExportChoice { border-bottom-color: var(--ui-border-light); }
+.monsterExportChoice:hover { background: var(--ui-parchment-recessed); }
+#worldLoadingTrack { background: var(--ui-brown-deep); border-radius: var(--ui-radius-small); }
+#worldLoadingFill { background: var(--ui-green-yellow); }
+#gameToast {
+    border-color: var(--ui-border-dark);
+    border-radius: var(--ui-radius-small);
+    background: var(--ui-green-deep);
+    color: var(--ui-ink-inverse);
+    box-shadow: var(--ui-shadow-medium);
+}
+.dialogSecondary { background: var(--ui-brown-light); color: var(--ui-ink-inverse); }
+.saveSlotDeleteButton, #discardCurrentGameButton, #confirmSaveLoadActionButton {
+    background: var(--ui-danger);
+    color: var(--ui-ink-inverse);
+}
+.saveSlotDeleteButton:hover, #discardCurrentGameButton:hover, #confirmSaveLoadActionButton:hover { background: #9a4c35; }
+#saveLoadConfirmation, .breedingWarning, .deadFieldInjuryNote {
+    border-color: var(--ui-warning);
+    background: #e6d5a6;
+    color: var(--ui-ink);
+}
+#customGameError, #saveLoadMessage, .nutritionShortfall, .selectionStatusWarning { color: var(--ui-danger); }
+.selectionStatusGood { color: var(--ui-good); }
+.roundHistoryTable th, .roundHistoryTable td { border-bottom-color: var(--ui-border); }
+.roundHistoryTable tr.mostRecentRound { background: var(--ui-parchment-recessed); outline-color: var(--ui-focus); }
+#roundHistoryOutcome.victory { color: var(--ui-good); }
+#roundHistoryOutcome.loss { color: var(--ui-danger); }
+
+/* UI geometry uses deliberately chunky vector edges: more pixels in spirit, not pixel art. */
+.dashboardCard, .monsterPortrait, .managementSection, .saveSlotRow,
+.foodAllocationRow, .statTile, .typeTile, .familyTreeGraphNode,
+.breedingParent, .exportModeBar, .foodEconomySummary {
+    border-radius: var(--ui-radius-small);
+}
+
+
+/* ========================================================================== */
+/* RETHEME CONSISTENCY AND ROUND-FLOW UI CORRECTIONS                          */
+/* ========================================================================== */
+:root {
+    /* One serif family is used throughout the non-diegetic interface. */
+    --ui-font-utility: var(--ui-font-body);
+}
+
+html, body, button, input, select, textarea,
+#mainMenuPanel, #saveLoadPanel, #monsterTransferPanel, #unsavedActionPanel,
+#foodShortagePanel, #roundHistoryPanel, #statDetailPanel, .familyTreeDialog,
+.breedingPairDialog, #optionsPanel, .familyTreeGraphNode,
+.familyTreeRecordDetails {
+    font-family: var(--ui-font-body);
+}
+
+/* Biome and related environment text use ordinary dark ink on parchment. */
+.climateBiome, .climateBiomeRow, .seasonRow, .settlementDistanceRow {
+    color: #17140f !important;
+}
+
+/* Family-tree records are pale cards with high-contrast serif text. */
+.familyTreeGraphNode,
+.familyTreeGraphNode.dead,
+.familyTreeRecordDetails {
+    background: #f7f1df !important;
+    color: #211c14 !important;
+    border-color: var(--ui-border) !important;
+}
+.familyTreeGraphNode.selected {
+    border-color: var(--ui-focus) !important;
+    box-shadow: 0 0 0 2px var(--ui-focus) !important;
+}
+.familyNodeName {
+    color: #211c14 !important;
+    font-family: var(--ui-font-body);
+}
+.familyNodeMeta, .familyGenerationTitle {
+    color: #5d5442 !important;
+    font-family: var(--ui-font-body);
+}
+
+/* All horizontal meter tracks and fills use the same square, full-height idiom. */
+.progressTrack, .balanceTrack, .treasureTrack, .selectionBar, .barTrack,
+.monsterHpBar, .ageTrack, .nutritionTrack, .nutritionBar,
+.nutritionOverlayBar, .injuryBar, .typeColour, #worldLoadingTrack,
+.progressFill, .balanceBar, .treasureSegment, .selectionBarFill,
+.selectionBarRemoved, .barFill, .monsterHpFill, .ageFill,
+.biomeFoodFill, .monsterNeedFill, .nutritionBarFill,
+.nutritionOverlayProduction, .nutritionOverlayNeed, .injuryBarFill,
+#worldLoadingFill {
+    border-radius: 0 !important;
+}
+.progressFill, .balanceBar, .treasureSegment, .selectionBarFill,
+.selectionBarRemoved, .barFill, .monsterHpFill, .ageFill,
+.biomeFoodFill, .monsterNeedFill, .nutritionBarFill,
+.nutritionOverlayProduction, .nutritionOverlayNeed, .injuryBarFill,
+#worldLoadingFill {
+    top: 0 !important;
+    bottom: 0 !important;
+    height: 100% !important;
+}
+.monsterNeedFill {
+    inset: 0 auto 0 0 !important;
+}
+.balanceBar {
+    top: 0 !important;
+    bottom: 0 !important;
+}
+
+
+
+/* ========================================================================== */
+/* AUTHORITATIVE EVENT LOG AND PEDIGREE LAYOUTS                               */
+/* These replace the former revision-chain rules for these two subsystems.    */
+/* ========================================================================== */
+#selectionSection {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+#selectionSection > #objectDetails {
+    flex: 1 1 auto;
+    min-height: 2.5rem;
+    overflow: auto;
+}
+#eventLogDisclosure {
+    flex: 0 0 auto;
+    min-height: 0;
+    margin-top: 0.35rem;
+    padding-top: 0.45rem;
+    border-top: 1px solid var(--ui-border);
+    overflow: hidden;
+}
+#eventLogDisclosure summary {
+    cursor: pointer;
+    color: var(--ui-ink-muted);
+    font-weight: 850;
+}
+#eventLogDisclosure[open] {
+    display: grid;
+    grid-template-rows: auto minmax(11rem, 1fr);
+    flex: 3 1 18rem;
+    min-height: 14rem;
+}
+#eventLog {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    margin: 0.35rem 0 0;
+    padding-right: 0.8rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+    color: var(--ui-ink-muted);
+    scrollbar-color: var(--ui-brown-light) var(--ui-parchment-recessed);
+    scrollbar-gutter: stable both-edges;
+}
+#eventLog::-webkit-scrollbar { width: 14px; }
+#eventLog::-webkit-scrollbar-track {
+    background: var(--ui-parchment-recessed);
+    border-left: 1px solid var(--ui-border);
+}
+#eventLog::-webkit-scrollbar-thumb {
+    background: var(--ui-brown-light);
+    border: 3px solid var(--ui-parchment-recessed);
+    border-radius: 0;
+}
+.familyTreeGraph {
+    position: relative;
+    display: block;
+    min-width: 100%;
+    min-height: 100%;
+    padding: 0;
+    overflow: auto;
+    box-sizing: border-box;
+}
+.familyTreeCanvas {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    box-sizing: content-box;
+    overflow: visible;
+}
+.familyTreeCanvas .familyTreeGraphNode {
+    position: absolute;
+    z-index: 2;
+    width: 174px;
+    min-width: 174px;
+    height: 116px;
+    margin: 0;
+}
+.familyTreeConnections {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 1;
+    display: block;
+    width: auto;
+    height: auto;
+    min-width: 0;
+    min-height: 0;
+    max-width: none;
+    max-height: none;
+    overflow: visible;
+    pointer-events: none;
+    transform: none;
+}
+
+
+/* ========================================================================== */
+/* FOOD SHORTAGE WORKSPACE AND STAT-CHART CONTRAST                            */
+/* ========================================================================== */
+#foodShortagePanel {
+    width: min(1120px, calc(100vw - 2rem));
+    max-height: min(820px, calc(100vh - 2rem));
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    overflow: hidden;
+    gap: 0.65rem;
+}
+#foodShortagePanel > h2 {
+    margin: 0;
+}
+#foodShortageColumns {
+    display: grid;
+    grid-template-columns: minmax(13rem, 0.8fr) minmax(24rem, 1.45fr) minmax(17rem, 1fr);
+    gap: 0.7rem;
+    min-height: 0;
+    align-items: stretch;
+}
+.foodShortageColumn {
+    min-width: 0;
+    min-height: 0;
+    padding: 0.65rem;
+    border: 1px solid var(--ui-border);
+    background: var(--ui-parchment-bright);
+    box-shadow: var(--ui-inset);
+    overflow: auto;
+}
+.foodShortageColumn h3 {
+    margin: 0 0 0.5rem;
+}
+#foodShortageSummary {
+    margin: 0;
+    padding: 0.55rem;
+    border: 1px solid var(--ui-border-light);
+    background: var(--ui-parchment-recessed);
+    color: var(--ui-ink);
+    line-height: 1.38;
+}
+.foodShortageExplanation {
+    margin: 0.6rem 0 0;
+    color: var(--ui-ink-muted);
+    font-size: 0.88rem;
+    line-height: 1.38;
+}
+#foodAllocationList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    margin: 0;
+    gap: 0.4rem;
+}
+.foodAllocationRow {
+    grid-template-columns: minmax(7rem, 1fr) 5.25rem;
+    gap: 0.35rem;
+    padding: 0.45rem;
+}
+.foodAllocationDemand {
+    grid-column: 1 / -1;
+    text-align: left;
+    color: var(--ui-ink-muted);
+    font-size: 0.8rem;
+}
+#treasureSpendControl {
+    margin: 0 0 0.6rem;
+    padding: 0.55rem;
+}
+#treasureSpendControl label {
+    grid-template-columns: minmax(0, 1fr) 6.5rem;
+}
+#foodSalePreview {
+    min-height: 0;
+    padding: 0.55rem;
+    background: var(--ui-parchment-recessed);
+    color: var(--ui-ink);
+    border: 1px solid var(--ui-border-light);
+    line-height: 1.38;
+}
+#foodShortageActions {
+    margin-top: 0;
+    padding-top: 0.1rem;
+}
+.statChart {
+    background: var(--ui-parchment-bright);
+    color: var(--ui-ink);
+}
+#statDetailPanel .treasureLegendItem,
+#statDetailPanel .barRow,
+#statDetailPanel .typeTile,
+#statDetailPanel .statTile {
+    color: var(--ui-ink);
+}
+@media (max-width: 900px) {
+    #foodShortagePanel {
+        overflow: auto;
+    }
+    #foodShortageColumns {
+        grid-template-columns: 1fr 1fr;
+    }
+    #foodAllocationColumn {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+}
+@media (max-width: 650px) {
+    #foodShortageColumns {
+        display: block;
+    }
+    .foodShortageColumn {
+        margin-bottom: 0.65rem;
+        overflow: visible;
+    }
+    #foodAllocationList {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+
+/* ========================================================================== */
+/* THEME DETAIL CORRECTIONS                                                    */
+/* ========================================================================== */
+.selectionEmpty {
+    color: var(--ui-ink);
+}
+.ageOverflow {
+    border-left-color: #8a6f32;
+    background: #dfd09f;
+    color: #3b301d;
+}
+.managementBadge.good {
+    border: 1px solid #596038;
+    background: #c9c58f;
+    color: #28311d;
+}
+
+
+
+/* ========================================================================== */
+/* SAVE/LOAD DENSITY, LIFE-PHASE COLOURS AND DASHBOARD CONTRAST               */
+/* ========================================================================== */
+#saveLoadPanel {
+    width: min(1040px, calc(100vw - 2rem));
+    max-height: min(820px, calc(100vh - 2rem));
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
+    gap: 0.45rem;
+    overflow: hidden;
+}
+#saveLoadPanel h2,
+#saveLoadDescription,
+#saveLoadMessage,
+#saveLoadConfirmation,
+#saveLoadDialogActions {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+#saveSlotList {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.42rem;
+    min-height: 0;
+    align-content: start;
+    overflow: auto;
+}
+.saveSlotRow {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 0.35rem;
+    min-width: 0;
+    padding: 0.42rem;
+}
+.saveSlotMetadata {
+    font-size: 0.76rem;
+    line-height: 1.18;
+}
+.saveSlotRow button {
+    padding: 0.34rem 0.48rem;
+}
+@media (max-width: 760px) {
+    #saveLoadPanel {
+        overflow: auto;
+    }
+    #saveSlotList {
+        grid-template-columns: 1fr;
+        overflow: visible;
+    }
+}
+
+/* Each life phase uses one solid, muted natural pigment. */
+.ageFill { background: #69764b; }
+.ageFill-infant { background: #b49a59; }
+.ageFill-young { background: #7d8250; }
+.ageFill-prime { background: #596b3c; }
+.ageFill-mature { background: #7a673e; }
+.ageFill-old { background: #8a5938; }
+.ageFill-senescent { background: #754438; }
+
+.dashboardFootnote,
+.victoryOrText {
+    color: var(--ui-ink);
+}
+
 </style>
 </head>
 <body>
@@ -1251,7 +1960,6 @@ button:hover {
 <button id="startSeasonButton" type="button">Start Season</button>
 </div>
 <div id="managementDrawer">
-<button id="closeManagementButton" type="button" aria-label="Close monster management">×</button>
 <h2>Monster Management</h2>
 <p id="managementSummary">Choose which collared monsters to release for the next season.</p>
 <div id="managementBody">
@@ -1267,14 +1975,10 @@ button:hover {
 <div id="managementActions"><div id="exportModeBar" class="exportModeBar hidden"><span id="exportModeStatus">Select monsters to export from the roster.</span><button id="confirmRosterExportButton" type="button" disabled>Export selected</button><button id="cancelRosterExportButton" type="button">Cancel</button></div>
 <button id="openMonsterTransferButton" type="button">Import Monsters</button><input id="managementMonsterImportFile" type="file" accept="application/json,.json" multiple hidden>
 
-<span id="managementHint" class="hint">
-</span>
 </div>
 </div>
 <canvas id="raidCanvas" width="960" height="540" aria-label="Raid map">
 </canvas>
-<div id="monsterTooltip" class="tooltipHidden">
-</div>
 </section>
 <aside id="sidePanel">
 <section id="campaignStatsSection">
@@ -1288,8 +1992,6 @@ button:hover {
 </div></section><section id="selectionSection">
 <h2 id="selectionTitle" class="selectionTitle"><span class="selectionTitleIcon" aria-hidden="true">&#128269;</span><span>Inspect</span></h2>
 <div id="objectDetails">Click any monster, adventurer, treasure, scenery object or terrain tile to inspect it.</div>
-<div id="monsterPortrait">
-</div>
 <details id="eventLogDisclosure"><summary title="Show or hide event log">Event Log</summary>
 <ol id="eventLog"></ol></details>
 </section>
@@ -1372,15 +2074,25 @@ button:hover {
 <div id="foodShortageOverlay" class="dialogHidden" role="dialog" aria-modal="true" aria-labelledby="foodShortageTitle">
 <div id="foodShortagePanel">
 <h2 id="foodShortageTitle">Food shortage before the new season</h2>
+<div id="foodShortageColumns">
+<section id="foodShortageOverview" class="foodShortageColumn" aria-labelledby="foodShortageOverviewTitle">
+<h3 id="foodShortageOverviewTitle">Shortage overview</h3>
 <p id="foodShortageSummary"></p>
-<h3>Distribute this season's food</h3>
-<p>Set how much food each monster is to receive at the lair, or reduce the treasure spend target to adjust every allocation automatically. Automatic changes are proportional to food need and favour monsters with fewer fat reserves. Any amount above the captive-macrofauna allowance and stored excess meat is bought by selling whole treasure units. Treasure nearest the human entry point is sold first. Meat bought with indivisible excess treasure value is stored for future seasons.</p>
+<p class="foodShortageExplanation">Set how much food each monster receives at the lair. Automatic allocations are proportional to need and favour monsters with fewer fat reserves. Food beyond captive production and stored meat is bought by selling whole treasure units nearest the human entry point; excess purchased meat is stored.</p>
+</section>
+<section id="foodAllocationColumn" class="foodShortageColumn" aria-labelledby="foodAllocationTitle">
+<h3 id="foodAllocationTitle">Monster allocations</h3>
+<div id="foodAllocationList"></div>
+</section>
+<section id="foodShortageEconomy" class="foodShortageColumn" aria-labelledby="foodShortageEconomyTitle">
+<h3 id="foodShortageEconomyTitle">Treasure and food</h3>
 <div id="treasureSpendControl">
 <label for="treasureSpendInput"><span>Treasure spend target (credits)</span><input id="treasureSpendInput" type="number" min="0" step="1" value="0"></label>
 <p id="treasureSpendHint">Reducing this automatically redistributes the resulting food among all monsters.</p>
 </div>
-<div id="foodAllocationList"></div>
 <div id="foodSalePreview" aria-live="polite"></div>
+</section>
+</div>
 <div id="foodShortageActions">
 <button id="cancelFoodShortageButton" type="button">Cancel</button>
 <button id="startUnderfedSeasonButton" type="button">Sell selected treasure and start season</button>
@@ -16793,7 +17505,7 @@ button:hover {
                 allocations : allocations
             } ;
         }
-        startSeason(foodAllocations){
+        startSeason(foodAllocations, prepareNextRoundOnly){
             if (this.phase==='raid'){
                 return {
                     ok : false,
@@ -16808,6 +17520,13 @@ button:hover {
                     } ;
                 }
                 this.startNewRound();
+                if (prepareNextRoundOnly){
+                    this.phase = 'management';
+                    this.paused = true;
+                    return {
+                        ok : true
+                    } ;
+                }
             }
             var feedingResult = this.prepareFoodForSeason(foodAllocations);
             if (!feedingResult.ok){
@@ -19583,7 +20302,10 @@ button:hover {
                     PostGenerationProgress(7, 'Releasing the previous climate back into the wild...');
                     PostGenerationProgress(18, 'Choosing a biome by asking three unreliable frogs...');
                 }
-                var startResult = gameSession.startSeason(command.payload && command.payload.foodAllocations ? command.payload.foodAllocations : null);
+                var startResult = gameSession.startSeason(
+                    command.payload && command.payload.foodAllocations ? command.payload.foodAllocations : null,
+                    !!(command.payload && command.payload.prepareNextRoundOnly)
+                );
                 if (generatingNewRound && startResult.ok){
                     PostGenerationProgress(78, 'Checking the new food web for loose screws...');
                     PostGenerationProgress(93, 'Issuing every shrub with a provisional address...');
@@ -19854,7 +20576,6 @@ button:hover {
     statusBox = document.getElementById('statusBox'),
     objectDetails = document.getElementById('objectDetails'),
     eventLog = document.getElementById('eventLog'),
-    monsterPortrait = document.getElementById('monsterPortrait'),
     managementDrawer = document.getElementById('managementDrawer'),
     managementSummary = document.getElementById('managementSummary'),
     rosterList = document.getElementById('rosterList'),
@@ -19868,17 +20589,8 @@ button:hover {
     foodSalePreview = document.getElementById('foodSalePreview'),
     startUnderfedSeasonButton = document.getElementById('startUnderfedSeasonButton'),
     cancelFoodShortageButton = document.getElementById('cancelFoodShortageButton'),
-    managementHint = document.getElementById('managementHint'),
-    monsterTooltip = document.getElementById('monsterTooltip'),
     monsterManagementTab = document.getElementById('monsterManagementTab'),
-    closeManagementButton = document.getElementById('closeManagementButton'),
     openMonsterTransferButton = document.getElementById('openMonsterTransferButton'),
-    monsterTransferStatus = document.createElement('span'),
-    monsterExportList = document.createElement('div'),
-    selectAllMonsterExportsButton = document.createElement('button'),
-    clearMonsterExportsButton = document.createElement('button'),
-    exportMonsterButton = document.createElement('button'),
-    monsterExportAvailabilityMessage = document.createElement('span'),
     monsterImportFile = document.getElementById('managementMonsterImportFile'),
     seasonDisplay = document.getElementById('seasonDisplay'),
     mainMenuOverlay = document.getElementById('mainMenuOverlay'),
@@ -19978,8 +20690,6 @@ button:hover {
     var selectedRosterMonsterId = null,
     lastManagementRenderKey = '',
     managementDrawerVisible = true,
-    hoveredMonsterId = null,
-    hoveredMonster = null,
     selectedObject = null,
     selectionCycleKey = '',
     selectionCycleIndex = 0,
@@ -19987,7 +20697,6 @@ button:hover {
     gameStarted = false,
     newGameMessagePending = false,
     interactionMode = 'inspect';
-    monsterPortrait.innerHTML = '<svg viewBox="0 0 180 120" role="img" aria-label="Purple starter monster"><ellipse cx="90" cy="70" rx="55" ry="30" fill="#6b2d83"/><circle cx="62" cy="57" r="8" fill="white"/><circle cx="118" cy="57" r="8" fill="white"/><circle cx="64" cy="58" r="4" fill="#1f2730"/><circle cx="116" cy="58" r="4" fill="#1f2730"/><rect x="52" y="68" width="76" height="8" rx="4" fill="#f2c14e"/></svg>';
     // ============================================================================
     // MODULE: VIEW TRANSFORMS AND WORKER COMMANDS
     // ============================================================================
@@ -20368,7 +21077,10 @@ button:hover {
         saveGameMenuButton.disabled = !gameStarted || pendingSaveRequest || pendingLoadRequest;
         quitGameMenuButton.disabled = !gameStarted || pendingSaveRequest || pendingLoadRequest;
         GetAllStoredSaveRecords().then(function (records){
-            loadGameMenuButton.disabled = records.length===0 || pendingSaveRequest || pendingLoadRequest;
+            // Keep Load game usable whenever browser storage itself is available.
+            // Opening an empty list is clearer than presenting an apparently broken
+            // disabled control while IndexedDB is still settling or contains no saves.
+            loadGameMenuButton.disabled = pendingSaveRequest || pendingLoadRequest;
             loadGameMenuButton.textContent = records.length>0 ? 'Load game ('+records.length+' saved)' : 'Load game';
         } ).catch(function (){
             loadGameMenuButton.disabled = true;
@@ -20682,7 +21394,7 @@ button:hover {
     function BiomeIcon(type){var icons={tropicalRainforest:'\ud83c\udf34',coastalTropical:'\ud83c\udf0a',coastalTemperate:'\ud83c\udf27\ufe0f',oceanicTemperate:'\ud83c\udf2c\ufe0f',temperateContinental:'\ud83c\udf33',continentalHighland:'\u26f0\ufe0f',hotDesert:'\ud83c\udf35',coolDesert:'\ud83c\udfdc\ufe0f',polar:'\u2744\ufe0f'};return icons[type]||'\ud83c\udf0d';}
     function MakeClickable(card,kind,label,shortcut){var tooltip=label+' <'+shortcut+'>';card.classList.add('statClickable');card.tabIndex=0;card.title=tooltip;card.setAttribute('aria-label',tooltip);card.addEventListener('pointerdown',function(e){if(e.pointerType==='mouse'&&e.button!==0)return;e.preventDefault();ShowStatDetail(kind);});card.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();ShowStatDetail(kind);}});}
     var lastCampaignDashboardKey = '';
-    function RenderCampaignDashboard(s){var dashboardKey=JSON.stringify([s.biomeType,SeasonNameForSnapshot(s),TemperatureForSnapshot(s),s.distanceToSettlementMiles,s.consecutiveSeasonsWithNoReturningAdventurers,s.noReturningAdventurersWinTarget,s.consecutiveSeasonsWithNoReturningTreasure,s.noReturningTreasureWinTarget,s.foodPlan,s.treasureBreakdown,s.foodExpenditureCredits]);if(dashboardKey===lastCampaignDashboardKey){return;}lastCampaignDashboardKey=dashboardKey;statusBox.innerHTML='';var d=E('div','campaignDashboard'),cl=E('section','dashboardCard climateCard'),br=E('div','climateBiomeRow'),bi=E('span','biomeIcon',BiomeIcon(s.biomeType)),bt=E('span','climateBiome',FormatBiomeType(s.biomeType)),instrument=E('div','climateInstrument'),th=E('div','thermometer'),tf=E('div','thermometerFill'),temp=TemperatureForSnapshot(s),temperatureColour=TemperatureColour(temp);br.appendChild(bi);br.appendChild(bt);br.title=BiomeExplanation(s.biomeType);br.setAttribute('aria-label',FormatBiomeType(s.biomeType)+'. '+BiomeExplanation(s.biomeType));cl.appendChild(br);tf.style.height=(Number.isFinite(temp)?UiClamp((temp+20)/70,0,1)*100:0)+'%';tf.style.background=temperatureColour;th.style.color=temperatureColour;th.appendChild(tf);instrument.appendChild(th);var ct=E('div');ct.appendChild(E('div','climateValue',FormatTemperatureForSnapshot(s)));var seasonName=SeasonNameForSnapshot(s),seasonRow=E('div','seasonRow'),seasonIcon=E('span','seasonIcon',SeasonIcon(seasonName));seasonRow.appendChild(seasonIcon);seasonRow.appendChild(E('span','seasonName',seasonName.charAt(0).toUpperCase()+seasonName.slice(1)));ct.appendChild(seasonRow);var settlementDistance=Number(s.distanceToSettlementMiles),settlementRow=E('div','settlementDistanceRow'),settlementIcon=E('span','settlementDistanceIcon','\ud83d\uded6'),settlementText=Number.isFinite(settlementDistance)?'Settlement: '+FormatNumber(settlementDistance)+' '+(settlementDistance===1?'mile':'miles')+' away':'Settlement distance unavailable';settlementRow.appendChild(settlementIcon);settlementRow.appendChild(E('span','settlementDistanceText',settlementText));settlementRow.title=Number.isFinite(settlementDistance)?'Distance from the lair to the nearest human settlement. Nearby settlements create greater raiding pressure.':'Distance to the nearest human settlement is unavailable.';settlementRow.setAttribute('aria-label',settlementText+'. '+settlementRow.title);ct.appendChild(settlementRow);instrument.appendChild(ct);cl.appendChild(instrument);MakeClickable(cl,'temperature','Environment','E');d.appendChild(cl);
+    function RenderCampaignDashboard(s){var dashboardKey=JSON.stringify([s.biomeType,SeasonNameForSnapshot(s),TemperatureForSnapshot(s),s.distanceToSettlementMiles,s.consecutiveSeasonsWithNoReturningAdventurers,s.noReturningAdventurersWinTarget,s.consecutiveSeasonsWithNoReturningTreasure,s.noReturningTreasureWinTarget,s.foodPlan,s.treasureBreakdown,s.foodExpenditureCredits]);if(dashboardKey===lastCampaignDashboardKey){return;}lastCampaignDashboardKey=dashboardKey;statusBox.innerHTML='';var d=E('div','campaignDashboard'),cl=E('section','dashboardCard climateCard'),br=E('div','climateBiomeRow'),bi=E('span','biomeIcon',BiomeIcon(s.biomeType)),bt=E('span','climateBiome',FormatBiomeType(s.biomeType)),instrument=E('div','climateInstrument'),th=E('div','thermometer'),tf=E('div','thermometerFill'),temp=TemperatureForSnapshot(s),temperatureColour=TemperatureColour(temp);br.appendChild(bi);br.appendChild(bt);br.title=BiomeExplanation(s.biomeType);br.setAttribute('aria-label',FormatBiomeType(s.biomeType)+'. '+BiomeExplanation(s.biomeType));cl.appendChild(br);tf.style.height=(Number.isFinite(temp)?12+UiClamp((temp+20)/70,0,1)*88:0)+'%';tf.style.background=temperatureColour;th.style.color=temperatureColour;th.appendChild(tf);instrument.appendChild(th);var ct=E('div');ct.appendChild(E('div','climateValue',FormatTemperatureForSnapshot(s)));var seasonName=SeasonNameForSnapshot(s),seasonRow=E('div','seasonRow'),seasonIcon=E('span','seasonIcon',SeasonIcon(seasonName));seasonRow.appendChild(seasonIcon);seasonRow.appendChild(E('span','seasonName',seasonName.charAt(0).toUpperCase()+seasonName.slice(1)));ct.appendChild(seasonRow);var settlementDistance=Number(s.distanceToSettlementMiles),settlementRow=E('div','settlementDistanceRow'),settlementIcon=E('span','settlementDistanceIcon','\ud83d\uded6'),settlementText=Number.isFinite(settlementDistance)?'Settlement: '+FormatNumber(settlementDistance)+' '+(settlementDistance===1?'mile':'miles')+' away':'Settlement distance unavailable';settlementRow.appendChild(settlementIcon);settlementRow.appendChild(E('span','settlementDistanceText',settlementText));settlementRow.title=Number.isFinite(settlementDistance)?'Distance from the lair to the nearest human settlement. Nearby settlements create greater raiding pressure.':'Distance to the nearest human settlement is unavailable.';settlementRow.setAttribute('aria-label',settlementText+'. '+settlementRow.title);ct.appendChild(settlementRow);instrument.appendChild(ct);cl.appendChild(instrument);MakeClickable(cl,'temperature','Environment','E');d.appendChild(cl);
         var goals=E('section','dashboardCard');goals.appendChild(E('div','dashboardHeading','Victory progress'));Goal(goals,s.consecutiveSeasonsWithNoReturningAdventurers||0,s.noReturningAdventurersWinTarget||4,'\u2694\ufe0f','No adventurer returned alive');var victoryOr=E('div','victoryOrRow'),victoryOrText=E('div','victoryOrText','\u2014\u2014 OR \u2014\u2014');victoryOr.appendChild(victoryOrText);goals.appendChild(victoryOr);Goal(goals,s.consecutiveSeasonsWithNoReturningTreasure||0,s.noReturningTreasureWinTarget||12,'\ud83d\udcb0','No adventurer returned with treasure');MakeClickable(goals,'victory','Victory progress','V');d.appendChild(goals);
         var food=E('section','dashboardCard');food.appendChild(E('div','dashboardHeading','\ud83e\udd69 Nutrition'));var fp=s.foodPlan||{},f=fp.captiveMacrofauna||{},b=Number.isFinite(fp.baseFoodBalance)?fp.baseFoodBalance:(f.foodProduced||0)-(fp.netLairFoodDemand||fp.totalDemand||0),scale=Math.max(10,Math.abs(b),fp.totalDemand||0,f.foodProduced||0),bt=E('div','balanceTrack'),bb=E('div','balanceBar '+(b>=0?'surplus':'deficit'));bb.style.width=UiClamp(Math.abs(b)/scale,0,1)*50+'%';bt.appendChild(bb);bt.appendChild(E('div','balanceValue',(b>=0?'+':'\u2212')+FormatNumber(Math.abs(b))));food.appendChild(bt);food.appendChild(E('div','dashboardFootnote',b>=0?'Seasonal food surplus':'Seasonal food deficit before new treasure sales'));MakeClickable(food,'food','Nutrition','N');d.appendChild(food);
         var treasure=E('section','dashboardCard');treasure.appendChild(E('div','dashboardHeading','\ud83e\ude99 Treasure'));var x=s.treasureBreakdown||{},start=x.starting&&x.starting.totalValue||0,stolen=x.stolen&&x.stolen.totalValue||0,sold=Number.isFinite(x.foodExpenditureCredits)?x.foodExpenditureCredits:(s.foodExpenditureCredits||0),physical=x.remaining&&x.remaining.totalValue||0,remaining=x.remainingAfterFoodValue!==undefined?x.remainingAfterFoodValue:Math.max(0,physical-sold),total=Math.max(1,start,remaining+sold+stolen),track=E('div','treasureTrack'),treasureTooltip='On map: '+FormatNumber(remaining)+'. Sold for food: '+FormatNumber(sold)+'. Stolen: '+FormatNumber(stolen)+'.';track.title=treasureTooltip;track.setAttribute('aria-label',treasureTooltip);[[remaining,'treasureSegment treasureRemaining','On map'],[sold,'treasureSegment treasureSold','Sold for food'],[stolen,'treasureSegment treasureStolen','Stolen']].forEach(function(p){var q=E('div',p[1]);q.style.width=100*p[0]/total+'%';q.title=p[2]+': '+FormatNumber(p[0]);if(!p[0])q.style.display='none';track.appendChild(q);});treasure.appendChild(track);var legend=E('div','treasureLegend');[[remaining,'treasureRemaining','On map','remaining'],[sold,'treasureSold','Sold for food','sold'],[stolen,'treasureStolen','Stolen','stolen']].forEach(function(p){var item=E('span','treasureLegendItem'),sw=E('span','legendSwatch '+p[1]);item.title=p[2];item.setAttribute('aria-label',p[2]);item.innerHTML=TreasureLegendIconSvg(p[3]);item.appendChild(sw);legend.appendChild(item);});treasure.appendChild(legend);MakeClickable(treasure,'treasure','Treasure','T');d.appendChild(treasure);statusBox.appendChild(d);}
@@ -20702,8 +21414,8 @@ button:hover {
         }
         tickValues.forEach(function(tickValue){
             var y=255-tickValue/axisMax*220;
-            svg.appendChild(SvgElement('line',{x1:70,y1:y,x2:730,y2:y,stroke:'#334155'}));
-            var valueText=SvgElement('text',{x:60,y:y+5,fill:'#cbd5e1',['text-anchor']:'end',['font-size']:12});
+            svg.appendChild(SvgElement('line',{x1:70,y1:y,x2:730,y2:y,stroke:'#8a7b5a'}));
+            var valueText=SvgElement('text',{x:60,y:y+5,fill:'#30291d',['text-anchor']:'end',['font-size']:12});
             valueText.textContent=FormatNumber(tickValue);
             svg.appendChild(valueText);
         });
@@ -20717,9 +21429,9 @@ button:hover {
                 svg.appendChild(node);
             });
         });
-        labels.forEach(function(label,i){var tx=SvgElement('text',{x:70+i*(660/Math.max(1,labels.length-1)),y:282,fill:'#cbd5e1',['text-anchor']:'middle',['font-size']:13});tx.textContent=label;svg.appendChild(tx);});
-        var xLabel=SvgElement('text',{x:400,y:308,fill:'#f8fafc',['text-anchor']:'middle',['font-size']:14,['font-weight']:'700'});xLabel.textContent='Season';svg.appendChild(xLabel);
-        var yLabel=SvgElement('text',{x:18,y:145,fill:'#f8fafc',['text-anchor']:'middle',['font-size']:14,['font-weight']:'700',transform:'rotate(-90 18 145)'});yLabel.textContent=yAxisLabel||'Value';svg.appendChild(yLabel);
+        labels.forEach(function(label,i){var tx=SvgElement('text',{x:70+i*(660/Math.max(1,labels.length-1)),y:282,fill:'#30291d',['text-anchor']:'middle',['font-size']:13});tx.textContent=label;svg.appendChild(tx);});
+        var xLabel=SvgElement('text',{x:400,y:308,fill:'#30291d',['text-anchor']:'middle',['font-size']:14,['font-weight']:'700'});xLabel.textContent='Season';svg.appendChild(xLabel);
+        var yLabel=SvgElement('text',{x:18,y:145,fill:'#30291d',['text-anchor']:'middle',['font-size']:14,['font-weight']:'700',transform:'rotate(-90 18 145)'});yLabel.textContent=yAxisLabel||'Value';svg.appendChild(yLabel);
         return svg;
     }
     function AddLegend(parent,items){var row=E('div','treasureLegend');items.forEach(function(item){var x=E('div','treasureLegendItem'),sw=E('span','legendSwatch');sw.style.background=item[1];x.appendChild(sw);x.appendChild(E('span','',item[0]));row.appendChild(x);});parent.appendChild(row);}
@@ -20793,8 +21505,8 @@ button:hover {
         if(latestSnapshot&&latestSnapshot.phase==='roundEnded'){
             HideRoundHistory();
             ShowWorldLoading(2,'Packing the old biome into a suspiciously small suitcase...');
-            managementDrawerVisible=false;lastManagementRenderKey='';
-            SendCommand('START_SEASON');
+            managementDrawerVisible=true;lastManagementRenderKey='';
+            SendCommand('START_SEASON', { prepareNextRoundOnly : true });
             return;
         }
         if(latestSnapshot&&latestSnapshot.phase==='gameOver'){
@@ -21187,7 +21899,7 @@ button:hover {
             shape.setAttribute('stroke-linecap','round');
             svg.appendChild(shape);
         }
-        visibleIds.forEach(function(childId){
+        visibleIds.forEach(function(childId, childIndex){
             var child=nodes[childId];
             var parentIds=[];
             [child.record.motherId,child.record.fatherId].forEach(function(parentId){
@@ -21198,8 +21910,9 @@ button:hover {
             var childX=child.x;
             var parents=parentIds.map(function(parentId){return nodes[parentId];});
             var parentBottom=Math.max.apply(Math,parents.map(function(parent){return parent.y+116;}));
-            var unionY=parentBottom+24;
-            var descentY=childTop-24;
+            var laneOffset=(childIndex % 5)*4;
+            var unionY=parentBottom+16+laneOffset;
+            var descentY=childTop-16-laneOffset;
             if(parents.length===2){
                 var left=parents[0].x<=parents[1].x?parents[0]:parents[1];
                 var right=left===parents[0]?parents[1]:parents[0];
@@ -21469,7 +22182,7 @@ button:hover {
         summary.appendChild(badges);var details=document.createElement('dl');details.className='monsterDetailGrid';
         var rows=isEgg?[['Status',TitleCase(monster.eggStatus||'Incubating')],['Parents',MonsterParentageLabel(monster,(currentSnapshot.management&&currentSnapshot.management.ownedMonsters)||[])],['Outcome',monster.eggFailureReason||'Incubating']]:[['Status',monster.alive?'Alive':'Dead'],['Life stage',TitleCase(monster.lifeStage||'Adult')],['Sex',MonsterSexWithSymbol(monster)],['Origin',MonsterOriginLabel(monster)],['Breeding',monster.canBreed?'Available':(monster.breedingBlockReason||'Unavailable')]];
         rows.forEach(function(row){var dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=row[0];dd.textContent=row[1];details.appendChild(dt);details.appendChild(dd);});summary.appendChild(details);
-        if(!isEgg){var expected=MonsterExpectedLifespanSeasons(),actual=monster.ageInSeasons||0,percent=actual/expected*100,age=document.createElement('div');age.className='ageGraphic';age.innerHTML='<div class="ageTrack"><div class="ageFill" style="width:'+Math.min(100,percent).toFixed(1)+'%"></div></div><div class="ageLegend"><span>'+MonsterAgeLabel(monster)+'</span><span>Expected lifespan: 6 years</span></div>'+(percent>100?'<div class="ageOverflow">'+Math.round(percent-100)+'% beyond expected lifespan</div>':'');summary.appendChild(age);}header.appendChild(summary);selectedMonsterPanel.appendChild(header);
+        if(!isEgg){var expected=MonsterExpectedLifespanSeasons(),actual=monster.ageInSeasons||0,percent=actual/expected*100,agePhase=actual<4?'infant':(actual<12?'young':(actual<16?'prime':(actual<24?'mature':(actual<28?'old':'senescent')))),age=document.createElement('div');age.className='ageGraphic';age.innerHTML='<div class="ageTrack"><div class="ageFill ageFill-'+agePhase+'" style="width:'+Math.min(100,percent).toFixed(1)+'%"></div></div><div class="ageLegend"><span>'+MonsterAgeLabel(monster)+'</span><span>Expected lifespan: 6 years</span></div>'+(percent>100?'<div class="ageOverflow">'+Math.round(percent-100)+'% beyond expected lifespan</div>':'');summary.appendChild(age);}header.appendChild(summary);selectedMonsterPanel.appendChild(header);
         if(isEgg){var eggInfo=document.createElement('section');eggInfo.className='managementSection';eggInfo.innerHTML='<h4>Egg record</h4><p>'+(monster.eggFailureReason||('Expected to hatch after '+(monster.incubationSeasonsRemaining||1)+' season.'))+'</p>';selectedMonsterPanel.appendChild(eggInfo);return;}
         var physical=document.createElement('section');physical.className='managementSection';physical.innerHTML='<h4>Physical characteristics</h4>';var plist=document.createElement('ul');plist.className='iconBulletList';PhysicalCharacteristicItems(monster).forEach(function(item){var li=document.createElement('li');li.innerHTML='<span class="featureIcon">'+item.icon+'</span><span>'+item.text+'</span>';plist.appendChild(li);});physical.appendChild(plist);selectedMonsterPanel.appendChild(physical);
         var nutrition=document.createElement('section');nutrition.className='managementSection';nutrition.innerHTML='<h4>Nutrition</h4>';var requirement=GetFoodRequirement(monster),plan=currentSnapshot&&currentSnapshot.foodPlan,production=plan&&plan.captiveMacrofauna?Number(plan.captiveMacrofauna.foodProduced)||0:0,scale=Math.max(1,requirement,production),needWidth=requirement/scale*100,productionWidth=production/scale*100;nutrition.innerHTML+='<div class="nutritionOverlayBar" title="Blue: this monster needs '+FormatNumber(requirement)+' food. Amber: biome production is '+FormatNumber(production)+' food."><div class="nutritionOverlayProduction" style="width:'+productionWidth.toFixed(1)+'%"></div><div class="nutritionOverlayNeed" style="width:'+needWidth.toFixed(1)+'%"></div></div><div class="nutritionOverlayLegend"><span><i class="nutritionLegendSwatch nutritionLegendNeed"></i>This monster: '+FormatNumber(requirement)+'</span><span><i class="nutritionLegendSwatch nutritionLegendProduction"></i>Biome production: '+FormatNumber(production)+'</span></div><div class="nutritionStatusLine">'+NutritionStateOnly(monster)+'</div>';selectedMonsterPanel.appendChild(nutrition);
@@ -21492,6 +22205,10 @@ button:hover {
         selectedMonsterPanel.appendChild(management);
     }
     var pendingMonsterTransferAction = '';
+    function ReportMonsterTransfer(text){
+        AppendLog(text.replace(/\n/g, ' | '));
+        ShowGameToast(text);
+    }
     var pendingMonsterExportDirectory = null;
     function MonsterTransferAvailable(){
         return !!currentSnapshot && currentSnapshot.phase!=='raid' && !!currentSnapshot.management;
@@ -21510,20 +22227,9 @@ button:hover {
     function MonsterExportAvailable(){
         return MonsterTransferAvailable() && !AdvancedCampaignSetupActive();
     }
-    function SelectedMonsterExportIds(){
-        return Array.prototype.slice.call(monsterExportList.querySelectorAll('input[type="checkbox"]:checked')).map(function(input){ return input.value; });
-    }
-    function RefreshMonsterExportButton(){
-        exportMonsterButton.disabled=!MonsterExportAvailable() || SelectedMonsterExportIds().length===0 || pendingMonsterTransferAction!=='';
-    }
     function RefreshMonsterTransferScreen(){
         var importAvailable=MonsterImportAvailable();
         monsterImportFile.disabled=!importAvailable || pendingMonsterTransferAction!=='';
-        RefreshMonsterExportButton();
-    }
-    function OpenMonsterTransferScreen(){
-        if(!MonsterImportAvailable() || pendingMonsterTransferAction!=='' ){ return; }
-        monsterImportFile.click();
     }
     function SafeMonsterFileName(name){
         var safe=String(name || 'monster').replace(/[^A-Za-z0-9_-]+/g,'_').replace(/^_+|_+$/g,''); return (safe || 'monster')+'.monster.json';
@@ -24432,10 +25138,7 @@ button:hover {
     }
     function SetInteractionMode(mode){interactionMode=mode;[['inspect',inspectModeButton],['capture',captureModeButton],['recall',recallModeButton],['release',releaseModeButton]].forEach(function(pair){pair[1].setAttribute('aria-pressed',pair[0]===mode?'true':'false');});canvas.classList.remove('modeInspect','modeCapture','modeRecall','modeRelease');canvas.classList.add(mode==='capture'?'modeCapture':(mode==='recall'?'modeRecall':(mode==='release'?'modeRelease':'modeInspect')));canvas.style.cursor=InteractionCursor(mode);}
     function ActivateInteractionAt(clientX,clientY){var picked=FindObjectAt(clientX,clientY);if(interactionMode==='inspect')return SelectObjectAt(clientX,clientY);if(!picked||picked.kind!=='monster')return false;var monster=picked.obj;selectedObject=picked;UpdateSelectedObjectPanel();if(interactionMode==='capture'&&!monster.owned){SendCommand('CAPTURE_WILD_MONSTER',{monsterId:monster.id});return true;}if(interactionMode==='recall'&&monster.owned&&monster.deployed){SendCommand('RECALL_MONSTER',{monsterId:monster.id});return true;}if(interactionMode==='release'&&monster.owned){SendCommand('RELEASE_OWNED_MONSTER',{monsterId:monster.id});return true;}return false;}
-    function UpdateMonsterHover(clientX, clientY){
-        var picked = FindObjectAt(clientX, clientY);
-        hoveredMonster =(picked && picked.kind==='monster') ? picked.obj : null;
-        hoveredMonsterId = hoveredMonster ? hoveredMonster.id : null;
+    function UpdateMonsterHover(){
         canvas.style.cursor = InteractionCursor(interactionMode);
     }
     function SelectObjectAt(clientX, clientY){
@@ -24480,20 +25183,10 @@ button:hover {
     document.getElementById('cancelBreedingPairButton').addEventListener('click', CloseBreedingPairDialog);
     document.getElementById('confirmBreedingPairButton').addEventListener('click', function(){ if(!pendingBreedingPair){return;} SendCommand('BREED_MONSTERS', pendingBreedingPair); CloseBreedingPairDialog(); });
     document.getElementById('breedingPairOverlay').addEventListener('click', function(event){ if(event.target===this){ CloseBreedingPairDialog(); } });
-    selectAllMonsterExportsButton.addEventListener('click',function(){ Array.prototype.forEach.call(monsterExportList.querySelectorAll('input[type="checkbox"]'),function(input){input.checked=true;}); RefreshMonsterExportButton(); });
-    clearMonsterExportsButton.addEventListener('click',function(){ Array.prototype.forEach.call(monsterExportList.querySelectorAll('input[type="checkbox"]'),function(input){input.checked=false;}); RefreshMonsterExportButton(); });
-    exportMonsterButton.addEventListener('click',async function(){
-        var ids=SelectedMonsterExportIds(); if (!MonsterExportAvailable() || !ids.length){ RefreshMonsterTransferScreen(); return; }
-        if (typeof window.showDirectoryPicker!=='function'){ monsterTransferStatus.textContent='Export failed: this browser does not support choosing a destination folder.'; return; }
-        try{ pendingMonsterExportDirectory=await window.showDirectoryPicker({mode:'readwrite'}); }
-        catch(error){ pendingMonsterExportDirectory=null; monsterTransferStatus.textContent=error && error.name==='AbortError' ? 'Export cancelled; no files were written.' : 'Export failed: '+String(error && error.message ? error.message : error); return; }
-        pendingMonsterTransferAction='export'; RefreshMonsterExportButton(); monsterTransferStatus.textContent='Preparing '+ids.length+' monster export'+(ids.length===1?'':'s')+'...';
-        SendCommand('EXPORT_MONSTERS',{monsterIds:ids});
-    });
     async function HandleMonsterImportFiles(files){
         if (!MonsterImportAvailable()){ return; }
         files=Array.prototype.slice.call(files || []); if (!files.length){ return; }
-        pendingMonsterTransferAction='import'; RefreshMonsterTransferScreen(); monsterTransferStatus.textContent='Reading '+files.length+' monster file'+(files.length===1?'':'s')+'...';
+        pendingMonsterTransferAction='import'; RefreshMonsterTransferScreen(); ReportMonsterTransfer('Reading '+files.length+' monster file'+(files.length===1?'':'s')+'...');
         var transfers=[]; var localErrors=[];
         for (var i=0; i<files.length; i+=1){
             try{
@@ -24503,9 +25196,9 @@ button:hover {
                 transfers.push(transfer);
             } catch(error){ localErrors.push(files[i].name+': '+String(error && error.message ? error.message : error)); }
         }
-        if (!transfers.length){ pendingMonsterTransferAction=''; RefreshMonsterTransferScreen(); monsterTransferStatus.textContent='Import rejected:\n'+localErrors.join('\n'); return; }
+        if (!transfers.length){ pendingMonsterTransferAction=''; RefreshMonsterTransferScreen(); ReportMonsterTransfer('Import rejected:\n'+localErrors.join('\n')); return; }
         window.pendingMonsterLocalImportErrors=localErrors;
-        monsterTransferStatus.textContent='Validating and importing '+transfers.length+' monster'+(transfers.length===1?'':'s')+'...';
+        ReportMonsterTransfer('Validating and importing '+transfers.length+' monster'+(transfers.length===1?'':'s')+'...');
         SendCommand('IMPORT_MONSTERS',{transfers:transfers});
     }
     monsterImportFile.addEventListener('change',function(){var files=Array.prototype.slice.call(monsterImportFile.files||[]);monsterImportFile.value='';HandleMonsterImportFiles(files);});
@@ -24536,7 +25229,7 @@ button:hover {
                 if (pendingMonsterTransferAction==='export'){
                     pendingMonsterExportDirectory=null;
                 }
-                monsterTransferStatus.textContent=(pendingMonsterTransferAction==='import' ? 'Import rejected: ' : 'Export rejected: ')+message.payload.reason;
+                ReportMonsterTransfer((pendingMonsterTransferAction==='import' ? 'Import rejected: ' : 'Export rejected: ')+message.payload.reason);
                 pendingMonsterTransferAction='';
                 RefreshMonsterTransferScreen();
             }
@@ -24547,8 +25240,8 @@ button:hover {
         case 'MONSTER_EXPORT_DATA' :
             SaveMonsterTransfers(message.payload.transfers || []).then(function(){
                 var count=(message.payload.transfers || []).length; pendingMonsterTransferAction=''; RefreshMonsterTransferScreen();
-                monsterTransferStatus.textContent=count+' monster'+(count===1?' was':'s were')+' exported successfully.';
-            }).catch(function(error){ pendingMonsterTransferAction=''; pendingMonsterExportDirectory=null; RefreshMonsterTransferScreen(); monsterTransferStatus.textContent='Export failed: '+String(error && error.message ? error.message : error); });
+                ReportMonsterTransfer(count+' monster'+(count===1?' was':'s were')+' exported successfully.');
+            }).catch(function(error){ pendingMonsterTransferAction=''; pendingMonsterExportDirectory=null; RefreshMonsterTransferScreen(); ReportMonsterTransfer('Export failed: '+String(error && error.message ? error.message : error)); });
             break;
         case 'MONSTER_IMPORT_ACCEPTED' :
             pendingMonsterTransferAction='';
@@ -24556,7 +25249,7 @@ button:hover {
             if (imported.length){ selectedRosterMonsterId=imported[imported.length-1].monsterId; lastManagementRenderKey=''; ShowGameToast(imported.length+' monster'+(imported.length===1?'':'s')+' joined the captive brood.'); }
             var lines=[imported.length+' monster'+(imported.length===1?'':'s')+' imported.'];
             rejected.forEach(function(item){lines.push(item.name+': '+item.reason);}); localErrors.forEach(function(item){lines.push(item);});
-            monsterTransferStatus.textContent=lines.join('\n');AppendLog(lines.join(' | '));RefreshMonsterTransferScreen();
+            ReportMonsterTransfer(lines.join('\n'));AppendLog(lines.join(' | '));RefreshMonsterTransferScreen();
             break;
         case 'SAVE_GAME_DATA' :
             PutSaveRecord(message.payload.saveRecord, pendingSaveSlotId, pendingSaveSlotName).then(function (storedRecord){
@@ -24867,13 +25560,6 @@ button:hover {
             UpdateManagementDrawer(latestSnapshot);
         }
     } );
-    closeManagementButton.addEventListener('click', function (){
-        managementDrawerVisible = false;
-        lastManagementRenderKey = '';
-        if (latestSnapshot){
-            UpdateManagementDrawer(latestSnapshot);
-        }
-    } );
     function TogglePlayPause(){
         SendCommand(latestSnapshot && latestSnapshot.paused ? 'RESUME_RAID' : 'PAUSE_RAID');
     }
@@ -24984,7 +25670,6 @@ button:hover {
         pointerDownX = e.clientX;
         pointerDownY = e.clientY;
         canvas.classList.add('dragging');
-        monsterTooltip.classList.add('tooltipHidden');
         canvas.setPointerCapture(e.pointerId);
     } );
     canvas.addEventListener('pointermove', function (e){
@@ -25016,7 +25701,6 @@ button:hover {
             UpdateMonsterHover(e.clientX, e.clientY);
             return;
         }
-        monsterTooltip.classList.add('tooltipHidden');
         var dx = e.clientX-lastMouseX;
         var dy = e.clientY-lastMouseY;
         lastMouseX = e.clientX;
@@ -25043,9 +25727,6 @@ button:hover {
         delete activePointersForZoom[e.pointerId];
         lastPinchDistance = 0;
         isDragging = false;
-        hoveredMonsterId = null;
-        hoveredMonster = null;
-        monsterTooltip.classList.add('tooltipHidden');
         canvas.classList.remove('dragging');
     } );
     function UpdateCamera(dt){
