@@ -981,23 +981,23 @@ button {
 .treasureLegendItem .legendSwatch{width:.72rem!important;height:.72rem!important;border:1px solid #cbd5e1;border-radius:.14rem!important;flex:none}
 
 /* Selected-object card: concise, icon-led and consistent with dashboard headings. */
-.selectionTitle{display:flex;align-items:center;gap:.5rem!important;color:#f2c14e!important;font-size:1rem!important;font-weight:900!important}
-.selectionTitleIcon{display:inline-flex;width:1.7rem;height:1.7rem;align-items:center;justify-content:center;border-radius:50%;background:#263449;font-size:1.05rem;flex:none}
-.selectionCard{display:grid;gap:.52rem;color:#e5e7eb}
+.selectionTitle{display:flex;align-items:center;gap:.5rem!important;color:var(--ui-warning)!important;font-size:1rem!important;font-weight:900!important}
+.selectionTitleIcon{display:inline-flex;width:1.7rem;height:1.7rem;align-items:center;justify-content:center;border:1px solid var(--ui-border-dark);border-radius:var(--ui-radius-small);background:var(--ui-green-muted);color:var(--ui-ink-inverse);font-size:1.05rem;flex:none}
+.selectionCard{display:grid;gap:.52rem;color:var(--ui-ink)}
 .selectionRow{display:grid;grid-template-columns:1.55rem minmax(0,1fr);gap:.5rem;align-items:start;line-height:1.3}
-.selectionRowIcon{display:flex;width:1.45rem;height:1.45rem;align-items:center;justify-content:center;border-radius:.3rem;background:#172033;font-size:.95rem;line-height:1}
-.selectionLabel{color:#94a3b8;font-size:.74rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
-.selectionValue{color:#f8fafc;font-size:.9rem}
+.selectionRowIcon{display:flex;width:1.45rem;height:1.45rem;align-items:center;justify-content:center;border:1px solid var(--ui-border-dark);border-radius:var(--ui-radius-small);background:var(--ui-green-muted);color:var(--ui-ink-inverse);font-size:.95rem;line-height:1}
+.selectionLabel{color:var(--ui-ink-muted);font-size:.74rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+.selectionValue{color:var(--ui-ink);font-size:.9rem}
 .selectionBarBlock{display:grid;gap:.28rem}
-.selectionBarHeader{display:flex;justify-content:space-between;gap:.6rem;color:#dbeafe;font-size:.84rem}
-.selectionBar{display:flex;height:1.35rem;overflow:hidden;border:1px solid #475569;border-radius:999px;background:#05070b}
+.selectionBarHeader{display:flex;justify-content:space-between;gap:.6rem;color:var(--ui-ink-muted);font-size:.84rem}
+.selectionBar{display:flex;height:1.35rem;overflow:hidden;border:1px solid var(--ui-border-dark);border-radius:999px;background:var(--ui-brown-deep)}
 .selectionBarFill{height:100%;background:#ca8a04}
-.selectionBarRemoved{height:100%;background:#050505}
-.selectionBarText{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.76rem;font-weight:900;text-shadow:0 1px 2px #000}
-.selectionBarWrap{position:relative}.selectionStatusWarning{color:#fca5a5}
-.selectionEmpty{line-height:1.42}
+.selectionBarRemoved{height:100%;background:var(--ui-brown-deep)}
+.selectionBarText{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ui-ink-inverse);font-size:.76rem;font-weight:900;text-shadow:0 1px 2px #000}
+.selectionBarWrap{position:relative}.selectionStatusWarning{color:var(--ui-danger)}
+.selectionEmpty{color:var(--ui-ink);line-height:1.42}
 .selectionClimateList{display:grid;gap:.28rem;margin-top:.08rem}
-.selectionClimateItem{display:flex;align-items:center;gap:.42rem;color:#f8fafc;font-size:.86rem}
+.selectionClimateItem{display:flex;align-items:center;gap:.42rem;color:var(--ui-ink);font-size:.86rem}
 .selectionClimateIcon{width:1.3rem;text-align:center;font-size:1.05rem;flex:none}
 .selectionStickIcon{width:1.2rem;height:1.2rem;display:block}
 
@@ -1244,7 +1244,7 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
     background: var(--ui-parchment);
     color: var(--ui-ink);
 }
-#sidePanel h2, #sidePanel h3, .selectionTitle,
+#sidePanel h2, #sidePanel h3,
 .dashboardHeading, .statTile strong, #statDetailPanel h2,
 #roundHistoryPanel h2, #optionsPanel h2 {
     color: var(--ui-heading);
@@ -1258,8 +1258,7 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
     box-shadow: var(--ui-inset);
 }
 
-.selectionValue, .selectionClimateItem { color: var(--ui-ink); }
-.selectionTitleIcon, .selectionRowIcon, .goalIcon, .statIcon {
+.goalIcon, .statIcon {
     background: var(--ui-green-muted);
     color: var(--ui-ink-inverse);
     border: 1px solid var(--ui-border-dark);
@@ -1402,7 +1401,7 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
     background: var(--ui-parchment-bright);
     color: var(--ui-ink);
 }
-.saveSlotName, .familyTreeGraphNode, .selectionCard { color: var(--ui-ink); }
+.saveSlotName, .familyTreeGraphNode { color: var(--ui-ink); }
 .saveSlotMetadata, .familyNodeMeta, #musicVolumeValue { color: var(--ui-ink-muted); }
 .monsterExportChoice { border-bottom-color: var(--ui-border-light); }
 .monsterExportChoice:hover { background: var(--ui-parchment-recessed); }
@@ -1426,7 +1425,7 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
     background: #e6d5a6;
     color: var(--ui-ink);
 }
-#customGameError, #saveLoadMessage, .nutritionShortfall, .selectionStatusWarning { color: var(--ui-danger); }
+#customGameError, #saveLoadMessage, .nutritionShortfall { color: var(--ui-danger); }
 .selectionStatusGood { color: var(--ui-good); }
 .roundHistoryTable th, .roundHistoryTable td { border-bottom-color: var(--ui-border); }
 .roundHistoryTable tr.mostRecentRound { background: var(--ui-parchment-recessed); outline-color: var(--ui-focus); }
@@ -1734,9 +1733,6 @@ html, body, button, input, select, textarea,
 
 /* ========================================================================== */
 /* ========================================================================== */
-.selectionEmpty {
-    color: var(--ui-ink);
-}
 .ageOverflow {
     border-left-color: #8a6f32;
     background: #dfd09f;
@@ -1751,7 +1747,6 @@ html, body, button, input, select, textarea,
 
 
 /* ========================================================================== */
-/* SAVE/LOAD DENSITY, LIFE-PHASE COLOURS AND DASHBOARD CONTRAST               */
 /* ========================================================================== */
 #saveLoadPanel {
     width: min(1040px, calc(100vw - 2rem));
@@ -22019,7 +22014,7 @@ html, body, button, input, select, textarea,
         var allSelectable=monsters.concat(recentDeaths.filter(function(dead){return !monsters.some(function(m){return m.id===dead.id;});}),eggRecords);
         if(!selectedRosterMonsterId&&allSelectable.length){selectedRosterMonsterId=allSelectable[0].id;} if(selectedRosterMonsterId&&!allSelectable.some(function(m){return m.id===selectedRosterMonsterId;})){selectedRosterMonsterId=allSelectable.length?allSelectable[0].id:null;}
         var renderKey=BuildManagementRenderKey(s,monsters)+'|deaths:'+recentDeaths.map(function(d){return d.id+':'+d.overallConditionPercent;}).join(',')+'|selected:'+selectedRosterMonsterId; if(renderKey===lastManagementRenderKey){return;} lastManagementRenderKey=renderKey;
-        managementSummary.textContent=phase==='raid'?'Season in progress. Use Deploy on a reserve monster to send it in from the far right edge.':'Inter-season management. Set automatic deployment for next season, breed eligible adults, or release a selected monster into the wild.';
+        managementSummary.textContent=phase==='raid'?'Season in progress. Use Deploy on a reserve monster to send it in from the far right edge.':'Choose which monsters to deploy for the next season. Breed monsters by dragging a male onto a female or vice versa.';
         rosterList.innerHTML='';
         var sections={};
         [['males','Males'],['females','Females'],['nursery','Nursery'],['mortuary','Mortuary']].forEach(function(pair){var section=document.createElement('section');section.className='monsterRosterSection';var heading=document.createElement('h3');heading.className='monsterRosterHeading';var headingText=document.createElement('span');headingText.textContent=pair[1];var countBadge=document.createElement('span');countBadge.className='monsterRosterCount';countBadge.textContent='0';heading.appendChild(headingText);heading.appendChild(countBadge);var grid=document.createElement('div');grid.className='monsterPortraitGrid';section.appendChild(heading);section.appendChild(grid);rosterList.appendChild(section);sections[pair[0]]={grid:grid,count:countBadge,total:0};});
