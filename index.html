@@ -23443,20 +23443,62 @@ html {
         ctx.restore();
     }
     function DrawRock(o){
-        var p = EntityScreenPoint(o.x, o.y),
-        r = o.radius *(o.type==='smallRock' ? 0.9 : 1.1);
-        ctx.fillStyle = o.type==='smallRock' ? '#8d8d84' : '#74756f';
+        var p = EntityScreenPoint(o.x, o.y);
+        var r = o.radius *(o.type==='smallRock' ? 0.9 : 1.1);
+        if (o.type==='smallRock'){
+            ctx.fillStyle = '#8d8d84';
+            ctx.beginPath();
+            ctx.moveTo(p.x-r, p.y);
+            ctx.lineTo(p.x-r * 0.45, p.y-r * 0.45);
+            ctx.lineTo(p.x+r * 0.25, p.y-r * 0.55);
+            ctx.lineTo(p.x+r, p.y-r * 0.05);
+            ctx.lineTo(p.x+r * 0.45, p.y+r * 0.38);
+            ctx.lineTo(p.x-r * 0.4, p.y+r * 0.35);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#4e504a';
+            ctx.stroke();
+            return;
+        }
+        var phase = StablePhase(o.id || 'bigRock');
+        var lean = (phase-0.5) * r * 0.24;
+        var topY = p.y-r * (1.12+(o.variant || 0) * 0.06);
+        ctx.save();
+        DrawVectorShadow(p.x+r * 0.10, p.y+r * 0.28, r * 0.98, r * 0.27, 0.24);
+        DrawOrganicClosedPath([
+            {x:p.x-r * 0.92,y:p.y+r * 0.18},
+            {x:p.x-r * 0.78+lean * 0.18,y:p.y-r * 0.42},
+            {x:p.x-r * 0.36+lean * 0.55,y:topY+r * 0.12},
+            {x:p.x+r * 0.16+lean,y:topY},
+            {x:p.x+r * 0.70+lean * 0.42,y:p.y-r * 0.55},
+            {x:p.x+r * 0.98,y:p.y-r * 0.02},
+            {x:p.x+r * 0.58,y:p.y+r * 0.34},
+            {x:p.x-r * 0.42,y:p.y+r * 0.38}
+        ], '#62645f', '#41433f', Math.max(1.4, r * 0.045));
+        DrawOrganicClosedPath([
+            {x:p.x-r * 0.78+lean * 0.18,y:p.y-r * 0.42},
+            {x:p.x-r * 0.36+lean * 0.55,y:topY+r * 0.12},
+            {x:p.x+r * 0.16+lean,y:topY},
+            {x:p.x+r * 0.46+lean * 0.65,y:p.y-r * 0.58},
+            {x:p.x+r * 0.08,y:p.y-r * 0.30},
+            {x:p.x-r * 0.48,y:p.y-r * 0.12}
+        ], '#858780', null, 0);
+        DrawOrganicClosedPath([
+            {x:p.x+r * 0.46+lean * 0.65,y:p.y-r * 0.58},
+            {x:p.x+r * 0.70+lean * 0.42,y:p.y-r * 0.55},
+            {x:p.x+r * 0.98,y:p.y-r * 0.02},
+            {x:p.x+r * 0.58,y:p.y+r * 0.34},
+            {x:p.x+r * 0.08,y:p.y-r * 0.30}
+        ], '#50524d', null, 0);
+        DrawVectorHighlight(p.x-r * 0.22+lean * 0.55, topY+r * 0.24, r * 0.34, r * 0.09, -0.28, 0.20);
+        ctx.strokeStyle = '#4a4c47';
+        ctx.lineWidth = Math.max(1, r * 0.025);
         ctx.beginPath();
-        ctx.moveTo(p.x-r, p.y);
-        ctx.lineTo(p.x-r * 0.45, p.y-r * 0.45);
-        ctx.lineTo(p.x+r * 0.25, p.y-r * 0.55);
-        ctx.lineTo(p.x+r, p.y-r * 0.05);
-        ctx.lineTo(p.x+r * 0.45, p.y+r * 0.38);
-        ctx.lineTo(p.x-r * 0.4, p.y+r * 0.35);
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = '#4e504a';
+        ctx.moveTo(p.x-r * 0.08+lean * 0.35, topY+r * 0.34);
+        ctx.lineTo(p.x-r * 0.18, p.y-r * 0.42);
+        ctx.lineTo(p.x+r * 0.02, p.y-r * 0.20);
         ctx.stroke();
+        ctx.restore();
     }
     function DrawStick(o){
         var p = EntityScreenPoint(o.x, o.y);
