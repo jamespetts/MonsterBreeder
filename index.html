@@ -64,7 +64,6 @@ body {
     transform: none;
 }
 #viewportTopControls #startSeasonButton {
-    border-radius: 0 0 0.65rem 0.65rem;
     padding: 0.35rem 1rem 0.45rem;
     box-shadow: 0 3px 10px rgba(0,0,0,0.25);
 }
@@ -76,12 +75,8 @@ body {
     width: 1.8rem;
     height: 1.8rem;
     padding: 0;
-    border-radius: 999px;
     font-size: 1.15rem;
     line-height: 1.8rem;
-}
-#closeManagementButton:hover {
-    background: #e5e7eb;
 }
 #controls {
     display: flex;
@@ -226,7 +221,6 @@ button {
     border-color: #394732;
 }
 .monsterCard.selected {
-    outline: 3px solid #f2c14e;
     border-color: #1f2730;
 }
 .monsterCard.dead {
@@ -428,27 +422,22 @@ button {
     margin-top: 0;
     display: grid;
     min-height: 0;
-    border: 1px solid #111827;
     box-shadow: 0 1px 8px rgba(0,0,0,0.45);
 }
 #sidePanel h2 {
     margin: 0 0 0.45rem;
     font-size: 1rem;
-    color: #f2c14e;
 }
 #sidePanel h3 {
     margin: 0.65rem 0 0.25rem;
     font-size: 0.92rem;
-    color: #bfdbfe;
 }
 #campaignStatsSection, #interactionModeSection, #selectionSection {
     min-width: 0;
     min-height: 0;
     overflow: auto;
-    border: 1px solid #1f2937;
     border-radius: 0.45rem;
     padding: 0.65rem;
-    background: #030712;
 }
 #statusBox, #objectDetails {
     white-space: pre-line;
@@ -469,9 +458,6 @@ button {
 .selectionActions button {
     padding: 0.4rem 0.55rem;
 }
-.detailMuted {
-    color: #9ca3af;
-}
 #mainMenuOverlay {
     position: fixed;
     inset: 0;
@@ -479,8 +465,6 @@ button {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(2,6,23,0.92);
-    color: #f9fafb;
 }
 #mainMenuOverlay.menuHidden {
     display: none;
@@ -529,10 +513,8 @@ button {
 }
 #mainMenuPanel {
     width: min(420px, calc(100vw - 2rem));
-    border: 1px solid #334155;
     border-radius: 0.85rem;
     padding: 1.2rem;
-    background: #111827;
     box-shadow: 0 18px 60px rgba(0,0,0,0.55);
 }
 #mainMenuPanel h2 {
@@ -541,12 +523,10 @@ button {
 }
 #mainMenuPanel p {
     margin: 0 0 1rem;
-    color: #cbd5e1;
 }
 #customGamePanel {
     margin-top: 0.75rem;
     padding-top: 0.75rem;
-    border-top: 1px solid #334155;
     display: none;
 }
 #customGamePanel.customGameVisible {
@@ -566,11 +546,8 @@ button {
 }
 .customGameGrid input, .customGameGrid select {
     min-width: 0;
-    border: 1px solid #475569;
     border-radius: 0.35rem;
     padding: 0.35rem 0.45rem;
-    background: #020617;
-    color: #f9fafb;
 }
 .customGameActions {
     display: flex;
@@ -593,8 +570,6 @@ button {
 }
 .mainMenuButtons button:disabled {
     cursor: not-allowed;
-    background: #374151;
-    color: #9ca3af;
 }
 @media (max-width: 980px) {
     #layout {
@@ -627,16 +602,13 @@ button {
     align-items: center;
     justify-content: center;
     background: rgba(2,6,23,0.94);
-    color: #f9fafb;
 }
 #saveLoadOverlay.dialogHidden {
     display: none;
 }
 #saveLoadPanel {
-    border: 1px solid #475569;
     border-radius: 0.85rem;
     padding: 1rem;
-    background: #111827;
     box-shadow: 0 18px 60px rgba(0,0,0,0.65);
     box-sizing: border-box;
 }
@@ -645,27 +617,22 @@ button {
 }
 #saveLoadDescription {
     margin: 0 0 0.8rem;
-    color: #cbd5e1;
 }
 .saveSlotRow {
     display: grid;
     align-items: center;
-    border: 1px solid #334155;
     border-radius: 0.55rem;
-    background: #020617;
 }
 .saveSlotDetails {
     min-width: 0;
 }
 .saveSlotName {
     display: block;
-    color: #f8fafc;
     font-weight: 800;
 }
 .saveSlotMetadata {
     display: block;
     margin-top: 0.15rem;
-    color: #94a3b8;
 }
 .saveSlotRow.empty .saveSlotMetadata {
     font-style: italic;
@@ -692,7 +659,6 @@ button {
     border: 1px solid #f59e0b;
     border-radius: 0.55rem;
     padding: 0.7rem;
-    background: #451a03;
 }
 #saveLoadConfirmation.confirmationHidden {
     display: none;
@@ -718,27 +684,24 @@ button {
     align-items: center;
     justify-content: center;
     background: rgba(2,6,23,0.94);
-    color: #f9fafb;
 }
 #monsterTransferOverlay.dialogHidden { display: none; }
 #monsterTransferPanel {
     width: min(780px, calc(100vw - 2rem));
     max-height: min(820px, calc(100vh - 2rem));
     overflow: auto;
-    border: 1px solid #475569;
     border-radius: 0.85rem;
     padding: 1rem;
-    background: #111827;
     box-shadow: 0 18px 60px rgba(0,0,0,0.65);
     box-sizing: border-box;
 }
 #monsterTransferPanel h2, #monsterTransferPanel h3 { margin: 0 0 0.45rem; }
 #monsterTransferStatus { min-height: 1.3rem; color: #fcd34d; white-space: pre-line; }
 .monsterTransferGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
-.monsterTransferSection { border: 1px solid #334155; border-radius: 0.55rem; padding: 0.75rem; background: #020617; }
+.monsterTransferSection { border-radius: 0.55rem; padding: 0.75rem; }
 .monsterTransferSection select, .monsterTransferSection input { width: 100%; box-sizing: border-box; margin: 0.4rem 0 0.6rem; }
-.monsterExportList { max-height: 18rem; overflow: auto; border: 1px solid #334155; border-radius: 0.4rem; margin: 0.45rem 0 0.7rem; }
-.monsterExportChoice { display: flex; gap: 0.55rem; align-items: center; padding: 0.48rem 0.55rem; cursor: pointer; border-bottom: 1px solid #1e293b; }
+.monsterExportList { max-height: 18rem; overflow: auto; border-radius: 0.4rem; margin: 0.45rem 0 0.7rem; }
+.monsterExportChoice { display: flex; gap: 0.55rem; align-items: center; padding: 0.48rem 0.55rem; cursor: pointer; }
 .monsterExportChoice:last-child { border-bottom: 0; }
 .monsterExportChoice input { width: auto; margin: 0; }
 #monsterExportToolbar { margin-top: 0.35rem; }
@@ -774,17 +737,14 @@ button {
     align-items: center;
     justify-content: center;
     background: rgba(2,6,23,0.90);
-    color: #f9fafb;
 }
 #unsavedActionOverlay.dialogHidden {
     display: none;
 }
 #unsavedActionPanel {
     width: min(480px, calc(100vw - 2rem));
-    border: 1px solid #475569;
     border-radius: 0.85rem;
     padding: 1rem;
-    background: #111827;
     box-shadow: 0 18px 60px rgba(0,0,0,0.65);
 }
 #unsavedActionPanel h2 {
@@ -792,7 +752,6 @@ button {
 }
 #unsavedActionPanel p {
     margin: 0 0 0.85rem;
-    color: #cbd5e1;
 }
 #unsavedActionButtons {
     display: flex;
@@ -816,7 +775,6 @@ button {
     align-items: center;
     justify-content: center;
     background: rgba(2,6,23,0.94);
-    color: #f9fafb;
 }
 #foodShortageOverlay.dialogHidden {
     display: none;
@@ -825,13 +783,11 @@ button {
     border: 1px solid #f59e0b;
     border-radius: 0.85rem;
     padding: 1rem;
-    background: #111827;
     box-shadow: 0 18px 60px rgba(0,0,0,0.68);
     box-sizing: border-box;
 }
 #foodShortagePanel h2, #foodShortagePanel h3 {
     margin: 0 0 0.45rem;
-    color: #f2c14e;
 }
 #foodShortageSummary {
     white-space: pre-line;
@@ -840,9 +796,7 @@ button {
     display: grid;
 }
 #treasureSpendControl {
-    border: 1px solid #475569;
     border-radius: 0.5rem;
-    background: #0f172a;
 }
 #treasureSpendControl label {
     display: grid;
@@ -853,32 +807,23 @@ button {
 #treasureSpendInput {
     width: 100%;
     box-sizing: border-box;
-    border: 1px solid #64748b;
     border-radius: 0.35rem;
     padding: 0.36rem;
-    background: #020617;
-    color: #f8fafc;
 }
 #treasureSpendHint {
     margin: 0.4rem 0 0;
-    color: #cbd5e1;
     font-size: 0.9rem;
 }
 .foodAllocationRow {
     display: grid;
     align-items: center;
-    border: 1px solid #334155;
     border-radius: 0.5rem;
-    background: #020617;
 }
 .foodAllocationRow input {
     width: 100%;
     box-sizing: border-box;
-    border: 1px solid #64748b;
     border-radius: 0.35rem;
     padding: 0.36rem;
-    background: #0f172a;
-    color: #f8fafc;
 }
 #foodSalePreview {
     white-space: pre-line;
@@ -912,30 +857,30 @@ button {
         text-align: left;
     }
 }
-#newRaidButton{order:10;margin-left:.6rem}.transportButton{width:2.8rem;height:2.55rem;padding:0;display:inline-flex;align-items:center;justify-content:center;gap:.2rem}.transportButton[aria-pressed=true]{background:#fff1a8;box-shadow:inset 0 2px 4px #0006}.playSymbol{width:0;height:0;border-top:.58rem solid transparent;border-bottom:.58rem solid transparent;border-left:.92rem solid #1f2730}.pauseSymbol,.fastForwardSymbol{display:inline-flex;gap:.2rem}.pauseSymbol span{width:.34rem;height:1.15rem;border-radius:.18rem;background:#1f2730}.fastForwardSymbol span{width:0;height:0;border-top:.48rem solid transparent;border-bottom:.48rem solid transparent;border-left:.72rem solid #1f2730;margin-left:-.09rem}
-#statusBox{white-space:normal}.campaignDashboard{display:grid;gap:.75rem}.dashboardCard{border:1px solid #263449;border-radius:.55rem;padding:.65rem;background:#0b1220}.climateCard{grid-template-columns:2.7rem 1fr}.thermometer{position:relative;width:.78rem;height:4.4rem;margin:0 auto .55rem;border:2px solid #cbd5e1;border-radius:999px 999px .3rem .3rem;background:#172033}.thermometer:after{content:"";position:absolute;left:50%;bottom:-.62rem;width:1.35rem;height:1.35rem;transform:translateX(-50%);border:2px solid #cbd5e1;border-radius:50%;background:currentColor}.thermometerFill{position:absolute;left:.13rem;right:.13rem;bottom:0;border-radius:999px}.climateValue{font-size:1.35rem;font-weight:900}.climateBiome{color:#bfdbfe;font-weight:800}.dashboardHeading{margin-bottom:.45rem;font-weight:900}.goalRow{display:grid;gap:.65rem;align-items:center;margin-top:.52rem}.progressTrack,.balanceTrack,.treasureTrack{position:relative;height:1.35rem;overflow:hidden;border-radius:999px;background:#1f2937;border:1px solid #475569}.progressFill{height:100%}.progressText,.balanceValue{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.78rem;font-weight:900;text-shadow:0 1px 2px #000}.goalDescription{color:#dbeafe;font-size:.82rem}.balanceTrack{overflow:visible;background:#172033}.balanceTrack:after{content:"";position:absolute;left:50%;top:-.2rem;bottom:-.2rem;width:2px}.balanceBar{position:absolute;border-radius:999px}.balanceBar.surplus{left:50%;background:#16a34a}.balanceBar.deficit{right:50%;background:#dc2626}.treasureTrack{display:flex;height:1.75rem}.treasureSegment{display:flex;align-items:center;justify-content:center;overflow:hidden;color:#fff;font-size:.72rem;font-weight:900;text-shadow:0 1px 2px #000;white-space:nowrap}.treasureRemaining{background:#ca8a04}.treasureSold{background:#7c3aed}.treasureStolen{background:#b91c1c}.dashboardFootnote{color:#94a3b8;font-size:.76rem;margin-top:.35rem}
-#roundHistoryOverlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:1rem;background:#020617f0;color:#f8fafc}#roundHistoryOverlay.dialogHidden{display:none}#roundHistoryPanel{width:min(980px,calc(100vw - 2rem));max-height:min(860px,calc(100vh - 2rem));overflow:auto;border:1px solid #475569;border-radius:.85rem;padding:1rem;background:#111827}#roundHistoryPanel h2{margin:0;color:#f2c14e}.roundHistoryTable{width:100%;border-collapse:collapse;font-size:.88rem}.roundHistoryTable th,.roundHistoryTable td{padding:.55rem;border-bottom:1px solid #334155;text-align:right;vertical-align:top}.roundHistoryTable th:nth-child(-n/**/+3),.roundHistoryTable td:nth-child(-n/**/+3){text-align:left}.roundResultBadge{display:inline-block;padding:.16rem .5rem;border-radius:999px;font-weight:900}.roundResultBadge.win{background:#166534}.roundResultBadge.loss{background:#991b1b}#roundHistoryActions{display:flex;justify-content:flex-end;margin-top:.8rem}@media(min-width:981px){#sidePanel{grid-template-rows:minmax(17rem,auto) minmax(13rem,1fr)}}@media(max-width:700px){.goalRow{grid-template-columns:1fr}}
+#newRaidButton{order:10;margin-left:.6rem}.transportButton{width:2.8rem;height:2.55rem;padding:0;display:inline-flex;align-items:center;justify-content:center;gap:.2rem}.transportButton[aria-pressed=true]{box-shadow:inset 0 2px 4px #0006}.playSymbol{width:0;height:0;border-top:.58rem solid transparent;border-bottom:.58rem solid transparent;border-left:.92rem solid #1f2730}.pauseSymbol,.fastForwardSymbol{display:inline-flex;gap:.2rem}.pauseSymbol span{width:.34rem;height:1.15rem;border-radius:.18rem;background:#1f2730}.fastForwardSymbol span{width:0;height:0;border-top:.48rem solid transparent;border-bottom:.48rem solid transparent;border-left:.72rem solid #1f2730;margin-left:-.09rem}
+#statusBox{white-space:normal}.campaignDashboard{display:grid;gap:.75rem}.dashboardCard{border-radius:.55rem;padding:.65rem}.climateCard{grid-template-columns:2.7rem 1fr}.thermometer{position:relative;width:.78rem;height:4.4rem;margin:0 auto .55rem;border-radius:999px 999px .3rem .3rem}.thermometer:after{content:"";position:absolute;left:50%;bottom:-.62rem;width:1.35rem;height:1.35rem;transform:translateX(-50%);border-radius:50%;background:currentColor}.thermometerFill{position:absolute;left:.13rem;right:.13rem;bottom:0;border-radius:999px}.climateValue{font-size:1.35rem;font-weight:900}.climateBiome{font-weight:800}.dashboardHeading{margin-bottom:.45rem;font-weight:900}.goalRow{display:grid;gap:.65rem;align-items:center;margin-top:.52rem}.progressTrack,.balanceTrack,.treasureTrack{position:relative;height:1.35rem;overflow:hidden;border-radius:999px}.progressFill{height:100%}.progressText,.balanceValue{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.78rem;font-weight:900;text-shadow:0 1px 2px #000}.goalDescription{font-size:.82rem}.balanceTrack{overflow:visible}.balanceTrack:after{content:"";position:absolute;left:50%;top:-.2rem;bottom:-.2rem;width:2px}.balanceBar{position:absolute;border-radius:999px}.balanceBar.surplus{left:50%;background:#16a34a}.balanceBar.deficit{right:50%;background:#dc2626}.treasureTrack{display:flex;height:1.75rem}.treasureSegment{display:flex;align-items:center;justify-content:center;overflow:hidden;color:#fff;font-size:.72rem;font-weight:900;text-shadow:0 1px 2px #000;white-space:nowrap}.treasureRemaining{background:#ca8a04}.treasureSold{background:#7c3aed}.treasureStolen{background:#b91c1c}.dashboardFootnote{font-size:.76rem;margin-top:.35rem}
+#roundHistoryOverlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:1rem}#roundHistoryOverlay.dialogHidden{display:none}#roundHistoryPanel{width:min(980px,calc(100vw - 2rem));max-height:min(860px,calc(100vh - 2rem));overflow:auto;border-radius:.85rem;padding:1rem}#roundHistoryPanel h2{margin:0}.roundHistoryTable{width:100%;border-collapse:collapse;font-size:.88rem}.roundHistoryTable th,.roundHistoryTable td{padding:.55rem;text-align:right;vertical-align:top}.roundHistoryTable th:nth-child(-n/**/+3),.roundHistoryTable td:nth-child(-n/**/+3){text-align:left}.roundResultBadge{display:inline-block;padding:.16rem .5rem;font-weight:900}#roundHistoryActions{display:flex;justify-content:flex-end;margin-top:.8rem}@media(min-width:981px){#sidePanel{grid-template-rows:minmax(17rem,auto) minmax(13rem,1fr)}}@media(max-width:700px){.goalRow{grid-template-columns:1fr}}
 
-.dashboardCard.statClickable{cursor:pointer;transition:border-color .15s,transform .15s}.dashboardCard.statClickable:hover{border-color:#f2c14e}
-.thermometerFill{background:currentColor!important}.treasureLegend{grid-template-columns:repeat(3,1fr)}.treasureLegendItem{color:#dbeafe;font-size:.76rem}.legendSwatch{width:.72rem;height:.72rem;border-radius:.18rem;flex:none}
-#statDetailOverlay{position:fixed;inset:0;z-index:55;display:flex;align-items:center;justify-content:center;padding:1rem;background:#020617f2;color:#f8fafc}#statDetailOverlay.dialogHidden{display:none}#statDetailPanel{width:min(900px,calc(100vw - 2rem));max-height:min(850px,calc(100vh - 2rem));overflow:auto;border:1px solid #475569;border-radius:.85rem;padding:1rem;background:#111827;box-sizing:border-box}#statDetailPanel h2{margin:0 0 .7rem;color:#f2c14e}.statDetailActions{display:flex;justify-content:flex-end;margin-top:1rem}.statChart{width:100%;height:auto;border:1px solid #334155;border-radius:.55rem}.statGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.65rem}.statTile{padding:.65rem;border:1px solid #334155;border-radius:.5rem;background:#0b1220}.statTile strong{display:block;color:#f2c14e;font-size:1.2rem}.iconRow{display:flex;align-items:center;gap:.55rem;margin:.45rem 0}.statIcon{width:2rem;height:2rem;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#263449;font-size:1.15rem;flex:none}.barRow{display:grid;grid-template-columns:minmax(7rem,1fr) 2fr 3.2rem;gap:.5rem;align-items:center;margin:.45rem 0}.barTrack{height:1rem;border-radius:999px;background:#1f2937;overflow:hidden}.barFill{height:100%;border-radius:999px}.typeGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.55rem;margin-top:.7rem}.typeTile{padding:.55rem;border-radius:.5rem;background:#0b1220;border:1px solid #334155}.typeColour{height:.45rem;border-radius:999px;margin:.35rem 0}
+.dashboardCard.statClickable{cursor:pointer;transition:border-color .15s,transform .15s}
+.thermometerFill{background:currentColor!important}.treasureLegend{grid-template-columns:repeat(3,1fr)}.treasureLegendItem{font-size:.76rem}.legendSwatch{width:.72rem;height:.72rem;border-radius:.18rem;flex:none}
+#statDetailOverlay{position:fixed;inset:0;z-index:55;display:flex;align-items:center;justify-content:center;padding:1rem}#statDetailOverlay.dialogHidden{display:none}#statDetailPanel{width:min(900px,calc(100vw - 2rem));max-height:min(850px,calc(100vh - 2rem));overflow:auto;border-radius:.85rem;padding:1rem;box-sizing:border-box}#statDetailPanel h2{margin:0 0 .7rem}.statDetailActions{display:flex;justify-content:flex-end;margin-top:1rem}.statChart{width:100%;height:auto;border-radius:.55rem}.statGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.65rem}.statTile{padding:.65rem;border-radius:.5rem}.statTile strong{display:block;font-size:1.2rem}.iconRow{display:flex;align-items:center;gap:.55rem;margin:.45rem 0}.statIcon{width:2rem;height:2rem;display:flex;align-items:center;justify-content:center;font-size:1.15rem;flex:none}.barRow{display:grid;grid-template-columns:minmax(7rem,1fr) 2fr 3.2rem;gap:.5rem;align-items:center;margin:.45rem 0}.barTrack{height:1rem;overflow:hidden}.barFill{height:100%;border-radius:999px}.typeGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.55rem;margin-top:.7rem}.typeTile{padding:.55rem;border-radius:.5rem}.typeColour{height:.45rem;border-radius:999px;margin:.35rem 0}
 #interactionModeSection{overflow:visible!important;padding:.35rem .65rem!important}
 .interactionModeButtons{display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem}
-.interactionModeButton{height:2.65rem;padding:.25rem;display:flex;align-items:center;justify-content:center;border:1px solid #475569}
+.interactionModeButton{height:2.65rem;padding:.25rem;display:flex;align-items:center;justify-content:center}
 .interactionModeButton svg{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.interactionModeButton[aria-pressed=true]{background:#f2c14e;color:#1f2730;border-color:#fde68a;box-shadow:inset 0 2px 5px #0005}
+.interactionModeButton[aria-pressed=true]{color:#1f2730;box-shadow:inset 0 2px 5px #0005}
 .climateCard{display:flex!important;flex-direction:column;align-items:stretch!important;gap:.55rem!important}
-.climateBiomeRow{display:flex;align-items:center;gap:.5rem;color:#bfdbfe;font-weight:800}
+.climateBiomeRow{display:flex;align-items:center;gap:.5rem;font-weight:800}
 .biomeIcon{font-size:1.45rem;line-height:1;flex:none}
-.seasonRow{display:flex;align-items:center;gap:.42rem;margin-top:.22rem;color:#dbeafe;font-weight:800}
+.seasonRow{display:flex;align-items:center;gap:.42rem;margin-top:.22rem;font-weight:800}
 .seasonIcon{font-size:1.12rem;line-height:1;flex:none}
-.settlementDistanceRow{display:flex;align-items:center;gap:.42rem;margin-top:.26rem;color:#dbeafe;font-size:.84rem;font-weight:800}.settlementDistanceIcon{font-size:1.12rem;line-height:1;flex:none}
+.settlementDistanceRow{display:flex;align-items:center;gap:.42rem;margin-top:.26rem;font-size:.84rem;font-weight:800}.settlementDistanceIcon{font-size:1.12rem;line-height:1;flex:none}
 .climateInstrument{display:grid;grid-template-columns:2.7rem 1fr;gap:.75rem;align-items:center}
-.goalIcon{width:2rem;height:2rem;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#263449;font-size:1.15rem;cursor:help}
+.goalIcon{width:2rem;height:2rem;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.15rem;cursor:help}
 .goalRow{grid-template-columns:2rem minmax(7rem,1fr)!important}
 .dashboardCard.statClickable{position:relative;transform:none!important}
 .dashboardCard.statClickable:hover{transform:none!important}
-.dashboardCard.statClickable[data-tooltip]:hover:after,.dashboardCard.statClickable[data-tooltip]:focus-visible:after{position:absolute;z-index:20;right:.45rem;top:.35rem;padding:.25rem .45rem;border:1px solid #64748b;border-radius:.3rem;background:#111827;color:#f8fafc;font-size:.75rem;font-weight:700;line-height:1.2;white-space:nowrap;box-shadow:0 3px 10px #0008;pointer-events:none}
+.dashboardCard.statClickable[data-tooltip]:hover:after,.dashboardCard.statClickable[data-tooltip]:focus-visible:after{position:absolute;z-index:20;right:.45rem;top:.35rem;padding:.25rem .45rem;border-radius:.3rem;font-size:.75rem;font-weight:700;line-height:1.2;white-space:nowrap;box-shadow:0 3px 10px #0008;pointer-events:none}
 #objectDetails{flex:1 1 auto;min-height:4rem;overflow:auto}
 
 /* Final sidebar sizing: campaign always fully visible; interaction strip is compact;
@@ -975,10 +920,10 @@ button {
 .treasureTrack{cursor:help}
 
 .victoryOrRow{display:grid;grid-template-columns:2rem minmax(7rem,1fr);gap:.65rem;align-items:center;margin:.15rem 0 -.15rem}
-.victoryOrText{grid-column:2;text-align:center;color:#94a3b8;font-size:.76rem;font-weight:900;letter-spacing:.08em}
+.victoryOrText{grid-column:2;text-align:center;font-size:.76rem;font-weight:900;letter-spacing:.08em}
 .treasureLegendItem{display:flex!important;width:auto!important;height:1.35rem!important;align-items:center!important;gap:.28rem!important;border:0!important;background:transparent!important}
 .treasureLegendIcon{width:1.1rem;height:1.1rem;display:block;flex:none}
-.treasureLegendItem .legendSwatch{width:.72rem!important;height:.72rem!important;border:1px solid #cbd5e1;border-radius:.14rem!important;flex:none}
+.treasureLegendItem .legendSwatch{width:.72rem!important;height:.72rem!important;border-radius:.14rem!important;flex:none}
 
 /* Selected-object card: concise, icon-led and consistent with dashboard headings. */
 .selectionTitle{display:flex;align-items:center;gap:.5rem!important;color:var(--ui-warning)!important;font-size:1rem!important;font-weight:900!important}
@@ -1012,21 +957,21 @@ button {
 .monsterRosterHeading{display:flex;justify-content:space-between;align-items:center;margin:0 0 .35rem;padding:.4rem .52rem;font-size:.86rem}
 .monsterRosterCount{padding:.08rem .35rem;border-radius:999px;background:#ffffff20;font-size:.72rem}
 .monsterPortraitGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr))}
-.monsterPortrait{position:relative;min-width:0;display:grid;align-items:center;justify-items:center;border:2px solid #8b795b;cursor:pointer}.monsterPortrait.selected{outline:3px solid #f2c14e}.monsterPortrait.touchBreedingSelected{outline:4px solid #2563eb;outline-offset:-1px;border-color:#1d4ed8;background:#dbeafe}.monsterPortrait[draggable=true]{cursor:grab}.monsterPortrait.dragging{opacity:.38}.monsterPortrait.compatibleBreedTarget{box-shadow:0 0 0 4px #22c55e88;border-color:#15803d}.monsterPortrait.incompatibleBreedTarget{opacity:.35}.monsterPortrait.dropBreedTarget{background:#dcfce7;transform:scale(1.03)}.monsterPortraitName{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;font-weight:850}.monsterPortraitStatus{width:100%;text-align:center;color:#526052}
+.monsterPortrait{position:relative;min-width:0;display:grid;align-items:center;justify-items:center;border:2px solid #8b795b;cursor:pointer}.monsterPortrait.touchBreedingSelected{outline:4px solid #2563eb;outline-offset:-1px;border-color:#1d4ed8}.monsterPortrait[draggable=true]{cursor:grab}.monsterPortrait.dragging{opacity:.38}.monsterPortrait.compatibleBreedTarget{box-shadow:0 0 0 4px #22c55e88;border-color:#15803d}.monsterPortrait.incompatibleBreedTarget{opacity:.35}.monsterPortrait.dropBreedTarget{background:#dcfce7;transform:scale(1.03)}.monsterPortraitName{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;font-weight:850}.monsterPortraitStatus{width:100%;text-align:center;color:#526052}
 .monsterPortraitControls{position:absolute;left:.22rem;right:.22rem;top:.18rem;display:flex;justify-content:space-between;align-items:center;pointer-events:none}.portraitDeployControl{display:flex;align-items:center;gap:.15rem;padding:.08rem .2rem;border:1px solid #8b795b;border-radius:.25rem;background:#fffffff2;font-size:.64rem;font-weight:800;pointer-events:auto}.portraitDeployControl input{margin:0}.deploymentBlockIcon{width:1.25rem;height:1.25rem;display:flex;align-items:center;justify-content:center;border:1px solid #991b1b;border-radius:50%;background:#fee2e2;color:#991b1b;font-size:.78rem;font-weight:900;pointer-events:auto}.portraitSex{padding:.08rem .25rem;border:1px solid #8b795b;border-radius:.25rem;background:#fffffff2;font-size:.68rem;font-weight:900}
 .monsterPortrait.mortuary{opacity:1;filter:none;background:#f4f0e7}.monsterPortrait.egg{background:#fff8dd}.monsterPortrait.brooding{background:#fff0c4}
 #selectedMonsterPanel{padding:.72rem}.selectedMonsterHeader{display:grid}.selectedMonsterPortrait{display:flex;align-items:center;justify-content:center;border-radius:.5rem;background:#efe4c8}.selectedMonsterPortrait svg{width:100%}.selectedMonsterTitleRow{display:flex;justify-content:space-between;align-items:start;gap:.5rem}.selectedMonsterTitleRow h3{margin:0;font-size:1.22rem}.selectedMonsterBadges{display:flex;flex-wrap:wrap;gap:.3rem;margin:.35rem 0}.managementBadge{padding:.14rem .42rem;border-radius:999px;background:#e9dfbd;font-size:.72rem;font-weight:800}.managementBadge.warning{background:#fee2e2;color:#991b1b}
 .managementSection{padding-top:.62rem;border-top:1px solid #d8d0b8}.managementSection h4{margin:0 0 .38rem}.iconBulletList{list-style:none;margin:.2rem 0;padding:0;display:grid}.iconBulletList li{display:grid;gap:.35rem;align-items:start}.featureIcon{display:flex;align-items:center;justify-content:center;border-radius:.3rem;background:#e9dfbd}.ageTrack{position:relative;border:1px solid #8b795b;border-radius:999px;background:#e5dfcf;overflow:hidden}.ageFill{height:100%}.ageExpectedMarker{position:absolute;right:0;top:-.15rem;bottom:-.15rem;width:3px}.ageOverflow{padding:.22rem .4rem;border-left:4px solid #7c3aed;font-weight:750}.ageLegend,.nutritionLegend{display:flex;justify-content:space-between;gap:.5rem;margin-top:.22rem;color:#657066;font-size:.72rem}
 .nutritionCompare{margin-top:.4rem}.nutritionTrack{position:relative;height:1.35rem;border:1px solid #8b795b;border-radius:999px;background:#e5dfcf;overflow:hidden}.biomeFoodFill{position:absolute;inset:0 auto 0 0;background:#86efac}.monsterNeedFill{position:absolute;background:#b45309;border-radius:999px}.nutritionTrackLabel{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#1f2730;font-size:.7rem;font-weight:900;text-shadow:0 1px #fff}
-.injuryList{display:grid}.injuryRow{display:grid;gap:.4rem;align-items:center}.injuryBar{height:.7rem;border-radius:999px;background:#e5e7eb;overflow:hidden}.injuryBarFill{height:100%;background:#22c55e}.injuryBarFill.minor{background:#eab308}.injuryBarFill.moderate{background:#f97316}.injuryBarFill.severe{background:#dc2626}.historicInjury{color:#7c2d12;font-weight:750}.deadFieldInjuryNote{padding:.45rem;border:1px solid #f59e0b;border-radius:.4rem;background:#fff7d6;font-size:.78rem}
+.injuryList{display:grid}.injuryRow{display:grid;gap:.4rem;align-items:center}.injuryBar{height:.7rem;border-radius:999px;overflow:hidden}.injuryBarFill{height:100%;background:#22c55e}.injuryBarFill.minor{background:#eab308}.injuryBarFill.moderate{background:#f97316}.injuryBarFill.severe{background:#dc2626}.historicInjury{color:#7c2d12;font-weight:750}.deadFieldInjuryNote{padding:.45rem;border:1px solid #f59e0b;border-radius:.4rem;background:#fff7d6;font-size:.78rem}
 .performanceBehaviour{padding:.45rem;border-radius:.4rem;background:#f3eedf;font-size:.8rem}.openFamilyTreeButton{width:100%}
 #managementActions{display:flex;align-items:center;gap:.55rem}.managementPrimaryActions{margin-left:auto;display:flex;gap:.45rem}#managementHint{display:none!important}
-#familyTreeOverlay,#breedingPairOverlay{position:fixed;inset:0;z-index:58;display:flex;align-items:center;justify-content:center;padding:1rem;background:#020617ee;color:#f8fafc}#familyTreeOverlay.dialogHidden,#breedingPairOverlay.dialogHidden{display:none}
-.familyTreeDialog,.breedingPairDialog{width:min(1040px,calc(100vw - 2rem));max-height:calc(100vh - 2rem);overflow:auto;padding:1rem;border:1px solid #475569;border-radius:.85rem;background:#111827;box-shadow:0 18px 60px #000b}.familyTreeDialog h2,.breedingPairDialog h2{margin:0 0 .65rem;color:#f2c14e}.familyGeneration:not(:last-child):after{content:"";position:absolute;right:-.65rem;top:5%;bottom:5%;width:2px;background:#64748b}.familyGenerationTitle{text-align:center;color:#94a3b8;font-size:.72rem;font-weight:850;text-transform:uppercase}.familyTreeGraphNode{padding:.45rem;border:1px solid #64748b;border-radius:.45rem;background:#0b1220;color:#f8fafc;text-align:left}.familyTreeGraphNode:after{content:"";position:absolute;right:-.65rem;top:50%;width:.65rem;height:2px;background:#64748b}.familyGeneration:last-child .familyTreeGraphNode:after{display:none}.familyTreeGraphNode.dead{color:#cbd5e1;background:#27272a}.familyNodeName{display:block;font-weight:900}.familyNodeMeta{display:block;margin-top:.12rem;color:#94a3b8;font-size:.72rem}.familyTreeRecordDetails{margin-top:.7rem;padding:.65rem;border:1px solid #334155;border-radius:.5rem;background:#080d18}.dialogActions{display:flex;justify-content:flex-end;gap:.45rem;margin-top:.75rem}.breedingPairGrid{display:grid;grid-template-columns:1fr auto 1fr;gap:.7rem;align-items:center}.breedingParent{padding:.6rem;border:1px solid #475569;border-radius:.5rem;background:#0b1220}.breedingWarning{margin-top:.65rem;padding:.55rem;border:1px solid #64748b;border-radius:.45rem;background:#172033;color:#dbeafe;font-weight:850}.breedingWarning.relationshipUnrelated{border-color:#3b82f6;background:#172554;color:#bfdbfe}.breedingWarning.relationshipCousin{border-color:#eab308;background:#422006;color:#fef08a}.breedingWarning.relationshipParent{border-color:#f59e0b;background:#451a03;color:#fde68a}.breedingWarning.relationshipSibling{border-color:#dc2626;background:#450a0a;color:#fecaca}
+#familyTreeOverlay,#breedingPairOverlay{position:fixed;inset:0;z-index:58;display:flex;align-items:center;justify-content:center;padding:1rem}#familyTreeOverlay.dialogHidden,#breedingPairOverlay.dialogHidden{display:none}
+.familyTreeDialog,.breedingPairDialog{width:min(1040px,calc(100vw - 2rem));max-height:calc(100vh - 2rem);overflow:auto;padding:1rem;border-radius:.85rem;box-shadow:0 18px 60px #000b}.familyTreeDialog h2,.breedingPairDialog h2{margin:0 0 .65rem}.familyGeneration:not(:last-child):after{content:"";position:absolute;right:-.65rem;top:5%;bottom:5%;width:2px}.familyGenerationTitle{text-align:center;font-size:.72rem;font-weight:850;text-transform:uppercase}.familyTreeGraphNode{padding:.45rem;border-radius:.45rem;text-align:left}.familyTreeGraphNode:after{content:"";position:absolute;right:-.65rem;top:50%;width:.65rem;height:2px}.familyGeneration:last-child .familyTreeGraphNode:after{display:none}.familyNodeName{display:block;font-weight:900}.familyNodeMeta{display:block;margin-top:.12rem;font-size:.72rem}.familyTreeRecordDetails{margin-top:.7rem;padding:.65rem;border-radius:.5rem}.dialogActions{display:flex;justify-content:flex-end;gap:.45rem;margin-top:.75rem}.breedingPairGrid{display:grid;grid-template-columns:1fr auto 1fr;gap:.7rem;align-items:center}.breedingParent{padding:.6rem;border-radius:.5rem}.breedingWarning{margin-top:.65rem;padding:.55rem;font-weight:850}
 @media(max-width:900px){#managementBody{grid-template-columns:1fr}.selectedMonsterHeader{grid-template-columns:1fr}.infoColumns{grid-template-columns:1fr}}
 .monsterPortrait{height:auto;overflow:visible}
 .monsterPortraitStatus{white-space:normal;overflow:visible;text-overflow:clip}
-.monsterPortraitControls{gap:.2rem}.portraitDeployControl:has(input:disabled){background:#e5e7eb;color:#6b7280;border-color:#9ca3af}.portraitDeployControl input:disabled{opacity:.55}
+.monsterPortraitControls{gap:.2rem}.portraitDeployControl:has(input:disabled){color:#6b7280}.portraitDeployControl input:disabled{opacity:.55}
 .monsterPortraitTooltip{display:none}
 .monsterPortrait[title]{position:relative}
 .monsterPortraitGrid:empty{display:none}
@@ -1043,9 +988,8 @@ button {
 #monsterExportSection{display:none!important}.exportModeActive .monsterPortrait{cursor:pointer}.portraitExportControl{left:.22rem;bottom:.22rem;z-index:3}.exportModeBar{display:flex;align-items:center;gap:.4rem;padding:.35rem .5rem;border:1px solid #60a5fa;border-radius:.4rem;background:#eff6ff;color:#1e3a8a;font-size:.75rem}.exportModeBar.hidden{display:none}.managementPrimaryActions{align-items:center}
 @media(max-width:1100px){#selectedMonsterPanel{font-size:.76rem;gap:.35rem}.selectedMonsterHeader{grid-template-columns:110px 1fr}.selectedMonsterPortrait{min-height:92px}.selectedMonsterPortrait svg{height:90px}}
 .ageExpectedMarker{display:none!important}
-.nutritionOverlayBar{position:relative;height:1.15rem;border:1px solid #64748b;border-radius:.28rem;background:#ece8df;overflow:hidden}.nutritionOverlayProduction,.nutritionOverlayNeed{position:absolute;left:0;top:0;bottom:0}.nutritionOverlayProduction{background:#d9a441}.nutritionOverlayNeed{background:#355f8a;opacity:.94}.nutritionOverlayLegend{display:flex;justify-content:space-between;gap:.4rem;margin-top:.25rem;font-size:.7rem}.nutritionLegendSwatch{display:inline-block;width:.8rem;height:.8rem;margin-right:.22rem;vertical-align:-.1rem;border-radius:.15rem}.nutritionLegendNeed{background:#355f8a}.nutritionLegendProduction{background:#d9a441}
-.deploymentBlockIcon.tooCold{border-color:#1d4ed8;background:#dbeafe;color:#1d4ed8}.deploymentBlockIcon.tooHot{border-color:#b91c1c;background:#fee2e2;color:#b91c1c}
-#cageViewport.exportModeActive,#rosterList.exportModeActive{background:#dbeafe!important}.exportModeActive .monsterRosterHeading{background:#355f8a}.portraitExportControl{position:static;padding:.08rem .2rem;border:1px solid #1d4ed8;border-radius:.25rem;background:#eff6ff;color:#1e3a8a;font-size:.64rem;font-weight:850;pointer-events:auto}.portraitExportControl input{margin:0}.exportModeBar{position:static!important;outline:none!important;box-shadow:none!important;flex:1 1 auto;min-width:0}.managementPrimaryActions{flex:0 0 auto}#managementActions{position:relative;z-index:3;padding-top:.35rem}.familyTreeGraphNode{position:relative}
+.nutritionOverlayBar{position:relative;height:1.15rem;border-radius:.28rem;background:#ece8df;overflow:hidden}.nutritionOverlayProduction,.nutritionOverlayNeed{position:absolute;left:0;top:0;bottom:0}.nutritionOverlayProduction{background:#d9a441}.nutritionOverlayNeed{background:#355f8a;opacity:.94}.nutritionOverlayLegend{display:flex;justify-content:space-between;gap:.4rem;margin-top:.25rem;font-size:.7rem}.nutritionLegendSwatch{display:inline-block;width:.8rem;height:.8rem;margin-right:.22rem;vertical-align:-.1rem;border-radius:.15rem}.nutritionLegendNeed{background:#355f8a}.nutritionLegendProduction{background:#d9a441}
+.deploymentBlockIcon.tooCold{border-color:#1d4ed8;color:#1d4ed8}.deploymentBlockIcon.tooHot{border-color:#b91c1c;background:#fee2e2;color:#b91c1c}.exportModeActive .monsterRosterHeading{background:#355f8a}.portraitExportControl{position:static;padding:.08rem .2rem;border:1px solid #1d4ed8;border-radius:.25rem;background:#eff6ff;color:#1e3a8a;font-size:.64rem;font-weight:850;pointer-events:auto}.portraitExportControl input{margin:0}.exportModeBar{position:static!important;outline:none!important;box-shadow:none!important;flex:1 1 auto;min-width:0}.managementPrimaryActions{flex:0 0 auto}#managementActions{position:relative;z-index:3;padding-top:.35rem}.familyTreeGraphNode{position:relative}
 .familyTreeDialog{width:min(1500px,calc(100vw - 1rem))!important;height:calc(100vh - 1rem)!important;max-height:none!important;box-sizing:border-box;grid-template-rows:auto minmax(0,1fr) 150px auto!important}
 
 .familyGeneration{position:relative!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-around!important;flex-wrap:nowrap!important;gap:34px!important;min-height:174px!important;padding:36px 10px!important;box-sizing:border-box}
@@ -1066,9 +1010,9 @@ button {
 
 
 
-#optionsOverlay{position:fixed;inset:0;z-index:65;display:flex;align-items:center;justify-content:center;background:rgba(2,6,23,.94);color:#f9fafb}#optionsOverlay.dialogHidden{display:none}#optionsPanel{width:min(440px,calc(100vw - 2rem));border:1px solid #475569;border-radius:.85rem;padding:1rem;background:#111827;box-shadow:0 18px 60px #000a;box-sizing:border-box}#optionsPanel h2{margin:0 0 .8rem;color:#f2c14e}.optionsControl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.7rem;align-items:center;margin:.7rem 0}.optionsControl label{font-weight:800}#musicVolumeInput{width:min(240px,48vw)}#musicVolumeValue{display:inline-block;min-width:3.5rem;text-align:right;color:#cbd5e1;font-variant-numeric:tabular-nums}#optionsActions{display:flex;justify-content:flex-end;margin-top:1rem}
-#preMenuOverlay{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;background:#020617;color:#f8fafc;cursor:pointer;text-align:center}#preMenuOverlay.preMenuHidden{display:none}#preMenuPanel{padding:2rem;max-width:42rem}#preMenuPanel h1{margin:0 0 .65rem;font-size:clamp(2.8rem,8vw,6rem);line-height:1}#preMenuPanel p{margin:0 0 1.7rem;color:#cbd5e1;font-size:clamp(1rem,2.3vw,1.35rem)}#preMenuPanel strong{display:block;margin-top:1.7rem;font-size:1.15rem;animation:preMenuPulse 1.5s ease-in-out infinite}@keyframes preMenuPulse{50%{opacity:.45}}
-#roundHistoryOutcome{margin:.35rem 0 1rem;font-size:clamp(2.4rem,7vw,5.2rem);font-weight:1000;line-height:1;text-align:center;text-transform:uppercase;letter-spacing:.05em}.roundHistoryTable tr.mostRecentRound{outline:2px solid #f2c14e;outline-offset:-2px}.roundHistoryTable tr.mostRecentRound td{font-weight:800}
+#optionsOverlay{position:fixed;inset:0;z-index:65;display:flex;align-items:center;justify-content:center;background:rgba(2,6,23,.94)}#optionsOverlay.dialogHidden{display:none}#optionsPanel{width:min(440px,calc(100vw - 2rem));border-radius:.85rem;padding:1rem;box-shadow:0 18px 60px #000a;box-sizing:border-box}#optionsPanel h2{margin:0 0 .8rem}.optionsControl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.7rem;align-items:center;margin:.7rem 0}.optionsControl label{font-weight:800}#musicVolumeInput{width:min(240px,48vw)}#musicVolumeValue{display:inline-block;min-width:3.5rem;text-align:right;font-variant-numeric:tabular-nums}#optionsActions{display:flex;justify-content:flex-end;margin-top:1rem}
+#preMenuOverlay{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;cursor:pointer;text-align:center}#preMenuOverlay.preMenuHidden{display:none}#preMenuPanel h1{margin:0 0 .65rem;font-size:clamp(2.8rem,8vw,6rem);line-height:1}#preMenuPanel p{margin:0 0 1.7rem;font-size:clamp(1rem,2.3vw,1.35rem)}#preMenuPanel strong{display:block;margin-top:1.7rem;font-size:1.15rem;animation:preMenuPulse 1.5s ease-in-out infinite}@keyframes preMenuPulse{50%{opacity:.45}}
+#roundHistoryOutcome{margin:.35rem 0 1rem;font-size:clamp(2.4rem,7vw,5.2rem);font-weight:1000;line-height:1;text-align:center;text-transform:uppercase;letter-spacing:.05em}.roundHistoryTable tr.mostRecentRound{outline-offset:-2px}.roundHistoryTable tr.mostRecentRound td{font-weight:800}
 #managementDrawer,#managementDrawer.raidDrawer{height:min(72%,calc(100% - 1.5rem))!important;max-height:min(72%,calc(100% - 1.5rem))!important}
 #managementBody{min-height:0!important;overflow:hidden!important}
 #cageViewport,#selectedMonsterPanel{min-height:0!important;height:100%!important;overflow-y:auto!important;overflow-x:hidden!important;scrollbar-gutter:stable}
@@ -1174,7 +1118,6 @@ button, input, select, textarea {
 }
 button {
     border: var(--ui-border-width) solid var(--ui-border-dark);
-    border-radius: var(--ui-radius-small);
     background: var(--ui-accent);
     color: var(--ui-ink);
     box-shadow: var(--ui-shadow-small), var(--ui-inset);
@@ -1297,7 +1240,6 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
 }
 #monsterManagementTab, #viewportTopControls #startSeasonButton {
     border-color: var(--ui-border-dark);
-    border-radius: 0 0 var(--ui-radius-medium) var(--ui-radius-medium);
     background: var(--ui-green);
     color: var(--ui-ink-inverse);
 }
@@ -1361,9 +1303,7 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
     color: var(--ui-ink-inverse);
 }
 #preMenuPanel h1 {
-    color: var(--ui-heading-inverse);
     font-family: var(--ui-font-display);
-    text-shadow: 4px 4px 0 var(--ui-brown-deep);
 }
 #preMenuPanel p, #mainMenuPanel p, #saveLoadDescription,
 #unsavedActionPanel p, #treasureSpendHint { color: var(--ui-ink-faint-inverse); }
@@ -1428,9 +1368,6 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
 #customGameError, #saveLoadMessage, .nutritionShortfall { color: var(--ui-danger); }
 .selectionStatusGood { color: var(--ui-good); }
 .roundHistoryTable th, .roundHistoryTable td { border-bottom-color: var(--ui-border); }
-.roundHistoryTable tr.mostRecentRound { background: var(--ui-parchment-recessed); outline-color: var(--ui-focus); }
-#roundHistoryOutcome.victory { color: var(--ui-good); }
-#roundHistoryOutcome.loss { color: var(--ui-danger); }
 
 /* UI geometry uses deliberately chunky vector edges: more pixels in spirit, not pixel art. */
 .dashboardCard, .monsterPortrait, .managementSection, .saveSlotRow,
@@ -1807,6 +1744,148 @@ html, body, button, input, select, textarea,
 .dashboardFootnote,
 .victoryOrText {
     color: var(--ui-ink);
+}
+
+/* Authoritative non-diegetic theme completion. */
+
+button {
+    border-radius: var(--ui-radius-small) !important;
+}
+
+#preMenuOverlay {
+    background: var(--ui-parchment-dark);
+    color: var(--ui-ink);
+}
+
+#preMenuPanel {
+    max-width: 42rem;
+    padding: 2rem;
+    border: var(--ui-border-width-heavy) solid var(--ui-border-dark);
+    border-radius: var(--ui-radius-medium);
+    background: var(--ui-parchment-light);
+    color: var(--ui-ink);
+    box-shadow: var(--ui-shadow-large), var(--ui-inset);
+}
+
+#preMenuPanel h1 {
+    color: var(--ui-heading);
+    text-shadow: 3px 3px 0 var(--ui-parchment-recessed);
+}
+
+#preMenuPanel p { color: var(--ui-ink-muted); }
+
+#preMenuPanel strong { color: var(--ui-warning); }
+
+#mainMenuOverlay { background: var(--ui-overlay-strong); }
+
+#mainMenuPanel,
+#roundHistoryPanel,
+#statDetailPanel,
+.familyTreeDialog,
+.breedingPairDialog,
+#optionsPanel {
+    border: var(--ui-border-width-heavy) solid var(--ui-border-dark);
+    border-radius: var(--ui-radius-medium);
+    background: var(--ui-parchment-light);
+    color: var(--ui-ink);
+    box-shadow: var(--ui-shadow-large), var(--ui-inset);
+}
+
+#mainMenuPanel h2,
+#roundHistoryPanel h2,
+#statDetailPanel h2,
+.familyTreeDialog h2,
+.breedingPairDialog h2,
+#optionsPanel h2 {
+    color: var(--ui-heading);
+}
+
+#mainMenuPanel p,
+.familyNodeMeta,
+.familyGenerationTitle,
+#musicVolumeValue { color: var(--ui-ink-muted); }
+
+.roundHistoryTable th,
+.roundHistoryTable td { border-bottom-color: var(--ui-border); }
+
+.roundResultBadge {
+    border: 1px solid var(--ui-border-dark);
+    border-radius: var(--ui-radius-small);
+    color: var(--ui-ink-inverse);
+    box-shadow: var(--ui-inset);
+}
+
+.roundResultBadge.win { background: var(--ui-good); }
+
+.roundResultBadge.loss { background: var(--ui-danger); }
+
+.roundHistoryTable tr.mostRecentRound {
+    background: var(--ui-parchment-recessed);
+    outline-color: var(--ui-focus);
+}
+
+#roundHistoryOutcome.victory { color: var(--ui-good); }
+
+#roundHistoryOutcome.loss { color: var(--ui-danger); }
+
+.statChart,
+.statTile,
+.typeTile,
+.familyTreeGraphNode,
+.familyTreeRecordDetails,
+.breedingParent {
+    border-color: var(--ui-border);
+    border-radius: var(--ui-radius-small);
+    background: var(--ui-parchment-bright);
+    color: var(--ui-ink);
+}
+
+.statTile strong { color: var(--ui-warning); }
+
+.statIcon {
+    border: 1px solid var(--ui-border-dark);
+    border-radius: var(--ui-radius-small);
+    background: var(--ui-green-muted);
+    color: var(--ui-ink-inverse);
+}
+
+.barTrack {
+    border: 1px solid var(--ui-border-dark);
+    border-radius: 0;
+    background: var(--ui-brown-deep);
+}
+
+.familyTreeConnections { color: var(--ui-border); }
+
+.familyTreeGraphNode.dead {
+    background: var(--ui-parchment-recessed) !important;
+    color: var(--ui-ink-muted) !important;
+}
+
+.breedingWarning {
+    border-color: var(--ui-warning);
+    border-radius: var(--ui-radius-small);
+    background: var(--ui-parchment-recessed);
+    color: var(--ui-ink);
+}
+
+.breedingWarning.relationshipUnrelated { border-color: var(--ui-info); background: var(--ui-parchment-bright); color: var(--ui-ink); }
+
+.breedingWarning.relationshipCousin { border-color: var(--ui-warning); background: #dfd09f; color: var(--ui-ink); }
+
+.breedingWarning.relationshipParent { border-color: var(--ui-warning); background: #e6d5a6; color: var(--ui-ink); }
+
+.breedingWarning.relationshipSibling { border-color: var(--ui-danger); background: #e2c2ad; color: var(--ui-ink); }
+
+.dashboardCard.statClickable:hover { border-color: var(--ui-accent); }
+
+.dashboardCard.statClickable[data-tooltip]:hover:after,
+.dashboardCard.statClickable[data-tooltip]:focus-visible:after {
+    border-color: var(--ui-border);
+    border-radius: var(--ui-radius-small);
+    background: var(--ui-parchment-bright);
+    color: var(--ui-ink);
+    box-shadow: var(--ui-shadow-small);
 }
 
 </style>
