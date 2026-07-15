@@ -5001,7 +5001,25 @@ html {
     class Bush extends TerrainObject{
         constructor(id, x, y, rng, terrainType, climateClass){
             var variant = rng.integer(0, 8);
-            var radius = terrainType===TERRAIN_TYPE.FOREST ? rng.range(20, 32) : (terrainType===TERRAIN_TYPE.MARSH ? rng.range(18, 28) : rng.range(15, 24));
+            // Bushes span ground clumps through substantial thickets. Small bushes
+            // remain common enough to read as undergrowth, while large specimens
+            // provide visually credible whole-body concealment for agents.
+            var sizeRoll = rng.nextFloat();
+            var radius;
+            if (sizeRoll<0.22){
+                radius = rng.range(14, 23);
+            } else if (sizeRoll<0.76){
+                radius = rng.range(23, 38);
+            } else{
+                radius = rng.range(38, 54);
+            }
+            if (terrainType===TERRAIN_TYPE.FOREST){
+                radius*=1.08;
+            } else if (terrainType===TERRAIN_TYPE.MARSH){
+                radius*=1.03;
+            } else{
+                radius*=0.96;
+            }
             super(id, 'bush', x, y, radius, false);
             var profile = BushVisualProfileForTerrain(terrainType, variant, climateClass);
             this.blockingRadius = 0;
@@ -19547,7 +19565,7 @@ html {
         AddRegressionResult(results, 'Temperate wooded maps generate passable vision-blocking bushes', bushCount>0 && bushWorld.terrainObjects.some(function (object){ return object.type==='bush' && object.blocksMovement===false && object.blocksVisionAmount>0; }), 'bushes='+bushCount);
 
         var sampleBush = bushWorld.terrainObjects.find(function (object){ return object.type==='bush'; });
-        AddRegressionResult(results, 'Generated bushes are shrub-sized cover rather than tree canopies or ground clumps', !!sampleBush && sampleBush.radius>=14 && sampleBush.radius<=34 && sampleBush.visionTopHeight>=7 && sampleBush.visionTopHeight<=30 && !!sampleBush.primaryColour && !!sampleBush.camouflageProfile, 'radius='+(sampleBush ? sampleBush.radius.toFixed(1) : 'none')+', top='+(sampleBush ? sampleBush.visionTopHeight.toFixed(1) : 'none'));
+        AddRegressionResult(results, 'Generated bushes are shrub-sized cover rather than tree canopies or ground clumps', !!sampleBush && sampleBush.radius>=13 && sampleBush.radius<=59 && sampleBush.visionTopHeight>=7 && sampleBush.visionTopHeight<=30 && !!sampleBush.primaryColour && !!sampleBush.camouflageProfile, 'radius='+(sampleBush ? sampleBush.radius.toFixed(1) : 'none')+', top='+(sampleBush ? sampleBush.visionTopHeight.toFixed(1) : 'none'));
         var bushCamouflageMonster = new Monster('bush_camouflage_monster', sampleBush ? sampleBush.x : 0, sampleBush ? sampleBush.y : 0, new SeededRng(424290), {});
         bushCamouflageMonster.deployed = true;
         bushCamouflageMonster.phenotype.colour.camouflageHue = sampleBush && sampleBush.camouflageProfile ? sampleBush.camouflageProfile.hue : 120;
@@ -23278,16 +23296,36 @@ html {
         ctx.fill();
         ctx.restore();
     }
-    function DrawTreeTrunk(o){
+    function TreeRenderGeometry(o){
         var p = EntityScreenPoint(o.x, o.y);
         var r = o.radius || 28;
         var kind = o.treeKind || 'deciduous';
+        var heightPhase = StablePhase((o.id || 'tree')+'_height');
+        var leanPhase = StablePhase((o.id || 'tree')+'_lean');
+        var trunkHeight = kind==='palm' ? r*2.45 : r*(1.58+heightPhase*0.34);
+        var lean = (leanPhase-0.5)*r*0.30;
+        return {
+            p : p,
+            r : r,
+            kind : kind,
+            trunkHeight : trunkHeight,
+            trunkWidth : kind==='palm' ? Math.max(4, r*0.16) : Math.max(6, r*0.27),
+            lean : lean,
+            crownX : p.x+lean,
+            crownY : p.y-trunkHeight
+        } ;
+    }
+    function DrawTreeTrunk(o){
+        var geometry = TreeRenderGeometry(o);
+        var p = geometry.p;
+        var r = geometry.r;
+        var kind = geometry.kind;
         if (kind==='cactus' || kind==='desertScrub'){
             return;
         }
-        var trunkHeight = kind==='palm' ? r*2.45 : r*(1.35+StablePhase((o.id || 'tree')+'_height')*0.45);
-        var trunkWidth = kind==='palm' ? Math.max(4, r*0.16) : Math.max(6, r*0.27);
-        var lean = (StablePhase((o.id || 'tree')+'_lean')-0.5)*r*0.30;
+        var trunkHeight = geometry.trunkHeight;
+        var trunkWidth = geometry.trunkWidth;
+        var lean = geometry.lean;
         ctx.save();
         ctx.strokeStyle = kind==='palm' ? '#765435' : '#4d3826';
         ctx.lineCap = 'round';
@@ -23295,62 +23333,89 @@ html {
         ctx.lineWidth = trunkWidth;
         ctx.beginPath();
         ctx.moveTo(p.x, p.y+2);
-        ctx.bezierCurveTo(p.x-lean*0.2, p.y-trunkHeight*0.35, p.x+lean*0.55, p.y-trunkHeight*0.72, p.x+lean, p.y-trunkHeight);
+        ctx.bezierCurveTo(p.x-lean*0.2, p.y-trunkHeight*0.35, p.x+lean*0.55, p.y-trunkHeight*0.72, geometry.crownX, geometry.crownY);
         ctx.stroke();
         ctx.strokeStyle = kind==='palm' ? '#a07a4c' : '#79573a';
         ctx.lineWidth = Math.max(1.4, trunkWidth*0.28);
         ctx.beginPath();
         ctx.moveTo(p.x-trunkWidth*0.18, p.y);
-        ctx.bezierCurveTo(p.x-lean*0.15, p.y-trunkHeight*0.35, p.x+lean*0.37, p.y-trunkHeight*0.72, p.x+lean-trunkWidth*0.18, p.y-trunkHeight);
+        ctx.bezierCurveTo(p.x-lean*0.15, p.y-trunkHeight*0.35, p.x+lean*0.37, p.y-trunkHeight*0.72, geometry.crownX-trunkWidth*0.18, geometry.crownY);
         ctx.stroke();
-        if (kind!=='palm'){
+        var treeState = TreeSnowState(o);
+        // This condition is the renderer's structural guarantee: exposed branch
+        // geometry exists only for leafless deciduous trees in winter. A tree that
+        // has any canopy never draws the exposed branch layer at all, so branches
+        // cannot protrude beyond or show through a canopy regardless of size, lean,
+        // crown shape, zoom level or future canopy geometry changes.
+        var drawExposedBranches = kind==='deciduous' && treeState.season==='winter';
+        if (drawExposedBranches){
             ctx.strokeStyle = '#5c402b';
-            ctx.lineWidth = Math.max(2, trunkWidth*0.42);
+            ctx.lineCap = 'round';
             for (var branch=0; branch<5; branch+=1){
                 var side = branch%2 ? 1 : -1;
-                var t = 0.48+branch*0.085;
+                var t = 0.40+branch*0.105;
                 var bx = p.x+lean*t;
                 var by = p.y-trunkHeight*t;
+                var length = r*(0.72-branch*0.065);
+                var rise = r*(0.30+branch*0.045);
+                var branchEndX = bx+side*length;
+                var branchEndY = by-rise;
+                ctx.lineWidth = Math.max(1.8, trunkWidth*(0.46-branch*0.035));
                 ctx.beginPath();
                 ctx.moveTo(bx, by);
-                ctx.quadraticCurveTo(bx+side*r*0.30, by-r*0.15, bx+side*r*(0.55+branch*0.04), by-r*(0.30+branch*0.04));
+                ctx.quadraticCurveTo(bx+side*length*0.42, by-rise*0.30, branchEndX, branchEndY);
+                ctx.stroke();
+                ctx.lineWidth = Math.max(1.2, trunkWidth*0.22);
+                ctx.beginPath();
+                ctx.moveTo(branchEndX-side*length*0.28, branchEndY+rise*0.22);
+                ctx.lineTo(branchEndX-side*length*0.05, branchEndY-r*0.20);
+                ctx.moveTo(branchEndX-side*length*0.40, branchEndY+rise*0.31);
+                ctx.lineTo(branchEndX-side*length*0.16, branchEndY+r*0.02);
                 ctx.stroke();
             }
+            // A tapered central leader makes a leafless deciduous crown read as one
+            // tree rather than as detached sticks when the winter canopy is absent.
+            ctx.lineWidth = Math.max(1.4, trunkWidth*0.28);
+            ctx.beginPath();
+            ctx.moveTo(geometry.crownX, geometry.crownY+r*0.14);
+            ctx.quadraticCurveTo(geometry.crownX-lean*0.18, geometry.crownY-r*0.25, geometry.crownX+lean*0.08, geometry.crownY-r*0.48);
+            ctx.stroke();
         }
         ctx.restore();
     }
     function DrawTreeCanopy(o){
-        var p=EntityScreenPoint(o.x,o.y);var r=o.radius||28;var state=TreeSnowState(o);var kind=o.treeKind||'deciduous';
+        var geometry=TreeRenderGeometry(o);var p=geometry.p;var r=geometry.r;var state=TreeSnowState(o);var kind=geometry.kind;
+        if(kind==='deciduous' && state.season==='winter'){
+            return;
+        }
         if(kind==='desertScrub'){DrawOrganicClosedPath([{x:p.x-r*0.8,y:p.y-3},{x:p.x-r*0.5,y:p.y-r*0.45},{x:p.x,y:p.y-r*0.62},{x:p.x+r*0.72,y:p.y-r*0.36},{x:p.x+r*0.84,y:p.y-2}],'#74724b','#4f5035',1.7);return;}
         if(kind==='cactus'){ctx.strokeStyle='#315f3b';ctx.lineCap='round';ctx.lineWidth=Math.max(8,r*0.34);ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x,p.y-r*2.1);ctx.stroke();ctx.lineWidth=Math.max(6,r*0.23);ctx.beginPath();ctx.moveTo(p.x,p.y-r*1.15);ctx.lineTo(p.x-r*0.65,p.y-r*1.15);ctx.lineTo(p.x-r*0.65,p.y-r*1.55);ctx.moveTo(p.x,p.y-r*0.85);ctx.lineTo(p.x+r*0.62,p.y-r*0.85);ctx.lineTo(p.x+r*0.62,p.y-r*1.25);ctx.stroke();return;}
         var palette={winter:state.snowy?'#e7eef0':'#365039',spring:'#69aa55',summer:'#2f6b3a',autumn:'#b86b20'};var colour=(kind==='evergreen'||kind==='tropicalEvergreen'||kind==='palm')?palette.summer:(palette[state.season]||palette.summer);
         if(kind==='palm'){
-            for(var f=0;f<8;f+=1){var a=-Math.PI+f*Math.PI*2/8;ctx.strokeStyle=f%2?colour:VectorShade(colour,12);ctx.lineWidth=Math.max(4,r*0.13);ctx.lineCap='round';ctx.beginPath();ctx.moveTo(p.x,p.y-r*2.40);ctx.quadraticCurveTo(p.x+Math.cos(a)*r*0.60,p.y-r*2.48+Math.sin(a)*r*0.18,p.x+Math.cos(a)*r*1.05,p.y-r*2.18+Math.sin(a)*r*0.42);ctx.stroke();}return;
+            for(var f=0;f<8;f+=1){var a=-Math.PI+f*Math.PI*2/8;ctx.strokeStyle=f%2?colour:VectorShade(colour,12);ctx.lineWidth=Math.max(4,r*0.13);ctx.lineCap='round';ctx.beginPath();ctx.moveTo(geometry.crownX,geometry.crownY);ctx.quadraticCurveTo(geometry.crownX+Math.cos(a)*r*0.60,geometry.crownY-r*0.08+Math.sin(a)*r*0.18,geometry.crownX+Math.cos(a)*r*1.05,geometry.crownY+r*0.22+Math.sin(a)*r*0.42);ctx.stroke();}return;
         }
         if(kind==='evergreen'){
-            for(var t=0;t<3;t+=1){var y=p.y-r*(1.90-t*0.43);var w=r*(0.46+t*0.22);ctx.fillStyle=t%2?colour:VectorShade(colour,-8);ctx.beginPath();ctx.moveTo(p.x,y-r*0.45);ctx.lineTo(p.x-w,y+r*0.48);ctx.quadraticCurveTo(p.x,y+r*0.32,p.x+w,y+r*0.48);ctx.closePath();ctx.fill();}return;
+            for(var t=0;t<3;t+=1){var y=geometry.crownY+r*(0.08+t*0.43);var w=r*(0.46+t*0.22);ctx.fillStyle=t%2?colour:VectorShade(colour,-8);ctx.beginPath();ctx.moveTo(geometry.crownX,y-r*0.45);ctx.lineTo(geometry.crownX-w,y+r*0.48);ctx.quadraticCurveTo(geometry.crownX,y+r*0.32,geometry.crownX+w,y+r*0.48);ctx.closePath();ctx.fill();}return;
         }
-        // One coherent crown silhouette is cleaner than a pile of overlapping circles.
-        var crownY=kind==='tropicalEvergreen'?p.y-r*1.56:p.y-r*1.48;var width=kind==='tropicalEvergreen'?r*1.12:r*0.94;var depth=kind==='tropicalEvergreen'?r*0.82:r*0.72;
-        DrawOrganicClosedPath([{x:p.x-width,y:crownY+depth*0.32},{x:p.x-width*0.76,y:crownY-depth*0.40},{x:p.x-width*0.26,y:crownY-depth*0.78},{x:p.x+width*0.23,y:crownY-depth*0.72},{x:p.x+width*0.82,y:crownY-depth*0.34},{x:p.x+width,y:crownY+depth*0.24},{x:p.x+width*0.54,y:crownY+depth*0.67},{x:p.x-width*0.42,y:crownY+depth*0.70}],colour,'#24452d',1.4);
-        DrawOrganicClosedPath([{x:p.x-width*0.72,y:crownY+depth*0.12},{x:p.x-width*0.42,y:crownY-depth*0.45},{x:p.x+width*0.10,y:crownY-depth*0.58},{x:p.x+width*0.56,y:crownY-depth*0.18},{x:p.x+width*0.42,y:crownY+depth*0.22},{x:p.x-width*0.10,y:crownY+depth*0.32}],VectorShade(colour,10),null,0);
+        var crownY=geometry.crownY+r*(kind==='tropicalEvergreen'?0.13:0.17);var width=kind==='tropicalEvergreen'?r*1.12:r*0.94;var depth=kind==='tropicalEvergreen'?r*0.82:r*0.72;
+        DrawOrganicClosedPath([{x:geometry.crownX-width,y:crownY+depth*0.32},{x:geometry.crownX-width*0.76,y:crownY-depth*0.40},{x:geometry.crownX-width*0.26,y:crownY-depth*0.78},{x:geometry.crownX+width*0.23,y:crownY-depth*0.72},{x:geometry.crownX+width*0.82,y:crownY-depth*0.34},{x:geometry.crownX+width,y:crownY+depth*0.24},{x:geometry.crownX+width*0.54,y:crownY+depth*0.67},{x:geometry.crownX-width*0.42,y:crownY+depth*0.70}],colour,'#24452d',1.4);
+        DrawOrganicClosedPath([{x:geometry.crownX-width*0.72,y:crownY+depth*0.12},{x:geometry.crownX-width*0.42,y:crownY-depth*0.45},{x:geometry.crownX+width*0.10,y:crownY-depth*0.58},{x:geometry.crownX+width*0.56,y:crownY-depth*0.18},{x:geometry.crownX+width*0.42,y:crownY+depth*0.22},{x:geometry.crownX-width*0.10,y:crownY+depth*0.32}],VectorShade(colour,10),null,0);
     }
-    
 
     function DrawBush(o){
         var p=EntityScreenPoint(o.x,o.y);var r=o.radius||22;var kind=o.bushKind||'bush';
         var primary=o.primaryColour||'#315f38';var secondary=o.secondaryColour||'#406f3d';var dark=o.darkColour||'#203f28';
         ctx.save();DrawVectorShadow(p.x,p.y-1,r*0.86,r*0.18,0.14);
         if(kind==='reed thicket'){
-            for(var i=0;i<9;i+=1){var f=i/8-0.5;var h=r*(0.72+StablePhase((o.id||'reed')+'_'+i)*0.34);ctx.strokeStyle=i%2?primary:secondary;ctx.lineWidth=2.3;ctx.beginPath();ctx.moveTo(p.x+f*r*1.15,p.y);ctx.quadraticCurveTo(p.x+f*r*1.07,p.y-h*0.55,p.x+f*r*0.95,p.y-h);ctx.stroke();}
+            for(var i=0;i<11;i+=1){var f=i/10-0.5;var h=r*(0.82+StablePhase((o.id||'reed')+'_'+i)*0.42);ctx.strokeStyle=i%2?primary:secondary;ctx.lineWidth=Math.max(2.3,r*0.075);ctx.beginPath();ctx.moveTo(p.x+f*r*1.35,p.y);ctx.quadraticCurveTo(p.x+f*r*1.24,p.y-h*0.55,p.x+f*r*1.08,p.y-h);ctx.stroke();}
         }else{
-            DrawOrganicClosedPath([{x:p.x-r*0.96,y:p.y-2},{x:p.x-r*0.86,y:p.y-r*0.52},{x:p.x-r*0.46,y:p.y-r*0.86},{x:p.x-r*0.05,y:p.y-r*1.02},{x:p.x+r*0.48,y:p.y-r*0.82},{x:p.x+r*0.92,y:p.y-r*0.44},{x:p.x+r*0.98,y:p.y-1}],dark,null,0);
-            DrawOrganicClosedPath([{x:p.x-r*0.82,y:p.y-r*0.14},{x:p.x-r*0.65,y:p.y-r*0.58},{x:p.x-r*0.24,y:p.y-r*0.85},{x:p.x+r*0.12,y:p.y-r*0.92},{x:p.x+r*0.63,y:p.y-r*0.66},{x:p.x+r*0.84,y:p.y-r*0.20}],primary,null,0);
-            DrawOrganicClosedPath([{x:p.x-r*0.48,y:p.y-r*0.50},{x:p.x-r*0.18,y:p.y-r*0.89},{x:p.x+r*0.28,y:p.y-r*0.80},{x:p.x+r*0.58,y:p.y-r*0.45},{x:p.x+r*0.10,y:p.y-r*0.32}],secondary,null,0);
-            DrawVectorHighlight(p.x-r*0.24,p.y-r*0.72,r*0.30,r*0.10,-0.25,0.14);
-            if(kind==='holly brake'){ctx.fillStyle='#a92836';for(var b=0;b<5;b+=1){var a=b*2.35;ctx.beginPath();ctx.arc(p.x+Math.cos(a)*r*0.50,p.y-r*0.55+Math.sin(a)*r*0.28,2.2,0,Math.PI*2);ctx.fill();}}
-            if(kind==='gorse brake'){ctx.fillStyle='#dbc13c';for(var g=0;g<6;g+=1){var ga=g*2.1;ctx.beginPath();ctx.arc(p.x+Math.cos(ga)*r*0.58,p.y-r*0.52+Math.sin(ga)*r*0.30,2,0,Math.PI*2);ctx.fill();}}
-            if(kind==='hawthorn scrub'){ctx.fillStyle='#eee6cf';for(var h=0;h<5;h+=1){var ha=h*2.25;ctx.beginPath();ctx.arc(p.x+Math.cos(ha)*r*0.54,p.y-r*0.58+Math.sin(ha)*r*0.27,2,0,Math.PI*2);ctx.fill();}}
+            DrawOrganicClosedPath([{x:p.x-r*1.08,y:p.y-2},{x:p.x-r*0.92,y:p.y-r*0.60},{x:p.x-r*0.48,y:p.y-r*0.98},{x:p.x-r*0.05,y:p.y-r*1.14},{x:p.x+r*0.52,y:p.y-r*0.92},{x:p.x+r*0.98,y:p.y-r*0.50},{x:p.x+r*1.10,y:p.y-1}],dark,null,0);
+            DrawOrganicClosedPath([{x:p.x-r*0.92,y:p.y-r*0.14},{x:p.x-r*0.70,y:p.y-r*0.66},{x:p.x-r*0.24,y:p.y-r*0.98},{x:p.x+r*0.14,y:p.y-r*1.04},{x:p.x+r*0.70,y:p.y-r*0.74},{x:p.x+r*0.94,y:p.y-r*0.20}],primary,null,0);
+            DrawOrganicClosedPath([{x:p.x-r*0.54,y:p.y-r*0.56},{x:p.x-r*0.18,y:p.y-r*1.00},{x:p.x+r*0.30,y:p.y-r*0.90},{x:p.x+r*0.64,y:p.y-r*0.50},{x:p.x+r*0.10,y:p.y-r*0.34}],secondary,null,0);
+            DrawVectorHighlight(p.x-r*0.24,p.y-r*0.82,r*0.32,r*0.11,-0.25,0.14);
+            if(kind==='holly brake'){ctx.fillStyle='#a92836';for(var b=0;b<7;b+=1){var a=b*2.35;ctx.beginPath();ctx.arc(p.x+Math.cos(a)*r*0.56,p.y-r*0.62+Math.sin(a)*r*0.32,Math.max(2.2,r*0.055),0,Math.PI*2);ctx.fill();}}
+            if(kind==='gorse brake'){ctx.fillStyle='#dbc13c';for(var g=0;g<8;g+=1){var ga=g*2.1;ctx.beginPath();ctx.arc(p.x+Math.cos(ga)*r*0.64,p.y-r*0.58+Math.sin(ga)*r*0.34,Math.max(2,r*0.05),0,Math.PI*2);ctx.fill();}}
+            if(kind==='hawthorn scrub'){ctx.fillStyle='#eee6cf';for(var h=0;h<7;h+=1){var ha=h*2.25;ctx.beginPath();ctx.arc(p.x+Math.cos(ha)*r*0.60,p.y-r*0.64+Math.sin(ha)*r*0.31,Math.max(2,r*0.05),0,Math.PI*2);ctx.fill();}}
         }
         ctx.restore();
     }
@@ -24630,7 +24695,7 @@ html {
         return selectedObject && selectedObject.kind===kind && selectedObject.obj && selectedObject.obj.id===obj.id;
     }
     function SelectionKindForRenderable(kind){
-        return(kind==='obstacle' || kind==='treeTrunk' || kind==='treeCanopy' || kind==='bushOverlay') ? 'worldObject' : kind;
+        return(kind==='obstacle' || kind==='tree' || kind==='bush' || kind==='treeTrunk' || kind==='treeCanopy' || kind==='bushOverlay') ? 'worldObject' : kind;
     }
     // ============================================================================
     // MODULE: RAID SCENE COMPOSITION
@@ -24668,29 +24733,24 @@ html {
         }
         DrawTerrainCliffFacesForVisibleTiles(s, visibleTerrainTiles);
         var renderables = [];
-        var bushOverlays = [];
-        var treeCanopyOverlays = [];
         (s.obstacles || []).forEach(function (o){
             if (o.carriedById){
                 return;
             }
             if (o.type==='tree'){
                 renderables.push({
-                    sort : o.x+o.y-4,
-                    kind : 'treeTrunk',
-                    obj : o
-                } );
-                treeCanopyOverlays.push({
-                    sort : o.x+o.y+50,
-                    kind : 'treeCanopy',
+                    sort : o.x+o.y,
+                    kind : 'tree',
                     obj : o
                 } );
                 return;
             }
             if (o.type==='bush'){
-                bushOverlays.push({
-                    sort : o.x+o.y+22,
-                    kind : 'bushOverlay',
+                renderables.push({
+                    // Bushes share the same grounded depth axis as agent feet. An
+                    // agent with feet in front of the bush is therefore drawn later.
+                    sort : o.x+o.y,
+                    kind : 'bush',
                     obj : o
                 } );
                 return;
@@ -24757,7 +24817,10 @@ html {
                 ctx.save();
                 ctx.filter = 'saturate(0.25) brightness(1.5)';
             }
-            if (r.kind==='treeTrunk')DrawTreeTrunk(r.obj);
+            if (r.kind==='tree'){
+                DrawTreeTrunk(r.obj);
+                DrawTreeCanopy(r.obj);
+            } else if (r.kind==='bush')DrawBush(r.obj);
             else if (r.kind==='obstacle'){
                 if (r.obj.type==='microfauna')DrawMicrofaunaEmitter(r.obj, now);
                 else if (r.obj.type==='stick')DrawStick(r.obj);
@@ -24768,34 +24831,6 @@ html {
             else if (r.kind==='monster')DrawMonster(r.obj, now);
             else if (r.kind==='adventurer')DrawAdventurer(r.obj, now);
             else DrawGroundRemain(r.obj, r.obj.agentKind || 'adventurer');
-            if (selectedForBrightness){
-                ctx.restore();
-            }
-        } );
-        bushOverlays.sort(function (a, b){
-            return a.sort-b.sort;
-        } );
-        bushOverlays.forEach(function (r){
-            var selectedForBrightness = IsSelectedRenderObject(SelectionKindForRenderable('bushOverlay'), r.obj);
-            if (selectedForBrightness){
-                ctx.save();
-                ctx.filter = 'saturate(0.25) brightness(1.5)';
-            }
-            DrawBush(r.obj);
-            if (selectedForBrightness){
-                ctx.restore();
-            }
-        } );
-        treeCanopyOverlays.sort(function (a, b){
-            return a.sort-b.sort;
-        } );
-        treeCanopyOverlays.forEach(function (r){
-            var selectedForBrightness = IsSelectedRenderObject(SelectionKindForRenderable('treeCanopy'), r.obj);
-            if (selectedForBrightness){
-                ctx.save();
-                ctx.filter = 'saturate(0.25) brightness(1.5)';
-            }
-            DrawTreeCanopy(r.obj);
             if (selectedForBrightness){
                 ctx.restore();
             }
