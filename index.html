@@ -1948,6 +1948,83 @@ button {
     scrollbar-gutter:stable!important;
 }
 .characteristicHelpItem{cursor:help}
+
+/* ========================================================================== */
+/* SHARED THEMED TOOLTIPS AND SCROLLBARS                                      */
+/* Native title bubbles are replaced by one immediate, theme-aware tooltip.   */
+/* Scrollbar colours live beside the other theme tokens and apply everywhere. */
+/* ========================================================================== */
+:root {
+    --ui-tooltip-background: var(--ui-green-deep);
+    --ui-tooltip-text: var(--ui-ink-inverse);
+    --ui-scrollbar-track: var(--ui-parchment-recessed);
+    --ui-scrollbar-thumb: var(--ui-brown-light);
+    --ui-scrollbar-thumb-hover: var(--ui-brown);
+    --ui-scrollbar-size: 14px;
+}
+
+#uiTooltip {
+    position: fixed;
+    z-index: 3000;
+    display: none;
+    max-width: min(28rem, calc(100vw - 1.5rem));
+    box-sizing: border-box;
+    padding: 0.45rem 0.6rem;
+    border: var(--ui-border-width) solid var(--ui-border-dark);
+    border-radius: var(--ui-radius-small);
+    background: var(--ui-tooltip-background);
+    color: var(--ui-tooltip-text);
+    box-shadow: var(--ui-shadow-medium), var(--ui-inset);
+    font-family: var(--ui-font-body);
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.32;
+    letter-spacing: 0.01em;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+    pointer-events: none;
+}
+
+#uiTooltip.tooltipVisible {
+    display: block;
+}
+
+html {
+    scrollbar-color: var(--ui-scrollbar-thumb) var(--ui-scrollbar-track);
+    scrollbar-width: auto;
+}
+
+* {
+    scrollbar-color: var(--ui-scrollbar-thumb) var(--ui-scrollbar-track);
+    scrollbar-width: auto;
+}
+
+*::-webkit-scrollbar {
+    width: var(--ui-scrollbar-size);
+    height: var(--ui-scrollbar-size);
+}
+
+*::-webkit-scrollbar-track {
+    background: var(--ui-scrollbar-track);
+    border: 1px solid var(--ui-border);
+}
+
+*::-webkit-scrollbar-thumb {
+    min-width: 2rem;
+    min-height: 2rem;
+    border: 3px solid var(--ui-scrollbar-track);
+    border-radius: 0;
+    background: var(--ui-scrollbar-thumb);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: var(--ui-scrollbar-thumb-hover);
+}
+
+*::-webkit-scrollbar-corner {
+    background: var(--ui-scrollbar-track);
+}
+
 </style>
 </head>
 <body>
@@ -2158,6 +2235,7 @@ button {
 </div>
 <input id="directMonsterImportFile" type="file" accept="application/json,.json" multiple aria-hidden="true">
 <div id="gameToast" role="status" aria-live="polite"></div>
+<div id="uiTooltip" role="tooltip" aria-hidden="true"></div>
 <script id="simulationWorkerSource" type="text/plain">
 // SPDX-License-Identifier: GPL-3.0-only
 // @ts-check
@@ -20611,6 +20689,167 @@ button {
 ());
 </script>
 <script>
+
+    // ========================================================================
+    // MODULE: SHARED THEMED TOOLTIPS
+    // ========================================================================
+    // Convert title attributes into a single immediate tooltip. Event delegation
+    // also covers controls and cards created later by renderer updates.
+    (function InitialiseThemedTooltips(){
+        if (!document || typeof document.addEventListener !== 'function'){
+            return;
+        }
+        var tooltip = document.getElementById('uiTooltip');
+        if (!tooltip){
+            return;
+        }
+        var activeTarget = null;
+        var pointerX = 0;
+        var pointerY = 0;
+        var TOOLTIP_OFFSET = 12;
+        var VIEWPORT_MARGIN = 8;
+
+        function TooltipTargetFrom(node){
+            while (node && node !== document){
+                if (node.nodeType === 1){
+                    if (node.hasAttribute('title')){
+                        var nativeText = node.getAttribute('title');
+                        if (nativeText){
+                            node.setAttribute('data-ui-tooltip', nativeText);
+                        }
+                        node.removeAttribute('title');
+                    }
+                    if (node.hasAttribute('data-ui-tooltip') && node.getAttribute('data-ui-tooltip')){
+                        return node;
+                    }
+                }
+                node = node.parentNode;
+            }
+            return null;
+        }
+
+        function ConvertNativeTitles(root){
+            if (!root || root.nodeType !== 1){
+                return;
+            }
+            if (root.hasAttribute('title')){
+                var rootTitle = root.getAttribute('title');
+                if (rootTitle){
+                    root.setAttribute('data-ui-tooltip', rootTitle);
+                }
+                root.removeAttribute('title');
+            }
+            if (typeof root.querySelectorAll === 'function'){
+                var titledElements = root.querySelectorAll('[title]');
+                for (var i = 0; i < titledElements.length; i += 1){
+                    var elementTitle = titledElements[i].getAttribute('title');
+                    if (elementTitle){
+                        titledElements[i].setAttribute('data-ui-tooltip', elementTitle);
+                    }
+                    titledElements[i].removeAttribute('title');
+                }
+            }
+        }
+
+        function PositionTooltip(){
+            if (!activeTarget || !tooltip.classList.contains('tooltipVisible')){
+                return;
+            }
+            var viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+            var viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+            var bounds = tooltip.getBoundingClientRect();
+            var left = Math.min(pointerX + TOOLTIP_OFFSET, viewportWidth - bounds.width - VIEWPORT_MARGIN);
+            var top = Math.min(pointerY + TOOLTIP_OFFSET, viewportHeight - bounds.height - VIEWPORT_MARGIN);
+            tooltip.style.left = Math.max(VIEWPORT_MARGIN, left) + 'px';
+            tooltip.style.top = Math.max(VIEWPORT_MARGIN, top) + 'px';
+        }
+
+        function ShowTooltip(target, clientX, clientY){
+            var text = target ? target.getAttribute('data-ui-tooltip') : '';
+            if (!text){
+                return;
+            }
+            activeTarget = target;
+            pointerX = Number.isFinite(clientX) ? clientX : VIEWPORT_MARGIN;
+            pointerY = Number.isFinite(clientY) ? clientY : VIEWPORT_MARGIN;
+            tooltip.textContent = text;
+            tooltip.classList.add('tooltipVisible');
+            tooltip.setAttribute('aria-hidden', 'false');
+            PositionTooltip();
+        }
+
+        function HideTooltip(target){
+            if (target && activeTarget !== target){
+                return;
+            }
+            activeTarget = null;
+            tooltip.classList.remove('tooltipVisible');
+            tooltip.setAttribute('aria-hidden', 'true');
+        }
+
+        ConvertNativeTitles(document.documentElement);
+
+        document.addEventListener('pointerover', function(event){
+            var target = TooltipTargetFrom(event.target);
+            if (target){
+                ShowTooltip(target, event.clientX, event.clientY);
+            }
+        }, true);
+        document.addEventListener('pointermove', function(event){
+            if (activeTarget){
+                pointerX = event.clientX;
+                pointerY = event.clientY;
+                PositionTooltip();
+            }
+        }, true);
+        document.addEventListener('pointerout', function(event){
+            if (!activeTarget){
+                return;
+            }
+            var nextTarget = TooltipTargetFrom(event.relatedTarget);
+            if (nextTarget !== activeTarget){
+                HideTooltip(activeTarget);
+            }
+        }, true);
+        document.addEventListener('focusin', function(event){
+            var target = TooltipTargetFrom(event.target);
+            if (target){
+                var bounds = target.getBoundingClientRect();
+                ShowTooltip(target, bounds.left, bounds.bottom);
+            }
+        }, true);
+        document.addEventListener('focusout', function(event){
+            if (activeTarget && event.target === activeTarget){
+                HideTooltip(activeTarget);
+            }
+        }, true);
+        document.addEventListener('keydown', function(event){
+            if (event.key === 'Escape'){
+                HideTooltip();
+            }
+        }, true);
+
+        if (typeof MutationObserver === 'function'){
+            var observer = new MutationObserver(function(records){
+                for (var i = 0; i < records.length; i += 1){
+                    if (records[i].type === 'attributes'){
+                        ConvertNativeTitles(records[i].target);
+                    } else {
+                        for (var j = 0; j < records[i].addedNodes.length; j += 1){
+                            ConvertNativeTitles(records[i].addedNodes[j]);
+                        }
+                    }
+                }
+            });
+            observer.observe(document.documentElement, {
+                attributes: true,
+                attributeFilter: ['title'],
+                childList: true,
+                subtree: true
+            });
+        }
+    }());
+
 // SPDX-License-Identifier: GPL-3.0-only
 // @ts-check
 (function (){
