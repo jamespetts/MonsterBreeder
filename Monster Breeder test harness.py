@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
 from pathlib import Path
-import json
 import re
 import subprocess
 import sys
@@ -10,16 +9,7 @@ import tempfile
 def FindHtmlPath():
     if len(sys.argv) > 1:
         return Path(sys.argv[1])
-    candidates = [
-        Path('monster_breeder_round_end_stats_20260704.html'),
-        Path('monster_breeder_fixes_20260703_2315.html'),
-        Path('monster_breeder_round_season_pathfinding_20260703.html'),
-        Path('index.html'),
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return candidates[-1]
+    return Path('index.html')
 
 
 def ExtractScripts(html):
@@ -44,9 +34,9 @@ def RunNodeCheck(path):
 
 
 def RunWorkerRegression(workerPath):
-    # Keep this harness deliberately short. It is a fast smoke/regression gate
-    # intended to finish comfortably in constrained Copilot/container runs.
-    # Large-map and long-raid soak tests should be separate opt-in diagnostics.
+    # This is the default smoke/regression gate. Runtime depends heavily on
+    # world-generation cost and may exceed short CI or container execution limits.
+    # Large-map and long-raid soak tests remain separate opt-in diagnostics.
     nodeSource = r'''
 const fs = require('fs');
 const vm = require('vm');
@@ -69,9 +59,9 @@ if (!result.payload.regressionTests || !result.payload.regressionTests.passed) {
     process.exit(3);
 }
 '''
-    runner = Path('monster_breeder_node_regression_runner_20260703_2327.js')
+    runner = workerPath.parent / 'workerRegressionRunner.js'
     runner.write_text(nodeSource, encoding='utf-8')
-    result = subprocess.run(['node', str(runner), str(workerPath)], capture_output=True, text=True, timeout=120)
+    result = subprocess.run(['node', str(runner), str(workerPath)], capture_output=True, text=True, timeout=300)
     if result.stdout:
         print(result.stdout)
     if result.stderr:
@@ -193,7 +183,7 @@ if (operations.length < 50 || pathCount < 10 || fillCount < 10) {
     throw new Error('Renderer smoke test did not draw enough terrain operations: ' + JSON.stringify(result));
 }
 '''
-    runner = Path('monster_breeder_main_renderer_smoke_20260705_1140.js')
+    runner = workerPath.parent / 'mainRendererSmokeRunner.js'
     runner.write_text(nodeSource, encoding='utf-8')
     result = subprocess.run(['node', str(runner), str(workerPath), str(mainPath)], capture_output=True, text=True, timeout=30)
     if result.stdout:
@@ -211,7 +201,7 @@ def StaticDomChecks(html):
         'function RunRegressionTests()',
         'class MicrofaunaEmitter',
         'getTreasureBreakdown(extraLooseTreasure)',
-        'function FormatEndOfRoundStats',
+        'function RenderRoundHistory',
         'function SeasonNameForSnapshot',
         'Food expenditure is a score/value deduction.',
         'Knights are not deterred by lower-class adventurers failing to return alive',
@@ -226,14 +216,16 @@ def main():
     html = htmlPath.read_text(encoding='utf-8')
     StaticDomChecks(html)
     workerSource, mainSource = ExtractScripts(html)
-    workerPath = Path('monster_breeder_extracted_worker_regression_20260703_2327.js')
-    mainPath = Path('monster_breeder_extracted_main_regression_20260703_2327.js')
-    workerPath.write_text(workerSource, encoding='utf-8')
-    mainPath.write_text(mainSource, encoding='utf-8')
-    RunNodeCheck(workerPath)
-    RunNodeCheck(mainPath)
-    RunMainRendererSmokeTest(workerPath, mainPath)
-    RunWorkerRegression(workerPath)
+    with tempfile.TemporaryDirectory(prefix='monster_breeder_harness_') as tempDirectory:
+        tempPath = Path(tempDirectory)
+        workerPath = tempPath / 'simulationWorkerSource.js'
+        mainPath = tempPath / 'mainBrowserScript.js'
+        workerPath.write_text(workerSource, encoding='utf-8')
+        mainPath.write_text(mainSource, encoding='utf-8')
+        RunNodeCheck(workerPath)
+        RunNodeCheck(mainPath)
+        RunMainRendererSmokeTest(workerPath, mainPath)
+        RunWorkerRegression(workerPath)
     print('All syntax and regression checks passed:', htmlPath)
 
 
