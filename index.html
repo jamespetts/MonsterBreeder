@@ -23300,8 +23300,12 @@ html {
         var p = EntityScreenPoint(o.x, o.y);
         var r = o.radius || 28;
         var kind = o.treeKind || 'deciduous';
-        var heightPhase = StablePhase((o.id || 'tree')+'_height');
-        var leanPhase = StablePhase((o.id || 'tree')+'_lean');
+        // StablePhase returns an angle-like value in the range 0.00-6.27. It is
+        // not a unit random value. Normalise it before using it as a proportion;
+        // otherwise tree height can exceed 3.7 radii and lean can exceed 1.7 radii,
+        // which visually separates the trunk from its canopy.
+        var heightPhase = StablePhase((o.id || 'tree')+'_height') / 6.28;
+        var leanPhase = StablePhase((o.id || 'tree')+'_lean') / 6.28;
         var trunkHeight = kind==='palm' ? r*2.45 : r*(1.58+heightPhase*0.34);
         var lean = (leanPhase-0.5)*r*0.30;
         return {
