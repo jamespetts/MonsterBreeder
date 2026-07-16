@@ -1753,7 +1753,7 @@ button {
 }
 
 #preMenuOverlay {
-    background: var(--ui-parchment-dark);
+    background: #000;
     color: var(--ui-ink);
 }
 
@@ -2025,6 +2025,33 @@ html {
     background: var(--ui-scrollbar-track);
 }
 
+
+/* Tutorial presentation is entirely inert unless .tutorialVisible is applied. */
+#tutorialOverlay{position:fixed;inset:0;z-index:4000;display:none;pointer-events:none}
+#tutorialOverlay.tutorialVisible{display:block}
+#tutorialShade{position:absolute;inset:0;background:transparent;pointer-events:none}
+#tutorialOverlay.tutorialLore{pointer-events:auto;cursor:pointer}
+#tutorialOverlay.tutorialLore #tutorialShade{background:#000;pointer-events:auto}
+#tutorialSpotlight{position:fixed;display:none;z-index:1;border:4px solid #f0d36a;box-shadow:0 0 0 9999px rgba(0,0,0,.68),0 0 18px #f0d36a;pointer-events:none;transition:left .16s,top .16s,width .16s,height .16s}
+#tutorialOverlay.tutorialUndim #tutorialSpotlight{box-shadow:0 0 18px #f0d36a}
+#tutorialOverlay.tutorialUndim #tutorialShade{background:transparent}
+#tutorialPanel{position:fixed;z-index:2;width:min(430px,calc(100vw - 2rem));box-sizing:border-box;padding:1rem;border:3px solid var(--ui-border-dark);background:var(--ui-parchment-light);color:var(--ui-ink);box-shadow:var(--ui-shadow-large),var(--ui-inset);pointer-events:auto}
+#tutorialOverlay.tutorialLore #tutorialPanel{left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;width:min(760px,calc(100vw - 3rem));padding:0;border:0;background:transparent;color:#f1e8c9;box-shadow:none;text-align:center;pointer-events:none}
+#tutorialTitle{margin:0 0 .55rem;color:var(--ui-heading);font-size:1.22rem}
+.tutorialLore #tutorialTitle{display:none}
+#tutorialText{margin:0;line-height:1.48;font-size:1rem}
+.tutorialLore #tutorialText{font-size:clamp(1.2rem,2.5vw,2rem);line-height:1.55;text-shadow:0 2px 6px #000}
+.tutorialLore #tutorialText.tutorialLoreFade{animation:tutorialLoreFadeIn .9s ease-out both}
+@keyframes tutorialLoreFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+#tutorialInstruction{margin:.7rem 0 0;padding:.5rem;border-left:4px solid var(--ui-accent);background:var(--ui-parchment-recessed);font-weight:800}
+.tutorialLore #tutorialInstruction,.tutorialLore #tutorialProgress,.tutorialLore #tutorialActions{display:none!important}
+#tutorialProgress{margin-top:.75rem;color:var(--ui-ink-muted);font-size:.78rem}
+#tutorialActions{display:flex;justify-content:flex-end;gap:.45rem;margin-top:.75rem}
+#tutorialBackButton{background:var(--ui-brown-light);color:var(--ui-ink-inverse)}
+#tutorialSkipButton{margin-right:auto;background:var(--ui-parchment-recessed)}
+.tutorialTarget{position:relative}
+@media(max-width:650px){#tutorialPanel{max-height:46vh;overflow:auto}.tutorialLore #tutorialPanel{max-height:none;overflow:visible}}
+
 </style>
 </head>
 <body>
@@ -2088,6 +2115,19 @@ html {
 </section>
 </aside>
 </main>
+
+<div id="tutorialOverlay" aria-live="polite">
+  <div id="tutorialShade"></div><div id="tutorialSpotlight"></div>
+  <section id="tutorialPanel" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle">
+    <h2 id="tutorialTitle"></h2><p id="tutorialText"></p><p id="tutorialInstruction"></p>
+    <div id="tutorialProgress"></div><div id="tutorialActions">
+      <button id="tutorialSkipButton" type="button">Leave tutorial</button>
+      <button id="tutorialBackButton" type="button">Back</button>
+      <button id="tutorialNextButton" type="button">Next</button>
+    </div>
+  </section>
+</div>
+
 <div id="worldLoadingOverlay" role="status" aria-live="polite" aria-busy="true">
 <div id="worldLoadingPanel">
 <h2>Generating ecological unit</h2>
@@ -2102,7 +2142,7 @@ html {
 <p>Choose how to begin. Press ESC during play to return to this menu.</p>
 <div class="mainMenuButtons">
 <button id="resumeGameMenuButton" type="button" disabled>Resume game</button>
-<button id="tutorialMenuButton" type="button" disabled>Tutorial - coming soon</button>
+<button id="tutorialMenuButton" type="button">Tutorial</button>
 <button id="campaignMenuButton" type="button">Campaign</button>
 <button id="advancedCampaignMenuButton" type="button">Advanced Campaign</button>
 <button id="quickGameMenuButton" type="button">Quick Game</button>
@@ -12756,7 +12796,7 @@ html {
                     bottomMargin : 0
                 } ;
             }
-            if (!this.collared && !this.owned){
+            if (!this.collared && !this.owned && !this.tutorialCaptureSubject){
                 return {
                     canLeave : true,
                     leftMargin : OFF_MAP_ESCAPE_MARGIN,
@@ -12809,6 +12849,13 @@ html {
             }
         }
         moveWildOffMap(raid){
+            if (this.tutorialCaptureSubject){
+                this.wildExitTargetX = null;
+                this.wildExitTargetY = null;
+                this.behaviourState = 'foragingForFauna';
+                this.moveWithPath(raid.world, raid.world.width * 0.62, raid.world.height * 0.50, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT, this.id+'_tutorial_capture_area');
+                return;
+            }
             if (this.wildExitTargetX===null || this.wildExitTargetY===null){
                 this.chooseWildExitTarget(raid.world, raid.rng);
             }
@@ -12830,6 +12877,10 @@ html {
             this.lastMacrofaunaTargetTick = raid.tickNumber;
         }
         continueDepartedMacrofaunaChase(raid, trail){
+            if (this.tutorialCaptureSubject){
+                this.moveWildOffMap(raid);
+                return;
+            }
             this.behaviourState = 'stalking';
             this.moveWithPath(raid.world, trail.exitX, trail.exitY, this.speed * NutritionSystem.getNutritionSpeedMultiplier(this) * TICK_DT, this.id+'_departed_'+trail.id);
             if (this.hasReachedMapExitTarget(raid.world, trail.exitX, trail.exitY)){
@@ -16026,6 +16077,30 @@ html {
                 }
             }
         }
+        requestTutorialCaptureEncounter(){
+            var subject = this.pendingWildMonsters.length>0 ? this.pendingWildMonsters[0] : null;
+            if (!subject){
+                this.ensureWildPopulation();
+                var available = this.gameState.getFreeWildResidents().filter(function (monster){
+                    return (monster.wildAvailableFromSeason || 1)<=this.seasonNumber;
+                } , this);
+                if (available.length>0){
+                    subject = available[0];
+                    this.pendingWildMonsters.push(subject);
+                }
+            }
+            if (!subject){
+                return { ok:false, reason:'No viable local wild resident is available for the tutorial encounter.' };
+            }
+            subject.spawnTick = this.tickNumber+1;
+            subject.deployed = false;
+            subject.escaped = false;
+            subject.behaviourState = 'offMapWild';
+            subject.tutorialCaptureSubject = true;
+            this.tutorialFocusMonsterId = subject.id;
+            this.addEvent('A wild uncollared monster is approaching for the capture lesson.');
+            return { ok:true, monsterId:subject.id };
+        }
         spawnDueWildMonsters(){
             for (var i = this.pendingWildMonsters.length-1;
             i>=0;
@@ -17091,7 +17166,7 @@ html {
             this.rng = new SeededRng(this.seed);
             this.paused = false;
             this.mode = options && options.mode ? options.mode : 'campaign';
-            this.campaignRoundLimit = this.mode==='advancedCampaign' ? ADVANCED_CAMPAIGN_ROUNDS : (this.mode==='campaign' ? STANDARD_CAMPAIGN_ROUNDS : 1);
+            this.campaignRoundLimit = this.mode==='tutorial' ? 1 : (this.mode==='advancedCampaign' ? ADVANCED_CAMPAIGN_ROUNDS : (this.mode==='campaign' ? STANDARD_CAMPAIGN_ROUNDS : 1));
             this.adventurerEntryEdge = options && ADVENTURER_ENTRY_EDGES.indexOf(options.adventurerEntryEdge)>=0 ? options.adventurerEntryEdge : null;
             this.baseWorldOptions = options && options.worldOptions ? Object.assign({
             } , options.worldOptions) : {
@@ -17108,6 +17183,9 @@ html {
             this.world = World.createWorld(this.seed, this.getWorldOptions(this.baseWorldOptions));
             this.captiveMacrofaunaFoodPlan = this.calculateCaptiveMacrofaunaFoodPlan();
             this.gameState = new GameState(this.rng, this.mode, this.world);
+            if (this.mode==='tutorial'){
+                this.configureTutorialFounders();
+            }
             this.gameState.roundNumber = this.roundNumber;
             this.currentRaid = null;
             this.roundRemains = [];
@@ -17117,7 +17195,28 @@ html {
             } ];
         }
         isCampaignMode(){
-            return this.mode==='campaign' || this.mode==='advancedCampaign';
+            return this.mode==='campaign' || this.mode==='advancedCampaign' || this.mode==='tutorial';
+        }
+        configureTutorialFounders(){
+            var first = this.gameState.ownedMonsters[0];
+            if (!first){
+                return;
+            }
+            first.name = 'Gribble';
+            first.sex = MONSTER_SEX.FEMALE;
+            first.selectedForDeployment = true;
+            var second = GameState.createLocallySelectedFounder(this.rng, this.world);
+            second.id = 'monster_2';
+            second.name = 'Bramble';
+            second.sex = MONSTER_SEX.MALE;
+            second.selectedForDeployment = false;
+            this.gameState.ownedMonsters.push(second);
+            this.gameState.nextMonsterId = 3;
+            this.gameState.recordFamilyMonster(first);
+            this.gameState.recordFamilyMonster(second);
+        }
+        tutorialRaidTickLimit(){
+            return this.roundNumber===1 ? 1500 : 1050;
         }
         effectiveCampaignRound(){
             if (this.mode==='advancedCampaign'){
@@ -17236,6 +17335,9 @@ html {
         tick(){
             if (!this.paused && this.currentRaid && this.phase==='raid'){
                 this.currentRaid.tick();
+                if (this.mode==='tutorial' && this.currentRaid.tickNumber>=this.tutorialRaidTickLimit()){
+                    this.currentRaid.raidEnded = true;
+                }
                 if (this.currentRaid.raidEnded){
                     this.finishRaid();
                 }
@@ -17384,6 +17486,19 @@ html {
             }
         }
         applyRoundProgression(summary){
+            if (this.mode==='tutorial'){
+                if (summary.treasureDepleted || (summary.treasureRemaining!==undefined && summary.treasureRemaining<=0)){
+                    this.roundEnded = true;
+                    this.roundResult = 'Tutorial round lost: all treasure has been depleted.';
+                } else if (this.seasonNumber>=2){
+                    this.roundEnded = true;
+                    this.roundResult = 'Tutorial round won: treasure remains after both training seasons.';
+                } else{
+                    this.roundEnded = false;
+                    this.roundResult = 'Tutorial round in progress';
+                }
+                return;
+            }
             if (summary.noAdventurersReturnedAlive){
                 this.consecutiveSeasonsWithNoReturningAdventurers+=1;
             } else{
@@ -17767,6 +17882,12 @@ html {
             }
             return result;
         }
+        requestTutorialCaptureEncounter(){
+            if (this.mode!=='tutorial' || !this.currentRaid || this.phase!=='raid'){
+                return { ok:false, reason:'The guided wild encounter is available only during a tutorial raid.' };
+            }
+            return this.currentRaid.requestTutorialCaptureEncounter();
+        }
         captureWildMonster(monsterId){
             if (!this.currentRaid || this.phase!=='raid'){
                 return {
@@ -17858,6 +17979,7 @@ html {
                 raidSnapshot.management = this.gameState.getManagementSnapshot();
                 raidSnapshot.foodPlan = this.getSeasonFoodPlan();
                 raidSnapshot.remains = this.roundRemains.slice(0);
+                raidSnapshot.tutorialFocusMonsterId = this.currentRaid.tutorialFocusMonsterId || null;
                 return raidSnapshot;
             }
             var treasureSnapshots = this.world.getTreasureSnapshots();
@@ -20557,6 +20679,11 @@ html {
                 Post(importResult.ok ? { replyTo:command.messageId, type:'MONSTER_IMPORT_ACCEPTED', payload:importResult } : { replyTo:command.messageId, type:'COMMAND_REJECTED', payload:{ reason:importResult.reason } });
                 SendSnapshotAndEvents(command.messageId);
                 break;
+            case 'REQUEST_TUTORIAL_CAPTURE_ENCOUNTER' : EnsureGameSession();
+                var tutorialEncounterResult = gameSession.requestTutorialCaptureEncounter();
+                Post(tutorialEncounterResult.ok ? { replyTo:command.messageId, type:'COMMAND_ACCEPTED' } : { replyTo:command.messageId, type:'COMMAND_REJECTED', payload:{ reason:tutorialEncounterResult.reason } });
+                SendSnapshotAndEvents(command.messageId);
+                break;
             case 'CAPTURE_WILD_MONSTER' : EnsureGameSession();
                 var captureResult = gameSession.captureWildMonster(command.payload && command.payload.monsterId);
                 Post(captureResult.ok ? {
@@ -21024,7 +21151,8 @@ html {
     lastSnapshotPhase = null,
     gameStarted = false,
     newGameMessagePending = false,
-    interactionMode = 'inspect';
+    interactionMode = 'inspect',
+    acceptGameSnapshots = false;
     // ============================================================================
     // MODULE: VIEW TRANSFORMS AND WORKER COMMANDS
     // ============================================================================
@@ -21128,10 +21256,46 @@ html {
         unsavedActionOverlay.classList.remove('dialogHidden');
         saveBeforeActionButton.focus();
     }
+    function ReturnFromTutorialToMainMenu(){
+        acceptGameSnapshots = false;
+        newGameMessagePending = false;
+        gameStarted = false;
+        latestSnapshot = null;
+        previousSnapshot = null;
+        currentSnapshot = null;
+        lastSnapshotPhase = null;
+        preserveTitleThroughInitialManagement = false;
+        StopMusic();
+        HideWorldLoading();
+        HideRoundHistory();
+        document.getElementById('closeRoundHistoryButton').style.display = '';
+        tutorialPresentation.active = false;
+        tutorialPresentation.followTutorialMonster = false;
+        tutorialPresentation.briefingPauseOwned = false;
+        tutorialPresentation.overlay.className = '';
+        tutorialPresentation.clearTarget();
+        mainMenuOverlay.classList.remove('menuHidden');
+        mainMenuOverlay.style.display = 'flex';
+        seasonDisplay.textContent = 'Main Menu';
+        RenderPlaceholder('Main menu');
+        statusBox.textContent = 'No game in progress. Choose a game mode from the main menu.';
+        UpdateResumeGameButton();
+        RefreshSaveLoadButtons();
+        PlayFixedMusic('title','Monster Breeder main theme.mp3',true);
+        SendCommand('QUIT_GAME');
+    }
     function AbandonCurrentGame(){
+        acceptGameSnapshots = false;
+        newGameMessagePending = false;
         gameStarted = false;
         latestWorldSnapshot = null;
         latestStaticObstacles = [];
+        latestTerrainGrid = null;
+        previousInterpolatedById = {};
+        latestInterpolatedById = {};
+        visualPositionById = {};
+        visualFacingById = {};
+        visualFacingCandidateById = {};
         latestSnapshot = null;
         previousSnapshot = null;
         currentSnapshot = null;
@@ -21730,7 +21894,7 @@ html {
         HideRoundHistory();
     }
     function UpdateTransportControls(s){var b=document.getElementById('playPauseButton'),paused=!!s.paused,fastForwardButton=document.getElementById('fastForwardButton'),fastForward=Number(s.simulationSpeedMultiplier)===4;b.setAttribute('aria-pressed',paused?'true':'false');b.setAttribute('aria-label','Toggle pause <SPACE>');b.title='Toggle pause <SPACE>';b.innerHTML=paused?'<span class="playSymbol" aria-hidden="true"></span>':'<span class="pauseSymbol" aria-hidden="true"><span></span><span></span></span>';fastForwardButton.setAttribute('aria-pressed',fastForward?'true':'false');}
-    function UpdateStatus(s){var mode=s.gameMode==='advancedCampaign'?'Advanced campaign':(s.gameMode==='campaign'?'Campaign':'Single round game');seasonDisplay.textContent=mode+' - Season '+s.seasonNumber+', Round '+(s.roundNumber||1)+(s.campaignRoundLimit?' of '+s.campaignRoundLimit:'');UpdateTransportControls(s);RenderCampaignDashboard(s);MaybeRecordCampaignResult(s);}
+    function UpdateStatus(s){var mode=s.gameMode==='tutorial'?'Tutorial':(s.gameMode==='advancedCampaign'?'Advanced campaign':(s.gameMode==='campaign'?'Campaign':'Single round game'));seasonDisplay.textContent=mode+' - Season '+s.seasonNumber+', Round '+(s.roundNumber||1)+(s.campaignRoundLimit?' of '+s.campaignRoundLimit:'');UpdateTransportControls(s);RenderCampaignDashboard(s);MaybeRecordCampaignResult(s);}
     function BuildManagementRenderKey(s, monsters){
         var eggs =(s.management && s.management.eggs) || [];
         return [s.phase || 'raid',
@@ -22601,7 +22765,7 @@ html {
             var controls=document.createElement('div');controls.className='monsterPortraitControls';
             if(exportSelectionMode&&key!=='mortuary'){var exportLabel=document.createElement('label');exportLabel.className='portraitExportControl';var exportCheck=document.createElement('input');exportCheck.type='checkbox';exportCheck.checked=!!rosterExportSelection[monster.id];exportCheck.addEventListener('click',function(event){event.stopPropagation();});exportCheck.addEventListener('change',function(event){event.stopPropagation();rosterExportSelection[monster.id]=exportCheck.checked;UpdateRosterExportStatus();});exportLabel.appendChild(exportCheck);var exportWord=document.createElement('span');exportWord.textContent='Export';exportLabel.appendChild(exportWord);controls.appendChild(exportLabel);}else if(!options.egg&&key!=='mortuary'){var label=document.createElement('div');label.className='portraitDeployControl';label.draggable=false;var checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.tabIndex=-1;var deployWord=document.createElement('span');if(phase==='raid'){label.setAttribute('role','button');checkbox.checked=!!monster.deployed;checkbox.disabled=!!monster.deployed||!monster.canDeploy;deployWord.textContent=monster.deployed?'Deployed':'Deploy';label.title=monster.deployed?'Already deployed this season':(monster.canDeploy?'Deploy now from the far right edge':ThermalDeploymentSimpleReason(monster.deploymentBlockReason));function deployNow(event){event.preventDefault();event.stopPropagation();if(checkbox.disabled){return;}checkbox.disabled=true;SendCommand('DEPLOY_CAPTIVE_MONSTER',{monsterId:monster.id});lastManagementRenderKey='';}label.addEventListener('pointerdown',deployNow);}else{label.setAttribute('role','checkbox');var checkboxChecked=!!monster.selectedForDeployment&&!!monster.canDeploy;checkbox.checked=checkboxChecked;label.setAttribute('aria-checked',checkboxChecked?'true':'false');checkbox.disabled=!monster.canDeploy;label.title=monster.canDeploy?'Select for automatic deployment at the start of the next season':ThermalDeploymentSimpleReason(monster.deploymentBlockReason);deployWord.textContent='Deploy';function toggleDeployment(event){event.preventDefault();event.stopPropagation();if(checkbox.disabled){return;}checkbox.checked=!checkbox.checked;label.setAttribute('aria-checked',checkbox.checked?'true':'false');checkbox.disabled=true;SendCommand('SET_MONSTER_DEPLOYMENT',{monsterId:monster.id,selected:checkbox.checked});lastManagementRenderKey='';}label.addEventListener('pointerdown',toggleDeployment);}label.appendChild(checkbox);label.appendChild(deployWord);label.addEventListener('mousedown',function(event){event.preventDefault();event.stopPropagation();});label.addEventListener('click',function(event){event.preventDefault();event.stopPropagation();});controls.appendChild(label);if(!monster.canDeploy&&!monster.deployed){var block=document.createElement('span');var simpleReason=ThermalDeploymentSimpleReason(monster.deploymentBlockReason);block.className='deploymentBlockIcon'+(simpleReason.indexOf('Too cold')===0?' tooCold':(simpleReason.indexOf('Too hot')===0?' tooHot':''));block.textContent=DeploymentBlockIcon(monster.deploymentBlockReason);block.title=simpleReason;controls.appendChild(block);}}
             card.appendChild(controls);var visual=document.createElement('div');visual.innerHTML=options.egg?('<div class="eggVisual"><div class="eggShape'+(monster.eggStatus==='cracked'?' cracked':'')+'"></div></div>'):MonsterIconSvg(monster);card.appendChild(visual);var name=document.createElement('div');name.className='monsterPortraitName';name.textContent=options.name||monster.name;card.appendChild(name);var status=document.createElement('div');status.className='monsterPortraitStatus';status.textContent=options.status||PortraitStatusText(monster);status.title=status.textContent;card.appendChild(status);card.title=(monster.ageInSeasons!==undefined?('Age: '+MonsterAgeLabel(monster)+'; food need: '+FormatNumber(GetFoodRequirement(monster))):status.textContent);
-            function select(){selectedRosterMonsterId=monster.id;lastManagementRenderKey='';UpdateManagementDrawer(s);}card.addEventListener('click',select);card.addEventListener('keydown',function(event){if(event.key==='Enter'||event.key===' '){event.preventDefault();select();}});
+            function select(){selectedRosterMonsterId=monster.id;lastManagementRenderKey='';UpdateManagementDrawer(s);tutorialPresentation.onRosterPortraitSelected(monster);}card.addEventListener('click',select);card.addEventListener('keydown',function(event){if(event.key==='Enter'||event.key===' '){event.preventDefault();select();}});
             card.addEventListener('pointerup',function(event){
                 if(event.pointerType!=='touch'||phase==='raid'||exportSelectionMode||!canDrag){return;}
                 if(event.target.closest&&event.target.closest('.monsterPortraitControls')){return;}
@@ -25301,6 +25465,8 @@ html {
             }
             var treasureText = o.carryingTreasure && o.carryingAmount>0 ? FormatNumber(o.carryingAmount)+' '+FriendlyLabel(o.carryingTreasureType || 'treasure').toLowerCase()+(String(o.carryingTreasureType || '').indexOf('coin')<0 && ['bronze','silver','gold'].indexOf(o.carryingTreasureType)>=0 ? ' coins' : '') : 'None';
             html+=SelectionRow('&#128176;', 'Treasure carried', treasureText);
+            html+=SelectionRow('&#9878;', 'Maximum carried per round', FormatNumber(Number.isFinite(o.carryCapacity) ? o.carryCapacity : 0)+' treasure units');
+            html+=SelectionRow('&#128737;', 'Protection', Number(o.armour)>0 ? FormatNumber(o.armour)+' armour' : 'No armour');
             var adventurerInjuries = AdventurerInjuryText(o);
             html+=SelectionRow('&#129656;', 'Visible injuries', adventurerInjuries, adventurerInjuries==='No visible injuries' ? 'selectionStatusGood' : 'selectionStatusWarning');
             return {icon:'&#9876;', title:'Adventurer', html:html+'</div>'};
@@ -25428,6 +25594,7 @@ html {
             obj : picked.obj
         } ;
         UpdateSelectedObjectPanel();
+        tutorialPresentation.onObjectInspected();
         return true;
     }
     
@@ -25537,7 +25704,17 @@ html {
             } );
             break;
         case 'QUIT_GAME_ACCEPTED' :
+            acceptGameSnapshots = false;
             AppendLog('Current game closed.');
+            HideWorldLoading();
+            HideRoundHistory();
+            mainMenuOverlay.classList.remove('menuHidden');
+            seasonDisplay.textContent = 'Main Menu';
+            RenderPlaceholder('Main menu');
+            StopMusic();
+            UpdateResumeGameButton();
+            RefreshSaveLoadButtons();
+            UpdateMusicForState();
             break;
         case 'LOAD_GAME_ACCEPTED' :
             gameStarted = true;
@@ -25550,7 +25727,9 @@ html {
             if (!worldLoadingActive){ ShowWorldLoading(message.payload.progress, message.payload.message); }
             else{ UpdateWorldLoading(message.payload.progress, message.payload.message); }
             break;
-        case 'WORLD_SNAPSHOT' : latestWorldSnapshot = message.payload.snapshot;
+        case 'WORLD_SNAPSHOT' :
+            if (!acceptGameSnapshots){ AppendLog('Ignored stale world snapshot after game closure.'); break; }
+            latestWorldSnapshot = message.payload.snapshot;
             TREASURE_TYPES = latestWorldSnapshot.treasureTypes || {};
             TREASURE_TYPE_ORDER = latestWorldSnapshot.treasureTypeOrder || [];
             if (worldLoadingActive){ HideWorldLoading(); }
@@ -25570,7 +25749,9 @@ html {
                 AppendLog('World seed: '+latestWorldSnapshot.world.seed+'.');
             }
             break;
-        case 'RAID_SNAPSHOT' : previousSnapshot = currentSnapshot;
+        case 'RAID_SNAPSHOT' :
+            if (!acceptGameSnapshots){ AppendLog('Ignored stale raid snapshot after game closure.'); break; }
+            previousSnapshot = currentSnapshot;
             previousSnapshotTime = currentSnapshotTime;
             currentSnapshot = AttachStaticWorldData(message.payload.snapshot);
             currentSnapshotTime = performance.now();
@@ -25578,8 +25759,8 @@ html {
             UpdateStatus(latestSnapshot);
             UpdateMusicForState();
             var completedRoundCount=CompletedRoundHistoryForSnapshot(latestSnapshot).length;
-            if(completedRoundCount>lastAutomaticallyShownRoundCount){lastAutomaticallyShownRoundCount=completedRoundCount;ShowRoundHistory();}
-            if (latestSnapshot.phase==='management' && lastSnapshotPhase==='raid'){
+            if(latestSnapshot.gameMode!=='tutorial'&&completedRoundCount>lastAutomaticallyShownRoundCount){lastAutomaticallyShownRoundCount=completedRoundCount;ShowRoundHistory();}
+            if ((latestSnapshot.phase==='management' && lastSnapshotPhase==='raid') || (latestSnapshot.gameMode==='tutorial' && latestSnapshot.phase==='roundEnded')){
                 managementDrawerVisible = true;
                 lastManagementRenderKey = '';
             }
@@ -25587,6 +25768,7 @@ html {
             UpdateManagementDrawer(latestSnapshot);
             RefreshSelectedObjectFromSnapshot(latestSnapshot);
             UpdateSelectedObjectPanel();
+            tutorialPresentation.onSnapshot(latestSnapshot);
             if (newGameMessagePending && latestSnapshot.phase!=='gameOver'){
                 newGameMessagePending = false;
                 HideMainMenu();
@@ -25616,6 +25798,237 @@ html {
             break;
         }
     } ;
+
+    class TutorialStep{
+        constructor(title,text,options){this.title=title;this.text=text;options=options||{};this.target=options.target||null;this.instruction=options.instruction||'';this.lore=!!options.lore;this.undim=!!options.undim;this.placement=options.placement||'';this.waitFor=options.waitFor||null;this.onShow=options.onShow||null;}
+        isComplete(snapshot){return !this.waitFor||this.waitFor(snapshot);}
+    }
+    class TutorialPresentation{
+        constructor(){
+            this.active=false;this.index=0;this.snapshot=null;this.lastOwnedCount=0;this.captureEncounterRequested=false;this.followTutorialMonster=false;this.objectInspected=false;this.briefingPauseOwned=false;
+            this.overlay=document.getElementById('tutorialOverlay');this.panel=document.getElementById('tutorialPanel');this.spotlight=document.getElementById('tutorialSpotlight');
+            this.title=document.getElementById('tutorialTitle');this.text=document.getElementById('tutorialText');this.instruction=document.getElementById('tutorialInstruction');this.progress=document.getElementById('tutorialProgress');
+            this.back=document.getElementById('tutorialBackButton');this.next=document.getElementById('tutorialNextButton');
+            this.steps=this.createSteps();
+            this.back.addEventListener('click',this.move.bind(this,-1));this.next.addEventListener('click',this.move.bind(this,1));
+            document.getElementById('tutorialSkipButton').addEventListener('click',this.stop.bind(this));
+            this.overlay.addEventListener('click',this.advanceLore.bind(this));
+            window.addEventListener('keydown',this.handleKeyDown.bind(this),true);
+            window.addEventListener('resize',this.position.bind(this));
+        }
+        createSteps(){
+            function Phase(name){return function(s){return !!s&&s.phase===name;};}
+            return [
+                new TutorialStep('', 'Many generations ago, a once mighty and prosperous kingdom fell.',{lore:true}),
+                new TutorialStep('', 'Rumour has it that stashes of its treasure still exist lain scattered about the lands that it once occupied.',{lore:true}),
+                new TutorialStep('', 'That treasure is guarded by fearsome creatures known only from legend.',{lore:true}),
+                new TutorialStep('', 'But over generations, the creatures have adapted to live wild in the many regions of the great kingdom and eat the local wildlife.',{lore:true}),
+                new TutorialStep('', 'Slowly, human populations are encroaching upon the land and realising that there is treasure to be had enough to make a person rich for life.',{lore:true}),
+                new TutorialStep('', 'Can you capture and breed what is left of the lineage of ancient monsters to guard the precious treasure from ever more powerful and ruthless thieves?',{lore:true,onShow:function(){StartNewGame('tutorial',{seed:20031017,worldOptions:{mapSizeKey:'quick',biomeType:'oceanicTemperate',customTreasureAmounts:{bronze:54,silver:4,gold:0,rubies:0,emeralds:0}}});}}),
+                new TutorialStep('Your task','This is a two-round training campaign. Protect the treasure, enlarge the brood and learn what your monsters need to survive.',{target:'#campaignStatsSection',waitFor:Phase('management')}),
+                new TutorialStep('The land','Climate, season and distance from settlement shape food, movement and the people who come looking for treasure.',{target:'.climateCard'}),
+                new TutorialStep('The treasure hoard','This panel records the treasure entrusted to your monsters. The gold part of the bar is treasure still present on the map.',{target:'.campaignDashboard .dashboardCard:nth-child(4)',onShow:function(){tutorialPresentation.showTreasurePreview('intact');}}),
+                new TutorialStep('Treasure can be stolen','Adventurers who carry treasure off the map permanently reduce the hoard. Stolen treasure appears in red, so you can see how much has been lost to thieves.',{target:'.campaignDashboard .dashboardCard:nth-child(4)',onShow:function(){tutorialPresentation.showTreasurePreview('stolen');}}),
+                new TutorialStep('Treasure may fund food','At times you may choose to sell treasure to feed the captive brood. Treasure sold for food appears in purple. We will return to feeding later.',{target:'.campaignDashboard .dashboardCard:nth-child(4)',onShow:function(){tutorialPresentation.showTreasurePreview('sold');}}),
+                new TutorialStep('Monster Management','Each season begins here. The left side is your captive brood; selecting a portrait shows that monster in detail.',{target:'#managementDrawer'}),
+                new TutorialStep('Meet the brood','Select Gribble. Portraits show sex, deployment choice and current availability.',{target:'#cageViewport',instruction:"Click Gribble's portrait.",waitFor:function(){return tutorialPresentation.selectedGribble;}}),
+                new TutorialStep('Read before you breed','The inspector explains inherited body features, age, nutrition, injuries, performance and pedigree. These are observations of one living monster, not abstract unit statistics.',{target:'#selectedMonsterPanel'}),
+                new TutorialStep('Breed deliberately','Before risking either founder, breed Gribble with Bramble. Drag one portrait onto the other (or select them by touch) and confirm the pair. Offspring inherit recombined genes from both parents.',{target:'#managementDrawer',placement:'bottomRight',instruction:'Create one brood, then return here.',waitFor:function(s){return !!s&&s.management&&s.management.eggs&&s.management.eggs.length>0;}}),
+                new TutorialStep('Eggs and generations','Eggs incubate between seasons. Some may fail; survivors hatch with visible, heritable differences. The family tree records ancestry rather than applying a separate inbreeding penalty.',{target:'#cageViewport'}),
+                new TutorialStep('Choose a defender','Deploying a monster sends it into the coming season. Click Deploy for Bramble; Gribble remains safely at the lair while incubating her brood.',{target:'#cageViewport',placement:'bottomRight',instruction:'Click Deploy on Bramble.',waitFor:function(s){return tutorialPresentation.monsterSelectedForDeployment(s,'Bramble');}}),
+                new TutorialStep('Begin the season','Starting a season commits deployment and feeding choices. The simulation then runs in real time.',{target:'#startSeasonButton',instruction:'Click Start Season.',waitFor:Phase('raid')}),
+                new TutorialStep('The living map','Your monsters act for themselves. They hunt, investigate sounds, perceive threats, tire, fight and may retreat according to their bodies and experience.',{target:'#raidCanvas'}),
+                new TutorialStep('Time controls','Use Pause whenever you need time to inspect the simulation. Fast-forward is useful while the land is quiet.',{target:'#controls',instruction:'Click Pause to continue.',waitFor:function(s){return !!s&&s.phase==='raid'&&s.paused;}}),
+                new TutorialStep('Moving around the map','Drag the map with the mouse or one finger to move the camera. Use the mouse wheel to zoom; on a touchscreen, pinch with two fingers. These camera controls never issue orders to monsters.',{target:'#raidCanvas',undim:true}),
+                new TutorialStep('Victory conditions','The raid remains paused while you review this panel. There are two ways to make a region safe: prevent any adventurer returning alive for the required number of consecutive seasons, or prevent any adventurer returning with treasure for the longer required run. Progress resets when an adventurer breaks the relevant condition.',{target:'.campaignDashboard .dashboardCard:nth-child(2)'}),
+                new TutorialStep('Query','While the raid remains paused, Query lets you examine terrain, treasure, wildlife, monsters and adventurers without issuing an order.',{target:'#inspectModeButton',undim:true,onShow:function(){SetInteractionMode('inspect');}}),
+                new TutorialStep('Object details','Click an object or terrain tile on the paused map. Its information will appear in the Object Details panel.',{target:'#objectDetails',undim:true,instruction:'Query something on the map.',waitFor:function(){return tutorialPresentation.objectInspected;}}),
+                new TutorialStep('Reading the Query panel','The Query panel identifies the selected object and presents only observable information: its type or class, present condition, activity and any relevant capacity or injuries. Query another object whenever you need to compare what is happening.',{target:'#selectionSection'}),
+                new TutorialStep('Villagers','Villagers are ordinary local people: unarmoured, less capable in a fight and comparatively slow at gathering treasure. Their query panel shows their class, current load, carrying limit, protection and injuries.',{target:'#objectDetails',undim:true,onShow:function(){tutorialPresentation.beginAdventurerBriefing();tutorialPresentation.showAdventurerExample('villager');}}),
+                new TutorialStep('Explorers','Explorers are faster, quieter and better equipped than villagers, with leather protection, but each carries less treasure than a villager. Compare those entries in the query panel. Every adventurer can carry only this much treasure in one round.',{target:'#objectDetails',undim:true,onShow:function(){tutorialPresentation.beginAdventurerBriefing();tutorialPresentation.showAdventurerExample('explorer');}}),
+                new TutorialStep('Greater treasure, greater danger','Bronze and silver attract villagers and explorers. Regions containing more valuable treasure can attract progressively more powerful adventurers, including warriors and knights. Treasure value therefore changes both what is at stake and who may come to take it. The raid will resume for the capture lesson.',{target:'#objectDetails',undim:true,onShow:function(){tutorialPresentation.beginAdventurerBriefing();tutorialPresentation.showAdventurerExample('explorer');}}),
+                new TutorialStep('A wild monster appears','The raid will now resume. A wild monster has entered for this lesson; the camera is centred on it and follows it at a closer zoom. It will remain on the map until you act.',{target:'#raidCanvas',undim:true,onShow:function(){tutorialPresentation.prepareCaptureSubject();},waitFor:function(s){return tutorialPresentation.captureSubjectIsVisible(s);}}),
+                new TutorialStep('Capture a wild monster','Choose Capture, then click the centred wild monster. Capture places a collar and adds it to the gene pool; it does not tame or train the animal.',{target:'#captureModeButton',undim:true,instruction:'Click the wild monster to capture it.',onShow:function(){tutorialPresentation.beginCaptureEncounter();},waitFor:function(s){return !!s&&s.management&&s.management.ownedMonsters&&s.management.ownedMonsters.length>=3;}}),
+                new TutorialStep('Recall','Recall sends a deployed collared monster back towards the lair. It remains part of your captive brood.',{target:'#recallModeButton'}),
+                new TutorialStep('Release','Release removes a collar permanently and returns that monster to the wild population.',{target:'#releaseModeButton'}),
+                new TutorialStep('Complete the first season','Adventurers who escape with treasure make the hoard smaller. Injuries, feeding and exertion persist into the next season of this same round.',{target:'#raidCanvas',undim:true,instruction:'The game is running. Let the first training season finish automatically.',onShow:function(){tutorialPresentation.ensureRaidRunning();},waitFor:function(s){return !!s&&s.phase==='management'&&s.seasonNumber===2;}}),
+                new TutorialStep('Food is strategic','Every captive body has a seasonal demand. A deployed monster expends more energy and therefore needs more food than it would in reserve. Local prey, stored meat and treasure-funded purchases cover demand; underfeeding changes condition and survival.',{target:'.campaignDashboard .dashboardCard:nth-child(3)'}),
+                new TutorialStep('Prepare the second season','The same region and round continue, while your brood, eggs, injuries and ancestry persist. Select Deploy for at least one available monster before continuing.',{target:'#cageViewport',placement:'bottomRight',instruction:'Click Deploy for at least one monster.',waitFor:function(s){return tutorialPresentation.anyMonsterSelectedForDeployment(s);}}),
+                new TutorialStep('Start the second season','Start the next season when ready. The final training raid will then run under the normal real-time controls.',{target:'#startSeasonButton',instruction:'Click Start Season.',waitFor:function(s){return !!s&&s.roundNumber===1&&s.seasonNumber===2&&s.phase==='raid';}}),
+                new TutorialStep('Second season under way','The final training season is now running. When it ends, the single tutorial round will be complete.',{target:'#raidCanvas',undim:true,waitFor:function(s){return !!s&&s.phase==='gameOver';}}),
+                new TutorialStep('Round scoreboard','The completed-round scoreboard separates treasure stolen from treasure sold for food and records whether the round was won or lost.',{target:'#roundHistoryPanel',undim:true,onShow:function(){tutorialPresentation.showFinalScoreboard();}}),
+                new TutorialStep('Tutorial complete','',{target:'#roundHistoryPanel',undim:true,onShow:function(){tutorialPresentation.prepareCompletion();}})
+            ];
+        }
+        handleKeyDown(event){
+            if(!this.active||event.ctrlKey||event.metaKey||event.altKey){return;}
+            var tag=event.target&&event.target.tagName?event.target.tagName.toLowerCase():'';
+            if(tag==='input'||tag==='textarea'||tag==='select'){return;}
+            var step=this.steps[this.index];
+            if(event.key==='ArrowLeft'){
+                event.preventDefault();
+                this.move(-1);
+                return;
+            }
+            if(event.key==='ArrowRight'&&!step.waitFor){
+                event.preventDefault();
+                this.move(1);
+            }
+        }
+        showFinalScoreboard(){
+            this.followTutorialMonster=false;
+            ShowRoundHistory();
+            document.getElementById('closeRoundHistoryButton').style.display='none';
+        }
+        prepareCompletion(){
+            this.followTutorialMonster=false;
+            ShowRoundHistory();
+            document.getElementById('closeRoundHistoryButton').style.display='none';
+            var lost=SnapshotIsLoss(this.snapshot||{});
+            this.text.textContent=lost ? 'This training round was lost because the treasure was depleted. Real raids may punish weak deployment, poor feeding or an unsuitable brood much more severely. You have still completed the tutorial and can now try again in a full game.' : 'You won this deliberately forgiving training round with treasure still in the hoard. A real raid may be much less easy: stronger adventurers, harsher conditions and accumulated losses will demand more careful breeding, feeding and deployment.';
+            this.clearTarget();
+            this.overlay.classList.add('tutorialUndim');
+            this.next.disabled=false;
+            this.next.textContent='Return to main menu';
+        }
+        monsterSelectedForDeployment(snapshot,name){
+            var monsters=snapshot&&snapshot.management&&snapshot.management.ownedMonsters?snapshot.management.ownedMonsters:[];
+            return monsters.some(function(monster){return monster.name===name&&monster.selectedForDeployment;});
+        }
+        anyMonsterSelectedForDeployment(snapshot){
+            var monsters=snapshot&&snapshot.management&&snapshot.management.ownedMonsters?snapshot.management.ownedMonsters:[];
+            return monsters.some(function(monster){return monster.alive&&monster.canDeploy&&monster.selectedForDeployment;});
+        }
+        onRosterPortraitSelected(monster){
+            if(!this.active||!monster){return;}
+            var step=this.steps[this.index];
+            if(step&&step.title==='Meet the brood'&&monster.name==='Gribble'){
+                this.selectedGribble=true;
+                this.move(1);
+            }
+        }
+        onObjectInspected(){
+            if(!this.active){return;}
+            this.objectInspected=true;
+            var step=this.steps[this.index];
+            if(step&&step.title==='Object details'){this.move(1);}
+        }
+        beginAdventurerBriefing(){
+            if(!this.snapshot||this.snapshot.phase!=='raid'){return;}
+            if(!this.snapshot.paused&&!this.briefingPauseOwned){
+                this.briefingPauseOwned=true;
+                SendCommand('PAUSE_RAID');
+            }
+        }
+        resumeAfterAdventurerBriefing(){
+            if(this.briefingPauseOwned){
+                this.briefingPauseOwned=false;
+                SendCommand('RESUME_RAID');
+            }
+        }
+        ensureRaidRunning(){
+            this.resumeAfterAdventurerBriefing();
+            if(this.snapshot&&this.snapshot.phase==='raid'&&this.snapshot.paused){SendCommand('RESUME_RAID');}
+        }
+        finish(){
+            ReturnFromTutorialToMainMenu();
+        }
+        start(){
+            this.active=true;
+            this.index=0;
+            this.snapshot=null;
+            this.selectedGribble=false;
+            this.objectInspected=false;
+            this.briefingPauseOwned=false;
+            this.captureEncounterRequested=false;
+            this.followTutorialMonster=false;
+            this.lastOwnedCount=0;
+            selectedRosterMonsterId=null;
+            selectedObject=null;
+            camera.x=0;
+            camera.y=0;
+            camera.zoom=1;
+            document.getElementById('tutorialSkipButton').style.display='';
+            document.getElementById('closeRoundHistoryButton').style.display='';
+            this.overlay.classList.add('tutorialVisible');
+            this.show();
+        }
+        stop(){this.active=false;this.briefingPauseOwned=false;this.overlay.classList.remove('tutorialVisible','tutorialLore','tutorialUndim');this.clearTarget();this.clearTreasurePreview();this.clearAdventurerExample();AbandonCurrentGame();}
+        move(delta){if(delta>0&&!this.steps[this.index].isComplete(this.snapshot)){return;}if(delta>0&&this.index===this.steps.length-1){this.finish();return;}this.index=Math.max(0,Math.min(this.steps.length-1,this.index+delta));this.show();}
+        advanceLore(event){if(!this.active||!this.steps[this.index].lore){return;}event.preventDefault();this.move(1);}
+        clearTarget(){document.querySelectorAll('.tutorialTarget').forEach(function(e){e.classList.remove('tutorialTarget');});this.spotlight.style.display='none';}
+        clearTreasurePreview(){
+            var track=document.querySelector('.treasureTrack');
+            if(!track||!track.dataset.tutorialOriginal){return;}
+            var original=JSON.parse(track.dataset.tutorialOriginal);
+            Array.prototype.forEach.call(track.children,function(segment,index){segment.style.width=original[index].width;segment.style.display=original[index].display;});
+            track.title=track.dataset.tutorialTitle||'';track.setAttribute('aria-label',track.dataset.tutorialLabel||'');delete track.dataset.tutorialOriginal;delete track.dataset.tutorialTitle;delete track.dataset.tutorialLabel;
+        }
+        showTreasurePreview(kind){
+            var track=document.querySelector('.treasureTrack');
+            if(!track){return;}
+            if(!track.dataset.tutorialOriginal){track.dataset.tutorialOriginal=JSON.stringify(Array.prototype.map.call(track.children,function(segment){return {width:segment.style.width,display:segment.style.display};}).concat([{title:track.title,label:track.getAttribute('aria-label')}])) ;var saved=JSON.parse(track.dataset.tutorialOriginal),meta=saved.pop();track.dataset.tutorialOriginal=JSON.stringify(saved);track.dataset.tutorialTitle=meta.title;track.dataset.tutorialLabel=meta.label;}
+            var shares=kind==='stolen'?[72,0,28]:(kind==='sold'?[58,24,18]:[100,0,0]);
+            Array.prototype.forEach.call(track.children,function(segment,index){segment.style.width=shares[index]+'%';segment.style.display=shares[index]?'':'none';});
+            var description=kind==='stolen'?'On map: 72. Sold for food: 0. Stolen: 28.':(kind==='sold'?'On map: 58. Sold for food: 24. Stolen: 18.':'On map: 100. Sold for food: 0. Stolen: 0.');
+            track.title=description;track.setAttribute('aria-label',description);
+        }
+        showAdventurerExample(className){
+            var explorer=className==='explorer';
+            selectedObject={kind:'adventurer',obj:{
+                id:'tutorial_'+className,
+                alive:true,
+                className:className,
+                displayName:explorer?'Explorer':'Villager',
+                carryingTreasure:false,
+                carryingAmount:0,
+                carryingTreasureType:null,
+                carryCapacity:explorer?10:15,
+                armour:explorer?3:0,
+                injuryHistory:[],
+                bodyHealth:{head:12,torso:12,leftArm:12,rightArm:12,leftLeg:12,rightLeg:12}
+            }};
+            UpdateSelectedObjectPanel();
+        }
+        clearAdventurerExample(){
+            if(selectedObject&&selectedObject.obj&&String(selectedObject.obj.id||'').indexOf('tutorial_')===0){
+                selectedObject=null;
+                UpdateSelectedObjectPanel();
+            }
+        }
+        prepareCaptureSubject(){
+            this.clearAdventurerExample();
+            this.resumeAfterAdventurerBriefing();
+            if(this.snapshot&&this.snapshot.phase==='raid'&&this.snapshot.paused){SendCommand('RESUME_RAID');}
+            this.followTutorialMonster=true;
+            if(!this.captureEncounterRequested){
+                this.captureEncounterRequested=true;
+                SendCommand('REQUEST_TUTORIAL_CAPTURE_ENCOUNTER');
+            }
+        }
+        captureSubjectIsVisible(snapshot){
+            if(!snapshot||!snapshot.tutorialFocusMonsterId){return false;}
+            return (snapshot.monsters||[]).some(function(monster){return monster.id===snapshot.tutorialFocusMonsterId&&!monster.owned;});
+        }
+        beginCaptureEncounter(){
+            this.prepareCaptureSubject();
+            SetInteractionMode('capture');
+        }
+        followCaptureSubject(snapshot){
+            if (!this.followTutorialMonster || !snapshot || !snapshot.tutorialFocusMonsterId){return;}
+            var monster=(snapshot.monsters||[]).find(function(candidate){return candidate.id===snapshot.tutorialFocusMonsterId;});
+            if (!monster || monster.owned){this.followTutorialMonster=false;return;}
+            var point=Iso(monster.x,monster.y);
+            camera.x=point.x;
+            camera.zoom=1.65;
+            camera.y=point.y-(canvas.height/2-40)/camera.zoom;
+        }
+        show(){if(!this.active)return;this.clearTarget();this.clearTreasurePreview();var step=this.steps[this.index];this.overlay.classList.toggle('tutorialLore',step.lore);this.overlay.classList.toggle('tutorialUndim',step.undim);this.title.textContent=step.title;this.text.classList.remove('tutorialLoreFade');this.text.textContent=step.text;if(step.lore){void this.text.offsetWidth;this.text.classList.add('tutorialLoreFade');}this.instruction.textContent=step.instruction;this.instruction.style.display=step.instruction?'block':'none';this.progress.textContent='Tutorial '+(this.index+1)+' of '+this.steps.length;this.back.disabled=this.index===0;this.next.textContent=this.index===this.steps.length-1?'Finish':'Next';document.getElementById('tutorialSkipButton').style.display=this.index===this.steps.length-1?'none':'';this.next.disabled=!step.isComplete(this.snapshot);if(step.onShow)step.onShow();this.position();}
+        position(){if(!this.active)return;var step=this.steps[this.index];if(step.lore||!step.target){return;}var target=document.querySelector(step.target);if(!target){this.panel.style.left='1rem';this.panel.style.top='1rem';return;}target.classList.add('tutorialTarget');var r=target.getBoundingClientRect(),m=8;this.spotlight.style.display='block';this.spotlight.style.left=(r.left-m)+'px';this.spotlight.style.top=(r.top-m)+'px';this.spotlight.style.width=(r.width+m*2)+'px';this.spotlight.style.height=(r.height+m*2)+'px';var pw=Math.min(430,window.innerWidth-32),left=r.right+18,top=r.top,panelHeight=Math.max(180,this.panel.offsetHeight||230);if(step.placement==='bottomRight'){left=Math.max(8,window.innerWidth-pw-18);top=Math.max(8,window.innerHeight-panelHeight-18);}else{if(left+pw>window.innerWidth-8)left=Math.max(8,r.left-pw-18);if(window.innerWidth<760){left=Math.max(8,(window.innerWidth-pw)/2);top=r.bottom+14;if(top+panelHeight>window.innerHeight-8)top=8;}top=Math.max(8,Math.min(top,window.innerHeight-panelHeight-8));}this.panel.style.left=left+'px';this.panel.style.top=top+'px';this.panel.style.transform='none';}
+        onSnapshot(snapshot){if(!this.active)return;this.snapshot=snapshot;if(snapshot&&snapshot.phase==='raid'&&managementDrawerVisible){managementDrawerVisible=false;lastManagementRenderKey='';UpdateManagementDrawer(snapshot);}this.followCaptureSubject(snapshot);var step=this.steps[this.index];var complete=step.isComplete(snapshot);if(complete&&step.title==='Capture a wild monster'){this.followTutorialMonster=false;}this.next.disabled=!complete;if(complete&&['Breed deliberately','Choose a defender','Begin the season','Time controls','Capture a wild monster','Complete the first season','Prepare the second season','Start the second season','Second season under way'].indexOf(step.title)>=0){this.move(1);return;}this.position();}
+    }
+    var tutorialPresentation = new TutorialPresentation();
+
     // ============================================================================
     // MODULE: INPUT HANDLERS
     // ============================================================================
@@ -25627,6 +26040,7 @@ html {
         resumeGameMenuButton.disabled = !GameCanResume();
     }
     function ShowMainMenu(){
+        mainMenuOverlay.style.display = 'flex';
         UpdateResumeGameButton();
         RefreshSaveLoadButtons();
         mainMenuOverlay.classList.remove('menuHidden');
@@ -25634,6 +26048,7 @@ html {
         UpdateMusicForState();
     }
     function HideMainMenu(){
+        mainMenuOverlay.style.display = '';
         mainMenuOverlay.classList.add('menuHidden');
         if (latestSnapshot){
             UpdateSeasonDisplay(latestSnapshot);
@@ -25665,9 +26080,11 @@ html {
         return Math.floor(value);
     }
     function StartNewGame(mode, options){
+        acceptGameSnapshots = true;
         var startOptions = options || {
         } ;
         gameStarted = true;
+        mainMenuOverlay.style.display = '';
         newGameMessagePending = true;
         // Keep the already-playing title recording continuous while the first
         // world is generated and its initial management screen is displayed.
@@ -25730,6 +26147,9 @@ html {
             return;
         }
         HideMainMenu();
+    } );
+    document.getElementById('tutorialMenuButton').addEventListener('click', function (){
+        RequestDestructiveAction('new', function (){ HideMainMenu(); tutorialPresentation.start(); });
     } );
     document.getElementById('campaignMenuButton').addEventListener('click', function (){
         RequestDestructiveAction('new', function (){
@@ -25895,7 +26315,7 @@ html {
             event.returnValue = '';
         }
     } );
-    window.addEventListener('keydown',function(e){if(e.key==='Escape'){ShowMainMenu();e.preventDefault();return;}var tag=e.target&&e.target.tagName?e.target.tagName.toLowerCase():'';if(tag==='input'||tag==='textarea'||tag==='select'||e.ctrlKey||e.metaKey||e.altKey)return;var key=e.key.toLowerCase();if(key==='q'){SetInteractionMode('inspect');e.preventDefault();return;}if(key==='c'){SetInteractionMode('capture');e.preventDefault();return;}if(key==='b'){SetInteractionMode('recall');e.preventDefault();return;}if(key==='r'){SetInteractionMode('release');e.preventDefault();return;}if(e.code==='Space'){document.getElementById('playPauseButton').click();e.preventDefault();return;}if(key==='f'){document.getElementById('fastForwardButton').click();e.preventDefault();return;}if(key==='s'){ShowRoundHistory();e.preventDefault();return;}if(key==='e'){ShowStatDetail('temperature');e.preventDefault();return;}if(key==='v'){ShowStatDetail('victory');e.preventDefault();return;}if(key==='n'){ShowStatDetail('food');e.preventDefault();return;}if(key==='t'){ShowStatDetail('treasure');e.preventDefault();return;}keys.add(key);});
+    window.addEventListener('keydown',function(e){if(tutorialPresentation&&tutorialPresentation.active&&(e.key==='ArrowLeft'||e.key==='ArrowRight')){return;}if(e.key==='Escape'){ShowMainMenu();e.preventDefault();return;}var tag=e.target&&e.target.tagName?e.target.tagName.toLowerCase():'';if(tag==='input'||tag==='textarea'||tag==='select'||e.ctrlKey||e.metaKey||e.altKey)return;var key=e.key.toLowerCase();if(key==='q'){SetInteractionMode('inspect');e.preventDefault();return;}if(key==='c'){SetInteractionMode('capture');e.preventDefault();return;}if(key==='b'){SetInteractionMode('recall');e.preventDefault();return;}if(key==='r'){SetInteractionMode('release');e.preventDefault();return;}if(e.code==='Space'){document.getElementById('playPauseButton').click();e.preventDefault();return;}if(key==='f'){document.getElementById('fastForwardButton').click();e.preventDefault();return;}if(key==='s'){ShowRoundHistory();e.preventDefault();return;}if(key==='e'){ShowStatDetail('temperature');e.preventDefault();return;}if(key==='v'){ShowStatDetail('victory');e.preventDefault();return;}if(key==='n'){ShowStatDetail('food');e.preventDefault();return;}if(key==='t'){ShowStatDetail('treasure');e.preventDefault();return;}keys.add(key);});
     window.addEventListener('keyup', function (e){
         keys.delete(e.key.toLowerCase());
     } );
