@@ -568,6 +568,17 @@ button {
     text-align: left;
     font-size: 1rem;
 }
+#tutorialMenuButton.tutorialIncomplete {
+    background: #b91c1c;
+    border-color: #7f1d1d;
+    color: #fff;
+    box-shadow: 0 0 0 2px #fee2e2, 0 4px 12px rgba(127,29,29,.45);
+}
+#tutorialMenuButton.tutorialIncomplete:hover,
+#tutorialMenuButton.tutorialIncomplete:focus-visible {
+    background: #dc2626;
+    border-color: #450a0a;
+}
 .mainMenuButtons button:disabled {
     cursor: not-allowed;
 }
@@ -21256,6 +21267,30 @@ html {
         unsavedActionOverlay.classList.remove('dialogHidden');
         saveBeforeActionButton.focus();
     }
+    var TUTORIAL_COMPLETED_STORAGE_KEY = 'monsterBreederTutorialCompleted';
+    function TutorialHasBeenCompleted(){
+        try{
+            return localStorage.getItem(TUTORIAL_COMPLETED_STORAGE_KEY)==='true';
+        } catch (error){
+            return false;
+        }
+    }
+    function UpdateTutorialMenuButtonState(){
+        var button=document.getElementById('tutorialMenuButton');
+        if(!button){return;}
+        var incomplete=!TutorialHasBeenCompleted();
+        button.classList.toggle('tutorialIncomplete',incomplete);
+        button.setAttribute('aria-label',incomplete?'Tutorial - not yet completed':'Tutorial');
+        button.title=incomplete?'Tutorial not yet completed':'';
+    }
+    function RecordTutorialCompletion(){
+        try{
+            localStorage.setItem(TUTORIAL_COMPLETED_STORAGE_KEY,'true');
+        } catch (error){
+            AppendLog('Tutorial completion could not be stored in this browser.');
+        }
+        UpdateTutorialMenuButtonState();
+    }
     function ReturnFromTutorialToMainMenu(){
         acceptGameSnapshots = false;
         newGameMessagePending = false;
@@ -25931,6 +25966,7 @@ html {
             if(this.snapshot&&this.snapshot.phase==='raid'&&this.snapshot.paused){SendCommand('RESUME_RAID');}
         }
         finish(){
+            RecordTutorialCompletion();
             ReturnFromTutorialToMainMenu();
         }
         start(){
@@ -26148,6 +26184,7 @@ html {
         }
         HideMainMenu();
     } );
+    UpdateTutorialMenuButtonState();
     document.getElementById('tutorialMenuButton').addEventListener('click', function (){
         RequestDestructiveAction('new', function (){ HideMainMenu(); tutorialPresentation.start(); });
     } );
