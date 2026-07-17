@@ -4481,6 +4481,19 @@ html {
     var VISIBILITY_CLOSE_RANGE = 70;
     var THROWN_PROJECTILE_ANIMATION_TICKS = 18;
     var WILD_MONSTER_COUNT_MAX = 3;
+    // A valid ecological unit retains at least one resident wild monster even when
+    // the continuous trophic estimate rounds below one.
+    var WILD_MONSTER_MIN_CALCULATED_CAPACITY = 1;
+    // In season one, a player with no more than this many living captive monsters
+    // receives an encounter opportunity from the real resident population.
+    var WILD_MONSTER_FIRST_SEASON_GUARANTEE_MAX_OWNED = 1;
+    // Resident ranges are deliberately wider than the original 1,500-3,200 units,
+    // but remain below the previous experimental 3,500-7,000 range. Individual
+    // body scale continues to modify these base distances.
+    var WILD_MONSTER_HOME_RANGE_RADIUS_MIN = 2500;
+    var WILD_MONSTER_HOME_RANGE_RADIUS_MAX = 5000;
+    // Used only for migrated or released residents that have no generated range.
+    var WILD_MONSTER_HOME_RANGE_RADIUS_DEFAULT = 3600;
     var WILD_MONSTER_FIRST_SPAWN_TICK_MIN = 45;
     var WILD_MONSTER_FIRST_SPAWN_TICK_MAX = 180;
     var WILD_MONSTER_SPAWN_GAP_MIN = 150;
@@ -16846,7 +16859,7 @@ html {
                 monster.wildHomeRangeY = ECOLOGICAL_UNIT_HEIGHT * 0.5;
             }
             if (!Number.isFinite(monster.wildHomeRangeRadius)) {
-                monster.wildHomeRangeRadius = 2200;
+                monster.wildHomeRangeRadius = WILD_MONSTER_HOME_RANGE_RADIUS_DEFAULT;
             }
             if (this.wildPopulation.indexOf(monster) < 0) {
                 this.wildPopulation.push(monster);
@@ -16895,7 +16908,7 @@ html {
                         immigrant.wildAvailableFromSeason = seasonNumber + 1;
                         immigrant.wildHomeRangeX = rng.range(0, ECOLOGICAL_UNIT_WIDTH);
                         immigrant.wildHomeRangeY = rng.range(0, ECOLOGICAL_UNIT_HEIGHT);
-                        immigrant.wildHomeRangeRadius = rng.range(1500, 3200) * Clamp(Math.sqrt(immigrant.bodyScale || 1), 0.75, 1.35);
+                        immigrant.wildHomeRangeRadius = rng.range(WILD_MONSTER_HOME_RANGE_RADIUS_MIN, WILD_MONSTER_HOME_RANGE_RADIUS_MAX) * Clamp(Math.sqrt(immigrant.bodyScale || 1), 0.75, 1.35);
                         this.wildPopulation.push(immigrant);
                         return [immigrant];
                     }
@@ -16935,7 +16948,7 @@ html {
             child.wildParentIds = [mother.id, father.id];
             child.wildHomeRangeX = Clamp(((mother.wildHomeRangeX || ECOLOGICAL_UNIT_WIDTH * 0.5) + (father.wildHomeRangeX || ECOLOGICAL_UNIT_WIDTH * 0.5)) * 0.5 + rng.range(-1800, 1800), 0, ECOLOGICAL_UNIT_WIDTH);
             child.wildHomeRangeY = Clamp(((mother.wildHomeRangeY || ECOLOGICAL_UNIT_HEIGHT * 0.5) + (father.wildHomeRangeY || ECOLOGICAL_UNIT_HEIGHT * 0.5)) * 0.5 + rng.range(-1400, 1400), 0, ECOLOGICAL_UNIT_HEIGHT);
-            child.wildHomeRangeRadius = rng.range(1500, 3000) * Clamp(Math.sqrt(child.bodyScale || 1), 0.75, 1.35);
+            child.wildHomeRangeRadius = rng.range(WILD_MONSTER_HOME_RANGE_RADIUS_MIN, WILD_MONSTER_HOME_RANGE_RADIUS_MAX) * Clamp(Math.sqrt(child.bodyScale || 1), 0.75, 1.35);
             this.wildPopulation.push(child);
             this.wildPopulationGeneration += 1;
             return [child];
@@ -17550,7 +17563,10 @@ html {
             var climateHarshness = Clamp((ecology.availability || 0.5), 0.12, 1.1);
             var capacity = unitFood / Math.max(1, 11.5 * 2.15);
             capacity *= Clamp(0.72 + climateHarshness * 0.55, 0.45, 1.25);
-            return Clamp(capacity, 1, Math.max(6, WILD_MONSTER_COUNT_MAX * IMAGINED_ECOSYSTEM_TO_MAP_AREA_FACTOR));
+            // The trophic calculation is authoritative. Do not impose a separate population
+            // ceiling: productive environments may support whatever resident population
+            // their calculated food supply permits.
+            return Math.max(WILD_MONSTER_MIN_CALCULATED_CAPACITY, capacity);
         }
         monsterCanRemainActiveThroughLocalYear(monster) {
             return MonsterMetabolismSystem.assessLongTermWildPopulationViability(monster, this.world).viable;
@@ -17610,7 +17626,9 @@ html {
                     resident.wildAvailableFromSeason = 1;
                     resident.wildHomeRangeX = this.rng.range(0, ECOLOGICAL_UNIT_WIDTH);
                     resident.wildHomeRangeY = this.rng.range(0, ECOLOGICAL_UNIT_HEIGHT);
-                    resident.wildHomeRangeRadius = this.rng.range(1500, 3200) * Clamp(Math.sqrt(resident.bodyScale || 1), 0.75, 1.35);
+                    // Wild monsters range beyond a compact den-centred home range. Body
+                    // size still scales the configured distance, preserving individual variation.
+                    resident.wildHomeRangeRadius = this.rng.range(WILD_MONSTER_HOME_RANGE_RADIUS_MIN, WILD_MONSTER_HOME_RANGE_RADIUS_MAX) * Clamp(Math.sqrt(resident.bodyScale || 1), 0.75, 1.35);
                     this.gameState.wildPopulation.push(resident);
                 }
             }
@@ -17630,7 +17648,7 @@ html {
                 var resident = free[i];
                 var homeX = Number.isFinite(resident.wildHomeRangeX) ? resident.wildHomeRangeX : ECOLOGICAL_UNIT_WIDTH * 0.5;
                 var homeY = Number.isFinite(resident.wildHomeRangeY) ? resident.wildHomeRangeY : ECOLOGICAL_UNIT_HEIGHT * 0.5;
-                var radius = Number.isFinite(resident.wildHomeRangeRadius) ? resident.wildHomeRangeRadius : 2200;
+                var radius = Number.isFinite(resident.wildHomeRangeRadius) ? resident.wildHomeRangeRadius : WILD_MONSTER_HOME_RANGE_RADIUS_DEFAULT;
                 var nearestX = Clamp(homeX, mapLeft, mapRight);
                 var nearestY = Clamp(homeY, mapTop, mapBottom);
                 var distanceToMap = Distance(homeX, homeY, nearestX, nearestY);
@@ -17642,9 +17660,10 @@ html {
                     selected.push(resident);
                 }
             }
-            // A player with no captive monsters must have at least one first-season
-            // opportunity, drawn from the real resident population.
-            if (this.seasonNumber === 1 && this.gameState.getLivingOwnedMonsters().length === 0 && selected.length === 0 && free.length) {
+            // A player with one or fewer captive monsters must have at least one first-season
+            // opportunity, drawn from the real resident population. This includes the
+            // ordinary campaign's single founder as well as an empty advanced campaign.
+            if (this.seasonNumber === 1 && this.gameState.getLivingOwnedMonsters().length <= WILD_MONSTER_FIRST_SEASON_GUARANTEE_MAX_OWNED && selected.length === 0 && free.length) {
                 selected.push(this.rng.pick(free));
             }
             var spawnTick = this.rng.integer(WILD_MONSTER_FIRST_SPAWN_TICK_MIN, WILD_MONSTER_FIRST_SPAWN_TICK_MAX);
