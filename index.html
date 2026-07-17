@@ -996,6 +996,15 @@ button {
     bottom:0;
     border-radius:999px
 }
+/* Keep the full temperature scale visible against every climate colour. */
+.thermometer {
+    box-sizing:border-box;
+    border:2px solid var(--ui-border-dark,#33281b)
+}
+.thermometer:after {
+    box-sizing:border-box;
+    border:2px solid var(--ui-border-dark,#33281b)
+}
 .climateValue {
     font-size:1.35rem;
     font-weight:900
@@ -4396,6 +4405,12 @@ html {
     // Snapshot rule: do not send static world scenery every tick. Send static world
     // data once with WORLD_SNAPSHOT after world creation, then send small dynamic
     // RAID_SNAPSHOT messages for agents, raid state, treasure amounts and drops.
+    //
+    // Single-representation rule:
+    // - One real-world fact has exactly one authoritative mutable representation.
+    // - Totals, unit conversions and compatibility names are computed at read time.
+    // - Snapshots may expose derived presentation values, but they must never be
+    //   copied back into a second mutable simulation field.
     //
     // Module discipline rule:
     // - Nutrition, treasure, campaign scoring and win/loss rules are authoritative
@@ -8131,6 +8146,7 @@ html {
             this.distanceToSettlementMiles = distanceToSettlementMiles;
             this.terrainObjects = terrainObjects;
             this.treasureDeposits = treasureDeposits;
+            this.treasureSoldForFoodValue = 0;
             // Treasure must remain physical map state. This also repairs legacy save
             // data containing a dropped pile recorded just beyond an escape edge.
             for (var treasureIndex = 0; treasureIndex < this.treasureDeposits.length; treasureIndex += 1) {
@@ -8139,8 +8155,6 @@ html {
                 boundedTreasure.y = Clamp(boundedTreasure.y, boundedTreasure.radius || 20, this.height - (boundedTreasure.radius || 20));
             }
             this.adventurerEntryEdge = adventurerEntryEdge || DEFAULT_ADVENTURER_ENTRY_EDGE;
-            this.foodExpenditureCredits = 0;
-            this.treasureSoldForFoodValue = 0;
             this.blockingTerrainObjects = this.terrainObjects.filter(function (object) {
                 return object.blocksMovement;
             });
@@ -8633,12 +8647,11 @@ html {
                 var remainingAmount = breakdown.remaining.byType[treasureType].amount;
                 addAmount('stolen', treasureType, Math.max(0, startingAmount - remainingAmount));
             });
-            var treasureSoldForFoodValue = Math.max(0, this.treasureSoldForFoodValue || this.foodExpenditureCredits || 0);
+            var treasureSoldForFoodValue = Math.max(0, this.treasureSoldForFoodValue || 0);
             // Sold treasure has already been removed physically from its deposit.
             // Report that removal as food expenditure, not as treasure stolen by
             // adventurers. Legacy saves may not retain sale attribution by type,
             // so the authoritative aggregate value is corrected here.
-            breakdown.foodExpenditureCredits = treasureSoldForFoodValue;
             breakdown.treasureSoldForFoodValue = treasureSoldForFoodValue;
             breakdown.stolen.totalValue = Math.max(0, breakdown.starting.totalValue - breakdown.remaining.totalValue - treasureSoldForFoodValue);
             breakdown.remainingAfterFoodValue = breakdown.remaining.totalValue;
@@ -8649,7 +8662,7 @@ html {
                 treasureDeposits: this.getTreasureSnapshots(),
                 remainingTreasureValue: this.getRemainingTreasureValue(),
                 treasureBreakdown: this.getTreasureBreakdown(extraLooseTreasure),
-                foodExpenditureCredits: this.treasureSoldForFoodValue || this.foodExpenditureCredits || 0
+                treasureSoldForFoodValue: this.treasureSoldForFoodValue || 0
             };
         }
         hasTreasureRemaining(extraLooseTreasure) {
@@ -8738,6 +8751,31 @@ html {
         }
         maxTotal() {
             return this.maxEach * this.getParts().length;
+        }
+        setTotal(total) {
+            var target = Clamp(Number(total) || 0, 0, this.maxTotal());
+            var current = this.total();
+            var parts = this.getParts();
+            if (current > 0) {
+                var scale = target / current;
+                for (var i = 0; i < parts.length; i += 1) {
+                    this[parts[i]] = Clamp((this[parts[i]] || 0) * scale, 0, this.maximumForPart(parts[i]));
+                }
+                return;
+            }
+            var each = target / Math.max(1, parts.length);
+            for (var p = 0; p < parts.length; p += 1) {
+                this[parts[p]] = Math.min(each, this.maximumForPart(parts[p]));
+            }
+        }
+        setMaxTotal(total) {
+            var parts = this.getParts();
+            var oldMaximum = Math.max(0.0001, this.maxTotal());
+            var healthRatio = this.total() / oldMaximum;
+            this.maxEach = Math.max(0.0001, (Number(total) || oldMaximum) / Math.max(1, parts.length));
+            for (var i = 0; i < parts.length; i += 1) {
+                this[parts[i]] = this.maximumForPart(parts[i]) * healthRatio;
+            }
         }
         applyGeneralDamage(amount, rng) {
             var parts = this.getParts();
@@ -9482,6 +9520,25 @@ html {
     // MODULE: ADVENTURERS
     // ============================================================================
     class Adventurer extends Agent {
+        get health() {
+            return this.bodyHealth ? this.bodyHealth.total() : 0;
+        }
+        set health(value) {
+            if (this.bodyHealth) {
+                this.bodyHealth.setTotal(value);
+            }
+        }
+        get maxHealth() {
+            return this.bodyHealth ? this.bodyHealth.maxTotal() : 0;
+        }
+        set maxHealth(value) {
+            if (this.bodyHealth) {
+                this.bodyHealth.setMaxTotal(value);
+            }
+        }
+        get treasureCollectionSeconds() {
+            return this.treasureCollectionDurationTicks * TICK_DT;
+        }
         constructor(id, x, y, rng, profile) {
             super(id, x, y, 12, rng.range(profile.speedMin, profile.speedMax));
             this.agentKind = 'adventurer';
@@ -9492,8 +9549,6 @@ html {
             this.weaponName = profile.weaponName || '';
             var bodyPartHealth = Number.isFinite(profile.bodyPartHealthMax) ? rng.range(profile.bodyPartHealth, profile.bodyPartHealthMax) : profile.bodyPartHealth;
             this.bodyHealth = new BodyHealth(bodyPartHealth);
-            this.maxHealth = this.bodyHealth.maxTotal();
-            this.health = this.bodyHealth.total();
             this.carryCapacity = profile.carryCapacity;
             this.carryingAmount = 0;
             this.carryingTreasure = false;
@@ -9510,8 +9565,8 @@ html {
             };
             var collectionBaseline = collectionSecondsByClass[this.className] || collectionSecondsByClass.villager;
             var collectionVariation = ((rng.nextFloat() + rng.nextFloat() + rng.nextFloat()) / 3 - 0.5) * 2.4;
-            this.treasureCollectionSeconds = Clamp(collectionBaseline + collectionVariation, 2, 7);
-            this.treasureCollectionDurationTicks = Math.max(Math.round(2 / TICK_DT), Math.min(Math.round(7 / TICK_DT), Math.round(this.treasureCollectionSeconds / TICK_DT)));
+            var treasureCollectionSeconds = Clamp(collectionBaseline + collectionVariation, 2, 7);
+            this.treasureCollectionDurationTicks = Math.max(Math.round(2 / TICK_DT), Math.min(Math.round(7 / TICK_DT), Math.round(treasureCollectionSeconds / TICK_DT)));
             this.entryEdge = DEFAULT_ADVENTURER_ENTRY_EDGE;
             this.entryX = x;
             this.entryY = y;
@@ -10004,7 +10059,6 @@ html {
         }
         applyDamage(amount, rng, raid, attacker) {
             var part = this.bodyHealth.applyGeneralDamage(this.receiveArmouredDamage(amount), rng);
-            this.health = this.bodyHealth.total();
             this.lastDamagePart = part;
             this.lastDamageTick = raid ? raid.tickNumber : -1;
             this.currentCourage = Clamp((this.currentCourage === undefined ? this.courage : this.currentCourage) - MORALE_INJURY_PENALTY, 0, 1.75);
@@ -10641,8 +10695,6 @@ html {
         },
         resetSeasonNutrition: function (monster) {
             monster.foodEatenThisSeason = 0;
-            monster.foodBoughtThisSeason = 0;
-            monster.foodBoughtCostCreditsThisSeason = 0;
             monster.foodFromCaptiveMacrofaunaThisSeason = 0;
             monster.foodFromStoredMeatThisSeason = 0;
             monster.foodFromPurchasedMeatThisSeason = 0;
@@ -10653,15 +10705,17 @@ html {
             monster.activityFoodThisSeason = 0;
             monster.seasonDistanceMoved = 0;
             monster.seasonTerrainEffort = 0;
-            monster.movementFoodRequired = 0;
             monster.combatFoodRequired = 0;
             monster.healingFoodRequirementThisSeason = 0;
             monster.plannedHealingThisSeason = 0;
             monster.seriousFatigueThisSeason = false;
             monster.fatigueTicks = 0;
         },
+        getLairFoodCommitted: function (monster) {
+            return (monster.foodFromCaptiveMacrofaunaThisSeason || 0) + (monster.foodFromStoredMeatThisSeason || 0) + (monster.foodFromPurchasedMeatThisSeason || 0);
+        },
         getTotalFoodThisSeason: function (monster) {
-            return (monster.foodEatenThisSeason || 0) + (monster.foodBoughtThisSeason || 0);
+            return (monster.foodEatenThisSeason || 0) + this.getLairFoodCommitted(monster);
         },
         getFoodNeeded: function (monster) {
             return Math.max(0, this.getMonsterRequirement(monster) - this.getTotalFoodThisSeason(monster));
@@ -10841,7 +10895,7 @@ html {
                 var requirement = NutritionSystem.getMonsterRequirement(monster);
                 var raidFoodUsed = Math.min(requirement, monster.foodEatenThisSeason || 0);
                 var lairFoodNeeded = Math.max(0, requirement - raidFoodUsed);
-                var lairFoodCommitted = monster.foodBoughtThisSeason || 0;
+                var lairFoodCommitted = NutritionSystem.getLairFoodCommitted(monster);
                 var release = Math.max(0, lairFoodCommitted - lairFoodNeeded);
                 result.raidFoodUsed += raidFoodUsed;
                 result.lairFoodReleased += release;
@@ -10856,8 +10910,6 @@ html {
                 var captiveRelease = Math.min(release, monster.foodFromCaptiveMacrofaunaThisSeason || 0);
                 monster.foodFromCaptiveMacrofaunaThisSeason = Math.max(0, (monster.foodFromCaptiveMacrofaunaThisSeason || 0) - captiveRelease);
                 result.captiveFoodUnused += captiveRelease;
-                monster.foodBoughtThisSeason = (monster.foodFromCaptiveMacrofaunaThisSeason || 0) + (monster.foodFromStoredMeatThisSeason || 0) + (monster.foodFromPurchasedMeatThisSeason || 0);
-                monster.foodBoughtCostCreditsThisSeason = (monster.foodFromPurchasedMeatThisSeason || 0) * NutritionSystem.getFoodCostCredits(world);
             });
             gameState.excessMeatFood = (gameState.excessMeatFood || 0) + result.purchasedMeatStored + result.previousStoredMeatReturned;
             gameState.currentSeasonCaptiveFoodRemaining = Math.max(0, gameState.currentSeasonCaptiveFoodRemaining || 0) + result.captiveFoodUnused;
@@ -10886,13 +10938,11 @@ html {
                 var fromCaptive = Math.min(needed, Math.max(0, gameState.currentSeasonCaptiveFoodRemaining || 0));
                 gameState.currentSeasonCaptiveFoodRemaining = Math.max(0, (gameState.currentSeasonCaptiveFoodRemaining || 0) - fromCaptive);
                 monster.foodFromCaptiveMacrofaunaThisSeason = (monster.foodFromCaptiveMacrofaunaThisSeason || 0) + fromCaptive;
-                monster.foodBoughtThisSeason = (monster.foodBoughtThisSeason || 0) + fromCaptive;
                 needed -= fromCaptive;
                 result.captiveFoodUsed += fromCaptive;
                 var fromStored = Math.min(needed, Math.max(0, gameState.excessMeatFood || 0));
                 gameState.excessMeatFood = Math.max(0, (gameState.excessMeatFood || 0) - fromStored);
                 monster.foodFromStoredMeatThisSeason = (monster.foodFromStoredMeatThisSeason || 0) + fromStored;
-                monster.foodBoughtThisSeason = (monster.foodBoughtThisSeason || 0) + fromStored;
                 needed -= fromStored;
                 result.storedFoodUsed += fromStored;
                 var purchased = 0;
@@ -10915,13 +10965,8 @@ html {
                     var purchaseExpenditure = result.expenditureCredits - expenditureBeforePurchase;
                     purchased = Math.min(needed, purchaseExpenditure / Math.max(1, price));
                     monster.foodFromPurchasedMeatThisSeason = (monster.foodFromPurchasedMeatThisSeason || 0) + purchased;
-                    monster.foodBoughtThisSeason = (monster.foodBoughtThisSeason || 0) + purchased;
-                    monster.foodBoughtCostCreditsThisSeason = (monster.foodBoughtCostCreditsThisSeason || 0) + purchased * price;
                     result.purchasedFood += purchased;
-                    gameState.treasureSoldForFoodValue = (gameState.treasureSoldForFoodValue || 0) + purchaseExpenditure;
-                    gameState.roundTreasureSoldForFoodValue = (gameState.roundTreasureSoldForFoodValue || 0) + purchaseExpenditure;
                     world.treasureSoldForFoodValue = (world.treasureSoldForFoodValue || 0) + purchaseExpenditure;
-                    world.foodExpenditureCredits = world.treasureSoldForFoodValue;
                 }
                 var supplied = fromCaptive + fromStored + purchased;
                 result.foodProvided += supplied;
@@ -10967,8 +11012,8 @@ html {
             monsters.forEach(function (monster) {
                 result.foodEatenInRaid += monster.foodEatenThisSeason || 0;
                 result.foodBought += monster.foodFromPurchasedMeatThisSeason || 0;
-                result.expenditureCredits += monster.foodBoughtCostCreditsThisSeason || 0;
-                if ((monster.foodBoughtThisSeason || 0) > 0) {
+                result.expenditureCredits += (monster.foodFromPurchasedMeatThisSeason || 0) * NutritionSystem.getFoodCostCredits(world);
+                if (NutritionSystem.getLairFoodCommitted(monster) > 0) {
                     result.monstersFed += 1;
                 }
                 var wasAliveBeforeNutrition = monster.alive;
@@ -12757,6 +12802,24 @@ html {
     var MonsterReproductionTraitDefinition = new ReproductionGeneticTraitDefinition();
     var MonsterPerceptionTraitDefinition = new PerceptionGeneticTraitDefinition();
     class GenePool {
+        get colourChromosomeSlots() {
+            return this.chromosomeSlots[COLOUR_CHROMOSOME_INDEX];
+        }
+        get metabolismChromosomeSlots() {
+            return this.chromosomeSlots[METABOLISM_CHROMOSOME_INDEX];
+        }
+        get morphologyChromosomeSlots() {
+            return this.chromosomeSlots[MORPHOLOGY_CHROMOSOME_INDEX];
+        }
+        get behaviourChromosomeSlots() {
+            return this.chromosomeSlots[BEHAVIOUR_CHROMOSOME_INDEX];
+        }
+        get reproductionChromosomeSlots() {
+            return this.chromosomeSlots[REPRODUCTION_CHROMOSOME_INDEX];
+        }
+        get perceptionChromosomeSlots() {
+            return this.chromosomeSlots[PERCEPTION_CHROMOSOME_INDEX];
+        }
         constructor() {
             this.traitDefinitions = [
                 MonsterColourTraitDefinition,
@@ -12773,12 +12836,6 @@ html {
             this.createChromosomeSlots(BEHAVIOUR_CHROMOSOME_INDEX, BEHAVIOUR_CHROMOSOME_SLOT_COUNT);
             this.createChromosomeSlots(REPRODUCTION_CHROMOSOME_INDEX, REPRODUCTION_CHROMOSOME_SLOT_COUNT);
             this.createChromosomeSlots(PERCEPTION_CHROMOSOME_INDEX, PERCEPTION_CHROMOSOME_SLOT_COUNT);
-            this.colourChromosomeSlots = this.chromosomeSlots[COLOUR_CHROMOSOME_INDEX];
-            this.metabolismChromosomeSlots = this.chromosomeSlots[METABOLISM_CHROMOSOME_INDEX];
-            this.morphologyChromosomeSlots = this.chromosomeSlots[MORPHOLOGY_CHROMOSOME_INDEX];
-            this.behaviourChromosomeSlots = this.chromosomeSlots[BEHAVIOUR_CHROMOSOME_INDEX];
-            this.reproductionChromosomeSlots = this.chromosomeSlots[REPRODUCTION_CHROMOSOME_INDEX];
-            this.perceptionChromosomeSlots = this.chromosomeSlots[PERCEPTION_CHROMOSOME_INDEX];
             this.addDefaultColourAlleles();
             this.addDefaultMetabolismAlleles();
             this.addDefaultMorphologyAlleles();
@@ -14051,6 +14108,22 @@ html {
     // long in-line tail and agile medium-length legs. Genetics cover colour, metabolism, morphology, behaviour, perception and
     // reproduction, with phenotype-driven lifecycle, disease and performance effects.
     class Monster extends Agent {
+        get health() {
+            return this.bodyHealth ? this.bodyHealth.total() : 0;
+        }
+        set health(value) {
+            if (this.bodyHealth) {
+                this.bodyHealth.setTotal(value);
+            }
+        }
+        get maxHealth() {
+            return this.bodyHealth ? this.bodyHealth.maxTotal() : 0;
+        }
+        set maxHealth(value) {
+            if (this.bodyHealth) {
+                this.bodyHealth.setMaxTotal(value);
+            }
+        }
         constructor(id, x, y, rng, options) {
             super(id, x, y, 16, options && options.speed ? options.speed : 165);
             this.agentKind = 'monster';
@@ -14073,11 +14146,9 @@ html {
             this.nutritionRequirement = options && Number.isFinite(options.nutritionRequirement) ? Math.max(0, options.nutritionRequirement) : DEFAULT_MONSTER_NUTRITION_REQUIREMENT;
             this.nutritionState = options && options.nutritionState ? options.nutritionState : NUTRITION_STATE.NOURISHED;
             this.foodEatenThisSeason = 0;
-            this.foodBoughtThisSeason = 0;
             // Hunger is a short-term appetite signal, not a synonym for seasonal
             // nutritional need. It can therefore permit surplus eating and fat gain.
             this.hunger = options && Number.isFinite(options.hunger) ? Clamp(options.hunger, 0, 1.5) : 0.58;
-            this.foodBoughtCostCreditsThisSeason = 0;
             this.foodFromCaptiveMacrofaunaThisSeason = 0;
             this.foodFromStoredMeatThisSeason = 0;
             this.foodFromPurchasedMeatThisSeason = 0;
@@ -14244,7 +14315,6 @@ html {
             this.seasonDistanceMoved = 0;
             this.seasonTerrainEffort = 0;
             this.seasonSprintingTicks = 0;
-            this.movementFoodRequired = 0;
             this.combatFoodRequired = 0;
             this.bodyMassFoodRequired = 0;
             this.tissueMaintenanceFoodRequired = 0;
@@ -14255,8 +14325,6 @@ html {
             if (settings.bodyHealth) {
                 this.restoreMonsterBodyHealth(settings.bodyHealth);
             }
-            this.maxHealth = this.bodyHealth.maxTotal();
-            this.health = this.bodyHealth.total();
         }
         restoreMonsterBodyHealth(snapshot) {
             var parts = this.bodyHealth.getParts();
@@ -15079,14 +15147,13 @@ html {
             var surfaceMassPenalty = Clamp(1 / Math.max(0.55, this.bodyScale || 1), 0.78, 1.55);
             var fatInsulation = Clamp(1 - ((this.currentFatMass || 0) / Math.max(1, this.currentBodyMass || 1)) * 1.8, 0.45, 1.10);
             this.thermalFoodRequired = coldStress * 0.85 * surfaceMassPenalty * fatInsulation + heatStress * 0.12;
-            this.movementFoodRequired = this.activityFoodThisSeason || 0;
             var r = this.phenotype && this.phenotype.reproduction ? this.phenotype.reproduction : null;
             var repair = r ? r.reproductiveRepair : 1;
             var recoveryFood = Math.max(0, this.reproductiveDepletion || 0) * 0.38 * Math.max(0.65, repair);
             var reproductionFood = Math.max(0, this.reproductiveFoodCostThisSeason || 0) + recoveryFood;
             var healingFood = NutritionSystem.getHealingFoodRequirement(this);
             var diseaseEffects = MonsterDiseaseSystem.combinedEffects(this);
-            var total = (this.bodyMassFoodRequired + this.tissueMaintenanceFoodRequired + this.thermalFoodRequired + this.movementFoodRequired + this.combatFoodRequired + reproductionFood + healingFood + growthFood) * diseaseEffects.foodMultiplier;
+            var total = (this.bodyMassFoodRequired + this.tissueMaintenanceFoodRequired + this.thermalFoodRequired + (this.activityFoodThisSeason || 0) + this.combatFoodRequired + reproductionFood + healingFood + growthFood) * diseaseEffects.foodMultiplier;
             this.nutritionRequirement = Math.max(1, Math.ceil(total));
             return this.nutritionRequirement;
         }
@@ -15668,8 +15735,6 @@ html {
                     raid.addEvent(this.name + ' suffered a permanent ' + damagedPart.replace(/([A-Z])/g, ' $1').toLowerCase() + ' injury.');
                 }
             }
-            this.health = this.bodyHealth.total();
-            this.maxHealth = this.bodyHealth.maxTotal();
             var actualDamage = Math.max(0, healthBeforeDamage - this.health);
             this.recordDamageTaken(Math.max(0, conditionBeforeDamage - this.getOverallConditionRatio()) * this.bodyHealth.maxTotal());
             if (attacker && attacker.agentKind === 'adventurer' && actualDamage > 0) {
@@ -15757,12 +15822,12 @@ html {
             s.nutritionState = this.nutritionState;
             s.foodEatenThisSeason = this.foodEatenThisSeason;
             s.hunger = NutritionSystem.getHunger(this);
-            s.foodBoughtThisSeason = this.foodBoughtThisSeason;
+            s.foodBoughtThisSeason = NutritionSystem.getLairFoodCommitted(this);
             s.foodFromCaptiveMacrofaunaThisSeason = this.foodFromCaptiveMacrofaunaThisSeason || 0;
             s.foodFromStoredMeatThisSeason = this.foodFromStoredMeatThisSeason || 0;
             s.foodFromPurchasedMeatThisSeason = this.foodFromPurchasedMeatThisSeason || 0;
             s.foodFromBodyReservesThisSeason = this.foodFromBodyReservesThisSeason || 0;
-            s.foodBoughtCostCreditsThisSeason = this.foodBoughtCostCreditsThisSeason || 0;
+            s.foodBoughtCostCreditsThisSeason = (this.foodFromPurchasedMeatThisSeason || 0) * DEFAULT_FOOD_COST_CREDITS;
             s.nutritionShortfallThisSeason = this.nutritionShortfallThisSeason;
             s.foodNeededThisSeason = NutritionSystem.getFoodNeeded(this);
             s.activityFoodThisSeason = this.activityFoodThisSeason || 0;
@@ -16648,8 +16713,8 @@ html {
                 reason: resultText,
                 startingTreasureValue: treasureBreakdown.starting.totalValue || 0,
                 endingTreasureValue: endingAfterFoodValue,
-                foodExpenditureCredits: treasureBreakdown.foodExpenditureCredits || 0,
-                treasureSoldForFoodValue: treasureBreakdown.foodExpenditureCredits || 0,
+                foodExpenditureCredits: treasureBreakdown.treasureSoldForFoodValue || 0,
+                treasureSoldForFoodValue: treasureBreakdown.treasureSoldForFoodValue || 0,
                 treasureLostValue: treasureBreakdown.stolen.totalValue || 0,
                 adventurersStartedByClass: Object.assign({}, summary.adventurersStartedByClass || {}),
                 adventurersReturnedAliveByClass: Object.assign({}, summary.adventurersReturnedAliveByClass || {}),
@@ -16699,15 +16764,11 @@ html {
             if (this.ownedMonsters.length > 0) {
                 this.recordFamilyMonster(this.ownedMonsters[0]);
             }
-            this.foodExpenditureCredits = 0;
-            this.roundFoodExpenditureCredits = 0;
             this.excessMeatFood = 0;
             // Authoritative amount of this season's fresh captive-macrofauna food
             // that has not been assigned to a monster. Allocations on monsters,
             // this pool and excessMeatFood are the only food inventory records.
             this.currentSeasonCaptiveFoodRemaining = 0;
-            this.treasureSoldForFoodValue = 0;
-            this.roundTreasureSoldForFoodValue = 0;
             this.wildMonsterHarvestByBiome = {};
             this.wildPopulation = [];
             this.wildPopulationWorldSeed = null;
@@ -16761,7 +16822,7 @@ html {
             this.recordFamilyMonster(monster);
             return { ok: true, monsterId: monster.id, monsterName: monster.name };
         }
-        releaseOwnedMonster(monsterId, world) {
+        releaseOwnedMonster(monsterId, world, seasonNumber) {
             var index = this.ownedMonsters.findIndex(function (monster) {
                 return monster.id === monsterId;
             });
@@ -16856,7 +16917,7 @@ html {
             monster.wild = true;
             monster.localWorldSeed = world ? world.seed : null;
             monster.wildResident = true;
-            monster.wildAvailableFromSeason = Math.max(1, (this.currentSeasonNumber || 1) + 1);
+            monster.wildAvailableFromSeason = Math.max(1, (seasonNumber || 1) + 1);
             if (!Number.isFinite(monster.wildHomeRangeX)) {
                 monster.wildHomeRangeX = ECOLOGICAL_UNIT_WIDTH * 0.5;
             }
@@ -17113,7 +17174,6 @@ html {
                     var healingAmount = Math.min(monster.bodyHealth.missingHealth(), 18 * NutritionSystem.getAgeHealingMultiplier(monster));
                     healed = monster.bodyHealth.healGeneral(healingAmount);
                     if (healed > 0) {
-                        monster.health = monster.bodyHealth.total();
                         events.push(monster.name + ' recovered ' + Math.round(healed) + ' injury points.');
                     }
                 }
@@ -17212,12 +17272,9 @@ html {
                     return { id: brood.id, motherId: brood.motherId, motherName: brood.motherName, fatherId: brood.fatherId, fatherName: brood.fatherName, seasonMated: brood.seasonMated, incubationSeasonsRemaining: brood.incubationSeasonsRemaining, clutchSize: brood.clutchSize, eggs: brood.eggs.map(function (egg) { return egg.getSnapshot(); }) };
                 }),
                 familyTree: Object.keys(this.familyTree).map(function (id) { return this.familyTree[id].getSnapshot(); }, this),
-                foodExpenditureCredits: this.treasureSoldForFoodValue || this.foodExpenditureCredits || 0,
-                roundFoodExpenditureCredits: this.roundFoodExpenditureCredits || 0,
+                foodExpenditureCredits: this.treasureSoldForFoodValue || 0,
                 excessMeatFood: this.excessMeatFood || 0,
                 currentSeasonCaptiveFoodRemaining: this.currentSeasonCaptiveFoodRemaining || 0,
-                treasureSoldForFoodValue: this.treasureSoldForFoodValue || 0,
-                roundTreasureSoldForFoodValue: this.roundTreasureSoldForFoodValue || 0
             };
         }
     }
@@ -18775,12 +18832,12 @@ html {
                     name: monster.name,
                     requirement: monster.nutritionRequirement || DEFAULT_MONSTER_NUTRITION_REQUIREMENT,
                     eatenInRaid: monster.foodEatenThisSeason || 0,
-                    fedAtBase: monster.foodBoughtThisSeason || 0,
-                    baseFoodCostCredits: monster.foodBoughtCostCreditsThisSeason || 0,
+                    fedAtBase: NutritionSystem.getLairFoodCommitted(monster),
+                    baseFoodCostCredits: (monster.foodFromPurchasedMeatThisSeason || 0) * NutritionSystem.getFoodCostCredits(this.world),
                     foodNeeded: NutritionSystem.getFoodNeeded(monster),
                     nutritionState: monster.nutritionState
                 };
-            });
+            }, this);
             return {
                 seed: this.seed,
                 worldSeed: this.world.seed,
@@ -18813,7 +18870,7 @@ html {
                 treasureLostValue: treasureBreakdown.stolen.totalValue,
                 treasureRemainingAfterFoodValue: treasureBreakdown.remainingAfterFoodValue,
                 endingTreasureAfterFoodValue: treasureBreakdown.remainingAfterFoodValue,
-                foodExpenditureCredits: treasureBreakdown.foodExpenditureCredits || 0,
+                foodExpenditureCredits: treasureBreakdown.treasureSoldForFoodValue || 0,
                 ownedNutrition: ownedNutrition,
                 foodEatenInRaidTotal: ownedNutrition.reduce(function (sum, row) {
                     return sum + row.eatenInRaid;
@@ -18897,7 +18954,7 @@ html {
                 }).map(function (animal) {
                     return animal.getSnapshot();
                 }),
-                foodExpenditureCredits: this.world.treasureSoldForFoodValue || this.world.foodExpenditureCredits || 0,
+                foodExpenditureCredits: this.world.treasureSoldForFoodValue || 0,
                 monsters: this.monsters.filter(function (monster) {
                     return !monster.escaped && monster.deployed;
                 }).map(function (monster) {
@@ -19196,7 +19253,6 @@ html {
                 });
             }, this);
             this.currentRaid.finalizeOwnedMonsterPerformance();
-            this.gameState.currentSeasonNumber = this.seasonNumber;
             var captivePreyFoodEaten = this.currentRaid.monsters.filter(function (m) { return m.owned; }).reduce(function (sum, m) { return sum + (m.foodEatenThisSeason || 0); }, 0);
             var wildBirths = this.gameState.breedWildPopulation(this.currentRaid.rng, this.world, this.seasonNumber, captivePreyFoodEaten);
             if (wildBirths.length) {
@@ -19304,8 +19360,6 @@ html {
             this.lastRaidSummary = null;
             this.roundSeasonHistory = [];
             this.roundRemains = [];
-            this.gameState.roundFoodExpenditureCredits = 0;
-            this.gameState.roundTreasureSoldForFoodValue = 0;
             this.gameState.resetWildMonsterDepletionForNewRound();
             this.world = World.createWorld(this.rng.integer(1, 0x7fffffff), this.getWorldOptions(this.baseWorldOptions));
             this.captiveMacrofaunaFoodPlan = this.calculateCaptiveMacrofaunaFoodPlan();
@@ -19402,10 +19456,16 @@ html {
             }, this);
             var totalDemand = monsters.reduce(function (sum, monster) { return sum + monster.demand; }, 0);
             var gameStateForFoodPlan = this.gameState;
-            var foodEatenInRaid = monsters.reduce(function (sum, entry) {
+            // Raid food can displace food already committed for the active season,
+            // but it must not be credited against the following season's plan.
+            // The monster fields are reset only when that next plan is committed,
+            // so management snapshots would otherwise read stale raid consumption,
+            // hide a real shortage, and then sell treasure when Start Season reset
+            // nutrition and prepared the full new-season requirement.
+            var foodEatenInRaid = this.phase === 'raid' ? monsters.reduce(function (sum, entry) {
                 var liveMonster = gameStateForFoodPlan.findOwnedMonster(entry.id);
                 return sum + Math.min(entry.demand, liveMonster ? (liveMonster.foodEatenThisSeason || 0) : 0);
-            }, 0);
+            }, 0) : 0;
             var netLairFoodDemand = Math.max(0, totalDemand - foodEatenInRaid);
             var storedMeat = Math.max(0, this.gameState.excessMeatFood || 0);
             var availableWithoutSale = fauna.foodProduced + storedMeat;
@@ -19518,11 +19578,6 @@ html {
                 }
             }, this);
             this.world.treasureSoldForFoodValue = (this.world.treasureSoldForFoodValue || 0) + salePreview.saleValue;
-            this.world.foodExpenditureCredits = this.world.treasureSoldForFoodValue;
-            this.gameState.treasureSoldForFoodValue = (this.gameState.treasureSoldForFoodValue || 0) + salePreview.saleValue;
-            this.gameState.roundTreasureSoldForFoodValue = (this.gameState.roundTreasureSoldForFoodValue || 0) + salePreview.saleValue;
-            this.gameState.foodExpenditureCredits = this.gameState.treasureSoldForFoodValue;
-            this.gameState.roundFoodExpenditureCredits = this.gameState.roundTreasureSoldForFoodValue;
             var oldStoredMeat = plan.storedExcessMeat;
             var captiveRemaining = plan.captiveMacrofauna.foodProduced;
             var storedRemaining = oldStoredMeat;
@@ -19543,8 +19598,6 @@ html {
                 monster.foodFromCaptiveMacrofaunaThisSeason = fromCaptive;
                 monster.foodFromStoredMeatThisSeason = fromStored;
                 monster.foodFromPurchasedMeatThisSeason = fromPurchased;
-                monster.foodBoughtThisSeason = fromCaptive + fromStored + fromPurchased;
-                monster.foodBoughtCostCreditsThisSeason = fromPurchased * NutritionSystem.getFoodCostCredits(this.world);
             }, this);
             // Unused fresh captive production does not carry over; only meat obtained
             // by selling indivisible treasure units remains in cold storage.
@@ -19605,7 +19658,7 @@ html {
                     reason: 'Owned monsters can be released into the wild only during inter-season management.'
                 };
             }
-            var result = this.gameState.releaseOwnedMonster(monsterId, this.world);
+            var result = this.gameState.releaseOwnedMonster(monsterId, this.world, this.seasonNumber);
             if (result.ok) {
                 this.pendingEvents.push({
                     tickNumber: 0,
@@ -19784,7 +19837,7 @@ html {
                 treasures: treasureSnapshots,
                 treasureDeposits: treasureSnapshots,
                 treasureBreakdown: this.world.getTreasureBreakdown(),
-                foodExpenditureCredits: this.world.treasureSoldForFoodValue || this.world.foodExpenditureCredits || 0,
+                foodExpenditureCredits: this.world.treasureSoldForFoodValue || 0,
                 droppedTreasure: [],
                 remains: this.roundRemains.slice(0),
                 macrofauna: [],
@@ -20453,7 +20506,6 @@ html {
         threatRegressionMonster.bodyHealth.getParts().forEach(function (part) {
             threatRegressionMonster.bodyHealth[part] = Math.max(1, threatRegressionMonster.bodyHealth.maxEach * 0.35);
         });
-        threatRegressionMonster.health = threatRegressionMonster.bodyHealth.total();
         raid.adventurers = [threatRegressionKnight];
         threatRegressionMonster.update(raid);
         AddRegressionResult(results, 'A genetically fearful injured monster interrupts its normal priority cascade and flees a visible knight', threatRegressionMonster.behaviourState === 'fleeingFromThreat', 'state=' + threatRegressionMonster.behaviourState);
@@ -20777,7 +20829,7 @@ html {
             treasureSoldForFoodValue: 20,
             foodExpenditureCredits: 0
         }, []);
-        AddRegressionResult(results, 'Treasure sold for food is reported separately from stolen treasure', accountingBreakdown.foodExpenditureCredits === 20 && accountingBreakdown.treasureSoldForFoodValue === 20 && accountingBreakdown.stolen.totalValue === 10 && accountingBreakdown.remainingAfterFoodValue === 70, 'breakdown=' + JSON.stringify(accountingBreakdown));
+        AddRegressionResult(results, 'Treasure sold for food is reported separately from stolen treasure', accountingBreakdown.treasureSoldForFoodValue === 20 && accountingBreakdown.stolen.totalValue === 10 && accountingBreakdown.remainingAfterFoodValue === 70, 'breakdown=' + JSON.stringify(accountingBreakdown));
         var endScreenSession = new GameSession(54321, {
             mode: 'campaign',
             worldOptions: {
@@ -21374,7 +21426,7 @@ html {
         var satiatedHunter = new Monster('satiated_cat_hunter', 320, 320, new SeededRng(424268), {});
         satiatedHunter.deployed = true;
         satiatedHunter.hunger = 0;
-        satiatedHunter.foodBoughtThisSeason = NutritionSystem.getMonsterRequirement(satiatedHunter);
+        satiatedHunter.foodFromCaptiveMacrofaunaThisSeason = NutritionSystem.getMonsterRequirement(satiatedHunter);
         var catHuntHare = new Macrofauna('cat_hunt_hare', 'hare', 320, 320, new SeededRng(424269));
         catHuntRaid.monsters = [satiatedHunter];
         catHuntRaid.adventurers = [];
@@ -21392,7 +21444,7 @@ html {
         fallenMonster.corpseState = 'corpse';
         fallenMonster.edibleFoodRemaining = 4;
         scavenger.foodEatenThisSeason = 0;
-        scavenger.foodBoughtThisSeason = 0;
+        scavenger.foodFromCaptiveMacrofaunaThisSeason = 0;
         scavenger.nutritionRequirement = Math.max(8, scavenger.nutritionRequirement || 8);
         scavengingRaid.monsters = [scavenger, fallenMonster];
         scavengingRaid.adventurers = [];
@@ -21412,7 +21464,7 @@ html {
         AddRegressionResult(results, 'Explorers collect treasure faster than double villagers across weighted individual variation', explorerAverage < doubleVillagerAverage, 'explorer=' + explorerAverage.toFixed(3) + ', doubleVillager=' + doubleVillagerAverage.toFixed(3));
         satiatedHunter.hunger = 1.0;
         var fatFoodRequirement = NutritionSystem.getMonsterRequirement(satiatedHunter);
-        satiatedHunter.foodBoughtThisSeason = fatFoodRequirement;
+        satiatedHunter.foodFromCaptiveMacrofaunaThisSeason = fatFoodRequirement;
         var fatMassBeforeSurplus = satiatedHunter.currentFatMass;
         var surplusConsumed = NutritionSystem.consumeOneFoodFromCarcass(satiatedHunter, catHuntHare);
         NutritionSystem.applyNutritionStateFromSeason(satiatedHunter, new SeededRng(424270));
@@ -21463,11 +21515,11 @@ html {
         raidFoodMonster.foodFromCaptiveMacrofaunaThisSeason = Math.max(0, raidFoodRequirement - 4);
         raidFoodMonster.foodFromStoredMeatThisSeason = 2;
         raidFoodMonster.foodFromPurchasedMeatThisSeason = 2;
-        raidFoodMonster.foodBoughtThisSeason = raidFoodRequirement;
+        
         raidFoodMonster.foodEatenThisSeason = 4;
         raidFoodEconomySession.gameState.excessMeatFood = 0;
         var raidFoodSettlement = NutritionSystem.settleLairFoodAfterRaid(raidFoodEconomySession.gameState, raidFoodEconomySession.world, [raidFoodMonster]);
-        AddRegressionResult(results, 'Raid food displaces purchased and stored lair meat before captive production', raidFoodMonster.foodBoughtThisSeason === (raidFoodMonster.foodFromPurchasedMeatThisSeason || 0) + (raidFoodMonster.foodFromStoredMeatThisSeason || 0) + (raidFoodMonster.foodFromCaptiveMacrofaunaThisSeason || 0) && raidFoodSettlement.purchasedMeatStored === Math.min(2, raidFoodSettlement.lairFoodReleased) && raidFoodSettlement.previousStoredMeatReturned === Math.min(2, Math.max(0, raidFoodSettlement.lairFoodReleased - 2)) && raidFoodSettlement.captiveFoodUnused === Math.max(0, raidFoodSettlement.lairFoodReleased - 4) && raidFoodEconomySession.gameState.excessMeatFood === raidFoodSettlement.purchasedMeatStored + raidFoodSettlement.previousStoredMeatReturned, 'lair=' + raidFoodMonster.foodBoughtThisSeason + ', stored=' + raidFoodEconomySession.gameState.excessMeatFood + ', released=' + raidFoodSettlement.lairFoodReleased);
+        AddRegressionResult(results, 'Raid food displaces purchased and stored lair meat before captive production', NutritionSystem.getLairFoodCommitted(raidFoodMonster) === (raidFoodMonster.foodFromPurchasedMeatThisSeason || 0) + (raidFoodMonster.foodFromStoredMeatThisSeason || 0) + (raidFoodMonster.foodFromCaptiveMacrofaunaThisSeason || 0) && raidFoodSettlement.purchasedMeatStored === Math.min(2, raidFoodSettlement.lairFoodReleased) && raidFoodSettlement.previousStoredMeatReturned === Math.min(2, Math.max(0, raidFoodSettlement.lairFoodReleased - 2)) && raidFoodSettlement.captiveFoodUnused === Math.max(0, raidFoodSettlement.lairFoodReleased - 4) && raidFoodEconomySession.gameState.excessMeatFood === raidFoodSettlement.purchasedMeatStored + raidFoodSettlement.previousStoredMeatReturned, 'lair=' + NutritionSystem.getLairFoodCommitted(raidFoodMonster) + ', stored=' + raidFoodEconomySession.gameState.excessMeatFood + ', released=' + raidFoodSettlement.lairFoodReleased);
         raidFoodMonster.foodEatenThisSeason = 4;
         var captureFoodState = new GameState(new SeededRng(880771), 'quick', session.world);
         captureFoodState.ownedMonsters = [];
@@ -21493,16 +21545,23 @@ html {
         var allocationPlan = allocationTruthSession.getSeasonFoodPlan();
         var deliberatelyLowAllocations = allocationPlan.monsters.map(function (entry) { return { monsterId: entry.id, food: 0 }; });
         var allocationResult = allocationTruthSession.prepareFoodForSeason(deliberatelyLowAllocations);
-        AddRegressionResult(results, 'Committed seasonal allocation creates exactly one authoritative unallocated captive-food pool', allocationResult.ok && allocationTruthSession.gameState.currentSeasonCaptiveFoodRemaining === allocationPlan.captiveMacrofauna.foodProduced && allocationTruthSession.gameState.getLivingOwnedMonsters().every(function (monster) { return (monster.foodBoughtThisSeason || 0) === 0; }), 'pool=' + allocationTruthSession.gameState.currentSeasonCaptiveFoodRemaining + ', produced=' + allocationPlan.captiveMacrofauna.foodProduced);
+        AddRegressionResult(results, 'Committed seasonal allocation creates exactly one authoritative unallocated captive-food pool', allocationResult.ok && allocationTruthSession.gameState.currentSeasonCaptiveFoodRemaining === allocationPlan.captiveMacrofauna.foodProduced && allocationTruthSession.gameState.getLivingOwnedMonsters().every(function (monster) { return NutritionSystem.getLairFoodCommitted(monster) === 0; }), 'pool=' + allocationTruthSession.gameState.currentSeasonCaptiveFoodRemaining + ', produced=' + allocationPlan.captiveMacrofauna.foodProduced);
         var injuredNutritionMonster = new Monster('nutrition_death_test', 0, 0, new SeededRng(880775), { owned: true, world: session.world });
         injuredNutritionMonster.bodyHealth.getParts().forEach(function (part) { injuredNutritionMonster.bodyHealth[part] = 0.1; });
         injuredNutritionMonster.currentFatMass = 0;
-        injuredNutritionMonster.foodBoughtThisSeason = 0;
+        
         injuredNutritionMonster.foodEatenThisSeason = 0;
         injuredNutritionMonster.applyNutritionBodyDamage(injuredNutritionMonster.bodyHealth.maxEach * 0.18, new SeededRng(880776));
         AddRegressionResult(results, 'Nutrition damage deaths always receive an observable cause', !injuredNutritionMonster.alive && injuredNutritionMonster.observableCauseOfDeath === 'Malnutrition complicated by injuries', 'alive=' + injuredNutritionMonster.alive + ', cause=' + injuredNutritionMonster.observableCauseOfDeath);
+        raidFoodEconomySession.phase = 'raid';
         var raidFoodPlan = raidFoodEconomySession.getSeasonFoodPlan();
         AddRegressionResult(results, 'Live captive food balance credits food eaten during the raid', raidFoodPlan.foodEatenInRaid === raidFoodSettlement.raidFoodUsed && raidFoodPlan.netLairFoodDemand === Math.max(0, raidFoodPlan.totalDemand - raidFoodSettlement.raidFoodUsed) && raidFoodPlan.baseFoodBalance === raidFoodPlan.captiveMacrofauna.foodProduced - raidFoodPlan.netLairFoodDemand, 'eaten=' + raidFoodPlan.foodEatenInRaid + ', net=' + raidFoodPlan.netLairFoodDemand + ', balance=' + raidFoodPlan.baseFoodBalance);
+        raidFoodEconomySession.phase = 'management';
+        var nextSeasonFoodPlan = raidFoodEconomySession.getSeasonFoodPlan();
+        AddRegressionResult(results, 'Management food forecast never credits stale food eaten in the previous raid', nextSeasonFoodPlan.foodEatenInRaid === 0 && nextSeasonFoodPlan.netLairFoodDemand === nextSeasonFoodPlan.totalDemand && nextSeasonFoodPlan.shortage === Math.max(0, nextSeasonFoodPlan.totalDemand - nextSeasonFoodPlan.availableWithoutSale), 'eaten=' + nextSeasonFoodPlan.foodEatenInRaid + ', demand=' + nextSeasonFoodPlan.totalDemand + ', shortage=' + nextSeasonFoodPlan.shortage);
+        AddRegressionResult(results, 'Lair food total is derived from the three physical food pools', !Object.prototype.hasOwnProperty.call(raidFoodMonster, 'foodBoughtThisSeason') && NutritionSystem.getLairFoodCommitted(raidFoodMonster) === (raidFoodMonster.foodFromCaptiveMacrofaunaThisSeason || 0) + (raidFoodMonster.foodFromStoredMeatThisSeason || 0) + (raidFoodMonster.foodFromPurchasedMeatThisSeason || 0), 'committed=' + NutritionSystem.getLairFoodCommitted(raidFoodMonster));
+        AddRegressionResult(results, 'Monster aggregate health is derived from body parts rather than cached', !Object.prototype.hasOwnProperty.call(raidFoodMonster, 'health') && !Object.prototype.hasOwnProperty.call(raidFoodMonster, 'maxHealth') && raidFoodMonster.health === raidFoodMonster.bodyHealth.total() && raidFoodMonster.maxHealth === raidFoodMonster.bodyHealth.maxTotal(), 'health=' + raidFoodMonster.health + '/' + raidFoodMonster.maxHealth);
+        AddRegressionResult(results, 'Treasure sold for food has one mutable World representation', !Object.prototype.hasOwnProperty.call(allocationTruthSession.world, 'foodExpenditureCredits') && !Object.prototype.hasOwnProperty.call(allocationTruthSession.gameState, 'treasureSoldForFoodValue') && !Object.prototype.hasOwnProperty.call(allocationTruthSession.gameState, 'foodExpenditureCredits'), 'world=' + allocationTruthSession.world.treasureSoldForFoodValue);
         var tinyMonster = new Monster('polar_predation_tiny', 200, 200, new SeededRng(424280), {});
         tinyMonster.deployed = true;
         tinyMonster.currentBodyMass = 28;
@@ -22083,7 +22142,11 @@ html {
         if (!Number.isFinite(session.world.treasureSoldForFoodValue)) {
             session.world.treasureSoldForFoodValue = Math.max(0, session.world.foodExpenditureCredits || session.gameState.roundTreasureSoldForFoodValue || 0);
         }
-        session.world.foodExpenditureCredits = session.world.treasureSoldForFoodValue;
+        delete session.world.foodExpenditureCredits;
+        delete session.gameState.foodExpenditureCredits;
+        delete session.gameState.roundFoodExpenditureCredits;
+        delete session.gameState.treasureSoldForFoodValue;
+        delete session.gameState.roundTreasureSoldForFoodValue;
         session.gameState.mode = session.gameState.mode || session.mode;
         session.gameState.ownedMonsters.forEach(function (monster) {
             if (monster.importedSourceId === undefined) {
@@ -23633,7 +23696,7 @@ html {
         d.appendChild(food);
         var treasure = E('section', 'dashboardCard');
         treasure.appendChild(E('div', 'dashboardHeading', '\ud83e\ude99 Treasure'));
-        var x = s.treasureBreakdown || {}, start = x.starting && x.starting.totalValue || 0, stolen = x.stolen && x.stolen.totalValue || 0, sold = Number.isFinite(x.foodExpenditureCredits) ? x.foodExpenditureCredits : (s.foodExpenditureCredits || 0), physical = x.remaining && x.remaining.totalValue || 0, remaining = x.remainingAfterFoodValue !== undefined ? x.remainingAfterFoodValue : Math.max(0, physical - sold), total = Math.max(1, start, remaining + sold + stolen), track = E('div', 'treasureTrack'), treasureTooltip = 'On map: ' + FormatNumber(remaining) + '. Sold for food: ' + FormatNumber(sold) + '. Stolen: ' + FormatNumber(stolen) + '.';
+        var x = s.treasureBreakdown || {}, start = x.starting && x.starting.totalValue || 0, stolen = x.stolen && x.stolen.totalValue || 0, sold = Number.isFinite(x.treasureSoldForFoodValue) ? x.treasureSoldForFoodValue : (s.foodExpenditureCredits || 0), physical = x.remaining && x.remaining.totalValue || 0, remaining = x.remainingAfterFoodValue !== undefined ? x.remainingAfterFoodValue : Math.max(0, physical - sold), total = Math.max(1, start, remaining + sold + stolen), track = E('div', 'treasureTrack'), treasureTooltip = 'On map: ' + FormatNumber(remaining) + '. Sold for food: ' + FormatNumber(sold) + '. Stolen: ' + FormatNumber(stolen) + '.';
         track.title = treasureTooltip;
         track.setAttribute('aria-label', treasureTooltip);
         [[remaining, 'treasureSegment treasureRemaining', 'On map'], [sold, 'treasureSegment treasureSold', 'Sold for food'], [stolen, 'treasureSegment treasureStolen', 'Stolen']].forEach(function (p) { var q = E('div', p[1]); q.style.width = 100 * p[0] / total + '%'; q.title = p[2] + ': ' + FormatNumber(p[0]); if (!p[0])
@@ -23792,7 +23855,7 @@ html {
             title.textContent = 'Treasure history and composition';
             var h = history.slice(0), currentBreakdown = s.treasureBreakdown || {};
             if (!h.some(function (r) { return r.seasonNumber === s.seasonNumber; })) {
-                h.push({ seasonNumber: s.seasonNumber, treasureRemainingValue: currentBreakdown.remainingAfterFoodValue !== undefined ? currentBreakdown.remainingAfterFoodValue : (currentBreakdown.remaining && currentBreakdown.remaining.totalValue || 0), treasureSoldForFoodValue: currentBreakdown.foodExpenditureCredits || s.foodExpenditureCredits || 0, treasureStolenValue: currentBreakdown.stolen && currentBreakdown.stolen.totalValue || 0 });
+                h.push({ seasonNumber: s.seasonNumber, treasureRemainingValue: currentBreakdown.remainingAfterFoodValue !== undefined ? currentBreakdown.remainingAfterFoodValue : (currentBreakdown.remaining && currentBreakdown.remaining.totalValue || 0), treasureSoldForFoodValue: currentBreakdown.treasureSoldForFoodValue || s.foodExpenditureCredits || 0, treasureStolenValue: currentBreakdown.stolen && currentBreakdown.stolen.totalValue || 0 });
             }
             body.appendChild(LineChart([h.map(function (r) { return r.treasureRemainingValue; }), h.map(function (r) { return r.treasureSoldForFoodValue; }), h.map(function (r) { return r.treasureStolenValue; })], h.map(function (r) { return String(r.seasonNumber); }), ['#ca8a04', '#7c3aed', '#b91c1c'], 'Treasure value'));
             AddLegend(body, [['Remaining', '#ca8a04'], ['Sold for food', '#7c3aed'], ['Stolen', '#b91c1c']]);
