@@ -4560,6 +4560,10 @@ html {
     // Old-age mortality uses a smooth Weibull survival curve rather than a hard
     // maximum age, so exceptional longevity remains possible but increasingly rare.
     var MONSTER_SEASONS_PER_YEAR = 4;
+    // Campaign founders are established young adults, but must not begin play old
+    // enough for an unlucky founder to reach age-related mortality immediately.
+    var CAMPAIGN_FOUNDER_MIN_AGE_SEASONS = 2 * MONSTER_SEASONS_PER_YEAR;
+    var CAMPAIGN_FOUNDER_MAX_AGE_SEASONS = 3 * MONSTER_SEASONS_PER_YEAR;
     var MONSTER_AGEING_START_SEASONS = 4 * MONSTER_SEASONS_PER_YEAR;
     var MONSTER_AVERAGE_LIFE_EXPECTANCY_SEASONS = 6 * MONSTER_SEASONS_PER_YEAR;
     var MONSTER_SENESCENT_START_SEASONS = 7 * MONSTER_SEASONS_PER_YEAR;
@@ -16674,7 +16678,8 @@ html {
                     owned: true,
                     name: 'Gribble',
                     selectedForDeployment: true,
-                    world: world
+                    world: world,
+                    ageInSeasons: rng.integer(CAMPAIGN_FOUNDER_MIN_AGE_SEASONS, CAMPAIGN_FOUNDER_MAX_AGE_SEASONS)
                 }));
             }
             candidates.sort(function (a, b) { return (a.currentBodyMass || 100) - (b.currentBodyMass || 100); });
@@ -21515,6 +21520,7 @@ html {
         AddRegressionResult(results, 'Hares and foxes have explicit small realistic body masses', MACROFAUNA_PROFILE.hare.bodyMass >= 3 && MACROFAUNA_PROFILE.hare.bodyMass <= 6 && MACROFAUNA_PROFILE.fox.bodyMass > MACROFAUNA_PROFILE.hare.bodyMass && MACROFAUNA_PROFILE.fox.bodyMass < 15, 'hare=' + MACROFAUNA_PROFILE.hare.bodyMass + ', fox=' + MACROFAUNA_PROFILE.fox.bodyMass);
         var founder = session.gameState.ownedMonsters[0];
         AddRegressionResult(results, 'Campaign founder is a small-end locally selected predator', founder.currentBodyMass >= 18 && founder.currentBodyMass <= 75, 'mass=' + founder.currentBodyMass.toFixed(1));
+        AddRegressionResult(results, 'Campaign founder begins no older than three years', founder.ageInSeasons >= CAMPAIGN_FOUNDER_MIN_AGE_SEASONS && founder.ageInSeasons <= CAMPAIGN_FOUNDER_MAX_AGE_SEASONS, 'ageSeasons=' + founder.ageInSeasons + ', maximum=' + CAMPAIGN_FOUNDER_MAX_AGE_SEASONS);
         // Balance must be checked over a local founder population, not one lucky
         // animal. These are ordinary local natural-selection products sampled from
         // the smaller end exactly as campaign founders are; no combat trait is edited.
