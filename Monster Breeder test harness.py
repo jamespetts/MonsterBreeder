@@ -104,7 +104,8 @@ function makeElement(id) {
         removeChild(child) {},
         querySelector() { return makeElement('query'); },
         getBoundingClientRect() { return { width: 960, height: 540, left: 0, top: 0 }; },
-        addEventListener() {},
+        listeners: {},
+        addEventListener(type, callback) { this.listeners[type] = callback; },
         setAttribute(key, value) { this[key] = value; },
         removeAttribute(key) { delete this[key]; },
         focus() {},
@@ -156,6 +157,11 @@ const mainContext = {
 };
 vm.createContext(mainContext);
 vm.runInContext(mainSource, mainContext, { filename: 'mainBrowserScript.js' });
+const quickGameButton = elements.quickGameMenuButton;
+if (!quickGameButton || typeof quickGameButton.listeners.click !== 'function') {
+    throw new Error('Main renderer did not register the quick-game click handler');
+}
+quickGameButton.listeners.click();
 const workerMessages = [];
 const workerContext = { console, setInterval() {}, clearInterval() {}, Date, Math, Object, Array, Number, String, Boolean, JSON };
 workerContext.self = { postMessage: (message) => workerMessages.push(message) };
