@@ -5852,9 +5852,7 @@ html {
                 }
             }
         }
-        static removeStreamComponentsNotTerminatingAtSea(cols, rows, waterKind, channelId, channelOrder, channelWidth, waterSurfaceHeight) {
-            TerrainGrid.removeStreamComponentsNotTerminatingAtOutlet(cols, rows, waterKind, channelId, channelOrder, channelWidth, waterSurfaceHeight, true);
-        }
+
         static renumberStreamChannels(cols, rows, waterKind, channelId) {
             var components = TerrainGrid.collectStreamComponents(cols, rows, waterKind);
             for (var i = 0; i < channelId.length; i += 1) {
@@ -6593,10 +6591,7 @@ html {
         getHeightAtTile(tx, ty) {
             return this.getTileHeightAtTile(tx, ty);
         }
-        getTileHeightAtWorld(x, y) {
-            var tile = this.worldToTile(x, y);
-            return this.getTileHeightAtTile(tile.tx, tile.ty);
-        }
+
         getHeightAtWorld(x, y) {
             var gx = Clamp(x / this.tileSize - 0.5, 0, this.cols - 1);
             var gy = Clamp(y / this.tileSize - 0.5, 0, this.rows - 1);
@@ -6614,9 +6609,7 @@ html {
             var h1 = h01 + (h11 - h01) * fx;
             return h0 + (h1 - h0) * fy;
         }
-        getInterpolatedHeightAtWorld(x, y) {
-            return this.getHeightAtWorld(x, y);
-        }
+
         getHeightTransitionDeltaBetweenTiles(ax, ay, bx, by) {
             return this.getTileHeightAtTile(bx, by) - this.getTileHeightAtTile(ax, ay);
         }
@@ -6723,23 +6716,7 @@ html {
             }
             return false;
         }
-        isHardHeightTransitionBetween(fromX, fromY, toX, toY) {
-            var steps = Math.max(2, Math.ceil(Distance(fromX, fromY, toX, toY) / Math.max(12, this.tileSize / 4)));
-            var previousTile = this.worldToTile(fromX, fromY);
-            for (var i = 1; i <= steps; i += 1) {
-                var t = i / steps;
-                var x = fromX + (toX - fromX) * t;
-                var y = fromY + (toY - fromY) * t;
-                var tile = this.worldToTile(x, y);
-                if (tile.tx !== previousTile.tx || tile.ty !== previousTile.ty) {
-                    if (this.getHeightTransitionBetweenTiles(previousTile.tx, previousTile.ty, tile.tx, tile.ty).isHardTransition) {
-                        return true;
-                    }
-                }
-                previousTile = tile;
-            }
-            return false;
-        }
+
         getSlopeAtTile(tx, ty) {
             var here = this.getHeightAtTile(tx, ty);
             var east = this.getHeightAtTile(tx + 1, ty);
@@ -7415,31 +7392,7 @@ html {
             }
             return normaliser > 0 ? value / normaliser : 0;
         }
-        static getLowestNeighbourIndex(index, cols, rows, heights) {
-            var x = index % cols;
-            var y = Math.floor(index / cols);
-            var here = heights[index];
-            var bestIndex = index;
-            var bestHeight = here;
-            for (var dy = -1; dy <= 1; dy += 1) {
-                for (var dx = -1; dx <= 1; dx += 1) {
-                    if (dx === 0 && dy === 0) {
-                        continue;
-                    }
-                    var nx = x + dx;
-                    var ny = y + dy;
-                    if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) {
-                        continue;
-                    }
-                    var ni = ny * cols + nx;
-                    if (heights[ni] < bestHeight) {
-                        bestHeight = heights[ni];
-                        bestIndex = ni;
-                    }
-                }
-            }
-            return bestIndex;
-        }
+
         static approximateSlopeAtIndex(index, cols, rows, heights) {
             var x = index % cols;
             var y = Math.floor(index / cols);
@@ -7624,11 +7577,7 @@ html {
             var tile = World.edgeTileCoordinates(grid, edge, edge === 'left' || edge === 'right' ? centreRow : centreCol);
             grid.terrainTypes[grid.index(tile.tx, tile.ty)] = TERRAIN_TYPE.GRASS;
         }
-        static ensureRequiredEntryEdgeLand(grid, settings) {
-            var adventurerEntryEdge = World.getConfiguredAdventurerEntryEdge(settings);
-            World.ensureEntryEdgeLand(grid, adventurerEntryEdge);
-            World.ensureEntryEdgeLand(grid, 'right');
-        }
+
         static campaignTreasureTierProbabilities(roundNumber) {
             var round = Math.max(1, Math.floor(roundNumber || 1));
             // The 25-round campaign provides a long breeding interval before plate
@@ -7986,95 +7935,7 @@ html {
             }
             return TerrainRules.movementCostBetween(agent, grid.getTerrainTypeAtWorld(fromCentre.x, fromCentre.y), grid.getTerrainTypeAtWorld(toCentre.x, toCentre.y), grid.getHeightAtWorld(fromCentre.x, fromCentre.y), grid.getHeightAtWorld(toCentre.x, toCentre.y), grid.getSlopeAtWorld(toCentre.x, toCentre.y));
         }
-        static treasureProbePathExists(grid, objects, startPoint, targetPoint) {
-            var cols = Math.floor(World.mapWidthForGrid(grid) / NAV_CELL_SIZE) + 1;
-            var rows = Math.floor(World.mapHeightForGrid(grid) / NAV_CELL_SIZE) + 1;
-            var start = World.nearestOpenTreasureProbeCell(grid, objects, startPoint);
-            var goal = World.nearestOpenTreasureProbeCell(grid, objects, targetPoint);
-            if (!start || !goal) {
-                return false;
-            }
-            var open = new BinaryHeap(function (a, b) {
-                return a.f - b.f;
-            });
-            var gScore = {};
-            var closed = {};
-            var directions = [[1,
-                    0],
-                [-1,
-                    0],
-                [0,
-                    1],
-                [0,
-                    -1],
-                [1,
-                    1],
-                [1,
-                    -1],
-                [-1,
-                    1],
-                [-1,
-                    -1]];
-            gScore[start.cx + ',' + start.cy] = 0;
-            open.push({
-                cx: start.cx,
-                cy: start.cy,
-                g: 0,
-                f: Math.hypot(goal.cx - start.cx, goal.cy - start.cy)
-            });
-            while (open.length > 0) {
-                var current = open.pop();
-                if (!current) {
-                    break;
-                }
-                var currentKey = current.cx + ',' + current.cy;
-                if (closed[currentKey]) {
-                    continue;
-                }
-                closed[currentKey] = true;
-                if (current.cx === goal.cx && current.cy === goal.cy) {
-                    return true;
-                }
-                for (var i = 0; i < directions.length; i += 1) {
-                    var nx = current.cx + directions[i][0];
-                    var ny = current.cy + directions[i][1];
-                    if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) {
-                        continue;
-                    }
-                    if (!World.navCellIsOpenForTreasureProbe(grid, objects, nx, ny)) {
-                        continue;
-                    }
-                    if (directions[i][0] !== 0 && directions[i][1] !== 0) {
-                        if (!World.navCellIsOpenForTreasureProbe(grid, objects, current.cx + directions[i][0], current.cy) || !World.navCellIsOpenForTreasureProbe(grid, objects, current.cx, current.cy + directions[i][1])) {
-                            continue;
-                        }
-                    }
-                    var movementCost = World.treasureProbeMovementCostBetween(grid, {
-                        cx: current.cx,
-                        cy: current.cy
-                    }, {
-                        cx: nx,
-                        cy: ny
-                    });
-                    if (movementCost >= 9999) {
-                        continue;
-                    }
-                    var step = (directions[i][0] === 0 || directions[i][1] === 0) ? 1 : 1.414;
-                    var tentative = current.g + step * movementCost;
-                    var neighbourKey = nx + ',' + ny;
-                    if (gScore[neighbourKey] === undefined || tentative < gScore[neighbourKey]) {
-                        gScore[neighbourKey] = tentative;
-                        open.push({
-                            cx: nx,
-                            cy: ny,
-                            g: tentative,
-                            f: tentative + Math.hypot(goal.cx - nx, goal.cy - ny)
-                        });
-                    }
-                }
-            }
-            return false;
-        }
+
         static treasureReachabilityMapFromEntryEdge(grid, objects, adventurerEntryEdge) {
             var entryEdge = adventurerEntryEdge || DEFAULT_ADVENTURER_ENTRY_EDGE;
             var blockingIds = objects.filter(function (object) {
@@ -8303,9 +8164,7 @@ html {
                 deposit.terrainHeight = grid.getHeightAtWorld(deposit.x, deposit.y);
             });
         }
-        getBlockingTerrainObjects() {
-            return this.blockingTerrainObjects;
-        }
+
         obstacleCellKey(cx, cy) {
             return cx + ',' + cy;
         }
@@ -8701,14 +8560,7 @@ html {
             }
             return total;
         }
-        getStartingTreasureValue() {
-            var total = 0;
-            for (var i = 0; i < this.treasureDeposits.length; i += 1) {
-                var deposit = this.treasureDeposits[i];
-                total += deposit.startingAmount * TREASURE_TYPES[deposit.treasureType].unitValue;
-            }
-            return total;
-        }
+
         getTreasureBreakdown(extraLooseTreasure) {
             var breakdown = {
                 starting: {
@@ -8818,10 +8670,7 @@ html {
                 terrainObjects: this.getObstacleSnapshots()
             };
         }
-        getDebugSnapshot() {
-            var snapshot = this.getStaticSnapshot();
-            return Object.assign(snapshot, this.getTreasureStateSnapshot([]));
-        }
+
     }
     // ============================================================================
     // MODULE: BODY HEALTH
@@ -8879,24 +8728,11 @@ html {
             this[part] = Math.max(0, (this[part] || 0) - amount);
             return part;
         }
-        applyDamageToPart(part, amount) {
-            if (this.getParts().indexOf(part) < 0) {
-                part = this.mainBodyPartName();
-            }
-            this[part] = Math.max(0, (this[part] || 0) - Math.max(0, amount || 0));
-            return part;
-        }
+
         maximumForPart(part) {
             return Math.max(0, this.maxEach - (this.permanentLoss[part] || 0));
         }
-        permanentLossTotal() {
-            var total = 0;
-            var parts = this.getParts();
-            for (var i = 0; i < parts.length; i += 1) {
-                total += this.permanentLoss[parts[i]] || 0;
-            }
-            return total;
-        }
+
         addPermanentLoss(part, amount) {
             if (this.getParts().indexOf(part) < 0) {
                 return 0;
@@ -9077,9 +8913,7 @@ html {
                 maxY: world.height + Math.max(0, policy.bottomMargin || 0)
             };
         }
-        hasLeftPlayableArea(world) {
-            return this.x < 0 || this.x > world.width || this.y < 0 || this.y > world.height;
-        }
+
         hasReachedMapExitTarget(world, tx, ty) {
             return (tx <= 0 && this.x <= 0) || (tx >= world.width && this.x >= world.width) || (ty <= 0 && this.y <= 0) || (ty >= world.height && this.y >= world.height);
         }
@@ -11879,10 +11713,7 @@ html {
         getSlotCount() {
             return this.homologueA.length;
         }
-        getAllelePair(slotIndex) {
-            return [this.homologueA[slotIndex],
-                this.homologueB[slotIndex]];
-        }
+
         expressTo(context) {
             for (var i = 0; i < this.getSlotCount(); i += 1) {
                 ChromosomePair.expressAllelePair(this.homologueA[i], this.homologueB[i], context);
@@ -13079,15 +12910,9 @@ html {
             var weights = this.getContextualNaturalSelectionSlotWeights(traitDefinition, profile, slotIndex);
             return this.pickAlleleFromWeights(pool, weights, rng);
         }
-        pickAlleleForColourSlot(slotIndex, rng, profile) {
-            return this.pickAlleleForTraitSlot(MonsterColourTraitDefinition, slotIndex, rng, profile);
-        }
-        pickAlleleForMetabolismSlot(slotIndex, rng, profile) {
-            return this.pickAlleleForTraitSlot(MonsterMetabolismTraitDefinition, slotIndex, rng, profile);
-        }
-        pickAlleleForMorphologySlot(slotIndex, rng, profile) {
-            return this.pickAlleleForTraitSlot(MonsterMorphologyTraitDefinition, slotIndex, rng, profile);
-        }
+
+
+
         pickAlleleFromWeights(pool, weights, rng) {
             if (!pool || pool.length === 0) {
                 return null;
@@ -13204,26 +13029,7 @@ html {
             traitDefinition.addSelectionAccumulatorToContext(context, candidateAccumulator);
             return traitDefinition.scoreSelectionContext(context, profile, this);
         }
-        getAllelePairFitness(alleleA, alleleB, traitKey, profile) {
-            if (traitKey === GENETIC_TRAIT.COLOUR) {
-                return this.getColourAllelePairFitness(alleleA, alleleB, profile);
-            }
-            if (traitKey === GENETIC_TRAIT.METABOLISM) {
-                return this.getMetabolismAllelePairFitness(alleleA, alleleB, profile);
-            }
-            if (traitKey === GENETIC_TRAIT.MORPHOLOGY) {
-                return this.getMorphologyAllelePairFitness(alleleA, alleleB, profile);
-            }
-            if (traitKey === GENETIC_TRAIT.BEHAVIOUR) {
-                return this.getBehaviourAllelePairFitness(alleleA, alleleB, profile);
-            }
-            if (traitKey === GENETIC_TRAIT.REPRODUCTION) {
-                var c = new MonsterPhenotypeExpressionContext();
-                ChromosomePair.expressAllelePair(alleleA, alleleB, c);
-                return this.getReproductionPhenotypeFitness(ReproductionPhenotypeSystem.resolve(c), profile);
-            }
-            return 1;
-        }
+
         getMetabolismAllelePairFitness(alleleA, alleleB, profile) {
             var context = new MonsterPhenotypeExpressionContext();
             ChromosomePair.expressAllelePair(alleleA, alleleB, context);
@@ -13344,12 +13150,8 @@ html {
             }
             return Math.max(0.0001, weightedFitness / totalWeight);
         }
-        getWildMetabolismWeight(allele, profile) {
-            return this.getMetabolismAllelePairFitness(allele, allele, profile);
-        }
-        getWildColourWeight(allele, profile) {
-            return this.getColourAllelePairFitness(allele, allele, profile);
-        }
+
+
         getWorldColourSelectionProfile(world) {
             if (!world || !world.terrainGrid) {
                 return null;
@@ -14751,9 +14553,7 @@ html {
             this.behaviourState = 'roaming';
             return true;
         }
-        enterWild(world, rng, preferredEdge) {
-            this.enterWildFromEdge(world, rng, preferredEdge);
-        }
+
         enterWildFromEdge(world, rng, preferredEdge) {
             var minimumDepthFraction = 2 / 3;
             var adventurerEntryEdge = world.adventurerEntryEdge || DEFAULT_ADVENTURER_ENTRY_EDGE;
@@ -15273,9 +15073,7 @@ html {
             this.nutritionRequirement = Math.max(1, Math.ceil(total));
             return this.nutritionRequirement;
         }
-        getFoodNeededThisSeason() {
-            return Math.max(0, this.calculateSeasonFoodRequirement() - ((this.foodEatenThisSeason || 0) + (this.foodBoughtThisSeason || 0)));
-        }
+
         recordMovementActivity(world, beforeX, beforeY, afterX, afterY, requestedDistance) {
             var actualDistance = Distance(beforeX, beforeY, afterX, afterY);
             if (actualDistance <= 0.0001) {
@@ -17164,27 +16962,13 @@ html {
                 monster.captureTickNumber = null;
             });
         }
-        cullDeadOwnedMonsters() {
-            this.updateFamilyTree();
-            this.ownedMonsters = this.ownedMonsters.filter(function (monster) {
-                return monster.alive;
-            });
-        }
+
         findOwnedMonster(monsterId) {
             return this.ownedMonsters.find(function (monster) {
                 return monster.id === monsterId;
             }) || null;
         }
-        setEveryMonsterSexForTesting(femaleId, maleId) {
-            var female = this.findOwnedMonster(femaleId);
-            var male = this.findOwnedMonster(maleId);
-            if (female) {
-                female.sex = MONSTER_SEX.FEMALE;
-            }
-            if (male) {
-                male.sex = MONSTER_SEX.MALE;
-            }
-        }
+
         breedMonsters(motherId, fatherId, rng, world, seasonNumber) {
             var mother = this.findOwnedMonster(motherId);
             var father = this.findOwnedMonster(fatherId);
