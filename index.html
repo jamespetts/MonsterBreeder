@@ -3596,7 +3596,7 @@ button {
     --ui-scrollbar-thumb: var(--ui-brown-light);
     --ui-scrollbar-thumb-hover: var(--ui-brown);
     --ui-scrollbar-size: 14px;
-    --ui-font-body: Georgia, "Times New Roman", serif;
+    --ui-font-body: Georgia, "Liberation Serif", "Times New Roman", serif;
     --ui-font-display: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
     --ui-ink: #30291d;
     --ui-ink-muted: #685f4c;
@@ -24402,9 +24402,10 @@ html {
     }
     function MonsterIconSvg(monster) {
         var colour = MonsterColourPhenotype(monster);
-        var body = monster.alive ? colour.bodyColour : '#6b7280';
-        var secondary = monster.alive ? (colour.secondaryBodyColour || colour.bodyColour) : '#6b7280';
-        var bodyDark = monster.alive ? (colour.bodyDarkColour || '#4a1f5d') : '#4b5563';
+        // Death changes posture and status, not the monster's inherited colour.
+        var body = colour.bodyColour;
+        var secondary = colour.secondaryBodyColour || colour.bodyColour;
+        var bodyDark = colour.bodyDarkColour || '#4a1f5d';
         var dark = monster.alive ? '#1f2730' : '#374151';
         var collar = monster.collared ? '#f2c14e' : 'transparent';
         var eye = monster.alive ? 'white' : '#d1d5db';
@@ -26628,6 +26629,87 @@ html {
             return '#bbf7d0';
         return '#ffffff';
     }
+    function TreasureShadeColour(t) {
+        if (t.treasureType === 'bronze')
+            return '#6a3413';
+        if (t.treasureType === 'silver')
+            return '#727b86';
+        if (t.treasureType === 'gold')
+            return '#9a6515';
+        if (t.treasureType === 'rubies')
+            return '#65131b';
+        if (t.treasureType === 'emeralds')
+            return '#034b38';
+        return '#5c4a26';
+    }
+    function TreasureLocalIso(p, u, v, z) {
+        // The treasure uses the same 2:1 isometric axes as the world. Local u and v
+        // lie on the ground plane; z rises vertically on screen.
+        return {
+            x: p.x + (u - v) * 0.86,
+            y: p.y + (u + v) * 0.43 - z
+        };
+    }
+    function DrawIsometricCoin(piece, baseColour, accent, shadeColour) {
+        var radius = piece.radius;
+        var faceHeight = radius * 0.46;
+        var thickness = Math.max(1.25, radius * 0.34);
+        ctx.fillStyle = shadeColour;
+        ctx.strokeStyle = 'rgba(31,39,48,0.64)';
+        ctx.lineWidth = 0.75;
+        ctx.beginPath();
+        ctx.ellipse(piece.x, piece.y + thickness, radius, faceHeight, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = baseColour;
+        ctx.beginPath();
+        ctx.ellipse(piece.x, piece.y, radius, faceHeight, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        if (piece.exposed) {
+            ctx.strokeStyle = accent;
+            ctx.lineWidth = 0.7;
+            ctx.beginPath();
+            ctx.ellipse(piece.x, piece.y, radius * 0.56, faceHeight * 0.56, 0, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+    }
+    function DrawIsometricGem(piece, baseColour, accent, shadeColour) {
+        var radius = piece.radius;
+        var crownY = piece.y - radius * 1.15;
+        var left = { x: piece.x - radius, y: piece.y };
+        var right = { x: piece.x + radius, y: piece.y };
+        var back = { x: piece.x, y: piece.y - radius * 0.48 };
+        var front = { x: piece.x, y: piece.y + radius * 0.48 };
+        ctx.strokeStyle = 'rgba(31,39,48,0.68)';
+        ctx.lineWidth = 0.75;
+        ctx.fillStyle = shadeColour;
+        ctx.beginPath();
+        ctx.moveTo(left.x, left.y);
+        ctx.lineTo(front.x, front.y);
+        ctx.lineTo(right.x, right.y);
+        ctx.lineTo(piece.x, crownY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = baseColour;
+        ctx.beginPath();
+        ctx.moveTo(left.x, left.y);
+        ctx.lineTo(back.x, back.y);
+        ctx.lineTo(piece.x, crownY);
+        ctx.lineTo(front.x, front.y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = accent;
+        ctx.beginPath();
+        ctx.moveTo(back.x, back.y);
+        ctx.lineTo(right.x, right.y);
+        ctx.lineTo(piece.x, crownY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+    }
     function DrawTreasurePile(t) {
         var state = TreasurePileState(t);
         if (state <= 0) {
@@ -26636,50 +26718,73 @@ html {
         var p = EntityScreenPoint(t.x, t.y);
         var baseColour = t.colour || '#f2c14e';
         var accent = TreasureAccentColour(t);
+        var shadeColour = TreasureShadeColour(t);
+        var isGemPile = t.treasureType === 'rubies' || t.treasureType === 'emeralds';
         var phase = StablePhase(t.id || t.treasureType || 'treasure');
-        var scale = 0.72 + state * 0.16;
-        var width = 18 + state * 7;
-        var height = 8 + state * 3;
+        var levels = state + 1;
+        var groundRadius = 11 + state * 5.2;
+        var levelHeight = isGemPile ? 4.8 : 3.8;
+        var spacing = isGemPile ? 7.2 : 6.5;
+        var pieces = [];
         ctx.save();
         ctx.globalAlpha = t.stolen ? 0.25 : 1;
-        ctx.fillStyle = 'rgba(39,31,18,0.24)';
+        // This diamond is a contact shadow on the world ground plane. Its edges use
+        // the same two isometric directions as terrain tiles.
+        var shadowNorth = TreasureLocalIso(p, 0, -groundRadius, 0);
+        var shadowEast = TreasureLocalIso(p, groundRadius, 0, 0);
+        var shadowSouth = TreasureLocalIso(p, 0, groundRadius, 0);
+        var shadowWest = TreasureLocalIso(p, -groundRadius, 0, 0);
+        ctx.fillStyle = 'rgba(39,31,18,0.28)';
         ctx.beginPath();
-        ctx.ellipse(p.x, p.y - 4, width * 0.78, height * 0.65, 0, 0, Math.PI * 2);
+        ctx.moveTo(shadowNorth.x, shadowNorth.y);
+        ctx.lineTo(shadowEast.x, shadowEast.y);
+        ctx.lineTo(shadowSouth.x, shadowSouth.y + 2.5);
+        ctx.lineTo(shadowWest.x, shadowWest.y);
+        ctx.closePath();
         ctx.fill();
-        ctx.fillStyle = baseColour;
-        ctx.strokeStyle = 'rgba(31,39,48,0.52)';
-        for (var layer = 0; layer < state; layer += 1) {
-            var layerWidth = width * (1 - layer * 0.1);
-            var layerY = p.y - 8 - layer * 4;
-            ctx.beginPath();
-            ctx.ellipse(p.x, layerY, layerWidth * 0.55, height * 0.45, 0, Math.PI, 0, true);
-            ctx.lineTo(p.x + layerWidth * 0.55, layerY + height * 0.32);
-            ctx.quadraticCurveTo(p.x, layerY + height * 0.82, p.x - layerWidth * 0.55, layerY + height * 0.32);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
+        // Build a three-dimensional stepped mound in local world coordinates. Each
+        // higher level contracts in both ground-plane axes, not merely across screen
+        // x, so the heap remains isometric rather than becoming a front-facing icon.
+        for (var level = 0; level < levels; level += 1) {
+            var levelRadius = groundRadius * (1 - level / (levels + 0.55));
+            var z = level * levelHeight;
+            var gridExtent = Math.floor(levelRadius / spacing);
+            for (var uIndex = -gridExtent; uIndex <= gridExtent; uIndex += 1) {
+                for (var vIndex = -gridExtent; vIndex <= gridExtent; vIndex += 1) {
+                    var u = uIndex * spacing;
+                    var v = vIndex * spacing;
+                    var distance = Math.hypot(u, v);
+                    if (distance > levelRadius) {
+                        continue;
+                    }
+                    var piecePhase = phase + level * 0.79 + uIndex * 0.37 + vIndex * 0.53;
+                    u += Math.sin(piecePhase * 1.93) * 0.58;
+                    v += Math.cos(piecePhase * 1.57) * 0.58;
+                    var point = TreasureLocalIso(p, u, v, z);
+                    pieces.push({
+                        x: point.x,
+                        y: point.y,
+                        depth: u + v + z * 0.04,
+                        level: level,
+                        radius: isGemPile ? 4.0 : 3.9,
+                        exposed: level >= levels - 2 || distance > levelRadius - spacing * 0.8
+                    });
+                }
+            }
         }
-        var pieces = 4 + state * 4;
-        for (var i = 0; i < pieces; i += 1) {
-            var angle = phase + i * 2.399;
-            var radial = (0.12 + ((i * 37) % 100) / 100 * 0.82) * scale;
-            var x = p.x + Math.cos(angle) * width * 0.52 * radial;
-            var y = p.y - 11 - state * 1.8 + Math.sin(angle * 1.7) * height * 0.5 * radial - ((i % state) * 2.1);
-            ctx.fillStyle = (i % 3 === 0) ? accent : baseColour;
-            ctx.strokeStyle = 'rgba(31,39,48,0.45)';
-            ctx.beginPath();
-            if (t.treasureType === 'rubies' || t.treasureType === 'emeralds') {
-                ctx.moveTo(x, y - 4);
-                ctx.lineTo(x + 5, y);
-                ctx.lineTo(x, y + 4);
-                ctx.lineTo(x - 5, y);
-                ctx.closePath();
+        pieces.sort(function (a, b) {
+            if (a.depth !== b.depth) {
+                return a.depth - b.depth;
+            }
+            return a.level - b.level;
+        });
+        for (var i = 0; i < pieces.length; i += 1) {
+            if (isGemPile) {
+                DrawIsometricGem(pieces[i], baseColour, accent, shadeColour);
             }
             else {
-                ctx.ellipse(x, y, 4.2, 2.7, angle, 0, Math.PI * 2);
+                DrawIsometricCoin(pieces[i], baseColour, accent, shadeColour);
             }
-            ctx.fill();
-            ctx.stroke();
         }
         ctx.restore();
     }
@@ -27203,9 +27308,6 @@ html {
             scale = a.isMounted ? 0.82 : 0.76;
         }
         scale = adventurerProfile.scale;
-        if (a.fleeing) {
-            tunic = '#6b7280';
-        }
         ctx.globalAlpha = a.escaped ? 0.12 : 1;
         ctx.save();
         ctx.translate(p.x, p.y + bob);
