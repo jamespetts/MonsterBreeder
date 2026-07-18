@@ -14632,26 +14632,47 @@ html {
             // balancing penalties on these genes.
             add(0, 100, { photonSensitivity: 58 });
             add(0, 100, { photonSensitivity: -38 });
-            add(0, 90, { photonSensitivity: 24, visualResolution: 16 });
+			add(0, 100, { photonSensitivity: 0 });
+			add(0, 110, { photonSensitivity: 60 });	
+			add(0, 80, { photonSensitivity: -52 });
+            add(0, 90, { photonSensitivity: 24, visualResolution: 16 });		
+            add(0, 40, { photonSensitivity: -50, visualResolution: -46 });
             add(1, 100, { visualResolution: 55, motionSensitivity: -18 });
+			add(1, 120, { visualResolution: 72, motionSensitivity: 55 });
             add(1, 100, { visualResolution: -20, motionSensitivity: 62 });
             add(1, 90, { visualResolution: 24, motionSensitivity: 24 });
             add(2, 100, { rodBias: 68 });
             add(2, 100, { rodBias: -52 });
             add(2, 90, { rodBias: 12 });
+			add(2, 110, { rodBias: 44 });
             add(3, 100, { hearingSensitivity: 58, highFrequencyBias: 44 });
+			add(3, 110, { hearingSensitivity: 66, highFrequencyBias: 20 });
+			add(3, 80, { hearingSensitivity: 26, highFrequencyBias: 90 });
             add(3, 100, { hearingSensitivity: -12, lowFrequencyBias: 55, noiseRejection: 35 });
-            add(3, 90, { hearingSensitivity: 24, noiseRejection: 24 });
+			add(3, 100, { hearingSensitivity: 0, lowFrequencyBias: 36, noiseRejection: 50 });
+			add(3, 120, { hearingSensitivity: 24, lowFrequencyBias: 20, noiseRejection: 15 });
+			add(3, 70, { hearingSensitivity: 81, lowFrequencyBias: -66, noiseRejection: 0 });
+			add(3, 40, { hearingSensitivity: 7, lowFrequencyBias: 0, noiseRejection: 40 });
+            add(3, 90, { hearingSensitivity: 24, noiseRejection: 24 });	
+            add(3, 110, { hearingSensitivity: 40, noiseRejection: 50 });			
+            add(3, 90, { hearingSensitivity: 80, noiseRejection: 10 });		
+            add(3, 80, { hearingSensitivity: 90, noiseRejection: 7 });
+			add(3, 50, {});
             // This is deliberately a junk locus. Most variants do nothing; uncommon
             // recessives damage sensory development through the normal runtime system.
             add(4, 100, {});
             add(4, 100, {});
+			add(4, 100, {});
             add(4, 28, { junkHealth: -92, sensoryGate: -44 });
             add(4, 32, { junkHealth: -45, eyeRedness: 115, photonSensitivity: -30 });
             add(4, 24, { junkHealth: -110, rodBias: 95, visualResolution: -70 });
             add(5, 100, { sensoryGate: 48, socialIndependence: 20 });
             add(5, 100, { sensoryGate: -30, socialResponseBias: 38 });
-            add(5, 90, { sensoryGate: 12, socialIndependence: -12 });
+            add(5, 70, { sensoryGate: 66, socialIndependence: 40 });
+			add(5, 40, { sensoryGate: 22, socialIndependence: -40 });
+			add(5, 50, { sensoryGate: 22, socialIndependence: 0 });
+			add(5, 80, { sensoryGate: 40, socialIndependence: 16 });
+			add(5, 100, { sensoryGate: 60, socialIndependence: -50 });
         }
         addDefaultMorphologyAlleles() {
             var junk = (slot) => new Allele(DOMINANCE_DEFAULT, { selectionSensitive: false, debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, slot) });
@@ -14660,10 +14681,29 @@ html {
                 this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, slot, junk(slot));
             }
             this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 0, new MorphologyAllele(100, { frameScale: -42, growthRate: 12 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 0) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 0, new MorphologyAllele(100, { frameScale: -60, growthRate: 40 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 0) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 0, new MorphologyAllele(110, { frameScale: -20, growthRate: 2 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 0) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 0, new MorphologyAllele(90, { frameScale: -25, growthRate: 15 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 0) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 0, new MorphologyAllele(90, { frameScale: -30, growthRate: 50 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 0) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 0, new MorphologyAllele(50, { frameScale: -70, growthRate: -20 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 0) }));
             this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 0, new MorphologyAllele(100, { frameScale: 32, growthRate: -6 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 0) }));
             this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 0, new MorphologyAllele(35, { frameScale: 86, growthRate: 52 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 0) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 0, new MorphologyAllele(50, { frameScale: 20, growthRate: 16 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 0) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 0, new MorphologyAllele(60, { frameScale: 90, growthRate: 26 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 0) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 0, new MorphologyAllele(60, { frameScale: 70, growthRate: 18 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 0) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 0, new MorphologyAllele(40, { frameScale: -25, growthRate: -18 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 0) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 0, new MorphologyAllele(110, { frameScale: 0, growthRate: 0 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 0) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 0, new MorphologyAllele(100, { frameScale: -20, growthRate: 21 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 0) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 0, new MorphologyAllele(90, { frameScale: 20, growthRate: -22 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 0) }));
             this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 1, new MorphologyAllele(100, { vertebralLength: 38, torsoDepth: -16 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 1) }));
             this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 1, new MorphologyAllele(100, { vertebralLength: -18, torsoDepth: 42 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 1) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 1, new MorphologyAllele(120, { vertebralLength: 0, torsoDepth: 55 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 1) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 1, new MorphologyAllele(100, { vertebralLength: 0, torsoDepth: -40 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 1) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 1, new MorphologyAllele(90, { vertebralLength: 40, torsoDepth: -15 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 1) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 1, new MorphologyAllele(110, { vertebralLength: -22, torsoDepth: 33 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 1) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 1, new MorphologyAllele(100, { vertebralLength: 0, torsoDepth: 30 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 1) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 1, new MorphologyAllele(90, { vertebralLength: -50, torsoDepth: 0 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 1) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 1, new MorphologyAllele(110, { vertebralLength: -20, torsoDepth: -23 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 1) }));
             this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 2, new MorphologyAllele(100, { limbLength: 42, hindlimbMuscle: 22, forelimbMuscle: -10 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 2) }));
             this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 2, new MorphologyAllele(100, { limbLength: -30, forelimbMuscle: 20 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 2) }));
             this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 3, new MorphologyAllele(100, { muscleGrowth: 36, hindlimbMuscle: 24, boneGrowth: 8 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 3) }));
@@ -14672,11 +14712,37 @@ html {
             this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(100, { boneGrowth: 42, boneMineralisation: 25 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
             this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(100, { boneGrowth: -26, boneMineralisation: -18 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
             this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(24, { boneGrowth: -105, boneMineralisation: -92 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(40, { boneGrowth: -80, boneMineralisation: -31 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(80, { boneGrowth: 0, boneMineralisation: -52 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(110, { boneGrowth: 0, boneMineralisation: -19 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(100, { boneGrowth: 20, boneMineralisation: -100 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(100, { boneGrowth: 5, boneMineralisation: 25 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(90, { boneGrowth: 15, boneMineralisation: 0 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
             this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(30, { muscleGrowth: 118, boneGrowth: -50 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(35, { muscleGrowth: 105, boneGrowth: -60 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(40, { muscleGrowth: 100, boneGrowth: -20 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(100, { muscleGrowth: 50, boneGrowth: 0 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(110, { muscleGrowth: 0, boneGrowth: 4 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(90, { muscleGrowth: -20, boneGrowth: -10 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(100, { muscleGrowth: 40, boneGrowth: -10 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 4, new MorphologyAllele(100, { muscleGrowth: 0, boneGrowth: 0 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 4) }));
             this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(85, { spineSize: 70 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(110, { spineSize: 0 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(110, { spineSize: 100 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(100, { spineSize: 50 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(100, { spineSize: 10 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(100, { spineSize: 0 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
             this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(55, { spineSize: 138 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
             this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(100, { toothSize: 38 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
-            this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(100, { toothSize: -28 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
+            this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(20, { toothSize: -90 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(90, { toothSize: -33 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(90, { toothSize: 4 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(80, { toothSize: 7 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(110, { toothSize: 36 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(110, { toothSize: 0 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));		
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(100, { toothSize: 12 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));		
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(100, { toothSize: 20 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
+			this.addAllele(MORPHOLOGY_CHROMOSOME_INDEX, 5, new MorphologyAllele(100, { toothSize: -28 }, { debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, 5) }));
         }
         addDefaultBehaviourAlleles() {
             var junk = (slot) => new Allele(DOMINANCE_DEFAULT, { selectionSensitive: false, debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, slot) });
@@ -14687,18 +14753,64 @@ html {
             this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 0, new BehaviourAllele(100, { pugilin: -46, cowardin: 20, exhaustionPugilinSuppression: 20 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 0) }));
             this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 0, new BehaviourAllele(100, { pugilin: 34, cowardin: -8, pugilinThreatGain: 16 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 0) }));
             this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 0, new BehaviourAllele(35, { pugilin: 94, cowardin: -34, pugilinInjuryGain: 46, thermalPugilinSuppression: -22 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 0) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 0, new BehaviourAllele(90, { pugilin: 0, cowardin: 0, pugilinInjuryGain: 0, thermalPugilinSuppression: 0 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 0) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 0, new BehaviourAllele(90, { pugilin: -20, cowardin: 0, pugilinInjuryGain: 80, thermalPugilinSuppression: 15 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 0) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 0, new BehaviourAllele(80, { pugilin: -40, cowardin: 60, pugilinInjuryGain: -15, thermalPugilinSuppression: 65 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 0) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 0, new BehaviourAllele(100, { pugilin: 20, cowardin: -15, pugilinInjuryGain: 10, thermalPugilinSuppression: -30 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 0) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 0, new BehaviourAllele(100, { pugilin: -15, cowardin: 20, pugilinInjuryGain: 0, thermalPugilinSuppression: -40 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 0) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 0, new BehaviourAllele(110, { pugilin: 2, cowardin: 16, pugilinInjuryGain: 92, thermalPugilinSuppression: 15 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 0) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 0, new BehaviourAllele(90, { pugilin: 24, cowardin: 15, pugilinInjuryGain: 10, thermalPugilinSuppression: 20 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 0) }));
             this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 1, new BehaviourAllele(100, { cowardin: 48, cowardinThreatGain: 42, relativeSizeClarity: 36 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 1) }));
-            this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 1, new BehaviourAllele(100, { cowardin: -32, pugilinThreatGain: 44, relativeSizeClarity: -18 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 1) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 1, new BehaviourAllele(110, { cowardin: 10, cowardinThreatGain: 12, relativeSizeClarity: 20 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 1) }));
+            this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 1, new BehaviourAllele(80, { cowardin: 80, pugilinThreatGain: 44, relativeSizeClarity: -18 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 1) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 1, new BehaviourAllele(90, { cowardin: -32, pugilinThreatGain: 44, relativeSizeClarity: -18 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 1) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 1, new BehaviourAllele(50, { cowardin: 128, pugilinThreatGain: -20, relativeSizeClarity: 50 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 1) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 1, new BehaviourAllele(100, { cowardin: 15, pugilinThreatGain: 16, relativeSizeClarity: 15 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 1) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 1, new BehaviourAllele(70, { cowardin: -70, pugilinThreatGain: 55, relativeSizeClarity: 0 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 1) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 1, new BehaviourAllele(90, { cowardin: -51, pugilinThreatGain: 36, relativeSizeClarity: 37 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 1) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 1, new BehaviourAllele(100, { cowardin: -27, pugilinThreatGain: -16, relativeSizeClarity: 50 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 1) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 1, new BehaviourAllele(70, { cowardin: 32, pugilinThreatGain: -10, relativeSizeClarity: 48 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 1) }));		
             this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 2, new BehaviourAllele(100, { vigilin: 54, cowardinThreatGain: 18 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 2) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 2, new BehaviourAllele(80, { vigilin: 70, cowardinThreatGain: 50 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 2) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 2, new BehaviourAllele(110, { vigilin: 50, cowardinThreatGain: 46 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 2) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 2, new BehaviourAllele(100, { vigilin: 0, cowardinThreatGain: 0 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 2) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 2, new BehaviourAllele(110, { vigilin: 60, cowardinThreatGain: 36 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 2) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 2, new BehaviourAllele(70, { vigilin: 0, cowardinThreatGain: 0 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 2) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 2, new BehaviourAllele(110, { vigilin: 0, cowardinThreatGain: 15 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 2) }));
             this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 2, new BehaviourAllele(100, { vigilin: -42, tenacitin: -8 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 2) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 2, new BehaviourAllele(80, { vigilin: 6, tenacitin: 12 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 2) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 2, new BehaviourAllele(110, { vigilin: 0, tenacitin: 0 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 2) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 2, new BehaviourAllele(95, { vigilin: -20, tenacitin: -16 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 2) }));
             this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 2, new BehaviourAllele(45, { vigilin: 96, pugilinThreatGain: 28, cowardinThreatGain: -20 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 2) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 2, new BehaviourAllele(60, { vigilin: 80, pugilinThreatGain: 16, cowardinThreatGain: 10 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 2) }));
             this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 3, new BehaviourAllele(100, { tenacitin: 48, pugilinHungerGain: 18 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 3) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 3, new BehaviourAllele(80, { tenacitin: 60, pugilinHungerGain: 4 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 3) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 3, new BehaviourAllele(100, { tenacitin: 20, pugilinHungerGain: 26 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 3) }));
             this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 3, new BehaviourAllele(100, { tenacitin: -38, cowardinInjuryGain: 18 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 3) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 3, new BehaviourAllele(90, { tenacitin: -20, cowardinInjuryGain: 70 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 3) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 3, new BehaviourAllele(60, { tenacitin: 66, cowardinInjuryGain: -25 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 3) }));
             this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 3, new BehaviourAllele(40, { tenacitin: 126, exhaustionPugilinSuppression: -34 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 3) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 3, new BehaviourAllele(80, { tenacitin: 58, exhaustionPugilinSuppression: -12 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 3) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 3, new BehaviourAllele(80, { tenacitin: 17, exhaustionPugilinSuppression: 40 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 3) }));
             this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 4, new BehaviourAllele(100, { dominin: 50, pugilinHungerGain: 18 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 4, new BehaviourAllele(100, { dominin: -20, pugilinHungerGain: 0 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 4, new BehaviourAllele(65, { dominin: -25, pugilinHungerGain: -16 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 4, new BehaviourAllele(50, { dominin: -80, pugilinHungerGain: -25 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 4, new BehaviourAllele(30, { dominin: -100, pugilinHungerGain: -87 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 4, new BehaviourAllele(110, { dominin: 40, pugilinHungerGain: 50 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 4, new BehaviourAllele(90, { dominin: 80, pugilinHungerGain: 60 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 4, new BehaviourAllele(50, { dominin: 105, pugilinHungerGain: 0 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 4) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 4, new BehaviourAllele(60, { dominin: 20, pugilinHungerGain: 80 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 4) }));
             this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 4, new BehaviourAllele(100, { dominin: -42, cowardinThreatGain: 18 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 4) }));
             this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 5, new BehaviourAllele(100, { umbratin: 58, vigilin: -8, preyShapePreference: -32 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 5) }));
             this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 5, new BehaviourAllele(100, { umbratin: -28, vigilin: 18, preyPowerPreference: 34 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 5) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 5, new BehaviourAllele(110, { umbratin: 0, vigilin: 2, preyPowerPreference: -2 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 5) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 5, new BehaviourAllele(80, { umbratin: 50, vigilin: 40, preyPowerPreference: 60 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 5) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 5, new BehaviourAllele(100, { umbratin: 0, vigilin: 0, preyPowerPreference: 0 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 5) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 5, new BehaviourAllele(90, { umbratin: -40, vigilin: -16, preyPowerPreference: -15 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 5) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 5, new BehaviourAllele(120, { umbratin: -6, vigilin: 25, preyPowerPreference: 20 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 5) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 5, new BehaviourAllele(115, { umbratin: 70, vigilin: 15, preyPowerPreference: 6 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 5) }));
+			this.addAllele(BEHAVIOUR_CHROMOSOME_INDEX, 5, new BehaviourAllele(10, { umbratin: 10, vigilin: 52, preyPowerPreference: 40 }, { debugLabel: this.createDebugLabel(BEHAVIOUR_CHROMOSOME_INDEX, 5) }));
         }
         addDefaultMetabolismAlleles() {
             this.addAllele(METABOLISM_CHROMOSOME_INDEX, 0, new MetabolicAllele(100, {
@@ -14744,6 +14856,36 @@ html {
                 selectionSensitive: true,
                 debugLabel: this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 1)
             }));
+			this.addAllele(METABOLISM_CHROMOSOME_INDEX, 1, new MetabolicAllele(110, {
+                plumptin: 0
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 1)
+            }));
+			this.addAllele(METABOLISM_CHROMOSOME_INDEX, 1, new MetabolicAllele(110, {
+                plumptin: 100
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 1)
+            }));
+			this.addAllele(METABOLISM_CHROMOSOME_INDEX, 1, new MetabolicAllele(50, {
+                plumptin: 80
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 1)
+            }));
+			this.addAllele(METABOLISM_CHROMOSOME_INDEX, 1, new MetabolicAllele(100, {
+                plumptin: -20
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 1)
+            }));
+			this.addAllele(METABOLISM_CHROMOSOME_INDEX, 1, new MetabolicAllele(110, {
+                plumptin: 20
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 1)
+            }));
             this.addAllele(METABOLISM_CHROMOSOME_INDEX, 1, new MetabolicAllele(100, {
                 plumptin: 0
             }, {
@@ -14764,6 +14906,24 @@ html {
             }));
             this.addAllele(METABOLISM_CHROMOSOME_INDEX, 2, new MetabolicAllele(100, {
                 energyConservation: -70
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 2)
+            }));
+			this.addAllele(METABOLISM_CHROMOSOME_INDEX, 2, new MetabolicAllele(90, {
+                energyConservation: -50
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 2)
+            }));
+			this.addAllele(METABOLISM_CHROMOSOME_INDEX, 2, new MetabolicAllele(90, {
+                energyConservation: 20
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 2)
+            }));
+			this.addAllele(METABOLISM_CHROMOSOME_INDEX, 2, new MetabolicAllele(100, {
+                energyConservation: 0
             }, {
                 selectionSensitive: true,
                 debugLabel: this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 2)
@@ -14811,6 +14971,34 @@ html {
                 selectionSensitive: true,
                 debugLabel: this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 3)
             }));
+			 this.addAllele(METABOLISM_CHROMOSOME_INDEX, 3, new MetabolicAllele(100, {
+                satietyConservationEffect: 15,
+                energyConservation: -20
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 3)
+            }));
+			this.addAllele(METABOLISM_CHROMOSOME_INDEX, 3, new MetabolicAllele(90, {
+                satietyConservationEffect: 40,
+                energyConservation: 60
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 3)
+            }));
+			this.addAllele(METABOLISM_CHROMOSOME_INDEX, 3, new MetabolicAllele(80, {
+                satietyConservationEffect: 10,
+                energyConservation: 5
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 3)
+            }));
+			this.addAllele(METABOLISM_CHROMOSOME_INDEX, 3, new MetabolicAllele(50, {
+                satietyConservationEffect: -40,
+                energyConservation: -37
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 3)
+            }));
         }
         addDefaultColourAlleles() {
             this.addAllele(COLOUR_CHROMOSOME_INDEX, 0, new Allele(DOMINANCE_DEFAULT, {
@@ -14849,6 +15037,22 @@ html {
                 selectionSensitive: true,
                 debugLabel: this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)
             }));
+			this.addAllele(COLOUR_CHROMOSOME_INDEX, 1, new ColourAllele(110, {
+                cerulene: 80,
+				verdine: 20,
+                negrine: 40
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)
+            }));
+			this.addAllele(COLOUR_CHROMOSOME_INDEX, 1, new ColourAllele(90, {
+                rodine: 90,
+				verdine: 5,
+                negrine: 128
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)
+            }));
             this.addAllele(COLOUR_CHROMOSOME_INDEX, 1, new ColourAllele(100, {
                 orgine: 130,
                 negrine: 10
@@ -14875,6 +15079,16 @@ html {
             this.addAllele(COLOUR_CHROMOSOME_INDEX, 1, new ColourAllele(100, {
                 cerulene: 145,
                 negrine: 6
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)
+            }));
+			this.addAllele(COLOUR_CHROMOSOME_INDEX, 1, new ColourAllele(60, {
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)
+            }));
+			this.addAllele(COLOUR_CHROMOSOME_INDEX, 1, new ColourAllele(50, {
             }, {
                 selectionSensitive: true,
                 debugLabel: this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 1)
@@ -14906,6 +15120,18 @@ html {
             }));
             this.addAllele(COLOUR_CHROMOSOME_INDEX, 2, new ColourAllele(110, {
                 negrine: 54
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 2)
+            }));
+			this.addAllele(COLOUR_CHROMOSOME_INDEX, 2, new ColourAllele(90, {
+                negrine: 44
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 2)
+            }));
+			this.addAllele(COLOUR_CHROMOSOME_INDEX, 2, new ColourAllele(80, {
+                negrine: 100
             }, {
                 selectionSensitive: true,
                 debugLabel: this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 2)
@@ -14956,6 +15182,21 @@ html {
                 selectionSensitive: true,
                 debugLabel: this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)
             }));
+			this.addAllele(COLOUR_CHROMOSOME_INDEX, 3, new ColourAllele(70, {
+                jaunine: 50,
+                orgine: 12,
+                negrine: 8
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)
+            }));
+			this.addAllele(COLOUR_CHROMOSOME_INDEX, 3, new ColourAllele(130, {
+                orgine: 40,
+				verdine: 33,
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)
+            }));
             this.addAllele(COLOUR_CHROMOSOME_INDEX, 3, new ColourAllele(100, {
                 negrine: 20
             }, {
@@ -14973,6 +15214,23 @@ html {
                 cerulene: 130,
                 rodine: 150,
                 negrine: 5
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)
+            }));
+			this.addAllele(COLOUR_CHROMOSOME_INDEX, 3, new ColourAllele(30, {
+                cerulene: 140,
+                rodine: 130,
+                negrine: 2
+            }, {
+                selectionSensitive: true,
+                debugLabel: this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)
+            }));
+			
+			this.addAllele(COLOUR_CHROMOSOME_INDEX, 3, new ColourAllele(50, {
+                cerulene: 120,
+                verdine: 118,
+                negrine: 12
             }, {
                 selectionSensitive: true,
                 debugLabel: this.createDebugLabel(COLOUR_CHROMOSOME_INDEX, 3)
