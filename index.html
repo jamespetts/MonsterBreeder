@@ -10344,7 +10344,9 @@ html {
                 effects: { speedMultiplier: 0.78, foodMultiplier: 1.14, infertileAt: 0.72, incapacitatedAt: 0.88, deathAt: 0.98, deathChance: 0.04, damageMultiplier: 1.42 },
                 geneticSelection: { riskModel: 'overmuscleStrainMorphology', selectionPressure: 5.8 }
             },
-            reproductiveTumour: { id: 'reproductiveTumour', displayName: 'Reproductive tumour', description: 'An abnormal growth of reproductive tissue. Its internal cause is not observable, but swelling, weakness and impaired fertility are apparent.', ui: { morphology: 'swollen' }, effects: { speedMultiplier: 0.82, foodMultiplier: 1.18, infertileAt: 0.42, incapacitatedAt: 0.82, deathAt: 0.93, deathChance: 0.16, damageMultiplier: 1.18 }, geneticSelection: { riskModel: 'reproductiveTumourRepair', selectionPressure: 7.0 } },
+            // The legacy ID is retained for save compatibility, but the disease is
+            // now systemic neoplasia rather than a reproductive-organ special case.
+            reproductiveTumour: { id: 'reproductiveTumour', displayName: 'Neoplastic disease', description: 'An abnormal tissue growth associated with excessive cell renewal, weak growth control and age-related damage. Swelling, wasting and impaired fertility are apparent.', ui: { morphology: 'swollen' }, effects: { speedMultiplier: 0.82, foodMultiplier: 1.18, infertileAt: 0.42, incapacitatedAt: 0.82, deathAt: 0.93, deathChance: 0.16, damageMultiplier: 1.18 }, geneticSelection: { riskModel: 'reproductiveTumourRepair', selectionPressure: 7.4 } },
             giantGrowthFailure: {
                 id: 'giantGrowthFailure',
                 displayName: 'Giant growth failure',
@@ -10415,9 +10417,19 @@ html {
                 var muscleLoad = (m.muscleGrowthBias || 1) * Math.max(m.forelimbMuscleBias || 1, m.hindlimbMuscleBias || 1) * Math.sqrt(m.frameScale || 1);
                 return Clamp(Math.max(0, muscleLoad - skeletal * 1.42) * 0.25, 0, 0.78);
             },
-            reproductiveTumourRepair: function (phenotype, profile) { var r = phenotype && phenotype.reproduction; if (!r) {
-                return 0;
-            } var age = profile && profile.selectionAgeFactor ? profile.selectionAgeFactor : 0.55; return Clamp(Math.max(0, r.reproductiveRepair - 1.12) * Math.max(0, 1.12 - r.tumourSuppression) * 0.42 * age, 0, 0.75); },
+            reproductiveTumourRepair: function (phenotype, profile) {
+                var r = phenotype && phenotype.reproduction ? phenotype.reproduction : null;
+                var m = phenotype && phenotype.metabolism ? phenotype.metabolism : null;
+                if (!r) {
+                    return 0;
+                }
+                var age = profile && profile.selectionAgeFactor ? profile.selectionAgeFactor : 0.55;
+                var metabolicOutput = m && Number.isFinite(m.baseMetabolicFood) ? m.baseMetabolicFood / 10 : 1;
+                var proliferativeDrive = Math.max(0, r.reproductiveRepair - 0.92) + Math.max(0, r.reproductiveSenescenceResistance - 0.96) * 0.72;
+                var oxidativeLoad = Math.max(0, metabolicOutput - 0.78) * (0.42 + age * 0.58);
+                var controlFailure = 1 / Math.max(0.35, r.tumourSuppression || 1);
+                return Clamp((proliferativeDrive * 0.18 + oxidativeLoad * 0.10) * controlFailure * (0.35 + age), 0, 0.82);
+            },
             giantGrowthFailureMorphology: function (phenotype, profile) {
                 var m = phenotype && phenotype.morphology ? phenotype.morphology : null;
                 if (!m) {
@@ -10554,11 +10566,18 @@ html {
             };
         },
         reproductiveTumourRiskFor: function (monster) {
-            var r = monster && monster.phenotype && monster.phenotype.reproduction;
+            var phenotype = monster && monster.phenotype ? monster.phenotype : null;
+            var r = phenotype && phenotype.reproduction ? phenotype.reproduction : null;
+            var m = phenotype && phenotype.metabolism ? phenotype.metabolism : null;
             if (!r) {
                 return 0;
             }
-            return Clamp(Math.max(0, r.reproductiveRepair - 1.08) * Math.max(0, 1.12 - r.tumourSuppression) * this.ageDiseaseRiskFactor(monster) * 0.065, 0, 0.42);
+            var age = this.ageDiseaseRiskFactor(monster);
+            var metabolicOutput = m && Number.isFinite(m.baseMetabolicFood) ? m.baseMetabolicFood / 10 : 1;
+            var proliferativeDrive = Math.max(0, r.reproductiveRepair - 0.90) + Math.max(0, r.reproductiveSenescenceResistance - 0.94) * 0.78;
+            var oxidativeLoad = Math.max(0, metabolicOutput - 0.76) * (0.35 + age);
+            var controlFailure = 1 / Math.max(0.35, r.tumourSuppression || 1);
+            return Clamp((proliferativeDrive * 0.030 + oxidativeLoad * 0.014) * controlFailure * age, 0, 0.42);
         },
         marginalMorphologyRiskFor: function (monster, world) {
             var m = monster && monster.phenotype && monster.phenotype.morphology ? monster.phenotype.morphology : null;
@@ -11952,9 +11971,19 @@ html {
         },
         resolve: function (context) {
             var f = this.combineLayers(context);
-            var baseMetabolicFood = Clamp(10 + f.baseMetabolicRate / 22, 6, 16);
-            var coldLimitC = Clamp(DEFAULT_BASE_THERMAL_LOW_C - f.coldTolerance / 11 + f.heatTolerance / 28, -22, 12);
-            var heatLimitC = Clamp(DEFAULT_BASE_THERMAL_HIGH_C + f.heatTolerance / 11 - f.coldTolerance / 30, 12, 48);
+            // Thermal genes encode mechanisms, not independent temperature limits.
+            // coldTolerance represents heat retention/thermogenesis; heatTolerance
+            // represents peripheral heat transfer and evaporative capacity. Expressing
+            // both strongly creates costly vascular/metabolic versatility rather than
+            // a free broad comfort range.
+            var coldMechanism = Clamp(f.coldTolerance / 150, -0.85, 1.25);
+            var heatMechanism = Clamp(f.heatTolerance / 150, -0.85, 1.25);
+            var antagonism = Math.max(0, Math.min(coldMechanism, heatMechanism));
+            var thermalVersatilityCost = antagonism * antagonism * 2.4;
+            var baseMetabolicFood = Clamp(10 + f.baseMetabolicRate / 22 + thermalVersatilityCost, 6, 18.5);
+            var coldLimitC = Clamp(DEFAULT_BASE_THERMAL_LOW_C - coldMechanism * 13 + heatMechanism * 4.5, -22, 12);
+            var heatLimitC = Clamp(DEFAULT_BASE_THERMAL_HIGH_C + heatMechanism * 13 - coldMechanism * 4.2, 12, 48);
+            var exertionEfficiency = Clamp(1 - antagonism * 0.30 - Math.max(0, coldMechanism) * Math.max(0, heatMechanism) * 0.08, 0.58, 1.08);
             var plumptinLevel = Clamp((f.plumptin + 90) / 220, 0, 1.45);
             var targetFatStorage = Clamp(0.6 + plumptinLevel * 4.2, 0.25, 8.5);
             var energyConservation = Clamp(0.50 + f.energyConservation / 170, 0.15, 1.25);
@@ -11967,6 +11996,8 @@ html {
                 targetFatStorage: targetFatStorage,
                 energyConservation: energyConservation,
                 satietyConservationEffect: satietyConservationEffect,
+                thermalVersatilityCost: thermalVersatilityCost,
+                exertionEfficiency: exertionEfficiency,
                 labels: {
                     metabolicRate: baseMetabolicFood < 8.5 ? 'low' : (baseMetabolicFood > 12.5 ? 'high' : 'moderate'),
                     plumptin: targetFatStorage < 1.4 ? 'lean' : (targetFatStorage > 5.7 ? 'very fat-storing' : 'ordinary'),
@@ -12697,25 +12728,61 @@ html {
                 f = f.cloneWith(bag.codominantPerceptionLayers[0]).cloneWith(bag.codominantPerceptionLayers[1]);
             }
             var redEyes = f.eyeRedness > 45;
-            var rodBias = Clamp(f.rodBias / 150, -0.72, 0.72);
+            // Retinal tissue is allocated between rods and cones. Genes may move the
+            // allocation and alter total retinal investment, but cannot independently
+            // request maximal dim-light sensitivity, colour discrimination, acuity and
+            // temporal resolution. Greater investment has an unavoidable neural cost.
+            var rodAllocation = Clamp(0.52 + f.rodBias / 240, 0.12, 0.90);
+            var coneAllocation = 1 - rodAllocation;
+            var retinalInvestment = Clamp(1 + (f.photonSensitivity + f.visualResolution + f.motionSensitivity) / 620, 0.62, 1.48);
+            var spatialAllocation = Clamp(0.52 + (f.visualResolution - f.motionSensitivity) / 360, 0.16, 0.84);
+            var temporalAllocation = 1 - spatialAllocation;
+            var photonSensitivity = Clamp(0.46 + rodAllocation * 1.12 + (retinalInvestment - 1) * 0.34, 0.42, 1.72);
+            var visualResolution = Clamp(0.50 + coneAllocation * 0.72 + spatialAllocation * 0.62 + (retinalInvestment - 1) * 0.30, 0.48, 1.65);
+            var motionSensitivity = Clamp(0.48 + rodAllocation * 0.34 + temporalAllocation * 0.82 + (retinalInvestment - 1) * 0.24, 0.44, 1.72);
+            var colourDiscrimination = Clamp(0.40 + coneAllocation * 1.18 + spatialAllocation * 0.18, 0.38, 1.75);
+            // Bright-light tolerance is a consequence of cone allocation and the
+            // inverse of photopigment gain; the legacy raw brightness field can no
+            // longer grant an independent benefit.
+            var brightnessTolerance = Clamp(0.38 + coneAllocation * 0.92 + Math.max(0, 1.02 - photonSensitivity) * 0.32 + (redEyes ? 0.06 : 0), 0.24, 1.18);
+            // Auditory sensitivity and filtering share cochlear/neural bandwidth.
+            // Selection can favour either detection or selectivity, while investment
+            // can improve both only by paying increasing neural maintenance cost.
+            var auditoryInvestment = Clamp(1 + (f.hearingSensitivity + Math.max(0, f.noiseRejection)) / 430, 0.65, 1.45);
+            var auditorySelectivity = Clamp(0.50 + (f.noiseRejection - f.hearingSensitivity * 0.34) / 250, 0.10, 0.90);
+            var hearingSensitivity = Clamp(0.48 + auditoryInvestment * 0.54 + (1 - auditorySelectivity) * 0.48, 0.42, 1.70);
+            var noiseRejection = Clamp(0.42 + auditoryInvestment * 0.46 + auditorySelectivity * 0.72 - hearingSensitivity * 0.16, 0.40, 1.70);
+            // A stronger gate rejects noise and false alarms but also attenuates
+            // ambiguous social and environmental signals. Independence can alter the
+            // social weighting, not bypass the shared gate.
+            var sensoryGate = Clamp(1 + f.sensoryGate / 175, 0.42, 1.72);
+            var gateClosure = Clamp((sensoryGate - 0.42) / 1.30, 0, 1);
+            var receptorNoise = Math.max(0, photonSensitivity - brightnessTolerance) * 0.28 + Math.max(0, hearingSensitivity - noiseRejection) * 0.34;
+            var falsePositiveBias = Clamp(0.72 + receptorNoise + (1 - gateClosure) * 0.42 + Math.max(0, f.falsePositiveBias) / 420, 0.35, 1.85);
+            var socialIndependence = Clamp(1 + f.socialIndependence / 170, 0.35, 1.85);
+            var socialResponseBias = Clamp((1 + f.socialResponseBias / 220) * (1.16 - gateClosure * 0.48) / Math.sqrt(socialIndependence), 0.35, 1.85);
+            var neuralComplexity = Math.pow(Math.max(0, retinalInvestment - 0.72), 1.45) + Math.pow(Math.max(0, auditoryInvestment - 0.72), 1.45) + Math.max(0, sensoryGate - 1) * 0.40;
+            var sensoryFoodCost = Clamp(0.04 + neuralComplexity * 0.22 + Math.max(0, f.neuralCost) / 240, 0.02, 0.95);
             return {
-                photonSensitivity: Clamp(1 + f.photonSensitivity / 170 + rodBias * 0.30, 0.42, 1.72),
-                brightnessTolerance: Clamp(0.66 + f.brightnessTolerance / 220 - redEyes * 0.00 + (redEyes ? 0.10 : 0), 0.24, 1.18),
-                visualResolution: Clamp(1 + f.visualResolution / 175, 0.48, 1.65),
-                motionSensitivity: Clamp(1 + f.motionSensitivity / 175, 0.44, 1.72),
-                rodBias: rodBias,
-                colourDiscrimination: Clamp(1 + f.colourDiscrimination / 170 - rodBias * 0.42, 0.38, 1.75),
-                hearingSensitivity: Clamp(1 + f.hearingSensitivity / 175, 0.42, 1.70),
+                photonSensitivity: photonSensitivity,
+                brightnessTolerance: brightnessTolerance,
+                visualResolution: visualResolution,
+                motionSensitivity: motionSensitivity,
+                rodBias: rodAllocation * 2 - 1,
+                rodAllocation: rodAllocation,
+                coneAllocation: coneAllocation,
+                colourDiscrimination: colourDiscrimination,
+                hearingSensitivity: hearingSensitivity,
                 highFrequencyBias: Clamp(f.highFrequencyBias / 150, -0.75, 0.75),
                 lowFrequencyBias: Clamp(f.lowFrequencyBias / 150, -0.75, 0.75),
-                noiseRejection: Clamp(1 + f.noiseRejection / 170, 0.40, 1.70),
-                sensoryGate: Clamp(1 + f.sensoryGate / 175, 0.42, 1.72),
-                falsePositiveBias: Clamp(1 + f.falsePositiveBias / 180, 0.35, 1.85),
-                socialResponseBias: Clamp(1 + f.socialResponseBias / 170, 0.35, 1.85),
-                socialIndependence: Clamp(1 + f.socialIndependence / 170, 0.35, 1.85),
-                sensoryFoodCost: Clamp(0.08 + Math.max(0, f.neuralCost) / 240, 0.02, 0.75),
+                noiseRejection: noiseRejection,
+                sensoryGate: sensoryGate,
+                falsePositiveBias: falsePositiveBias,
+                socialResponseBias: socialResponseBias,
+                socialIndependence: socialIndependence,
+                sensoryFoodCost: sensoryFoodCost,
                 junkHealth: Clamp(1 + f.junkHealth / 150, 0.35, 1.25),
-                eyeColour: redEyes ? '#d7191c' : (rodBias > 0.24 ? '#8a6b32' : (f.colourDiscrimination > 35 ? '#4e7f79' : '#6f5b3e')),
+                eyeColour: redEyes ? '#d7191c' : (rodAllocation > 0.64 ? '#8a6b32' : (coneAllocation > 0.58 ? '#4e7f79' : '#6f5b3e')),
                 redEyes: redEyes,
                 fearDisplayBonus: redEyes ? 0.28 : 0,
                 rawFactors: Object.assign({}, f)
@@ -13680,7 +13747,14 @@ html {
             var viable = eggs * Clamp(provisioning, 0.12, 1.15) * shellBalance * rateBalance * Clamp(r.gameteMaintenance, 0.25, 1.35);
             var maternalCost = eggs * r.yolkSynthesis * (1.15 / Math.max(0.45, r.reproductiveRepair));
             var foodPenalty = Math.exp(-Math.max(0, maternalCost - (6 + food * 1.5)) * 0.10);
-            var tumourRisk = Math.max(0, r.reproductiveRepair - 1.18) * Math.max(0, 1.08 - r.tumourSuppression) * 0.9;
+            // Use the same systemic neoplasia model as runtime disease. This
+            // keeps natural selection aligned with repair, senescence resistance,
+            // metabolic damage and growth control rather than retaining the obsolete
+            // reproductive-tumour shortcut.
+            var tumourRisk = MonsterDiseaseSystem.geneticSelectionRiskModels.reproductiveTumourRepair({
+                reproduction: r,
+                metabolism: { baseMetabolicFood: 10 }
+            }, { selectionAgeFactor: 0.55 });
             var sexSkew = Math.abs((r.femaleBias || 0) - (r.maleBias || 0));
             var sexRatioPenalty = Math.exp(-sexSkew * sexSkew * 3.2);
             var longevityBenefit = Clamp(r.reproductiveSenescenceResistance || 1, 0.5, 1.5);
@@ -13713,15 +13787,25 @@ html {
             add(4, 25, { gameteMaintenance: -135, sexHormone: 70 });
             add(4, 85, { femaleBias: 45 });
             add(4, 85, { maleBias: 45 });
-            add(5, 100, { reproductiveRepair: 42, reproductiveSenescenceResistance: 25, tumourSuppression: -18 });
-            add(5, 100, { reproductiveRepair: -25, reproductiveSenescenceResistance: -15, tumourSuppression: 24 });
+            // Repair rate and reproductive senescence are expressed here.
+            // Growth control is no longer inserted as a hand-authored opposite: the
+            // systemic repair/neoplasia/healing model supplies that constraint.
+            add(5, 100, { reproductiveRepair: 42, reproductiveSenescenceResistance: 25 });
+            add(5, 100, { reproductiveRepair: -25, reproductiveSenescenceResistance: -15 });
+            // This rare recessive represents a genuine coupled checkpoint defect and
+            // may therefore retain pleiotropic loss of tumour suppression.
             add(5, 30, { reproductiveRepair: 145, reproductiveSenescenceResistance: 70, tumourSuppression: -115 });
-            // Predominantly junk DNA. Most alleles do nothing; uncommon variants have pleiotropic extremes.
+            // Predominantly junk DNA. Most alleles do nothing. Two ordinary variants
+            // alter growth-control strength independently of repair; uncommon
+            // recessives cause pleiotropic reproductive defects.
             add(6, 100, {});
             add(6, 100, {});
+            add(6, 95, { tumourSuppression: 34 });
+            add(6, 95, { tumourSuppression: -28 });
             add(6, 35, { shellDeposition: 95, developmentRate: -45 });
             add(6, 30, { gameteMaintenance: 90, femaleBias: 75, reproductiveRepair: -55 });
             add(6, 25, { yolkSynthesis: -95, maleBias: 90, tumourSuppression: 65 });
+            add(6, 22, { gameteMaintenance: -110, tumourSuppression: -85, reproductiveSenescenceResistance: -55 });
         }
         getWorldPerceptionSelectionProfile(world) {
             if (world && world.perceptionSelectionProfileCache) {
@@ -13746,13 +13830,29 @@ html {
         getPerceptionPhenotypeFitness(p, profile) {
             var visual = 0;
             (profile.terrainProfiles || []).forEach(function (t) {
-                var brightnessPenalty = Math.max(0, t.brightness - p.brightnessTolerance) * 1.5 + Math.max(0, 0.38 - t.brightness) * Math.max(0, 1 - p.photonSensitivity);
-                visual += (t.weight || 0) * (1 - brightnessPenalty * 0.55 + (t.clutter || 0) * (p.colourDiscrimination - 1) * 0.22);
+                var weight = t.weight || 0;
+                var brightness = Clamp(Number.isFinite(t.brightness) ? t.brightness : 0.6, 0, 1.2);
+                var darkness = Clamp((0.58 - brightness) / 0.48, 0, 1);
+                var daylight = Clamp((brightness - 0.24) / 0.62, 0, 1);
+                // Photon gain is valuable in dim environments but increasingly
+                // counterproductive where its derived brightness tolerance is exceeded.
+                var dimBenefit = darkness * Math.log(Math.max(0.30, p.photonSensitivity)) * 0.72;
+                var glarePenalty = Math.max(0, brightness - p.brightnessTolerance) * (0.72 + p.photonSensitivity * 0.34);
+                // Colour information requires cone-supported illumination. It cannot
+                // provide its full clutter-separation benefit under scotopic vision.
+                var clutterBenefit = (t.clutter || 0) * daylight * (p.colourDiscrimination - 1) * 0.30;
+                var acuityBenefit = daylight * (p.visualResolution - 1) * 0.16;
+                var motionBenefit = (0.35 + darkness * 0.65) * (p.motionSensitivity - 1) * 0.16;
+                visual += weight * (1 + dimBenefit - glarePenalty + clutterBenefit + acuityBenefit + motionBenefit);
             });
-            var noiseCost = (profile.ambientNoise || 0) * Math.max(0, p.hearingSensitivity - p.noiseRejection) * 0.35;
-            var energyCost = p.sensoryFoodCost * (0.45 + (profile.foodScarcity || 0) * 0.75);
+            var ambientNoise = profile.ambientNoise || 0;
+            var quietDetectionBenefit = (1 - ambientNoise) * Math.max(-0.35, p.hearingSensitivity - 1) * 0.18;
+            var noisyFilteringBenefit = ambientNoise * Math.max(-0.35, p.noiseRejection - 1) * 0.20;
+            var noiseCost = ambientNoise * Math.max(0, p.hearingSensitivity - p.noiseRejection) * 0.42;
+            var falseAlarmCost = Math.max(0, p.falsePositiveBias - 1) * (0.12 + ambientNoise * 0.22);
+            var energyCost = p.sensoryFoodCost * (0.42 + (profile.foodScarcity || 0) * 0.82);
             var junkPenalty = Math.max(0, 1 - p.junkHealth) * 0.8;
-            return Math.exp(Clamp((visual - 0.75) * 1.2 - noiseCost - energyCost - junkPenalty, -2.4, 1.7));
+            return Math.exp(Clamp((visual - 0.75) * 1.2 + quietDetectionBenefit + noisyFilteringBenefit - noiseCost - falseAlarmCost - energyCost - junkPenalty, -2.4, 1.7));
         }
         addDefaultPerceptionAlleles() {
             var junk = (slot) => new PerceptionAllele(DOMINANCE_DEFAULT, {}, { selectionSensitive: false, debugLabel: this.createDebugLabel(PERCEPTION_CHROMOSOME_INDEX, slot) });
@@ -13761,20 +13861,32 @@ html {
                 this.addAllele(PERCEPTION_CHROMOSOME_INDEX, slot, junk(slot));
             }
             var add = (slot, dom, effects) => this.addAllele(PERCEPTION_CHROMOSOME_INDEX, slot, new PerceptionAllele(dom, effects, { debugLabel: this.createDebugLabel(PERCEPTION_CHROMOSOME_INDEX, slot) }));
-            add(0, 100, { photonSensitivity: 55, brightnessTolerance: -28, neuralCost: 12 });
-            add(0, 100, { photonSensitivity: -35, brightnessTolerance: 60, neuralCost: 5 });
-            add(1, 100, { visualResolution: 55, motionSensitivity: -18, neuralCost: 18 });
-            add(1, 100, { visualResolution: -20, motionSensitivity: 62, falsePositiveBias: 15 });
-            add(2, 100, { rodBias: 68, colourDiscrimination: -20, photonSensitivity: 25 });
-            add(2, 100, { rodBias: -52, colourDiscrimination: 72, photonSensitivity: -20 });
-            add(3, 100, { hearingSensitivity: 58, highFrequencyBias: 44, noiseRejection: -18, falsePositiveBias: 20, neuralCost: 12 });
+            // Ordinary sensory alleles encode biological construction choices.
+            // Brightness tolerance, colour loss, receptor noise and neural food cost
+            // are now derived by PerceptionPhenotypeSystem and must not be authored as
+            // balancing penalties on these genes.
+            add(0, 100, { photonSensitivity: 58 });
+            add(0, 100, { photonSensitivity: -38 });
+            add(0, 90, { photonSensitivity: 24, visualResolution: 16 });
+            add(1, 100, { visualResolution: 55, motionSensitivity: -18 });
+            add(1, 100, { visualResolution: -20, motionSensitivity: 62 });
+            add(1, 90, { visualResolution: 24, motionSensitivity: 24 });
+            add(2, 100, { rodBias: 68 });
+            add(2, 100, { rodBias: -52 });
+            add(2, 90, { rodBias: 12 });
+            add(3, 100, { hearingSensitivity: 58, highFrequencyBias: 44 });
             add(3, 100, { hearingSensitivity: -12, lowFrequencyBias: 55, noiseRejection: 35 });
+            add(3, 90, { hearingSensitivity: 24, noiseRejection: 24 });
+            // This is deliberately a junk locus. Most variants do nothing; uncommon
+            // recessives damage sensory development through the normal runtime system.
             add(4, 100, {});
             add(4, 100, {});
-            add(4, 28, { junkHealth: -92, falsePositiveBias: 70, sensoryGate: -44 });
-            add(4, 32, { junkHealth: -45, eyeRedness: 115, brightnessTolerance: 28, photonSensitivity: -30 });
-            add(5, 100, { sensoryGate: 48, falsePositiveBias: -25, socialIndependence: 20 });
-            add(5, 100, { sensoryGate: -30, falsePositiveBias: 42, socialResponseBias: 55 });
+            add(4, 28, { junkHealth: -92, sensoryGate: -44 });
+            add(4, 32, { junkHealth: -45, eyeRedness: 115, photonSensitivity: -30 });
+            add(4, 24, { junkHealth: -110, rodBias: 95, visualResolution: -70 });
+            add(5, 100, { sensoryGate: 48, socialIndependence: 20 });
+            add(5, 100, { sensoryGate: -30, socialResponseBias: 38 });
+            add(5, 90, { sensoryGate: 12, socialIndependence: -12 });
         }
         addDefaultMorphologyAlleles() {
             var junk = (slot) => new Allele(DOMINANCE_DEFAULT, { selectionSensitive: false, debugLabel: this.createDebugLabel(MORPHOLOGY_CHROMOSOME_INDEX, slot) });
@@ -13842,7 +13954,10 @@ html {
                 selectionSensitive: true,
                 debugLabel: this.createDebugLabel(METABOLISM_CHROMOSOME_INDEX, 0)
             }));
-            this.addAllele(METABOLISM_CHROMOSOME_INDEX, 0, new MetabolicAllele(105, {
+            // Rare pathological hypermetabolism. Its slight thermal breadth
+            // does not compensate for its large maintenance demand; low dominance
+            // allows it to persist without displacing ordinary metabolic strategies.
+            this.addAllele(METABOLISM_CHROMOSOME_INDEX, 0, new MetabolicAllele(35, {
                 baseMetabolicRate: 42,
                 coldTolerance: 18,
                 heatTolerance: 16
@@ -15152,8 +15267,13 @@ html {
             var recoveryFood = Math.max(0, this.reproductiveDepletion || 0) * 0.38 * Math.max(0.65, repair);
             var reproductionFood = Math.max(0, this.reproductiveFoodCostThisSeason || 0) + recoveryFood;
             var healingFood = NutritionSystem.getHealingFoodRequirement(this);
+            var perception = this.phenotype && this.phenotype.perception ? this.phenotype.perception : null;
+            // Neural tissue is metabolically active in every environment. Sensory
+            // investment therefore contributes to the actual seasonal food bill,
+            // not only to the natural-selection scoring heuristic.
+            var sensoryFood = perception && Number.isFinite(perception.sensoryFoodCost) ? perception.sensoryFoodCost * 2.6 : 0;
             var diseaseEffects = MonsterDiseaseSystem.combinedEffects(this);
-            var total = (this.bodyMassFoodRequired + this.tissueMaintenanceFoodRequired + this.thermalFoodRequired + (this.activityFoodThisSeason || 0) + this.combatFoodRequired + reproductionFood + healingFood + growthFood) * diseaseEffects.foodMultiplier;
+            var total = (this.bodyMassFoodRequired + this.tissueMaintenanceFoodRequired + this.thermalFoodRequired + (this.activityFoodThisSeason || 0) + this.combatFoodRequired + reproductionFood + healingFood + growthFood + sensoryFood) * diseaseEffects.foodMultiplier;
             this.nutritionRequirement = Math.max(1, Math.ceil(total));
             return this.nutritionRequirement;
         }
@@ -15179,7 +15299,9 @@ html {
                 gaitCostMultiplier = Clamp(1.55 + Math.max(0, limbLength - 1.0) * 0.18 + Math.max(0, massMultiplier - 1.0) * 0.22, 1.45, 2.35);
                 this.seasonSprintingTicks = (this.seasonSprintingTicks || 0) + 1;
             }
-            var effort = actualDistance * Math.max(0.25, terrainCost) * massMultiplier * muscleEfficiency * gaitCostMultiplier / 1650;
+            var metabolism = this.phenotype && this.phenotype.metabolism ? this.phenotype.metabolism : null;
+            var exertionEfficiency = metabolism && Number.isFinite(metabolism.exertionEfficiency) ? metabolism.exertionEfficiency : 1;
+            var effort = actualDistance * Math.max(0.25, terrainCost) * massMultiplier * muscleEfficiency * gaitCostMultiplier / (1650 * exertionEfficiency);
             this.seasonTerrainEffort = (this.seasonTerrainEffort || 0) + effort;
             this.activityFoodThisSeason = (this.activityFoodThisSeason || 0) + effort;
         }
@@ -15236,7 +15358,8 @@ html {
             var metabolism = this.phenotype && this.phenotype.metabolism ? this.phenotype.metabolism : null;
             var conservation = metabolism ? metabolism.energyConservation : 0.5;
             var fatFraction = (this.currentFatMass || 0) / Math.max(1, this.currentBodyMass || 1);
-            var maxTicks = Math.max(18, Math.round(150 * Clamp(1 - fatFraction * 1.8, 0.32, 1.05)));
+            var exertionEfficiency = metabolism && Number.isFinite(metabolism.exertionEfficiency) ? metabolism.exertionEfficiency : 1;
+            var maxTicks = Math.max(18, Math.round(150 * Clamp(1 - fatFraction * 1.8, 0.32, 1.05) * exertionEfficiency));
             if (!Number.isFinite(this.currentSprintEnduranceTicks) || this.currentSprintEnduranceTicks <= 0) {
                 this.currentSprintEnduranceTicks = maxTicks;
             }
@@ -15682,15 +15805,41 @@ html {
             }.bind(this));
             return candidates[0];
         }
+        canDetectAdventurer(raid, adventurer) {
+            if (!raid || !adventurer || !adventurer.isActive || !adventurer.isActive()) {
+                return false;
+            }
+            var distance = this.distanceTo(adventurer);
+            if (distance <= VISIBILITY_CLOSE_RANGE || this.canSee(raid.world, adventurer)) {
+                return true;
+            }
+            // Scent is a genuine short-range modality, not a decorative snapshot
+            // value. It does not identify a target across the map, but it prevents a
+            // nearby human from becoming completely undetectable merely by standing
+            // behind a monster or behind one visual obstruction. Moving humans and
+            // treasure carriers leave stronger local cues than stationary agents.
+            var scentRange = this.scentRange || 0;
+            if (adventurer.carryingTreasure) {
+                scentRange *= 1.16;
+            }
+            if (adventurer.behaviourState === 'fleeing' || adventurer.behaviourState === 'escapingWithTreasure') {
+                scentRange *= 1.12;
+            }
+            return distance <= scentRange;
+        }
         chooseTarget(raid) {
             var candidates = raid.adventurers.filter(function (adventurer) {
-                return adventurer.isActive() && this.canSee(raid.world, adventurer);
+                return this.canDetectAdventurer(raid, adventurer);
             }, this);
             if (candidates.length === 0) {
                 return null;
             }
             candidates.sort(function (a, b) {
-                return this.distanceTo(a) - this.distanceTo(b);
+                // A nearby treasure carrier is an unusually salient moving intruder,
+                // but distance remains the principal target-selection criterion.
+                var aScore = this.distanceTo(a) / (a.carryingTreasure ? 1.18 : 1);
+                var bScore = this.distanceTo(b) / (b.carryingTreasure ? 1.18 : 1);
+                return aScore - bScore;
             }.bind(this));
             return candidates[0];
         }
@@ -16625,7 +16774,12 @@ html {
             var phenotype = this.getOffspringDevelopmentPhenotype();
             var morphology = phenotype.morphology || {};
             var growthRate = Number.isFinite(morphology.growthRate) ? morphology.growthRate : 1;
-            var expected = MONSTER_GROWTH_TO_FULL_SIZE_SEASONS / Math.max(0.70, growthRate);
+            // Building a large, muscular and heavily mineralised body takes
+            // time even when a growth-rate allele is favourable. This is derived from
+            // the expressed construction burden, so an allele cannot remove it by
+            // omitting a manually authored maturation penalty.
+            var constructionBurden = Math.pow(morphology.frameScale || 1, 3) * (0.48 + 0.30 * (morphology.muscleGrowthBias || 1) + 0.22 * (morphology.boneGrowthBias || 1) * (morphology.boneMineralisation || 1));
+            var expected = MONSTER_GROWTH_TO_FULL_SIZE_SEASONS * Math.pow(constructionBurden, 0.34) / Math.max(0.70, growthRate);
             var varied = expected + rng.range(-0.35, 0.35);
             return Clamp(Math.round(varied), MONSTER_GROWTH_TO_FULL_SIZE_SEASONS_MIN, MONSTER_GROWTH_TO_FULL_SIZE_SEASONS_MAX);
         }
@@ -16850,7 +17004,7 @@ html {
                     reason: monster.name + ' cannot be released while she has an incubating brood.'
                 };
             }
-            this.recordWildMonsterRelease(monster, world);
+            this.recordWildMonsterRelease(monster, world, seasonNumber);
             monster.collared = false;
             monster.owned = false;
             monster.deployed = false;
@@ -16909,7 +17063,7 @@ html {
             }
             return Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; })[0] || 'unknown';
         }
-        recordWildMonsterRelease(monster, world) {
+        recordWildMonsterRelease(monster, world, seasonNumber) {
             if (!monster) {
                 return;
             }
@@ -17123,7 +17277,13 @@ html {
             brood.clutchSize = brood.eggs.length;
             var actualYolk = brood.eggs.reduce(function (sum, e) { return sum + e.yolkProvision; }, 0);
             var actualShell = brood.eggs.reduce(function (sum, e) { return sum + e.shellThickness; }, 0);
-            var reproductiveCost = potentialOva * 0.28 + actualYolk * 0.75 + actualShell * 0.20;
+            var offspringConstructionTotal = brood.eggs.reduce(function (sum, egg) {
+                var offspring = egg.getOffspringDevelopmentPhenotype();
+                var morphology = offspring && offspring.morphology ? offspring.morphology : {};
+                var construction = Math.pow(morphology.frameScale || 1, 3) * (0.52 + 0.28 * (morphology.muscleGrowthBias || 1) + 0.20 * (morphology.boneGrowthBias || 1) * (morphology.boneMineralisation || 1));
+                return sum + construction;
+            }, 0);
+            var reproductiveCost = potentialOva * 0.28 + actualYolk * 0.75 + actualShell * 0.20 + offspringConstructionTotal * 0.34;
             mother.reproductiveFoodCostThisSeason = (mother.reproductiveFoodCostThisSeason || 0) + reproductiveCost;
             mother.reproductiveDepletion = (mother.reproductiveDepletion || 0) + reproductiveCost / Math.max(0.65, bodyCapacity);
             mother.reproductiveHistory.eggs += brood.clutchSize;
@@ -17171,7 +17331,11 @@ html {
                 monster.applyAgeEffects();
                 var healed = 0;
                 if (monster.bodyHealth && monster.bodyHealth.healGeneral) {
-                    var healingAmount = Math.min(monster.bodyHealth.missingHealth(), 18 * NutritionSystem.getAgeHealingMultiplier(monster));
+                    var reproductionPhenotype = monster.phenotype && monster.phenotype.reproduction ? monster.phenotype.reproduction : null;
+                    var cellularRepair = reproductionPhenotype ? reproductionPhenotype.reproductiveRepair : 1;
+                    var growthControl = reproductionPhenotype ? reproductionPhenotype.tumourSuppression : 1;
+                    var repairThroughput = Clamp(cellularRepair / Math.pow(Math.max(0.45, growthControl), 0.22), 0.45, 1.65);
+                    var healingAmount = Math.min(monster.bodyHealth.missingHealth(), 18 * NutritionSystem.getAgeHealingMultiplier(monster) * repairThroughput);
                     healed = monster.bodyHealth.healGeneral(healingAmount);
                     if (healed > 0) {
                         events.push(monster.name + ' recovered ' + Math.round(healed) + ' injury points.');
@@ -18051,7 +18215,20 @@ html {
                     var strength = perceived / Math.max(0.0001, threshold);
                     var hormoneModifier = Clamp((listener.vigilinBase || 1) * 0.55 + (listener.currentPugilinLevel ? listener.currentPugilinLevel(0, 0, 0) : 1) * 0.15 + (listener.cowardinBase || 1) * 0.18, 0.45, 1.65);
                     var social = typeof listener.nearbyStimulusSocialModifier === 'function' ? listener.nearbyStimulusSocialModifier(this, sound) : 1;
-                    var chance = Clamp(0.12 + Math.log(1 + Math.max(0, strength)) * 0.24 * pp.falsePositiveBias * pp.sensoryGate * hormoneModifier * social, 0.04, 0.96);
+                    var signalEvidence = Math.log(1 + Math.max(0, strength));
+                    var chance;
+                    if (sound.falseStimulus) {
+                        // False-positive bias applies only to ambiguous environmental
+                        // stimuli. A stronger sensory gate and better noise rejection
+                        // suppress false alarms; they must not make genuine sounds
+                        // harder to hear merely because the animal is discerning.
+                        chance = Clamp(0.018 + signalEvidence * 0.105 * pp.falsePositiveBias / Math.max(0.55, pp.sensoryGate) / Math.max(0.65, pp.noiseRejection) * hormoneModifier * social, 0.01, 0.72);
+                    }
+                    else {
+                        var gateTransmission = Clamp(1.04 - Math.abs(pp.sensoryGate - 1) * 0.10, 0.84, 1.04);
+                        var signalClarity = Clamp(0.92 + pp.noiseRejection * 0.10, 0.88, 1.10);
+                        chance = Clamp(0.18 + signalEvidence * 0.27 * gateTransmission * signalClarity * hormoneModifier * social, 0.08, 0.985);
+                    }
                     var hash = World.terrainHash((sound.createdTick || 0) + (listener.id || '').length, Math.floor(sound.x + sound.y), this.world.seed || 1);
                     if (hash > chance) {
                         continue;
@@ -19652,14 +19829,27 @@ html {
             };
         }
         releaseOwnedMonster(monsterId) {
-            if (this.phase === 'raid') {
-                return {
-                    ok: false,
-                    reason: 'Owned monsters can be released into the wild only during inter-season management.'
-                };
-            }
+            var releasedMonster = this.gameState.ownedMonsters.find(function (monster) {
+                return monster.id === monsterId;
+            });
+            var wasActiveInRaid = this.phase === 'raid' && this.currentRaid && releasedMonster && releasedMonster.deployed && !releasedMonster.escaped;
             var result = this.gameState.releaseOwnedMonster(monsterId, this.world, this.seasonNumber);
             if (result.ok) {
+                if (wasActiveInRaid) {
+                    // In-map release is a permanent uncollaring, not a deployment or
+                    // disappearance command. The same object remains physically in
+                    // the raid, but changes immediately from captive to wild status.
+                    releasedMonster.deployed = true;
+                    releasedMonster.escaped = false;
+                    releasedMonster.recallRequested = false;
+                    releasedMonster.selectedForDeployment = false;
+                    if (this.currentRaid.wildMonsters.indexOf(releasedMonster) < 0) {
+                        this.currentRaid.wildMonsters.push(releasedMonster);
+                    }
+                    if (this.currentRaid.monsters.indexOf(releasedMonster) < 0) {
+                        this.currentRaid.monsters.push(releasedMonster);
+                    }
+                }
                 this.pendingEvents.push({
                     tickNumber: 0,
                     text: result.monsterName + ' was uncollared and released into the wild. It no longer uses captive food.'
@@ -20287,6 +20477,56 @@ html {
             return selection && typeof MonsterDiseaseSystem.geneticSelectionRiskModels[selection.riskModel] === 'function';
         });
         AddRegressionResult(results, 'All current genetic disease definitions participate in natural-selection dry-run scoring', allGeneticDiseasesHaveSelectionModels, 'diseases=' + Object.keys(MonsterDiseaseSystem.definitions).join(','));
+        var perceptionTradeoffContext = new MonsterPhenotypeExpressionContext();
+        new PerceptionAllele(100, { rodBias: 140, photonSensitivity: 120, visualResolution: 120, motionSensitivity: 120, colourDiscrimination: 120, hearingSensitivity: 120, noiseRejection: 120 }, {}).phenotype(perceptionTradeoffContext, false);
+        var perceptionTradeoff = PerceptionPhenotypeSystem.resolve(perceptionTradeoffContext);
+        AddRegressionResult(results, 'Perception genes cannot independently maximise rods, cones, acuity and brightness tolerance', perceptionTradeoff.rodAllocation > 0.70 && perceptionTradeoff.coneAllocation < 0.30 && perceptionTradeoff.colourDiscrimination < 1.05 && perceptionTradeoff.brightnessTolerance < perceptionTradeoff.photonSensitivity, JSON.stringify({ rods: perceptionTradeoff.rodAllocation, cones: perceptionTradeoff.coneAllocation, colour: perceptionTradeoff.colourDiscrimination, photon: perceptionTradeoff.photonSensitivity, bright: perceptionTradeoff.brightnessTolerance }));
+        AddRegressionResult(results, 'Combined sensory investment incurs an unavoidable neural food cost', perceptionTradeoff.sensoryFoodCost > 0.30, 'cost=' + perceptionTradeoff.sensoryFoodCost.toFixed(3));
+        var broadThermalContext = new MonsterPhenotypeExpressionContext();
+        new MetabolicAllele(100, { coldTolerance: 150, heatTolerance: 150 }, {}).phenotype(broadThermalContext, false);
+        var broadThermal = MetabolismPhenotypeSystem.resolve(broadThermalContext);
+        AddRegressionResult(results, 'Broad thermal physiology raises maintenance and lowers exertion efficiency', broadThermal.thermalVersatilityCost > 1.5 && broadThermal.baseMetabolicFood > 11 && broadThermal.exertionEfficiency < 0.75, JSON.stringify({ cost: broadThermal.thermalVersatilityCost, food: broadThermal.baseMetabolicFood, efficiency: broadThermal.exertionEfficiency }));
+        var neoplasiaLow = MonsterDiseaseSystem.geneticSelectionRiskModels.reproductiveTumourRepair({ reproduction: { reproductiveRepair: 0.9, reproductiveSenescenceResistance: 0.9, tumourSuppression: 1.3 }, metabolism: { baseMetabolicFood: 8 } }, { selectionAgeFactor: 0.8 });
+        var neoplasiaHigh = MonsterDiseaseSystem.geneticSelectionRiskModels.reproductiveTumourRepair({ reproduction: { reproductiveRepair: 1.6, reproductiveSenescenceResistance: 1.6, tumourSuppression: 0.7 }, metabolism: { baseMetabolicFood: 14 } }, { selectionAgeFactor: 0.8 });
+        AddRegressionResult(results, 'Repair, senescence resistance and metabolic output create systemic neoplasia risk', neoplasiaHigh > neoplasiaLow + 0.20, 'low=' + neoplasiaLow.toFixed(3) + ', high=' + neoplasiaHigh.toFixed(3));
+        var dimPerceptionProfile = { terrainProfiles: [{ weight: 1, brightness: 0.12, clutter: 0.42 }], ambientNoise: 0.18, foodScarcity: 0.35 };
+        var brightPerceptionProfile = { terrainProfiles: [{ weight: 1, brightness: 0.94, clutter: 0.18 }], ambientNoise: 0.18, foodScarcity: 0.35 };
+        var rodContext = new MonsterPhenotypeExpressionContext();
+        new PerceptionAllele(100, { rodBias: 68 }, {}).phenotype(rodContext, false);
+        var coneContext = new MonsterPhenotypeExpressionContext();
+        new PerceptionAllele(100, { rodBias: -52 }, {}).phenotype(coneContext, false);
+        var rodPhenotype = PerceptionPhenotypeSystem.resolve(rodContext);
+        var conePhenotype = PerceptionPhenotypeSystem.resolve(coneContext);
+        var rodDimFitness = MonsterGenePool.getPerceptionPhenotypeFitness(rodPhenotype, dimPerceptionProfile);
+        var coneDimFitness = MonsterGenePool.getPerceptionPhenotypeFitness(conePhenotype, dimPerceptionProfile);
+        var rodBrightFitness = MonsterGenePool.getPerceptionPhenotypeFitness(rodPhenotype, brightPerceptionProfile);
+        var coneBrightFitness = MonsterGenePool.getPerceptionPhenotypeFitness(conePhenotype, brightPerceptionProfile);
+        AddRegressionResult(results, 'Perception natural selection favours rod allocation in genuinely dim habitat', rodDimFitness > coneDimFitness * 1.05, 'rod=' + rodDimFitness.toFixed(3) + ', cone=' + coneDimFitness.toFixed(3));
+        AddRegressionResult(results, 'Perception natural selection favours cone allocation in bright habitat', coneBrightFitness > rodBrightFitness * 1.05, 'rod=' + rodBrightFitness.toFixed(3) + ', cone=' + coneBrightFitness.toFixed(3));
+        var perceptionAlleleDeadFieldsAbsent = MonsterGenePool.perceptionChromosomeSlots.every(function (slotAlleles) {
+            return slotAlleles.every(function (allele) {
+                var factors = allele.perceptionFactors || {};
+                return !factors.brightnessTolerance && !factors.colourDiscrimination && !factors.neuralCost;
+            });
+        });
+        AddRegressionResult(results, 'Default perception genes contain no obsolete authored brightness colour or neural-cost balancing fields', perceptionAlleleDeadFieldsAbsent, 'catalogue checked');
+        var pathologicalMetabolicAllele = MonsterGenePool.metabolismChromosomeSlots[0].filter(function (allele) {
+            return allele.metabolicFactors && allele.metabolicFactors.baseMetabolicRate === 42;
+        })[0];
+        AddRegressionResult(results, 'Pathological broad hypermetabolism is recessive rather than a dominant default strategy', pathologicalMetabolicAllele && pathologicalMetabolicAllele.dominanceIndex < 50, 'dominance=' + (pathologicalMetabolicAllele ? pathologicalMetabolicAllele.dominanceIndex : 'missing'));
+        var ordinaryRepairAllelesAvoidAuthoredSuppression = MonsterGenePool.reproductionChromosomeSlots[5].filter(function (allele) {
+            return allele.dominanceIndex >= 100 && allele.reproductionFactors && allele.reproductionFactors.reproductiveRepair !== 0;
+        }).every(function (allele) {
+            return allele.reproductionFactors.tumourSuppression === 0;
+        });
+        AddRegressionResult(results, 'Ordinary repair alleles rely on systemic growth-control tradeoffs rather than authored suppression penalties', ordinaryRepairAllelesAvoidAuthoredSuppression, 'repair alleles checked');
+        var perceptionJunkHarmful = MonsterGenePool.perceptionChromosomeSlots[4].some(function (allele) {
+            return allele.dominanceIndex < 40 && allele.perceptionFactors && allele.perceptionFactors.junkHealth < 0;
+        });
+        var reproductionJunkHarmful = MonsterGenePool.reproductionChromosomeSlots[6].some(function (allele) {
+            return allele.dominanceIndex < 40 && allele.reproductionFactors && (allele.reproductionFactors.gameteMaintenance < 0 || allele.reproductionFactors.yolkSynthesis < 0);
+        });
+        AddRegressionResult(results, 'Predominantly junk loci retain occasional recessive harmful variants', perceptionJunkHarmful && reproductionJunkHarmful, 'perception=' + perceptionJunkHarmful + ', reproduction=' + reproductionJunkHarmful);
         function makeColourRegressionWorld(terrainType) {
             return {
                 terrainGrid: {
@@ -21343,6 +21583,42 @@ html {
         AddRegressionResult(results, 'Explorer movement is quieter than villager movement', soundRegressionRaid.agentMovementSoundLoudness(quietExplorer) < soundRegressionRaid.agentMovementSoundLoudness(normalVillager), 'explorer=' + soundRegressionRaid.agentMovementSoundLoudness(quietExplorer) + ', villager=' + soundRegressionRaid.agentMovementSoundLoudness(normalVillager));
         var soundTarget = hearingMonster.chooseHeardSoundTarget(soundRegressionRaid);
         AddRegressionResult(results, 'Monster can choose an audible non-visible sound target', soundTarget && soundTarget.kind === 'regressionLoud', 'target=' + (soundTarget ? soundTarget.kind : 'none'));
+        var scentDetectionMonster = new Monster('scent_detection_monster', 500, 500, new SeededRng(73451), { owned: true, world: soundRegressionRaid.world });
+        scentDetectionMonster.deployed = true;
+        scentDetectionMonster.escaped = false;
+        scentDetectionMonster.lookDirectionAngle = 0;
+        scentDetectionMonster.scentRange = 300;
+        var scentedTreasureCarrier = new Adventurer('scented_treasure_carrier', 285, 500, new SeededRng(73452), ADVENTURER_PROFILE.villager);
+        scentedTreasureCarrier.carryingTreasure = true;
+        scentedTreasureCarrier.carryingAmount = 5;
+        scentedTreasureCarrier.behaviourState = 'escapingWithTreasure';
+        var scentDetectionRaid = { world: soundRegressionRaid.world, adventurers: [scentedTreasureCarrier] };
+        AddRegressionResult(results, 'Nearby treasure carriers remain detectable by scent when directly behind a monster', scentDetectionMonster.chooseTarget(scentDetectionRaid) === scentedTreasureCarrier, 'distance=' + scentDetectionMonster.distanceTo(scentedTreasureCarrier).toFixed(1) + ', scent=' + scentDetectionMonster.scentRange.toFixed(1));
+        var trueSignalSound = { id: 'true_signal_test', kind: 'movement', sourceKind: 'adventurer', sourceId: 'true_signal_source', x: 900, y: 500, loudness: SOUND_LOUDNESS.QUIET, frequency: SOUND_FREQUENCY_MID, createdTick: 441, expiresTick: 500 };
+        var falseSignalSound = Object.assign({}, trueSignalSound, { id: 'false_signal_test', falseStimulus: true });
+        function TestSensoryListener(id, falsePositiveBias, sensoryGate) {
+            return { id: id, x: 500, y: 500, agentKind: 'monster', hearingThreshold: DEFAULT_MONSTER_HEARING_THRESHOLD, phenotype: { perception: { highFrequencyBias: 0, lowFrequencyBias: 0, noiseRejection: 1, falsePositiveBias: falsePositiveBias, sensoryGate: sensoryGate } }, vigilinBase: 1, cowardinBase: 1, currentPugilinLevel: function () { return 1; }, nearbyStimulusSocialModifier: function () { return 1; } };
+        }
+        function HearingChanceFor(listener, sound) {
+            var perceived = soundRegressionRaid.soundLoudnessAt(sound, listener.x, listener.y);
+            var pp = listener.phenotype.perception;
+            var strength = perceived / listener.hearingThreshold;
+            var evidence = Math.log(1 + Math.max(0, strength));
+            if (sound.falseStimulus) {
+                return Clamp(0.018 + evidence * 0.105 * pp.falsePositiveBias / Math.max(0.55, pp.sensoryGate) / Math.max(0.65, pp.noiseRejection) * 0.88, 0.01, 0.72);
+            }
+            var gateTransmission = Clamp(1.04 - Math.abs(pp.sensoryGate - 1) * 0.10, 0.84, 1.04);
+            var signalClarity = Clamp(0.92 + pp.noiseRejection * 0.10, 0.88, 1.10);
+            return Clamp(0.18 + evidence * 0.27 * gateTransmission * signalClarity * 0.88, 0.08, 0.985);
+        }
+        var discerningListener = TestSensoryListener('discerning_listener', 0.62, 1.35);
+        var noisyListener = TestSensoryListener('noisy_listener', 1.55, 0.72);
+        var discerningTrueChance = HearingChanceFor(discerningListener, trueSignalSound);
+        var noisyTrueChance = HearingChanceFor(noisyListener, trueSignalSound);
+        var discerningFalseChance = HearingChanceFor(discerningListener, falseSignalSound);
+        var noisyFalseChance = HearingChanceFor(noisyListener, falseSignalSound);
+        AddRegressionResult(results, 'Low false-positive bias does not reduce detection of genuine adventurer sounds', discerningTrueChance >= noisyTrueChance * 0.94, 'discerning=' + discerningTrueChance.toFixed(3) + ', noisy=' + noisyTrueChance.toFixed(3));
+        AddRegressionResult(results, 'Sensory gating and low false-positive bias selectively suppress false stimuli', discerningFalseChance < noisyFalseChance * 0.55, 'discerning=' + discerningFalseChance.toFixed(3) + ', noisy=' + noisyFalseChance.toFixed(3));
         var committedFleeMonster = new Monster('committed_flee_monster', 450, 100, new SeededRng(424246), {});
         committedFleeMonster.deployed = true;
         var temporarilyHiddenThreat = new Villager('temporarily_hidden_threat', 800, 100, new SeededRng(424247));
@@ -21779,6 +22055,31 @@ html {
         AddRegressionResult(results, 'Campaign emeralds are excluded before round 22 and introduced gradually', round21TreasureProbabilities.emeralds === 0 && round22TreasureProbabilities.emeralds > 0, 'round21=' + round21TreasureProbabilities.emeralds + ', round22=' + round22TreasureProbabilities.emeralds);
         AddRegressionResult(results, 'Late campaign gem probabilities respect ruby and emerald caps', Math.abs(lateTreasureProbabilities.rubies - 0.50) < 0.000001 && Math.abs(lateTreasureProbabilities.emeralds - 0.33) < 0.000001, 'rubies=' + lateTreasureProbabilities.rubies + ', emeralds=' + lateTreasureProbabilities.emeralds);
         AddRegressionResult(results, 'Late campaign retains coin-only treasure outcomes', lateTreasureProbabilities.bronze > 0 && lateTreasureProbabilities.silver > 0 && lateTreasureProbabilities.gold > 0, 'bronze=' + lateTreasureProbabilities.bronze.toFixed(4) + ', silver=' + lateTreasureProbabilities.silver.toFixed(4) + ', gold=' + lateTreasureProbabilities.gold.toFixed(4));
+        try {
+            var saveRoundTripSession = new GameSession(991701, { mode: 'quick', worldOptions: { mapSizeKey: 'legacy', maxMapGenerationAttempts: 20 } });
+            var saveRoundTripRecord = JSON.parse(JSON.stringify(CreateSaveRecord(saveRoundTripSession)));
+            var saveRoundTripRestored = RestoreSaveRecord(saveRoundTripRecord);
+            AddRegressionResult(results, 'Saved games survive a complete JSON storage and restoration round trip', saveRoundTripRestored instanceof GameSession && saveRoundTripRestored.world instanceof World && saveRoundTripRestored.gameState instanceof GameState && saveRoundTripRestored.gameState.ownedMonsters.length === saveRoundTripSession.gameState.ownedMonsters.length, 'owned=' + saveRoundTripRestored.gameState.ownedMonsters.length);
+        }
+        catch (saveRoundTripError) {
+            AddRegressionResult(results, 'Saved games survive a complete JSON storage and restoration round trip', false, saveRoundTripError && saveRoundTripError.message ? saveRoundTripError.message : String(saveRoundTripError));
+        }
+        var managementReleaseSession = new GameSession(991702, { mode: 'quick', worldOptions: { mapSizeKey: 'legacy', maxMapGenerationAttempts: 20 } });
+        var managementReleaseMonster = managementReleaseSession.gameState.ownedMonsters[0];
+        var managementReleaseSeason = managementReleaseSession.seasonNumber;
+        var managementReleaseResult = managementReleaseSession.releaseOwnedMonster(managementReleaseMonster.id);
+        AddRegressionResult(results, 'Management release transfers a captive monster into the persistent wild population', managementReleaseResult.ok && managementReleaseSession.gameState.ownedMonsters.indexOf(managementReleaseMonster) < 0 && managementReleaseSession.gameState.wildPopulation.indexOf(managementReleaseMonster) >= 0 && managementReleaseMonster.wildAvailableFromSeason === managementReleaseSeason + 1, 'ok=' + managementReleaseResult.ok + ', available=' + managementReleaseMonster.wildAvailableFromSeason);
+        var mapReleaseSession = new GameSession(991703, { mode: 'quick', worldOptions: { mapSizeKey: 'legacy', maxMapGenerationAttempts: 20 } });
+        mapReleaseSession.currentRaid = new Raid(mapReleaseSession.world, mapReleaseSession.gameState, 991704, mapReleaseSession.seasonNumber, []);
+        mapReleaseSession.phase = 'raid';
+        var mapReleaseMonster = mapReleaseSession.gameState.ownedMonsters[0];
+        mapReleaseMonster.deployed = true;
+        mapReleaseMonster.escaped = false;
+        if (mapReleaseSession.currentRaid.monsters.indexOf(mapReleaseMonster) < 0) {
+            mapReleaseSession.currentRaid.monsters.push(mapReleaseMonster);
+        }
+        var mapReleaseResult = mapReleaseSession.releaseOwnedMonster(mapReleaseMonster.id);
+        AddRegressionResult(results, 'In-map release permanently uncollars a deployed monster without removing it from the active raid', mapReleaseResult.ok && !mapReleaseMonster.owned && !mapReleaseMonster.collared && mapReleaseMonster.deployed && !mapReleaseMonster.escaped && mapReleaseSession.currentRaid.wildMonsters.indexOf(mapReleaseMonster) >= 0 && mapReleaseSession.currentRaid.monsters.indexOf(mapReleaseMonster) >= 0, 'ok=' + mapReleaseResult.ok + ', deployed=' + mapReleaseMonster.deployed + ', wild=' + (mapReleaseSession.currentRaid.wildMonsters.indexOf(mapReleaseMonster) >= 0));
         var failed = results.filter(function (result) {
             return !result.passed;
         });
@@ -22106,8 +22407,23 @@ html {
         // Defaults for fields introduced after the first public save schema.
         // Keep this idempotent so that both migrated and current saves use the
         // same restoration path.
+        if (!session.gameState || !(session.gameState instanceof GameState)) {
+            throw new Error('The loaded save has no valid game state.');
+        }
         if (!Array.isArray(session.gameState.importedMonsterTransferIds)) {
             session.gameState.importedMonsterTransferIds = [];
+        }
+        if (!Array.isArray(session.gameState.wildPopulation)) {
+            session.gameState.wildPopulation = [];
+        }
+        if (!session.gameState.wildMonsterHarvestByBiome || typeof session.gameState.wildMonsterHarvestByBiome !== 'object') {
+            session.gameState.wildMonsterHarvestByBiome = {};
+        }
+        if (!Array.isArray(session.pendingEvents)) {
+            session.pendingEvents = [];
+        }
+        if (!Array.isArray(session.roundRemains)) {
+            session.roundRemains = [];
         }
         if (!session.mode) {
             session.mode = 'campaign';
