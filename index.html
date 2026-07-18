@@ -25126,7 +25126,7 @@ html {
         var secondary = colour.secondaryBodyColour || colour.bodyColour;
         var bodyDark = colour.bodyDarkColour || '#4a1f5d';
         var dark = monster.alive ? '#1f2730' : '#374151';
-        var collar = monster.collared ? '#f2c14e' : 'transparent';
+        var collar = '#f2c14e';
         var eye = monster.alive ? 'white' : '#d1d5db';
         var morphology = MonsterFatMorphology(monster);
         var bodyTransform = 'translate(90 62) scale(' + morphology.torsoLengthScale.toFixed(2) + ' ' + morphology.torsoDepthScale.toFixed(2) + ') translate(-90 -62)';
@@ -25139,17 +25139,50 @@ html {
         var pupilX = bodyRight + 23;
         var mouthX1 = bodyRight + 27;
         var mouthX2 = bodyRight + 2;
-        var collarPath = '<path d="M' + (bodyRight + 2).toFixed(1) + ' 68 Q' + (bodyRight + 19).toFixed(1) + ' 75 ' + (bodyRight + 32).toFixed(1) + ' 70" stroke="' + collar + '" stroke-width="7" stroke-linecap="round" fill="none"/>';
+        // The portrait has one fixed ground line. Convert that screen-space line
+        // back through wholeScale so every inherited body size plants its feet on
+        // the shadow rather than shrinking the legs away from the floor.
+        var groundScreenY = 96;
+        var groundY = 62 + (groundScreenY - 62) / wholeScale;
+        var legWidth = 7.5 * morphology.legThicknessScale;
+        var legTopY = 70 + Math.max(0, morphology.torsoDepthScale - 1) * 6;
+        var frontLegX = bodyRight - 25;
+        var rearLegX = bodyLeft + 29;
+        function MonsterLegPath(x, rear, near) {
+            var direction = rear ? -1 : 1;
+            var halfWidth = legWidth * (near ? 0.55 : 0.43);
+            var kneeX = x + direction * legWidth * 0.55;
+            var ankleX = x + direction * legWidth * 0.30;
+            var footX = ankleX + direction * 3.5;
+            var kneeY = legTopY + (groundY - legTopY) * (0.48 + (morphology.legScale - 1) * 0.10);
+            var legFill = near ? body : bodyDark;
+            return '<path d="M' + (x - halfWidth).toFixed(1) + ' ' + legTopY.toFixed(1) + ' C' + (x - halfWidth * 0.9).toFixed(1) + ' ' + (legTopY + 5).toFixed(1) + ' ' + (kneeX - halfWidth * 0.55).toFixed(1) + ' ' + (kneeY - 3).toFixed(1) + ' ' + (kneeX - halfWidth * 0.45).toFixed(1) + ' ' + kneeY.toFixed(1) + ' L' + (ankleX - halfWidth * 0.38).toFixed(1) + ' ' + (groundY - 4).toFixed(1) + ' L' + (footX - halfWidth * 0.35).toFixed(1) + ' ' + groundY.toFixed(1) + ' L' + (footX + halfWidth * 1.15).toFixed(1) + ' ' + groundY.toFixed(1) + ' L' + (ankleX + halfWidth * 0.55).toFixed(1) + ' ' + (groundY - 5).toFixed(1) + ' L' + (kneeX + halfWidth * 0.55).toFixed(1) + ' ' + kneeY.toFixed(1) + ' C' + (kneeX + halfWidth * 0.70).toFixed(1) + ' ' + (kneeY - 4).toFixed(1) + ' ' + (x + halfWidth).toFixed(1) + ' ' + (legTopY + 5).toFixed(1) + ' ' + (x + halfWidth).toFixed(1) + ' ' + legTopY.toFixed(1) + ' Z" fill="' + legFill + '" stroke="' + dark + '" stroke-width="3" stroke-linejoin="round"/>';
+        }
+        var farLegs = MonsterLegPath(rearLegX + 11, true, false) + MonsterLegPath(frontLegX + 10, false, false);
+        var nearLegs = MonsterLegPath(rearLegX, true, true) + MonsterLegPath(frontLegX, false, true);
+        // The collar is split into hidden and visible halves. The rear half is
+        // painted before the head and the front half afterwards, so the neck
+        // genuinely passes through the band instead of an ellipse lying on top.
+        var collarBack = '';
+        var collarFront = '';
+        if (monster.collared) {
+            var collarX = bodyRight + 1;
+            collarBack = '<path d="M' + (collarX - 4).toFixed(1) + ' 44 C' + (collarX + 5).toFixed(1) + ' 48 ' + (collarX + 7).toFixed(1) + ' 61 ' + (collarX + 2).toFixed(1) + ' 70" fill="none" stroke="' + dark + '" stroke-width="7" stroke-linecap="round"/><path d="M' + (collarX - 4).toFixed(1) + ' 44 C' + (collarX + 5).toFixed(1) + ' 48 ' + (collarX + 7).toFixed(1) + ' 61 ' + (collarX + 2).toFixed(1) + ' 70" fill="none" stroke="' + collar + '" stroke-width="4" stroke-linecap="round"/>';
+            collarFront = '<path d="M' + (collarX - 4).toFixed(1) + ' 44 C' + (collarX - 11).toFixed(1) + ' 51 ' + (collarX - 10).toFixed(1) + ' 64 ' + (collarX + 2).toFixed(1) + ' 70" fill="none" stroke="' + dark + '" stroke-width="7" stroke-linecap="round"/><path d="M' + (collarX - 4).toFixed(1) + ' 44 C' + (collarX - 11).toFixed(1) + ' 51 ' + (collarX - 10).toFixed(1) + ' 64 ' + (collarX + 2).toFixed(1) + ' 70" fill="none" stroke="' + collar + '" stroke-width="4" stroke-linecap="round"/><circle cx="' + (collarX + 2).toFixed(1) + '" cy="72" r="3.2" fill="' + collar + '" stroke="' + dark + '" stroke-width="1.5"/>';
+        }
         var stripes = MonsterColourIsStriped(monster) ? '<path d="M52 48 C58 54 56 68 63 76 C68 81 72 82 76 80 C71 68 76 54 80 42 C72 38 60 40 52 48 Z M84 38 C91 47 88 64 96 78 C101 85 107 87 112 84 C105 70 111 53 116 41 C106 35 94 34 84 38 Z" fill="' + secondary + '" opacity="0.72"/>' : '';
         var injurySvg = '';
         if (monster.bodyHealth && monster.bodyHealth.maxEach) {
-            var iconInjuries = [['head', bodyRight + 18, 48], ['body', 92, 67], ['frontLeftLeg', 124, 84], ['rearLeftLeg', 58, 84]];
-            iconInjuries.forEach(function (item) { var value = Number.isFinite(monster.bodyHealth[item[0]]) ? monster.bodyHealth[item[0]] : monster.bodyHealth.maxEach; if (value < monster.bodyHealth.maxEach * 0.72) {
-                injurySvg += '<path d="M' + (item[1] - 5) + ' ' + (item[2] + 1) + ' C' + (item[1] - 2) + ' ' + (item[2] - 4) + ' ' + (item[1] + 2) + ' ' + (item[2] + 4) + ' ' + (item[1] + 6) + ' ' + item[2] + '" fill="none" stroke="#6b211c" stroke-width="3" stroke-linecap="round"/>';
-            } });
+            var iconInjuries = [['head', bodyRight + 18, 48], ['body', 92, 67], ['frontLeftLeg', frontLegX, groundY - 8], ['rearLeftLeg', rearLegX, groundY - 8]];
+            iconInjuries.forEach(function (item) {
+                var value = Number.isFinite(monster.bodyHealth[item[0]]) ? monster.bodyHealth[item[0]] : monster.bodyHealth.maxEach;
+                if (value < monster.bodyHealth.maxEach * 0.72) {
+                    injurySvg += '<path d="M' + (item[1] - 5) + ' ' + (item[2] + 1) + ' C' + (item[1] - 2) + ' ' + (item[2] - 4) + ' ' + (item[1] + 2) + ' ' + (item[2] + 4) + ' ' + (item[1] + 6) + ' ' + item[2] + '" fill="none" stroke="#6b211c" stroke-width="3" stroke-linecap="round"/>';
+                }
+            });
         }
         var spines = morphology.spineScale > 0 ? '<path d="M69 42 L76 ' + (30 - Math.round(morphology.spineScale * 10)) + ' L84 43 Z M94 39 L103 ' + (25 - Math.round(morphology.spineScale * 12)) + ' L113 43 Z" fill="' + colour.spineColour + '" stroke="' + dark + '" stroke-width="3"/>' : '';
-        return '<svg viewBox="0 0 180 110" role="img" aria-label="Monster icon">' + '<ellipse cx="90" cy="82" rx="54" ry="11" fill="rgba(0,0,0,0.18)"/>' + '<g transform="translate(90 62) scale(' + wholeScale.toFixed(2) + ' ' + wholeScale.toFixed(2) + ') translate(-90 -62)">' + tailPath + '<g transform="' + bodyTransform + '">' + '<path d="M35 66 C44 38 86 29 126 42 C150 50 157 74 139 84 C109 100 58 94 35 66 Z" fill="' + body + '" stroke="' + dark + '" stroke-width="4"/>' + stripes + spines + '</g>' + headPath + '<circle cx="' + eyeX.toFixed(1) + '" cy="46" r="10" fill="' + eye + '" stroke="' + dark + '" stroke-width="2"/><circle cx="' + pupilX.toFixed(1) + '" cy="46" r="6" fill="' + (monster.eyeColour || '#6f5b3e') + '"/><circle cx="' + (pupilX + 1).toFixed(1) + '" cy="46" r="3" fill="#111"/>' + '<path d="M' + mouthX1.toFixed(1) + ' 58 Q' + (bodyRight + 15).toFixed(1) + ' 66 ' + mouthX2.toFixed(1) + ' 58" fill="none" stroke="' + dark + '" stroke-width="3" stroke-linecap="round"/>' + collarPath + injurySvg + '</g></svg>';
+        return '<svg viewBox="0 0 180 110" role="img" aria-label="Monster icon">' + '<ellipse cx="90" cy="97" rx="55" ry="7" fill="rgba(0,0,0,0.18)"/>' + '<g transform="translate(90 62) scale(' + wholeScale.toFixed(2) + ' ' + wholeScale.toFixed(2) + ') translate(-90 -62)">' + tailPath + farLegs + '<g transform="' + bodyTransform + '">' + '<path d="M35 66 C44 38 86 29 126 42 C150 50 157 74 139 84 C109 100 58 94 35 66 Z" fill="' + body + '" stroke="' + dark + '" stroke-width="4"/>' + stripes + spines + '</g>' + nearLegs + collarBack + headPath + '<circle cx="' + eyeX.toFixed(1) + '" cy="46" r="10" fill="' + eye + '" stroke="' + dark + '" stroke-width="2"/><circle cx="' + pupilX.toFixed(1) + '" cy="46" r="6" fill="' + (monster.eyeColour || '#6f5b3e') + '"/><circle cx="' + (pupilX + 1).toFixed(1) + '" cy="46" r="3" fill="#111"/>' + '<path d="M' + mouthX1.toFixed(1) + ' 58 Q' + (bodyRight + 15).toFixed(1) + ' 66 ' + mouthX2.toFixed(1) + ' 58" fill="none" stroke="' + dark + '" stroke-width="3" stroke-linecap="round"/>' + collarFront + injurySvg + '</g></svg>';
     }
     function LowTechCauseOfDeathLabel(cause) {
         var technicalCauseLabels = {
@@ -29962,7 +29995,7 @@ html {
                 new TutorialStep('The living map', 'Your monsters act for themselves. They hunt, investigate sounds, perceive threats, tire, fight and may retreat according to their bodies and experience.', { target: '#raidCanvas' }),
                 new TutorialStep('Time controls', 'Use Pause whenever you need time to inspect the simulation. Fast-forward is useful while the land is quiet.', { target: '#controls', instruction: 'Click Pause to continue.', waitFor: function (s) { return !!s && s.phase === 'raid' && s.paused; } }),
                 new TutorialStep('Moving around the map', 'Drag the map with the mouse or one finger to move the camera. Use the mouse wheel to zoom; on a touchscreen, pinch with two fingers.', { target: '#raidCanvas', undim: true }),
-                new TutorialStep('Victory conditions', "Protecting treasure requires more than seeing off this season's adventurers: it requires deterring them from returning. If nobody returns alive four seasons in a row, adventurers will fear to venture forth into this realm and the precious treasure will be safe. Likewise, if no adventurer returns with treasure twelve seasons in a row, they will give up and spend their time more wisely.', { target: '.campaignDashboard .dashboardCard:nth-child(2)' }),
+                new TutorialStep('Victory conditions', "Protecting treasure requires more than seeing off this season's adventurers: it requires deterring them from returning. If nobody returns alive four seasons in a row, adventurers will fear to venture forth into this realm and the precious treasure will be safe. Likewise, if no adventurer returns with treasure twelve seasons in a row, they will give up and spend their time more wisely.", { target: '.campaignDashboard .dashboardCard:nth-child(2)' }),
                 new TutorialStep('Query', 'The Query tool allows you to obtain detailed information on items in the world such as terrain, treasure, wildlife, monsters and adventurers.', { target: '#inspectModeButton', undim: true, onShow: function () { SetInteractionMode('inspect'); } }),
                 new TutorialStep('Object details', 'Click an object or terrain tile on the paused map. Its information will appear in the Object Details panel.', { target: '#objectDetails', undim: true, instruction: 'Query something on the map.', waitFor: function () { return tutorialPresentation.objectInspected; } }),
                 new TutorialStep('Reading the Query panel', 'The Query panel identifies the selected object and presents only observable information: its type or class, present condition, activity and any relevant capacity or injuries. Query another object whenever you need to compare what is happening.', { target: '#selectionSection' }),
