@@ -28604,25 +28604,30 @@ html {
         fy /= len;
         var lx = -fy, ly = fx;
         var tailWave = Math.sin(walk) * 4;
-        DrawOrganicClosedPath([{ x: -fx * profile.bodyLength - lx * profile.bodyDepth * 0.35, y: -18 - ly * 4 }, { x: -fx * 10 - lx * profile.bodyDepth, y: -31 - ly * 4 }, { x: fx * profile.bodyLength * 0.72 - lx * profile.bodyDepth * 0.7, y: -28 - ly * 3 }, { x: fx * profile.bodyLength, y: -20 }, { x: fx * profile.bodyLength * 0.72 + lx * profile.bodyDepth * 0.7, y: -12 + ly * 3 }, { x: -fx * 13 + lx * profile.bodyDepth, y: -10 + ly * 4 }], body, dark, 2.2);
+        // Every point below is expressed as (forward-axis offset, lateral-axis offset).
+        // The forward offset must land in BOTH screen x (via fx) and screen y (via fy);
+        // previously only the x contribution was applied, so facings with fx===0 (looking
+        // straight toward/away from the camera) dropped the entire forward axis and the
+        // body collapsed into a squashed, disproportionately wide blob.
+        DrawOrganicClosedPath([{ x: -fx * profile.bodyLength - lx * profile.bodyDepth * 0.35, y: -18 - fy * profile.bodyLength - ly * 4 }, { x: -fx * 10 - lx * profile.bodyDepth, y: -31 - fy * 10 - ly * 4 }, { x: fx * profile.bodyLength * 0.72 - lx * profile.bodyDepth * 0.7, y: -28 + fy * profile.bodyLength * 0.72 - ly * 3 }, { x: fx * profile.bodyLength, y: -20 + fy * profile.bodyLength }, { x: fx * profile.bodyLength * 0.72 + lx * profile.bodyDepth * 0.7, y: -12 + fy * profile.bodyLength * 0.72 + ly * 3 }, { x: -fx * 13 + lx * profile.bodyDepth, y: -10 - fy * 13 + ly * 4 }], body, dark, 2.2);
         ctx.fillStyle = VectorShade(body, 12);
         ctx.beginPath();
-        ctx.ellipse(fx * profile.bodyLength * 0.69, -22 + fy * 6, profile.headLength, profile.headLength * 0.75, Math.atan2(fy, fx), 0, Math.PI * 2);
+        ctx.ellipse(fx * profile.bodyLength * 0.69, -22 + fy * profile.bodyLength * 0.69, profile.headLength, profile.headLength * 0.75, Math.atan2(fy, fx), 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
         ctx.fillStyle = VectorShade(body, -16);
         for (var side = -1; side <= 1; side += 2) {
             ctx.beginPath();
-            ctx.moveTo(fx * 3 + lx * side * 7, -14 + ly * side * 3);
-            ctx.quadraticCurveTo(-fx * 5 + lx * side * 20, -5 + ly * side * 8, -fx * 18 + lx * side * 17, -2 + ly * side * 5);
-            ctx.quadraticCurveTo(-fx * 5 + lx * side * 5, -9, fx * 3 + lx * side * 7, -14 + ly * side * 3);
+            ctx.moveTo(fx * 3 + lx * side * 7, -14 + fy * 3 + ly * side * 3);
+            ctx.quadraticCurveTo(-fx * 5 + lx * side * 20, -5 - fy * 5 + ly * side * 8, -fx * 18 + lx * side * 17, -2 - fy * 18 + ly * side * 5);
+            ctx.quadraticCurveTo(-fx * 5 + lx * side * 5, -9 - fy * 5, fx * 3 + lx * side * 7, -14 + fy * 3 + ly * side * 3);
             ctx.fill();
             ctx.stroke();
         }
         ctx.beginPath();
-        ctx.moveTo(-fx * profile.bodyLength, -18);
-        ctx.lineTo(-fx * (profile.bodyLength + profile.tail) - lx * 8, -12 + tailWave);
-        ctx.lineTo(-fx * (profile.bodyLength + profile.tail) + lx * 8, -12 - tailWave);
+        ctx.moveTo(-fx * profile.bodyLength, -18 - fy * profile.bodyLength);
+        ctx.lineTo(-fx * (profile.bodyLength + profile.tail) - lx * 8, -12 + tailWave - fy * (profile.bodyLength + profile.tail));
+        ctx.lineTo(-fx * (profile.bodyLength + profile.tail) + lx * 8, -12 - tailWave - fy * (profile.bodyLength + profile.tail));
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
@@ -28630,13 +28635,13 @@ html {
             ctx.strokeStyle = '#eee2c2';
             ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.moveTo(fx * (profile.bodyLength + 5) + lx * 5, -17);
-            ctx.lineTo(fx * (profile.bodyLength + 10) + lx * 5, -5);
-            ctx.moveTo(fx * (profile.bodyLength + 5) - lx * 5, -17);
-            ctx.lineTo(fx * (profile.bodyLength + 10) - lx * 5, -5);
+            ctx.moveTo(fx * (profile.bodyLength + 5) + lx * 5, -17 + fy * (profile.bodyLength + 5));
+            ctx.lineTo(fx * (profile.bodyLength + 10) + lx * 5, -5 + fy * (profile.bodyLength + 10));
+            ctx.moveTo(fx * (profile.bodyLength + 5) - lx * 5, -17 + fy * (profile.bodyLength + 5));
+            ctx.lineTo(fx * (profile.bodyLength + 10) - lx * 5, -5 + fy * (profile.bodyLength + 10));
             ctx.stroke();
         }
-        DrawMacrofaunaEye(fx * profile.bodyLength * 0.76, -25 + fy * 6, fx, fy, lx, facing.away, dark);
+        DrawMacrofaunaEye(fx * profile.bodyLength * 0.76, -25 + fy * profile.bodyLength * 0.76, fx, fy, lx, facing.away, dark);
         if (inWater) {
             ctx.save();
             ctx.globalAlpha = 0.42;
@@ -28644,7 +28649,7 @@ html {
             ctx.lineWidth = 2;
             for (var w = -1; w <= 1; w += 1) {
                 ctx.beginPath();
-                ctx.arc(-fx * 8 + lx * w * 10, -6, 18 + w * 2, 0.15, Math.PI - 0.15);
+                ctx.arc(-fx * 8 + lx * w * 10, -6 - fy * 8, 18 + w * 2, 0.15, Math.PI - 0.15);
                 ctx.stroke();
             }
             ctx.restore();
@@ -28691,12 +28696,12 @@ html {
         if (profile.family === 'elephant') {
             for (var el = -1; el <= 1; el += 2) {
                 for (var es = -1; es <= 1; es += 2) {
-                    var ep = walk + (el < 0 ? 0 : Math.PI) + (es < 0 ? 0 : Math.PI * .35), stride = Math.sin(ep) * 5, ax = fx * el * 22 + lx * es * 12;
-                    DrawTaperedVectorLimb(ax, -18, ax + fx * stride * .3, 0, ax + fx * stride, profile.legLength, 7, 5, VectorShade(body, -4), dark, 4);
+                    var ep = walk + (el < 0 ? 0 : Math.PI) + (es < 0 ? 0 : Math.PI * .35), stride = Math.sin(ep) * 5, ax = fx * el * 22 + lx * es * 12, ayBase = fy * el * 22;
+                    DrawTaperedVectorLimb(ax, ayBase - 18, ax + fx * stride * .3, ayBase, ax + fx * stride, ayBase + profile.legLength, 7, 5, VectorShade(body, -4), dark, 4);
                 }
             }
-            DrawOrganicClosedPath([{ x: -fx * 42 - lx * 22, y: -25 }, { x: -fx * 28 - lx * 27, y: -47 }, { x: fx * 28 - lx * 26, y: -48 }, { x: fx * 43 - lx * 20, y: -30 }, { x: fx * 30 + lx * 23, y: -14 }, { x: -fx * 35 + lx * 22, y: -13 }], body, dark, 2.5);
-            var ehx = fx * 48, ehy = -38 + fy * 16;
+            DrawOrganicClosedPath([{ x: -fx * 42 - lx * 22, y: -25 - fy * 42 }, { x: -fx * 28 - lx * 27, y: -47 - fy * 28 }, { x: fx * 28 - lx * 26, y: -48 + fy * 28 }, { x: fx * 43 - lx * 20, y: -30 + fy * 43 }, { x: fx * 30 + lx * 23, y: -14 + fy * 30 }, { x: -fx * 35 + lx * 22, y: -13 - fy * 35 }], body, dark, 2.5);
+            var ehx = fx * 48, ehy = -38 + fy * 48;
             ctx.fillStyle = VectorShade(body, 2);
             ctx.strokeStyle = dark;
             ctx.lineWidth = 2.2;
@@ -28707,7 +28712,7 @@ html {
             for (var ee = -1; ee <= 1; ee += 2) {
                 ctx.fillStyle = VectorShade(body, ee < 0 ? -5 : 8);
                 ctx.beginPath();
-                ctx.ellipse(ehx - fx * 8 + lx * ee * 15, ehy - 2 + ly * ee * 6, 15, 19, rot + ee * .18, 0, Math.PI * 2);
+                ctx.ellipse(ehx - fx * 8 + lx * ee * 15, ehy - 2 - fy * 8 + ly * ee * 6, 15, 19, rot + ee * .18, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.stroke();
             }
@@ -28715,35 +28720,35 @@ html {
             ctx.lineWidth = 8;
             ctx.lineCap = 'round';
             ctx.beginPath();
-            ctx.moveTo(ehx + fx * 15, ehy + 8);
-            ctx.quadraticCurveTo(ehx + fx * 30, ehy + 27, ehx + fx * 22 + lx * Math.sin(walk) * 3, ehy + 43);
+            ctx.moveTo(ehx + fx * 15, ehy + 8 + fy * 15);
+            ctx.quadraticCurveTo(ehx + fx * 30, ehy + 27 + fy * 30, ehx + fx * 22 + lx * Math.sin(walk) * 3, ehy + 43 + fy * 22);
             ctx.stroke();
             if (!facing.away) {
                 ctx.strokeStyle = '#eee0b9';
                 ctx.lineWidth = 3.2;
                 for (var et = -1; et <= 1; et += 2) {
                     ctx.beginPath();
-                    ctx.moveTo(ehx + fx * 12 + lx * et * 7, ehy + 8);
-                    ctx.quadraticCurveTo(ehx + fx * 24 + lx * et * 8, ehy + 18, ehx + fx * 29 + lx * et * 7, ehy + 9);
+                    ctx.moveTo(ehx + fx * 12 + lx * et * 7, ehy + 8 + fy * 12);
+                    ctx.quadraticCurveTo(ehx + fx * 24 + lx * et * 8, ehy + 18 + fy * 24, ehx + fx * 29 + lx * et * 7, ehy + 9 + fy * 29);
                     ctx.stroke();
                 }
             }
-            DrawMacrofaunaEye(ehx + fx * 5, ehy - 4, fx, fy, lx, facing.away, dark);
+            DrawMacrofaunaEye(ehx + fx * 5, ehy - 4 + fy * 5, fx, fy, lx, facing.away, dark);
         }
         else if (profile.family === 'reptile') {
-            DrawOrganicClosedPath([{ x: -fx * profile.bodyLength - lx * 7, y: -16 }, { x: -fx * 8 - lx * profile.bodyDepth, y: -25 }, { x: fx * profile.bodyLength - lx * 7, y: -21 }, { x: fx * (profile.bodyLength + profile.headLength), y: -16 }, { x: fx * profile.bodyLength + lx * 7, y: -10 }, { x: -fx * 8 + lx * profile.bodyDepth, y: -8 }], body, dark, 2);
+            DrawOrganicClosedPath([{ x: -fx * profile.bodyLength - lx * 7, y: -16 - fy * profile.bodyLength }, { x: -fx * 8 - lx * profile.bodyDepth, y: -25 - fy * 8 }, { x: fx * profile.bodyLength - lx * 7, y: -21 + fy * profile.bodyLength }, { x: fx * (profile.bodyLength + profile.headLength), y: -16 + fy * (profile.bodyLength + profile.headLength) }, { x: fx * profile.bodyLength + lx * 7, y: -10 + fy * profile.bodyLength }, { x: -fx * 8 + lx * profile.bodyDepth, y: -8 - fy * 8 }], body, dark, 2);
             ctx.strokeStyle = dark;
             ctx.lineWidth = 8;
             ctx.lineCap = 'round';
             ctx.beginPath();
-            ctx.moveTo(-fx * profile.bodyLength, -15);
-            ctx.quadraticCurveTo(-fx * (profile.bodyLength + profile.tail * 0.5) + lx * 7, -12, -fx * (profile.bodyLength + profile.tail), -7 + Math.sin(walk) * 4);
+            ctx.moveTo(-fx * profile.bodyLength, -15 - fy * profile.bodyLength);
+            ctx.quadraticCurveTo(-fx * (profile.bodyLength + profile.tail * 0.5) + lx * 7, -12 - fy * (profile.bodyLength + profile.tail * 0.5), -fx * (profile.bodyLength + profile.tail), -7 + Math.sin(walk) * 4 - fy * (profile.bodyLength + profile.tail));
             ctx.stroke();
         }
         else if (profile.family === 'bird') {
             for (var bl = -1; bl <= 1; bl += 2) {
                 var stride = Math.sin(walk + (bl < 0 ? 0 : Math.PI)) * 7;
-                DrawTaperedVectorLimb(lx * bl * 5, -15, lx * bl * 5 + fx * stride * 0.3, 1, lx * bl * 6 + fx * stride, profile.legLength, 3.3, 1.8, '#7b6b55', dark, 5);
+                DrawTaperedVectorLimb(lx * bl * 5, -15, lx * bl * 5 + fx * stride * 0.3, 1 + fy * stride * 0.3, lx * bl * 6 + fx * stride, profile.legLength + fy * stride, 3.3, 1.8, '#7b6b55', dark, 5);
             }
             ctx.fillStyle = body;
             ctx.strokeStyle = dark;
@@ -28756,19 +28761,19 @@ html {
             ctx.lineWidth = 11;
             ctx.lineCap = 'round';
             ctx.beginPath();
-            ctx.moveTo(fx * 11, -38);
-            ctx.lineTo(fx * 23, -57);
+            ctx.moveTo(fx * 11, -38 + fy * 11);
+            ctx.lineTo(fx * 23, -57 + fy * 23);
             ctx.stroke();
             ctx.fillStyle = '#23474f';
             ctx.beginPath();
-            ctx.ellipse(fx * 27, -61, profile.headLength, profile.headLength * 0.82, rot, 0, Math.PI * 2);
+            ctx.ellipse(fx * 27, -61 + fy * 27, profile.headLength, profile.headLength * 0.82, rot, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
             ctx.fillStyle = '#b34432';
             ctx.beginPath();
-            ctx.moveTo(fx * 25 - lx * 6, -67);
-            ctx.lineTo(fx * 31, -81);
-            ctx.lineTo(fx * 34 + lx * 6, -65);
+            ctx.moveTo(fx * 25 - lx * 6, -67 + fy * 25);
+            ctx.lineTo(fx * 31, -81 + fy * 31);
+            ctx.lineTo(fx * 34 + lx * 6, -65 + fy * 34);
             ctx.fill();
         }
         else {
@@ -28779,31 +28784,31 @@ html {
                     var stride = Math.sin(phase) * (profile.hindLeg && pair === 0 ? 9 : 6);
                     var lift = Math.max(0, Math.cos(phase)) * 3;
                     var ax = fx * anchors[pair] + lx * side * profile.bodyDepth * 0.45;
-                    var ay = -17 + ly * side * 3;
+                    var ay = -17 + fy * anchors[pair] + ly * side * 3;
                     DrawTaperedVectorLimb(ax, ay, ax + fx * stride * 0.35, ay + profile.legLength * 0.52 - lift, ax + fx * stride, ay + profile.legLength - lift * 0.2, profile.family === 'bear' ? 5 : 3.6, profile.family === 'bear' ? 3.5 : 2.1, VectorShade(body, pair === 0 ? -8 : 0), dark, 4);
                 }
             }
-            DrawOrganicClosedPath([{ x: -fx * profile.bodyLength - lx * profile.bodyDepth * 0.58, y: -24 - ly * 5 }, { x: -fx * profile.bodyLength * 0.45 - lx * profile.bodyDepth, y: -34 - ly * 5 }, { x: fx * profile.bodyLength * 0.48 - lx * profile.bodyDepth * 0.92, y: -35 - ly * 4 }, { x: fx * profile.bodyLength - lx * profile.bodyDepth * 0.54, y: -27 - ly * 3 }, { x: fx * profile.bodyLength * 0.72 + lx * profile.bodyDepth * 0.78, y: -13 + ly * 4 }, { x: -fx * profile.bodyLength * 0.65 + lx * profile.bodyDepth * 0.82, y: -12 + ly * 5 }], body, dark, 2.1);
+            DrawOrganicClosedPath([{ x: -fx * profile.bodyLength - lx * profile.bodyDepth * 0.58, y: -24 - fy * profile.bodyLength - ly * 5 }, { x: -fx * profile.bodyLength * 0.45 - lx * profile.bodyDepth, y: -34 - fy * profile.bodyLength * 0.45 - ly * 5 }, { x: fx * profile.bodyLength * 0.48 - lx * profile.bodyDepth * 0.92, y: -35 + fy * profile.bodyLength * 0.48 - ly * 4 }, { x: fx * profile.bodyLength - lx * profile.bodyDepth * 0.54, y: -27 + fy * profile.bodyLength - ly * 3 }, { x: fx * profile.bodyLength * 0.72 + lx * profile.bodyDepth * 0.78, y: -13 + fy * profile.bodyLength * 0.72 + ly * 4 }, { x: -fx * profile.bodyLength * 0.65 + lx * profile.bodyDepth * 0.82, y: -12 - fy * profile.bodyLength * 0.65 + ly * 5 }], body, dark, 2.1);
             if (profile.scales) {
                 ctx.save();
                 ctx.strokeStyle = VectorShade(body, 24);
                 ctx.lineWidth = 2;
                 for (var sc = -18; sc < 20; sc += 6) {
                     ctx.beginPath();
-                    ctx.arc(fx * sc, -28 + fy * sc * 0.2, 6, Math.PI, Math.PI * 2);
+                    ctx.arc(fx * sc, -28 + fy * sc, 6, Math.PI, Math.PI * 2);
                     ctx.stroke();
                 }
                 ctx.restore();
             }
-            var headX = fx * (profile.bodyLength + profile.headLength * 0.45), headY = -32 + fy * profile.bodyLength * 0.38;
-            DrawOrganicClosedPath([{ x: headX - fx * profile.headLength - lx * profile.headLength * 0.55, y: headY - 5 }, { x: headX + fx * profile.headLength * 0.65 - lx * profile.headLength * 0.48, y: headY - 4 }, { x: headX + fx * profile.headLength, y: headY + 2 }, { x: headX + fx * profile.headLength * 0.45 + lx * profile.headLength * 0.56, y: headY + 7 }, { x: headX - fx * profile.headLength * 0.75 + lx * profile.headLength * 0.52, y: headY + 6 }], VectorShade(body, 3), dark, 1.8);
+            var headX = fx * (profile.bodyLength + profile.headLength * 0.45), headY = -32 + fy * (profile.bodyLength + profile.headLength * 0.45);
+            DrawOrganicClosedPath([{ x: headX - fx * profile.headLength - lx * profile.headLength * 0.55, y: headY - 5 - fy * profile.headLength }, { x: headX + fx * profile.headLength * 0.65 - lx * profile.headLength * 0.48, y: headY - 4 + fy * profile.headLength * 0.65 }, { x: headX + fx * profile.headLength, y: headY + 2 + fy * profile.headLength }, { x: headX + fx * profile.headLength * 0.45 + lx * profile.headLength * 0.56, y: headY + 7 + fy * profile.headLength * 0.45 }, { x: headX - fx * profile.headLength * 0.75 + lx * profile.headLength * 0.52, y: headY + 6 - fy * profile.headLength * 0.75 }], VectorShade(body, 3), dark, 1.8);
             if (profile.ear) {
                 for (var ear = -1; ear <= 1; ear += 2) {
                     ctx.fillStyle = VectorShade(body, 8);
                     ctx.beginPath();
-                    ctx.moveTo(headX - fx * 3 + lx * ear * 5, headY - 4);
-                    ctx.lineTo(headX - fx * 5 + lx * ear * (5 + profile.ear * 0.6), headY - profile.ear);
-                    ctx.lineTo(headX + fx * 2 + lx * ear * 5, headY - 3);
+                    ctx.moveTo(headX - fx * 3 + lx * ear * 5, headY - 4 - fy * 3);
+                    ctx.lineTo(headX - fx * 5 + lx * ear * (5 + profile.ear * 0.6), headY - profile.ear - fy * 5);
+                    ctx.lineTo(headX + fx * 2 + lx * ear * 5, headY - 3 + fy * 2);
                     ctx.fill();
                     ctx.stroke();
                 }
@@ -28813,8 +28818,8 @@ html {
                 ctx.lineWidth = 2.4;
                 for (var gh = -1; gh <= 1; gh += 2) {
                     ctx.beginPath();
-                    ctx.moveTo(headX - fx * 1 + lx * gh * 4, headY - 5);
-                    ctx.quadraticCurveTo(headX - fx * 7 + lx * gh * 7, headY - 20, headX - fx * 3 + lx * gh * 9, headY - 31);
+                    ctx.moveTo(headX - fx * 1 + lx * gh * 4, headY - 5 - fy * 1);
+                    ctx.quadraticCurveTo(headX - fx * 7 + lx * gh * 7, headY - 20 - fy * 7, headX - fx * 3 + lx * gh * 9, headY - 31 - fy * 3);
                     ctx.stroke();
                 }
             }
@@ -28824,10 +28829,10 @@ html {
                 for (var ant = -1; ant <= 1; ant += 2) {
                     ctx.beginPath();
                     ctx.moveTo(headX + lx * ant * 5, headY - 5);
-                    ctx.lineTo(headX - fx * 3 + lx * ant * 10, headY - 24);
-                    ctx.lineTo(headX + fx * 4 + lx * ant * 14, headY - 30);
-                    ctx.moveTo(headX - fx * 2 + lx * ant * 9, headY - 18);
-                    ctx.lineTo(headX - fx * 9 + lx * ant * 15, headY - 25);
+                    ctx.lineTo(headX - fx * 3 + lx * ant * 10, headY - 24 - fy * 3);
+                    ctx.lineTo(headX + fx * 4 + lx * ant * 14, headY - 30 + fy * 4);
+                    ctx.moveTo(headX - fx * 2 + lx * ant * 9, headY - 18 - fy * 2);
+                    ctx.lineTo(headX - fx * 9 + lx * ant * 15, headY - 25 - fy * 9);
                     ctx.stroke();
                 }
             }
@@ -28835,8 +28840,8 @@ html {
                 ctx.strokeStyle = '#eee0b9';
                 ctx.lineWidth = 2.5;
                 ctx.beginPath();
-                ctx.moveTo(headX + fx * profile.headLength * 0.8 + lx * 4, headY + 4);
-                ctx.lineTo(headX + fx * (profile.headLength + 7) + lx * 5, headY - 1);
+                ctx.moveTo(headX + fx * profile.headLength * 0.8 + lx * 4, headY + 4 + fy * profile.headLength * 0.8);
+                ctx.lineTo(headX + fx * (profile.headLength + 7) + lx * 5, headY - 1 + fy * (profile.headLength + 7));
                 ctx.stroke();
             }
             if (profile.tail) {
@@ -28844,11 +28849,11 @@ html {
                 ctx.lineWidth = profile.family === 'canid' ? 10 : 5;
                 ctx.lineCap = 'round';
                 ctx.beginPath();
-                ctx.moveTo(-fx * profile.bodyLength, -24);
-                ctx.quadraticCurveTo(-fx * (profile.bodyLength + profile.tail * 0.55) + lx * 8, -28, -fx * (profile.bodyLength + profile.tail), -20 + Math.sin(walk) * 4);
+                ctx.moveTo(-fx * profile.bodyLength, -24 - fy * profile.bodyLength);
+                ctx.quadraticCurveTo(-fx * (profile.bodyLength + profile.tail * 0.55) + lx * 8, -28 - fy * (profile.bodyLength + profile.tail * 0.55), -fx * (profile.bodyLength + profile.tail), -20 + Math.sin(walk) * 4 - fy * (profile.bodyLength + profile.tail));
                 ctx.stroke();
             }
-            DrawMacrofaunaEye(headX + fx * profile.headLength * 0.35, headY - 2, fx, fy, lx, facing.away, dark);
+            DrawMacrofaunaEye(headX + fx * profile.headLength * 0.35, headY - 2 + fy * profile.headLength * 0.35, fx, fy, lx, facing.away, dark);
         }
         DrawVectorHighlight(-8, -31, profile.bodyLength * 0.42, profile.bodyDepth * 0.16, rot, 0.12);
         ctx.restore();
