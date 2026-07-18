@@ -28045,13 +28045,14 @@ html {
         var skeleton = entity.corpseState === 'skeleton';
         var radius = entity.radius || 12;
         var scale = kind === 'monster' ? 1.25 : (kind === 'macrofauna' ? 1.05 : 0.9);
+        var bodyAngle = -0.18;
         ctx.save();
         ctx.translate(p.x, p.y);
         ctx.scale(scale, scale);
         ctx.globalAlpha = 0.92;
         ctx.fillStyle = 'rgba(0,0,0,0.2)';
         ctx.beginPath();
-        ctx.ellipse(0, 3, radius * 1.45, 5, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 4, radius * 1.65, Math.max(5, radius * 0.34), bodyAngle, 0, Math.PI * 2);
         ctx.fill();
         if (skeleton) {
             ctx.strokeStyle = '#e6dcc4';
@@ -28081,17 +28082,151 @@ html {
         }
         else {
             var colour = kind === 'adventurer' ? '#6b7280' : (kind === 'macrofauna' ? (entity.colour || '#8b5a2b') : (MonsterColourPhenotype(entity).bodyColour || '#6b2d83'));
-            ctx.fillStyle = colour;
+            var darkColour = MixHexColour(colour, '#000000', 0.34);
+            var lightColour = MixHexColour(colour, '#f4ecd7', 0.22);
+
+            // The pool sits beneath the body and is deliberately secondary to the
+            // readable prone silhouette. A corpse must never look like a map marker.
+            ctx.fillStyle = 'rgba(112,24,20,0.42)';
+            ctx.beginPath();
+            ctx.ellipse(radius * 0.18, 3, radius * 0.92, Math.max(3, radius * 0.24), bodyAngle, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
             ctx.strokeStyle = '#1f2730';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.ellipse(0, 0, radius * 1.35, radius * 0.55, -0.18, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-            ctx.fillStyle = 'rgba(120,20,20,0.5)';
-            ctx.beginPath();
-            ctx.ellipse(radius * 0.45, 2, radius * 0.36, radius * 0.14, -0.25, 0, Math.PI * 2);
-            ctx.fill();
+
+            if (kind === 'adventurer') {
+                // A fallen humanoid: bent legs, outstretched arms, torso and head.
+                // The asymmetric pose reads as a body even at the minimum zoom.
+                ctx.lineWidth = Math.max(4, radius * 0.34);
+                ctx.beginPath();
+                ctx.moveTo(-radius * 0.2, 0);
+                ctx.lineTo(-radius * 0.92, -radius * 0.48);
+                ctx.lineTo(-radius * 1.34, -radius * 0.3);
+                ctx.moveTo(-radius * 0.1, radius * 0.12);
+                ctx.lineTo(-radius * 0.72, radius * 0.66);
+                ctx.lineTo(-radius * 1.2, radius * 0.58);
+                ctx.moveTo(radius * 0.35, -radius * 0.08);
+                ctx.lineTo(radius * 0.9, -radius * 0.58);
+                ctx.moveTo(radius * 0.28, radius * 0.12);
+                ctx.lineTo(radius * 0.8, radius * 0.56);
+                ctx.stroke();
+
+                ctx.fillStyle = colour;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, radius * 0.72, radius * 0.46, bodyAngle, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = lightColour;
+                ctx.beginPath();
+                ctx.arc(radius * 0.88, -radius * 0.18, Math.max(4, radius * 0.3), 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.strokeStyle = darkColour;
+                ctx.lineWidth = 1.4;
+                ctx.beginPath();
+                ctx.moveTo(radius * 0.76, -radius * 0.23);
+                ctx.lineTo(radius * 0.83, -radius * 0.2);
+                ctx.moveTo(radius * 0.96, -radius * 0.17);
+                ctx.lineTo(radius * 1.03, -radius * 0.14);
+                ctx.stroke();
+            }
+            else if (kind === 'macrofauna') {
+                // A collapsed quadruped retains the animal's colour and has a clear
+                // muzzle, tail and folded legs rather than one anonymous ellipse.
+                ctx.strokeStyle = darkColour;
+                ctx.lineWidth = Math.max(3, radius * 0.25);
+                ctx.beginPath();
+                ctx.moveTo(-radius * 0.5, radius * 0.12);
+                ctx.lineTo(-radius * 0.9, radius * 0.62);
+                ctx.lineTo(-radius * 1.23, radius * 0.48);
+                ctx.moveTo(radius * 0.2, radius * 0.18);
+                ctx.lineTo(radius * 0.62, radius * 0.7);
+                ctx.lineTo(radius * 0.98, radius * 0.52);
+                ctx.moveTo(-radius * 1.0, -radius * 0.08);
+                ctx.quadraticCurveTo(-radius * 1.45, -radius * 0.55, -radius * 1.62, -radius * 0.22);
+                ctx.stroke();
+
+                ctx.fillStyle = colour;
+                ctx.strokeStyle = '#1f2730';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.ellipse(-radius * 0.05, 0, radius * 1.08, radius * 0.5, bodyAngle, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.ellipse(radius * 1.0, -radius * 0.14, radius * 0.48, radius * 0.34, bodyAngle, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = lightColour;
+                ctx.beginPath();
+                ctx.ellipse(radius * 1.38, -radius * 0.08, radius * 0.3, radius * 0.2, bodyAngle, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            }
+            else {
+                // A monster corpse remains recognisably monstrous: large phenotype-
+                // coloured torso, separate head, four splayed limbs, tail and spines.
+                ctx.strokeStyle = darkColour;
+                ctx.lineWidth = Math.max(3.5, radius * 0.28);
+                ctx.beginPath();
+                ctx.moveTo(-radius * 0.48, -radius * 0.1);
+                ctx.lineTo(-radius * 0.95, -radius * 0.66);
+                ctx.lineTo(-radius * 1.32, -radius * 0.52);
+                ctx.moveTo(-radius * 0.35, radius * 0.18);
+                ctx.lineTo(-radius * 0.9, radius * 0.72);
+                ctx.lineTo(-radius * 1.3, radius * 0.55);
+                ctx.moveTo(radius * 0.35, -radius * 0.02);
+                ctx.lineTo(radius * 0.82, -radius * 0.62);
+                ctx.lineTo(radius * 1.18, -radius * 0.5);
+                ctx.moveTo(radius * 0.25, radius * 0.2);
+                ctx.lineTo(radius * 0.72, radius * 0.72);
+                ctx.lineTo(radius * 1.15, radius * 0.58);
+                ctx.moveTo(-radius * 0.85, -radius * 0.04);
+                ctx.bezierCurveTo(-radius * 1.4, -radius * 0.45, -radius * 1.72, radius * 0.06, -radius * 1.9, -radius * 0.25);
+                ctx.stroke();
+
+                ctx.fillStyle = colour;
+                ctx.strokeStyle = '#1f2730';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, radius * 1.08, radius * 0.58, bodyAngle, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.ellipse(radius * 1.03, -radius * 0.18, radius * 0.53, radius * 0.4, bodyAngle, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = lightColour;
+                ctx.beginPath();
+                ctx.moveTo(-radius * 0.55, -radius * 0.45);
+                ctx.lineTo(-radius * 0.3, -radius * 0.9);
+                ctx.lineTo(-radius * 0.05, -radius * 0.48);
+                ctx.lineTo(radius * 0.18, -radius * 0.86);
+                ctx.lineTo(radius * 0.38, -radius * 0.42);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                // Closed eye and visible teeth make the state legible without using
+                // skeletal artwork for a flesh-bearing corpse.
+                ctx.strokeStyle = '#1f2730';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(radius * 0.92, -radius * 0.26);
+                ctx.lineTo(radius * 1.06, -radius * 0.24);
+                ctx.stroke();
+                ctx.fillStyle = '#f4ecd7';
+                ctx.beginPath();
+                ctx.moveTo(radius * 1.34, -radius * 0.06);
+                ctx.lineTo(radius * 1.45, radius * 0.05);
+                ctx.lineTo(radius * 1.29, radius * 0.06);
+                ctx.closePath();
+                ctx.fill();
+            }
         }
         ctx.restore();
     }
