@@ -3836,6 +3836,704 @@ html {
         overflow:visible
     }
 }
+
+/* ========================================================================== */
+/* DIEGETIC BOOK OF MONSTER HUSBANDRY                                         */
+/* This deliberately has its own manuscript visual language.                  */
+/* ========================================================================== */
+#openHusbandryBookButton {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    background: #5a3524;
+    color: #f0dfaf;
+    text-shadow: 0 1px #20150d;
+}
+#openHusbandryBookButton:hover {
+    background: #72472f;
+}
+.husbandryBookButtonIcon {
+    width: 1.55rem;
+    height: 1.25rem;
+    display: inline-block;
+    border: 2px solid #29190f;
+    background: linear-gradient(90deg, #8d5937 0 46%, #3b2417 47% 53%, #8d5937 54% 100%);
+    box-shadow: inset 0 0 0 2px #bd8a55;
+}
+#husbandryBookOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 4200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    box-sizing: border-box;
+    background: radial-gradient(circle at center, rgba(48,35,20,.72), rgba(10,7,4,.97));
+}
+#husbandryBookOverlay.dialogHidden {
+    display: none;
+}
+#husbandryBookTome {
+    position: relative;
+    width: min(1120px, calc(100vw - 2rem));
+    height: min(780px, calc(100vh - 2rem));
+    display: grid;
+    grid-template-rows: auto minmax(0,1fr) auto;
+    box-sizing: border-box;
+    border: 14px solid #472a19;
+    border-left-width: 24px;
+    border-right-width: 24px;
+    border-radius: 12px 20px 20px 12px;
+    background: #6b4127;
+    box-shadow: 0 22px 70px #000, inset 0 0 0 3px #a77845;
+    overflow: hidden;
+}
+#husbandryBookTome:before,
+#husbandryBookTome:after {
+    content: '';
+    position: absolute;
+    top: 8%;
+    bottom: 8%;
+    width: 10px;
+    border: 2px solid #2a180e;
+    background: #8b5734;
+    z-index: 4;
+    pointer-events: none;
+}
+#husbandryBookTome:before { left: -17px; }
+#husbandryBookTome:after { right: -17px; }
+.husbandryBookHeader,
+.husbandryBookFooter {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+    padding: .55rem .85rem;
+    border-bottom: 2px solid #7d6840;
+    background: #dfcf9e;
+    color: #3a2b1a;
+    font-family: Georgia, "Liberation Serif", serif;
+}
+.husbandryBookFooter {
+    justify-content: space-between;
+    border-top: 2px solid #7d6840;
+    border-bottom: 0;
+}
+#husbandryBookRunningTitle {
+    flex: 1;
+    text-align: center;
+    font-variant: small-caps;
+    letter-spacing: .1em;
+    font-weight: 800;
+}
+#closeHusbandryBookButton {
+    padding: .3rem .55rem;
+    background: #77543a;
+    color: #fff1c8;
+}
+#husbandryBookPage {
+    position: relative;
+    min-height: 0;
+    overflow: auto;
+    box-sizing: border-box;
+    padding: clamp(1.25rem, 3vw, 2.7rem) clamp(1.35rem, 4vw, 4rem);
+    background:
+        radial-gradient(circle at 13% 18%, rgba(108,78,33,.08) 0 2px, transparent 3px),
+        radial-gradient(circle at 85% 72%, rgba(108,78,33,.06) 0 1px, transparent 2px),
+        linear-gradient(90deg, #c7b379 0, #eadcae 5%, #f1e5b9 49%, #d8c68e 50%, #f2e7bd 54%, #ead9a8 96%, #b9a269 100%);
+    background-size: 79px 67px, 91px 83px, auto;
+    color: #342817;
+    font-family: Georgia, "Liberation Serif", "Times New Roman", serif;
+    font-size: clamp(1rem, 1.55vw, 1.2rem);
+    line-height: 1.55;
+    scrollbar-color: #76542f #d6c48e;
+}
+#husbandryBookPage:after {
+    content: '';
+    position: fixed;
+    left: 50%;
+    top: calc(50% - min(390px, calc(50vh - 1rem)) + 3.8rem);
+    bottom: calc(50% - min(390px, calc(50vh - 1rem)) + 3.8rem);
+    width: 2px;
+    background: linear-gradient(#80683c, #cbb77c 15%, #8a7040 50%, #cbb77c 85%, #80683c);
+    box-shadow: -5px 0 12px rgba(48,34,13,.18), 5px 0 12px rgba(48,34,13,.18);
+    pointer-events: none;
+}
+.husbandryPageContent {
+    max-width: 920px;
+    margin: 0 auto;
+    column-count: 2;
+    column-gap: clamp(2.3rem, 7vw, 5.5rem);
+    column-rule: 1px solid rgba(105,79,38,.35);
+}
+.husbandryPageContent.coverPage,
+.husbandryPageContent.singleColumn {
+    column-count: 1;
+    max-width: 760px;
+}
+.husbandryPageContent.coverPage {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+.husbandryPageContent h2 {
+    margin: 0 0 .8rem;
+    color: #4b351d;
+    font-family: "Palatino Linotype", Palatino, Georgia, serif;
+    font-size: clamp(1.55rem, 3vw, 2.45rem);
+    line-height: 1.1;
+    text-align: center;
+    font-variant: small-caps;
+    letter-spacing: .06em;
+    break-after: avoid;
+}
+.husbandryPageContent h3 {
+    margin: 1rem 0 .25rem;
+    color: #6f2f25;
+    font-size: 1.08em;
+    font-variant: small-caps;
+    break-after: avoid;
+}
+.husbandryPageContent p {
+    margin: 0 0 .85rem;
+    text-align: justify;
+    hyphens: auto;
+}
+.husbandryPageContent ul {
+    margin: .2rem 0 .9rem;
+    padding-left: 1.2rem;
+}
+.husbandryPageContent li { margin: .28rem 0; }
+.illuminatedInitial {
+    float: left;
+    position: relative;
+    width: 3.25rem;
+    height: 3.25rem;
+    margin: .08rem .55rem .1rem 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px double #6f2f25;
+    background:
+        radial-gradient(circle at 24% 25%, #e5c85a 0 8%, transparent 9%),
+        radial-gradient(circle at 76% 75%, #e5c85a 0 8%, transparent 9%),
+        linear-gradient(135deg, #244c3a 0 48%, #71332b 49% 100%);
+    color: #f4df79;
+    box-shadow: inset 0 0 0 3px #d1a949;
+    font-family: "Palatino Linotype", Palatino, serif;
+    font-size: 2.45rem;
+    font-weight: 900;
+    line-height: 1;
+    text-shadow: 1px 2px #29150f;
+}
+.husbandryMarginalia {
+    margin: .7rem 0 1rem;
+    padding: .55rem .7rem;
+    border-left: 4px solid #824235;
+    background: rgba(151,116,55,.12);
+    color: #533d24;
+    font-size: .92em;
+    font-style: italic;
+    break-inside: avoid;
+}
+.husbandryIllustration {
+    display: block;
+    width: min(100%, 360px);
+    max-height: 190px;
+    margin: .6rem auto 1rem;
+    color: #563a22;
+    break-inside: avoid;
+}
+.husbandryIllustration .ink { fill: none; stroke: currentColor; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+.husbandryIllustration .wash { fill: #9b6a3f; opacity: .22; stroke: #563a22; stroke-width: 3; }
+.husbandryIllustration .rubric { fill: none; stroke: #7b3028; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.husbandryCoverDevice {
+    width: min(330px, 72%);
+    margin: 1rem auto;
+    color: #5d3d20;
+}
+.husbandryCoverSubtitle {
+    max-width: 38rem;
+    color: #604b2f;
+    font-style: italic;
+}
+.husbandryDiseaseEntry {
+    break-inside: avoid;
+    margin-bottom: .8rem;
+}
+#husbandryBookPageNumber {
+    min-width: 8rem;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-style: italic;
+}
+#husbandryBookPreviousButton,
+#husbandryBookNextButton {
+    min-width: 8.5rem;
+    background: #7d5a38;
+    color: #fff0c5;
+}
+#husbandryBookPreviousButton:disabled,
+#husbandryBookNextButton:disabled {
+    color: #766b54;
+    background: #bcae83;
+}
+@media (max-width: 760px) {
+    #husbandryBookTome { border-width: 10px 14px; }
+    #husbandryBookPage { padding: 1.2rem; }
+    #husbandryBookPage:after { display: none; }
+    .husbandryPageContent { column-count: 1; }
+    .husbandryBookFooter { gap: .35rem; padding: .42rem; }
+    #husbandryBookPreviousButton,
+    #husbandryBookNextButton { min-width: 0; padding: .45rem; }
+}
+
+
+/* ========================================================================== */
+/* AUTHORITATIVE MANUSCRIPT BOOK REVISION                                     */
+/* ========================================================================== */
+#husbandryBookPage,
+.husbandryPageContent,
+.husbandryPageContent p,
+.husbandryMarginalia,
+.husbandryCoverSubtitle {
+    font-family: "Segoe Print", "Bradley Hand ITC", "Bradley Hand", "Lucida Handwriting", "Apple Chancery", "URW Chancery L", "Comic Sans MS", cursive;
+}
+.husbandryBookHeader,
+.husbandryBookFooter,
+#husbandryBookRunningTitle,
+.husbandryPageContent h2,
+.husbandryPageContent h3,
+.illuminatedInitial {
+    font-family: "Uncial Antiqua", "IM FELL English SC", "Copperplate Gothic", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+}
+#husbandryBookPage {
+    overflow: hidden;
+    font-size: clamp(.93rem, 1.32vw, 1.08rem);
+    line-height: 1.48;
+}
+.husbandryPageContent {
+    height: 100%;
+    box-sizing: border-box;
+}
+.husbandryPageContent.singleColumn {
+    max-width: 780px;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    align-content: start;
+}
+.husbandryPageContent.singleColumn .husbandryIllustration {
+    max-height: 230px;
+}
+.husbandryPageContent h2 {
+    font-size: clamp(1.45rem, 2.7vw, 2.25rem);
+}
+.husbandryMarginalia {
+    position: relative;
+    margin: .85rem .35rem 1rem;
+    padding: .5rem .75rem .45rem 1.75rem;
+    border: 0;
+    border-top: 2px solid #9a6a3a;
+    border-bottom: 1px solid #b18a52;
+    background: transparent;
+    color: #762f26;
+    font-size: .88em;
+    font-style: normal;
+    transform: rotate(-.35deg);
+}
+.husbandryMarginalia:before {
+    content: "¶";
+    position: absolute;
+    left: .3rem;
+    top: .2rem;
+    color: #8a3027;
+    font-family: "Uncial Antiqua", "IM FELL English SC", Georgia, serif;
+    font-size: 1.45rem;
+    font-weight: 900;
+}
+.husbandryCoverSubtitle {
+    max-width: 38rem;
+    color: #604b2f;
+    font-style: normal;
+    letter-spacing: .015em;
+}
+.husbandryIllustration {
+    width: min(100%, 390px);
+    max-height: 205px;
+}
+.husbandryIllustration .ink {
+    fill: none;
+    stroke: #4e3320;
+    stroke-width: 4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.husbandryIllustration .fine {
+    fill: none;
+    stroke: #5f432b;
+    stroke-width: 2.25;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.husbandryIllustration .wash {
+    fill: #aa7948;
+    opacity: .24;
+    stroke: #563a22;
+    stroke-width: 3;
+}
+.husbandryIllustration .pale {
+    fill: #d8bd7b;
+    opacity: .35;
+    stroke: #563a22;
+    stroke-width: 3;
+}
+.husbandryIllustration .rubric {
+    fill: none;
+    stroke: #7b3028;
+    stroke-width: 4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+@media (max-width: 760px) {
+    #husbandryBookPage { overflow: auto; }
+    .husbandryPageContent { height: auto; }
+}
+
+
+/* ========================================================================== */
+/* AUTHORITATIVE SINGLE-LEAF MANUSCRIPT AND OUTER-COVER REVISION              */
+/* ========================================================================== */
+#husbandryBookPage,
+.husbandryPageContent,
+.husbandryPageContent p,
+.husbandryMarginalia,
+.husbandryCoverSubtitle {
+    font-family: "IM FELL English", "Junicode", "EB Garamond", "Cormorant Garamond", "Bookman Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+}
+.husbandryBookHeader,
+.husbandryBookFooter,
+#husbandryBookRunningTitle,
+.husbandryPageContent h2,
+.husbandryPageContent h3,
+.illuminatedInitial {
+    font-family: "IM FELL English SC", "Uncial Antiqua", "Junicode", "Cormorant SC", "Palatino Linotype", Palatino, Georgia, serif;
+}
+#husbandryBookPage {
+    overflow: hidden;
+    padding: clamp(1rem, 2.2vw, 2rem) clamp(1.15rem, 3vw, 3rem);
+    font-size: clamp(.94rem, 1.23vw, 1.08rem);
+    line-height: 1.48;
+}
+.husbandryPageContent,
+.husbandryPageContent.singleColumn,
+.husbandryPageContent.coverPage {
+    width: calc(50% - clamp(1.7rem, 4vw, 3.8rem));
+    max-width: none;
+    height: 100%;
+    margin: 0 auto 0 0;
+    padding: 0 clamp(.3rem, 1vw, .8rem);
+    column-count: 1;
+    column-rule: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+.husbandryPageContent h2 {
+    margin-bottom: .45rem;
+    font-size: clamp(1.35rem, 2.3vw, 2rem);
+}
+.husbandryIllustration {
+    width: min(100%, 330px);
+    max-height: 150px;
+    margin: .25rem auto .55rem;
+}
+.husbandryPageContent p {
+    margin: 0 0 .66rem;
+}
+.husbandryMarginalia {
+    margin: .55rem .15rem .3rem;
+    padding: .38rem .5rem .35rem 1.55rem;
+}
+.husbandryPageContent.outerCover {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: clamp(2rem, 6vw, 5rem);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 12px double #bb8b48;
+    background:
+        radial-gradient(circle at 50% 42%, rgba(196,139,65,.12), transparent 38%),
+        linear-gradient(135deg, #2c170d, #714326 48%, #3b2012);
+    color: #e4c779;
+    box-shadow: inset 0 0 55px #120a06, inset 0 0 0 8px #372013;
+    text-align: center;
+}
+.husbandryPageContent.outerCover:before,
+.husbandryPageContent.outerCover:after {
+    content: '';
+    position: absolute;
+    inset: 5%;
+    border: 3px solid #a97a3d;
+    pointer-events: none;
+}
+.husbandryPageContent.outerCover:after {
+    inset: 7%;
+    border-width: 1px;
+}
+.husbandryPageContent.outerCover h2 {
+    max-width: 36rem;
+    color: #efd78f;
+    font-size: clamp(2.2rem, 5.4vw, 4.8rem);
+    line-height: 1.08;
+    text-shadow: 0 3px #1d0e08;
+}
+.husbandryPageContent.outerCover .husbandryIllustration {
+    width: min(360px, 55%);
+    max-height: 210px;
+    color: #d5b461;
+    filter: sepia(.25);
+}
+.husbandryCoverDeviceText {
+    max-width: 30rem;
+    padding: .7rem 1rem;
+    border-top: 1px solid #c89d55;
+    border-bottom: 1px solid #c89d55;
+    color: #dec581;
+    font-variant: small-caps;
+    letter-spacing: .075em;
+}
+.husbandryPageContent.openingLeaf .illuminatedInitial {
+    width: 6.6rem;
+    height: 6.6rem;
+    margin: .1rem .8rem .3rem 0;
+    font-size: 5.2rem;
+    border-width: 5px;
+    box-shadow: inset 0 0 0 5px #d1a949;
+}
+.husbandryPageContent.openingLeaf .husbandryIllustration {
+    display: none;
+}
+.husbandryPageContent.openingLeaf h2 {
+    display: none;
+}
+@media (max-width: 760px) {
+    #husbandryBookPage { overflow: auto; }
+    .husbandryPageContent,
+    .husbandryPageContent.singleColumn,
+    .husbandryPageContent.coverPage {
+        width: 100%;
+        height: auto;
+        margin: 0;
+        overflow: visible;
+    }
+    .husbandryPageContent.outerCover {
+        position: absolute;
+        height: 100%;
+        overflow: hidden;
+    }
+}
+
+
+/* ========================================================================== */
+/* AUTHORITATIVE TWO-LEAF SPREAD REVISION                                     */
+/* Each inner page is an independent leaf. The closed cover occupies only the */
+/* right half of the open-book footprint.                                     */
+/* ========================================================================== */
+#husbandryBookPage,
+.husbandryLeaf,
+.husbandryLeaf p,
+.husbandryMarginalia,
+.husbandryCoverDeviceText {
+    font-family: "Lucida Calligraphy", "Apple Chancery", "URW Chancery L", "Segoe Script", "Bradley Hand ITC", "Bradley Hand", "Monotype Corsiva", cursive;
+    font-weight: 500;
+}
+.husbandryLeaf h2,
+.husbandryLeaf h3,
+.illuminatedInitial,
+#husbandryBookRunningTitle {
+    font-family: "Uncial Antiqua", "IM FELL English SC", "Lucida Blackletter", "Old English Text MT", "Junicode", "Apple Chancery", serif;
+}
+#husbandryBookPage {
+    overflow: hidden;
+    padding: clamp(.8rem, 1.8vw, 1.65rem) clamp(1rem, 2.6vw, 2.5rem);
+    font-size: clamp(.86rem, 1.02vw, 1rem);
+    line-height: 1.42;
+}
+#husbandryBookPage.outerCoverShown {
+    background: #0b0806;
+}
+#husbandryBookPage.outerCoverShown:after {
+    display: none;
+}
+.husbandrySpread {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(2.2rem, 6vw, 5.2rem);
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+}
+.husbandryLeaf {
+    min-width: 0;
+    height: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+    color: #342817;
+}
+.husbandryLeaf.leftLeaf {
+    padding: 0 .2rem 0 .35rem;
+}
+.husbandryLeaf.rightLeaf {
+    padding: 0 .35rem 0 .2rem;
+}
+.husbandryLeaf.blankLeaf {
+    visibility: hidden;
+}
+.husbandryLeaf h2 {
+    margin: 0 0 .32rem;
+    color: #4b351d;
+    font-size: clamp(1.23rem, 1.85vw, 1.72rem);
+    line-height: 1.08;
+    text-align: center;
+    font-variant: small-caps;
+    letter-spacing: .055em;
+}
+.husbandryLeaf p {
+    margin: 0 0 .56rem;
+    text-align: justify;
+    hyphens: auto;
+}
+.husbandryLeaf .husbandryIllustration {
+    display: block;
+    width: min(100%, 300px);
+    max-height: 132px;
+    margin: .16rem auto .42rem;
+}
+.husbandryLeafText {
+    display: flow-root;
+}
+.husbandryLeafText > p:first-child {
+    display: block;
+}
+.illuminatedInitial {
+    float: left;
+    display: block;
+    width: 2.85rem;
+    height: 2.85rem;
+    margin: .08rem .48rem .16rem 0;
+    box-sizing: border-box;
+    font-size: 2.1rem;
+    line-height: 2.52rem;
+    text-align: center;
+}
+.husbandryLeaf.openingLeaf .illuminatedInitial {
+    width: 6.1rem;
+    height: 6.1rem;
+    margin: .06rem .7rem .28rem 0;
+    font-size: 4.75rem;
+    line-height: 5.45rem;
+}
+.husbandryLeaf.openingLeaf .husbandryIllustration,
+.husbandryLeaf.openingLeaf h2 {
+    display: none;
+}
+.husbandryMarginalia {
+    clear: both;
+    margin: .45rem .1rem .2rem;
+    padding: .31rem .4rem .3rem 1.4rem;
+    font-size: .82em;
+}
+.husbandryMarginalia:before {
+    font-size: 1.2rem;
+}
+.husbandryClosedStage {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: #0b0806;
+}
+.husbandryClosedTable {
+    background:
+        radial-gradient(ellipse at 45% 50%, rgba(100,71,42,.2), transparent 58%),
+        linear-gradient(90deg, #080605, #15100c 88%, #24170f);
+    box-shadow: inset -14px 0 20px rgba(0,0,0,.65);
+}
+.husbandryOuterCover {
+    position: relative;
+    min-width: 0;
+    margin: .35rem .45rem .35rem 0;
+    padding: clamp(1.4rem, 3vw, 3rem);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    border: 12px double #bb8b48;
+    background:
+        radial-gradient(circle at 50% 42%, rgba(196,139,65,.12), transparent 38%),
+        linear-gradient(135deg, #2c170d, #714326 48%, #3b2012);
+    color: #e4c779;
+    box-shadow: 10px 14px 28px #000, inset 0 0 55px #120a06, inset 0 0 0 8px #372013;
+    text-align: center;
+}
+.husbandryOuterCover:before,
+.husbandryOuterCover:after {
+    content: '';
+    position: absolute;
+    inset: 5%;
+    border: 3px solid #a97a3d;
+    pointer-events: none;
+}
+.husbandryOuterCover:after {
+    inset: 7%;
+    border-width: 1px;
+}
+.husbandryOuterCover h2 {
+    z-index: 1;
+    max-width: 26rem;
+    margin: 0;
+    color: #efd78f;
+    font-family: "Uncial Antiqua", "IM FELL English SC", "Lucida Blackletter", "Old English Text MT", serif;
+    font-size: clamp(1.7rem, 3.4vw, 3.4rem);
+    line-height: 1.08;
+    text-shadow: 0 3px #1d0e08;
+}
+.husbandryOuterCover .husbandryIllustration {
+    z-index: 1;
+    width: min(300px, 65%);
+    max-height: 165px;
+    margin: .5rem auto;
+}
+.husbandryCoverDeviceText {
+    z-index: 1;
+    max-width: 22rem;
+    padding: .55rem .7rem;
+    border-top: 1px solid #c89d55;
+    border-bottom: 1px solid #c89d55;
+    color: #dec581;
+    font-size: .9rem;
+    font-variant: small-caps;
+    letter-spacing: .06em;
+}
+@media (max-width: 760px) {
+    #husbandryBookPage { overflow: auto; }
+    .husbandrySpread { display: block; height: auto; }
+    .husbandryLeaf { height: auto; min-height: 100%; overflow: visible; }
+    .husbandryLeaf + .husbandryLeaf { margin-top: 2rem; }
+    .husbandryClosedStage { grid-template-columns: 0 1fr; }
+    .husbandryClosedTable { display: none; }
+}
+
   </style>
  </head>
  <body>
@@ -3932,6 +4630,11 @@ html {
         Cancel
        </button>
       </div>
+
+      <button id="openHusbandryBookButton" type="button" title="Open the Book of Monster Husbandry">
+       <span aria-hidden="true" class="husbandryBookButtonIcon"></span>
+       Book of Husbandry
+      </button>
       <button id="openMonsterTransferButton" type="button">
        Import Monsters
       </button>
@@ -4404,6 +5107,22 @@ html {
   <div aria-live="polite" id="gameToast" role="status">
   </div>
   <div aria-hidden="true" id="uiTooltip" role="tooltip">
+  </div>
+
+  <div aria-labelledby="husbandryBookRunningTitle" aria-modal="true" class="dialogHidden" id="husbandryBookOverlay" role="dialog">
+   <section id="husbandryBookTome">
+    <header class="husbandryBookHeader">
+     <span aria-hidden="true" class="husbandryBookButtonIcon"></span>
+     <div id="husbandryBookRunningTitle">The Book of Monster Husbandry</div>
+     <button id="closeHusbandryBookButton" type="button">Close</button>
+    </header>
+    <article id="husbandryBookPage" tabindex="0"></article>
+    <footer class="husbandryBookFooter">
+     <button id="husbandryBookPreviousButton" type="button">Previous leaf</button>
+     <span aria-live="polite" id="husbandryBookPageNumber"></span>
+     <button id="husbandryBookNextButton" type="button">Next leaf</button>
+    </footer>
+   </section>
   </div>
   <script id="simulationWorkerSource" type="text/plain">
    // SPDX-License-Identifier: GPL-3.0-only
@@ -10326,7 +11045,7 @@ html {
         definitions: {
             adiposeFever: {
                 id: 'adiposeFever',
-                displayName: 'Adipose fever',
+                displayName: 'Swelling fever',
                 description: 'A metabolic inflammatory illness in very over-fat monsters; severe cases leave the monster exhausted and infertile for a time.',
                 ui: {
                     morphology: 'puffy'
@@ -10368,7 +11087,7 @@ html {
             },
             congenitalMuscleWasting: {
                 id: 'congenitalMuscleWasting',
-                displayName: 'Congenital muscle wasting',
+                displayName: "Youngling's wasting",
                 description: 'A juvenile wasting disorder in monsters whose morphology cannot sustain enough muscle for their frame.',
                 ui: { morphology: 'wasted' },
                 effects: { speedMultiplier: 0.62, foodMultiplier: 1.08, infertileAt: 0.50, incapacitatedAt: 0.70, deathAt: 0.82, deathChance: 0.34, juvenileDeathChance: 0.55, damageMultiplier: 1.30 },
@@ -10376,7 +11095,7 @@ html {
             },
             brittleBoneSyndrome: {
                 id: 'brittleBoneSyndrome',
-                displayName: 'Brittle bone syndrome',
+                displayName: 'Shatterbone',
                 description: 'A skeletal mineralisation disorder causing severe injury vulnerability; only the most extreme juvenile cases are often fatal directly.',
                 ui: { morphology: 'fragile' },
                 effects: { speedMultiplier: 0.82, foodMultiplier: 1.04, infertileAt: 0.70, incapacitatedAt: 0.86, deathAt: 0.96, deathChance: 0.08, juvenileDeathChance: 0.18, damageMultiplier: 1.65 },
@@ -10384,7 +11103,7 @@ html {
             },
             overmuscleStrain: {
                 id: 'overmuscleStrain',
-                displayName: 'Over-muscle strain',
+                displayName: 'Thew-strain',
                 description: 'Excessive muscle on an under-built skeleton, causing sprains, tears and injury vulnerability.',
                 ui: { morphology: 'strained' },
                 effects: { speedMultiplier: 0.78, foodMultiplier: 1.14, infertileAt: 0.72, incapacitatedAt: 0.88, deathAt: 0.98, deathChance: 0.04, damageMultiplier: 1.42 },
@@ -10392,10 +11111,10 @@ html {
             },
             // The legacy ID is retained for save compatibility, but the disease is
             // now systemic neoplasia rather than a reproductive-organ special case.
-            reproductiveTumour: { id: 'reproductiveTumour', displayName: 'Neoplastic disease', description: 'An abnormal tissue growth associated with excessive cell renewal, weak growth control and age-related damage. Swelling, wasting and impaired fertility are apparent.', ui: { morphology: 'swollen' }, effects: { speedMultiplier: 0.82, foodMultiplier: 1.18, infertileAt: 0.42, incapacitatedAt: 0.82, deathAt: 0.93, deathChance: 0.16, damageMultiplier: 1.18 }, geneticSelection: { riskModel: 'reproductiveTumourRepair', selectionPressure: 7.4 } },
+            reproductiveTumour: { id: 'reproductiveTumour', displayName: 'Creeping tumour', description: 'An abnormal tissue growth associated with excessive cell renewal, weak growth control and age-related damage. Swelling, wasting and impaired fertility are apparent.', ui: { morphology: 'swollen' }, effects: { speedMultiplier: 0.82, foodMultiplier: 1.18, infertileAt: 0.42, incapacitatedAt: 0.82, deathAt: 0.93, deathChance: 0.16, damageMultiplier: 1.18 }, geneticSelection: { riskModel: 'reproductiveTumourRepair', selectionPressure: 7.4 } },
             giantGrowthFailure: {
                 id: 'giantGrowthFailure',
-                displayName: 'Giant growth failure',
+                displayName: "Greatling's decline",
                 description: 'A juvenile failure-to-thrive syndrome in very large, fast-growing monsters where food supply and skeletal growth cannot keep pace.',
                 ui: { morphology: 'stunted giant' },
                 effects: { speedMultiplier: 0.64, foodMultiplier: 1.24, infertileAt: 0.52, incapacitatedAt: 0.76, deathAt: 0.88, deathChance: 0.18, juvenileDeathChance: 0.45, damageMultiplier: 1.24 },
@@ -23167,7 +23886,7 @@ html {
             HideTooltip(activeTarget);
         }
     }, true);
-    document.addEventListener('keydown', function (event) {
+    window.addEventListener('keydown', function (event) {
         if (event.key === 'Escape') {
             HideTooltip();
         }
@@ -24434,14 +25153,13 @@ html {
     }
     function LowTechCauseOfDeathLabel(cause) {
         var technicalCauseLabels = {
-            'Adipose fever': 'Fever with severe swelling',
+            'Swelling fever': 'Fever with severe swelling',
             'Wasting chill': 'Severe wasting and cold weakness',
-            'Congenital muscle wasting': 'Severe wasting since youth',
-            'Brittle bone syndrome': 'Multiple fractures and a malformed skeleton',
-            'Over-muscle strain': 'Severe muscular injuries',
-            'Reproductive tumour': 'A large reproductive tumour',
-            'Giant growth failure': 'Failure to thrive during growth',
-            'Cardiac disorder': 'Unknown illness'
+            "Youngling's wasting": 'Severe wasting since youth',
+            'Shatterbone': 'Multiple fractures and a malformed skeleton',
+            'Thew-strain': 'Severe muscular injuries',
+            'Creeping tumour': 'A large tumour',
+            "Greatling's decline": 'Failure to thrive during growth',
         };
         return technicalCauseLabels[cause] || cause || 'Unknown cause';
     }
@@ -29236,6 +29954,7 @@ html {
                 new TutorialStep('Monster Management', 'Each season begins here. The left side is your captive brood; selecting a portrait shows that monster in detail.', { target: '#managementDrawer' }),
                 new TutorialStep('Meet the brood', 'Select Gribble. Portraits show sex, deployment choice and current availability.', { target: '#cageViewport', instruction: "Click Gribble's portrait.", waitFor: function () { return tutorialPresentation.selectedGribble; } }),
                 new TutorialStep('Read before you breed', 'The inspector explains inherited body features, age, nutrition, injuries, performance and pedigree. These are observations of one living monster, not abstract unit statistics.', { target: '#selectedMonsterPanel' }),
+                new TutorialStep('The Book of Monster Husbandry', 'This old husbandry book gathers the outward signs and practical counsel recorded by generations of monster keepers. It explains breeding, eggs, food, wounds, healing and named afflictions without revealing the hidden workings beneath them. Open it from Monster Management whenever you need counsel.', { target: '#openHusbandryBookButton' }),
                 new TutorialStep('Breed deliberately', 'Before risking either founder, breed Gribble with Bramble. Drag one portrait onto the other (or select them by touch) and confirm the pair. Offspring inherit recombined genes from both parents.', { target: '#managementDrawer', placement: 'bottomRight', instruction: 'Create one brood, then return here.', waitFor: function (s) { return !!s && s.management && s.management.eggs && s.management.eggs.length > 0; } }),
                 new TutorialStep('Eggs and generations', 'Eggs incubate between seasons. Some may fail; survivors hatch with visible, heritable differences. The family tree records ancestry rather than applying a separate inbreeding penalty.', { target: '#cageViewport' }),
                 new TutorialStep('Choose a defender', 'Deploying a monster sends it into the coming season. Click Deploy for Bramble; Gribble remains safely at the lair while incubating her brood.', { target: '#cageViewport', placement: 'bottomRight', instruction: 'Click Deploy on Bramble.', waitFor: function (s) { return tutorialPresentation.monsterSelectedForDeployment(s, 'Bramble'); } }),
@@ -30011,6 +30730,154 @@ html {
         camera.x += dx * camera.speed * dt;
         camera.y += dy * camera.speed * dt;
     }
+
+    // ============================================================================
+    // MODULE: DIEGETIC BOOK OF MONSTER HUSBANDRY
+    // ============================================================================
+    var openHusbandryBookButton = document.getElementById('openHusbandryBookButton');
+    var husbandryBookOverlay = document.getElementById('husbandryBookOverlay');
+    var husbandryBookPage = document.getElementById('husbandryBookPage');
+    var husbandryBookPreviousButton = document.getElementById('husbandryBookPreviousButton');
+    var husbandryBookNextButton = document.getElementById('husbandryBookNextButton');
+    var husbandryBookPageNumber = document.getElementById('husbandryBookPageNumber');
+    var closeHusbandryBookButton = document.getElementById('closeHusbandryBookButton');
+    var husbandryBookPageIndex = 0;
+    var husbandryBookReturnFocus = null;
+
+    function HusbandryIllustration(kind) {
+        var frame = '<path class="fine" d="M20 166c36 11 73 13 110 7 35-6 69-6 103 0 37 6 73 4 107-7"/>';
+        var commonMonster = '<path class="wash" d="M72 126c8-36 32-59 68-65 30-5 59 4 79 25 18 18 44 23 70 14l20 18-19 20h-48l-23-15-17 32h-25l8-42-49 5-18 37H94l7-42-29 13z"/>' +
+            '<path class="ink" d="M83 112l-22-25 35 9m154-9 29-19-10 34M103 113c33 8 68 8 106 0m-91 42 8-37m76 37 17-32m22-1 49 16m-134-62 9-20 12 20m-50 5-17-22 30 11"/>' +
+            '<circle cx="252" cy="102" r="3.5" fill="#4e3320"/>';
+        var drawings = {
+            witness: commonMonster + '<path class="rubric" d="M44 42h82m108 0h82M47 52c19 3 31 12 37 27m229-27c-19 3-31 12-37 27"/>',
+            breeding: '<g transform="translate(-28 2) scale(.78)">' + commonMonster + '</g><g transform="translate(386 2) scale(-.78 .78)">' + commonMonster + '</g><ellipse class="pale" cx="180" cy="139" rx="22" ry="31"/><path class="rubric" d="M147 46c18 8 29 20 33 36 4-16 15-28 33-36"/>',
+            eggs: '<path class="fine" d="M54 150c38-30 80-38 126-23 45-15 88-7 127 23"/><ellipse class="pale" cx="102" cy="111" rx="35" ry="52"/><ellipse class="pale" cx="180" cy="101" rx="41" ry="61"/><ellipse class="pale" cx="261" cy="114" rx="33" ry="49"/><path class="ink" d="M164 48l15 21-11 18 17 20-13 28"/><path class="rubric" d="M65 48c24-18 49-22 74-11m82 0c25-11 50-7 74 11"/>',
+            clutch: commonMonster + '<ellipse class="pale" cx="245" cy="145" rx="13" ry="19"/><ellipse class="pale" cx="275" cy="144" rx="14" ry="20"/><ellipse class="pale" cx="306" cy="145" rx="12" ry="18"/><path class="rubric" d="M239 43h72M275 27v31"/>',
+            food: commonMonster + '<path class="pale" d="M232 137h91l-12 27h-67z"/><path class="ink" d="M245 137c8-23 18-35 30-35s22 12 30 35M254 104l-15-19m44 18 13-22"/><path class="rubric" d="M233 66c13-15 27-20 43-16m44 11c-14-13-29-17-44-11"/>',
+            injuries: commonMonster + '<path class="rubric" d="M142 91l29 25m-37-11 37-2m63 9 32 24m-37-8 39-5"/><path class="fine" d="M130 84l48 39m50-18 47 37"/>',
+            healing: '<path class="pale" d="M45 142c36-20 78-29 126-25 45-5 92 4 141 25v24H45z"/>' + commonMonster + '<path class="rubric" d="M258 44v58m-29-29h58"/><path class="fine" d="M70 155h242"/>',
+            disease: commonMonster + '<circle class="rubric" cx="224" cy="106" r="16"/><path class="rubric" d="M45 43l22 19m-8-31 12 28m245-16-22 19m8-31-12 28"/>',
+            swelling: commonMonster + '<path class="rubric" d="M122 108c7-23 23-34 47-34 25 0 42 12 51 37m-91 8c10 14 25 21 46 21 22 0 38-8 49-23"/><circle class="pale" cx="167" cy="109" r="35"/>',
+            chill: commonMonster + '<path class="rubric" d="M39 48l13 13m-13 0 13-13m259 0 13 13m-13 0 13-13M151 88l-13 13m13 0-13-13"/><path class="fine" d="M116 104c20-8 37-8 53 0m-52 15c18-7 34-7 49 0"/>',
+            youngling: '<g transform="translate(52 28) scale(.72)">' + commonMonster + '</g><path class="rubric" d="M95 138c20 10 41 12 63 6m-54-40c13-19 30-28 50-26"/>',
+            shatterbone: commonMonster + '<path class="rubric" d="M115 129l18-9 13 10 18-14m54 18 14-12 16 9 18-15M158 89l15 14 16-15"/>',
+            thew: commonMonster + '<path class="rubric" d="M111 105c10-19 24-27 42-25 18 1 31 11 39 30m-71 2c13 18 28 24 46 19m66-29c12 8 20 20 24 37"/><path class="fine" d="M144 81l8 50m80-28 12 37"/>',
+            tumour: commonMonster + '<path class="rubric" d="M205 91c8-12 20-16 34-11 14 4 21 14 20 29-1 15-10 24-25 26-15 1-26-6-31-20-4-10-3-18 2-24z"/><circle class="pale" cx="231" cy="107" r="25"/>',
+            greatling: '<g transform="translate(-18 -19) scale(1.13)">' + commonMonster + '</g><path class="rubric" d="M60 42l20 24m-1-29 6 30m215-25-20 24m1-29-6 30"/>',
+            age: '<g transform="translate(-5 58) scale(.48)">' + commonMonster + '</g><g transform="translate(73 38) scale(.63)">' + commonMonster + '</g><g transform="translate(154 19) scale(.78)">' + commonMonster + '</g><path class="rubric" d="M62 48c12-12 25-18 39-18m80 2c15-11 30-15 45-12m68 15c13 1 24 6 34 15"/>',
+            counsel: commonMonster + '<path class="pale" d="M236 84h78v64h-78z"/><path class="ink" d="M246 96h58m-58 13h58m-58 13h58m-58 13h38"/><path class="rubric" d="M228 69c17-14 36-20 56-17"/>'
+        };
+        return '<svg class="husbandryIllustration" viewBox="0 0 360 190" role="img" aria-label="A hand-painted husbandry figure">' + (drawings[kind] || drawings.witness) + frame + '</svg>';
+    }
+
+    var husbandryBookPages = [
+        { title: 'The Book of Monster Husbandry', initial: '', className: 'outerCover', illustration: 'witness', body: '<div class="husbandryCoverDeviceText">The received counsel of keepers and brood-masters</div>' },
+        { title: '', initial: 'B', className: 'openingLeaf', illustration: 'witness', body: '<p>Being the gathered witness of keepers, wardens, egg-tenders and brood-masters, set down for the better continuance of sound stock.</p><p>Neither charm-book nor physician\'s canon: only those things often seen, carefully remembered, and found useful again.</p><div class="husbandryMarginalia">Let each keeper add faithful witness, but amend no counsel upon one strange happening alone.</div>' },
+        { title: 'Of the Authority of This Work', initial: 'W', illustration: 'witness', body: '<p>We write of that which may be known from the stall, the nesting floor, the feeding trough and the field. What lies hidden within blood, seed or flesh is beyond our sight. Yet the same outward signs, returning in many broods and under many keepers, deserve a place in memory.</p><p>Thus, where this book says that one thing follows another, understand the manner of the saying: it has followed often enough that a prudent keeper prepares for it. No leaf herein promises that every beast will answer alike.</p><div class="husbandryMarginalia">The wise breeder marks the line, the season, the feeding and the mishap; the unwise remembers only the finest hatchling.</div>' },
+        { title: 'Of Likeness in the Brood', initial: 'M', illustration: 'breeding', body: '<p>Monsters commonly carry something of both parents: stature, colour, frame, appetite, temper and many lesser particulars. The likeness may be plain in the first brood, or may pass unseen and appear again among descendants.</p><p>Breed not from a name alone. Look upon the whole beast, its kindred, its former young and the manner in which it has endured hunger, labour, wounds and years. A notable excellence may travel with an unwelcome weakness, though no keeper can see the cord that binds them.</p><p>Near kin often give young very like their house. This may fasten a desired quality, but it may likewise gather hidden frailties until they stand openly in the nest.</p>' },
+        { title: 'Of Eggs, Shells and Cracking', initial: 'A', illustration: 'eggs', body: '<p>A cracked egg is the end of a chain, not the name of its first cause. Some eggs are laid with scant or tender shell; some meet a hard knock that a sounder shell might have borne; some are so thick or close that the young within seems poorly served by the air. The keeper sees the break, but seldom the whole cause of it.</p><p>When cracked eggs return often from the same dam or family, especially where nests are quiet and well bedded, husbanders have long suspected a weakness in the making of the shell. Poor condition and heavy demands upon the dam are also ill companions to a sound laying.</p><div class="husbandryMarginalia">Mend the nest first; judge the blood only after rough handling, cold stone and careless transport have been ruled out.</div>' },
+        { title: 'Of Stature and the Number of Eggs', initial: 'L', illustration: 'clutch', body: '<p>Large dams commonly possess more bodily room and substance for the making of a brood, and are more often seen with the fuller clutch. Small dams tend toward fewer eggs. Yet size is no warrant: condition, age, former breeding, illness and the particular nature of the line may outweigh stature.</p><p>A numerous clutch divides the dam\'s labour among many eggs. Therefore six poor eggs are not always a better issue than three well furnished ones. Very large clutches are uncommon, and the inexperienced should not mistake mere number for good husbandry.</p><p>The sire also matters, though his effect is less easily read at the laying. Some matings yield fewer sound eggs than the count first promised.</p>' },
+        { title: 'Of Feeding and Want', initial: 'F', illustration: 'food', body: '<p>Food first maintains the living beast; what remains may restore flesh, sustain labour, make fat, mend wounds and furnish a brood. A beast short of food may spend its stored fat and appear little harmed for a while. When that reserve is gone, muscle and vigour fail.</p><p>The underfed monster moves more slowly, bears cold and exertion poorly, heals badly and is less fit for breeding. Continued want leaves visible wasting and fresh bodily harm; the deepest want kills. Young and growing monsters, great-bodied beasts, hard workers, the wounded and breeding dams are costly mouths.</p><p>Nor is excess always kindness. Monsters made grossly fat are burdened in movement and are sometimes visited by swelling fever.</p><div class="husbandryMarginalia">Judge the trough against the beast, not the beast against its neighbour: equal shares are not always equal feeding.</div>' },
+        { title: 'Of Wounds and Their Consequence', initial: 'A', illustration: 'injuries', body: '<p>A wound is more than blood lost in the hour. Hurt legs shorten the stride; hurt body or head may end a beast outright; repeated or grave hurts can leave a lasting lack that no rest wholly repairs. A monster returning alive may therefore be less serviceable in the next season than its courage suggests.</p><p>The wounded require food for mending in addition to their ordinary maintenance. If that food is denied, restoration is scant and want may add new harm to old. Illness, great age and poor bodily constitution are likewise seen to make recovery uncertain.</p><p>Keep account of the place and gravity of each wound. A line in which slight blows repeatedly end as grave injury deserves caution.</p>' },
+        { title: 'Of Rest and the Mending of Flesh', initial: 'M', illustration: 'healing', body: '<p>Mending is reckoned by seasons, not by nights. A light hurt in a young, well-fed beast may be much improved by the next season. A deep hurt commonly asks several seasons, and fresh injury may undo the gain. Old monsters mend more slowly after the middle years, and the very old restore only a small part in the same time.</p><p>No keeper should read the passing of one season as a promise of wholeness. The body repairs what it can, subject to food, age, disease and the depth of loss. Where a wound has become permanent, time may strengthen what remains but does not return what is gone.</p><div class="husbandryMarginalia">One quiet season with a full ration may purchase more future service than one bold but costly release.</div>' },
+        { title: 'Of the Named Afflictions', initial: 'D', illustration: 'disease', className: 'singleColumn', body: '<p>Disorders do not pass by one simple road known to us. Keepers have seen them follow bodily make, age, climate, injury, want and mere ill fortune. The names on the following leaves describe the outward pattern only; they do not pretend to name an unseen essence.</p><p>A name is useful when it tells one keeper what another has seen. It is dangerous when it tempts the keeper to stop observing. Therefore compare the beast with its former condition, its kin and the circumstances in which the affliction arose.</p><div class="husbandryMarginalia">No disorder described here is known by the mere sight of one sign. Attend to the whole course of the illness.</div>' },
+        { title: 'Swelling Fever', initial: 'S', illustration: 'swelling', className: 'singleColumn', body: '<p>Swelling fever is a hot, weary affliction most often recorded in monsters carrying excessive fat. The body appears puffy or swollen; movement grows laborious; appetite and heat may remain while useful vigour fails.</p><p>In the stronger attack the monster may cease breeding for a time and become unfit for the field. Keepers disagree as to whether fat invites the fever or the fever makes the swelling, but both are so often found together that prudent husbanders avoid gross condition.</p>' },
+        { title: 'Wasting Chill', initial: 'W', illustration: 'chill', className: 'singleColumn', body: '<p>Wasting chill is known by leanness, cold weakness and a drawn appearance. It is often seen in beasts already spare of flesh, in hard cold, or where the beast seems poorly suited to the season.</p><p>The sufferer becomes slow and fragile, and may be too weak to leave the lair. Warm shelter and good feeding are sensible aids, yet some lines encounter the chill repeatedly despite careful keeping.</p>' },
+        { title: "Youngling's Wasting", initial: 'Y', illustration: 'youngling', className: 'singleColumn', body: '<p>Youngling\'s wasting first declares itself during growth. The frame lengthens, but the flesh that should move and sustain it does not keep pace. The youngster remains slight, slow and easily exhausted.</p><p>Many badly afflicted young fail before maturity. Survivors may strengthen somewhat with time, but rarely become the sound, full-bodied adults that their early frame appeared to promise.</p>' },
+        { title: 'Shatterbone', initial: 'S', illustration: 'shatterbone', className: 'singleColumn', body: '<p>Shatterbone is the old keeper\'s name for a beast whose bones break too readily. Crooked growth, repeated fractures, or grievous harm from an ordinary blow are its chief witnesses.</p><p>The affliction is most perilous in the young, while the skeleton is still being made. An adult may live with it, yet every fall, struggle and battle carries more danger than it would for sound stock.</p>' },
+        { title: 'Thew-strain', initial: 'T', illustration: 'thew', className: 'singleColumn', body: '<p>Thew-strain appears where abundant muscle burdens a frame unequal to it. The beast may look extraordinarily powerful, yet suffer recurring sprains, tears and deep soreness after exertion.</p><p>Such monsters can strike hard, but their strength is costly to carry and easily turns against them. Repeated muscular hurt in a heavily made family is a warning not to judge soundness by bulk alone.</p>' },
+        { title: 'Creeping Tumour', initial: 'C', illustration: 'tumour', className: 'singleColumn', body: '<p>Creeping tumour is an unnatural swelling that enlarges where no proper growth should be. It is seen more often in older monsters, though no age is wholly spared.</p><p>As the growth advances, the beast may waste, lose vigour, breed poorly and at last become unable to work. Tumours arise in differing parts, so the outward signs vary; the shared mark is a growth that persists and encroaches.</p>' },
+        { title: "Greatling's Decline", initial: 'G', illustration: 'greatling', className: 'singleColumn', body: '<p>Greatling\'s decline afflicts some very large, fast-growing young. Their promised size outruns the making of sound bone and sustaining flesh. Though they eat heavily, they remain weak, stunted or unable to bear their own growth.</p><p>The largest youngster is therefore not always the best prospect. Where great size and early decline return together in one family, keepers have learned to favour slower, sounder growth.</p>' },
+        { title: 'Of Age, Growth and Breeding', initial: 'Y', illustration: 'age', body: '<p>Young monsters do not reach their full making at once. Some mature swiftly; others remain juvenile across more than one season, and the largest frames may take years to fill. Do not condemn a slow-growing youngster before its proper time, nor mistake early bulk for completed strength.</p><p>Prime adults generally endure work and mend injury better than the old. With advancing years, weakness appears by degrees, breeding becomes less certain and affliction more troublesome. There is no single appointed season of death.</p><p>Dams lately bred require respite. Pressing the same mother without recovery is an old road to poor condition and disappointing eggs.</p>' },
+        { title: 'A Keeper\'s Rule of Judgment', initial: 'K', illustration: 'counsel', body: '<p>Keep names, parentage and outcomes together. Mark not only victories, but food consumed, wounds carried home, seasons needed for recovery, afflictions shown, eggs laid, eggs cracked and young that failed to hatch.</p><p>Prefer repeated witness to a single marvel. Compare kin raised under like conditions. When a weakness appears, first examine feeding, age, handling, climate and injury; then consider whether the family itself bears a tendency.</p><p>Above all, breed the monster that continues sound in the work required of it. Beauty without endurance, power without frame, appetite without service and fertility without viable young are costly ornaments.</p><div class="husbandryMarginalia">So ends the common counsel. The next brood will amend it, if its keeper has patience to observe.</div>' }
+    ];
+
+    function HusbandryLeafHtml(page, sideClass) {
+        if (!page) {
+            return '<section class="husbandryLeaf blankLeaf ' + sideClass + '" aria-hidden="true"></section>';
+        }
+        var body = page.body;
+        if (page.initial) {
+            var firstLetterPattern = new RegExp('(<p[^>]*>)' + page.initial, 'i');
+            body = body.replace(firstLetterPattern, '$1<span aria-hidden="true" class="illuminatedInitial">' + page.initial + '</span>');
+        }
+        var title = page.title ? '<h2>' + page.title + '</h2>' : '';
+        return '<section class="husbandryLeaf ' + sideClass + ' ' + (page.className || '') + '">' +
+            title + HusbandryIllustration(page.illustration) + '<div class="husbandryLeafText">' + body + '</div></section>';
+    }
+    function RenderHusbandryBookPage() {
+        var page = husbandryBookPages[husbandryBookPageIndex];
+        if (husbandryBookPageIndex === 0) {
+            husbandryBookPage.classList.add('outerCoverShown');
+            husbandryBookPage.innerHTML = '<div class="husbandryClosedStage"><div class="husbandryClosedTable" aria-hidden="true"></div>' +
+                '<section class="husbandryOuterCover"><h2>' + page.title + '</h2>' + HusbandryIllustration(page.illustration) + page.body + '</section></div>';
+            husbandryBookPageNumber.textContent = 'Outer cover';
+        }
+        else {
+            husbandryBookPage.classList.remove('outerCoverShown');
+            var leftPage = husbandryBookPages[husbandryBookPageIndex];
+            var rightPage = husbandryBookPages[husbandryBookPageIndex + 1] || null;
+            husbandryBookPage.innerHTML = '<div class="husbandrySpread">' + HusbandryLeafHtml(leftPage, 'leftLeaf') + HusbandryLeafHtml(rightPage, 'rightLeaf') + '</div>';
+            var lastLeaf = Math.min(husbandryBookPageIndex + 1, husbandryBookPages.length - 1);
+            husbandryBookPageNumber.textContent = rightPage ? 'Leaves ' + husbandryBookPageIndex + '-' + lastLeaf + ' of ' + (husbandryBookPages.length - 1) : 'Leaf ' + husbandryBookPageIndex + ' of ' + (husbandryBookPages.length - 1);
+        }
+        husbandryBookPage.scrollTop = 0;
+        husbandryBookPreviousButton.disabled = husbandryBookPageIndex === 0;
+        husbandryBookNextButton.disabled = husbandryBookPageIndex >= husbandryBookPages.length - 2;
+    }
+    function OpenHusbandryBook() {
+        husbandryBookReturnFocus = document.activeElement;
+        husbandryBookPageIndex = 0;
+        RenderHusbandryBookPage();
+        husbandryBookOverlay.classList.remove('dialogHidden');
+        closeHusbandryBookButton.focus();
+    }
+    function CloseHusbandryBook() {
+        husbandryBookOverlay.classList.add('dialogHidden');
+        if (husbandryBookReturnFocus && husbandryBookReturnFocus.focus) {
+            husbandryBookReturnFocus.focus();
+        }
+    }
+    openHusbandryBookButton.addEventListener('click', OpenHusbandryBook);
+    closeHusbandryBookButton.addEventListener('click', CloseHusbandryBook);
+    husbandryBookPreviousButton.addEventListener('click', function () {
+        if (husbandryBookPageIndex > 0) {
+            husbandryBookPageIndex = husbandryBookPageIndex <= 1 ? 0 : Math.max(1, husbandryBookPageIndex - 2);
+            RenderHusbandryBookPage();
+        }
+    });
+    husbandryBookNextButton.addEventListener('click', function () {
+        if (husbandryBookPageIndex < husbandryBookPages.length - 2) {
+            husbandryBookPageIndex = husbandryBookPageIndex === 0 ? 1 : Math.min(husbandryBookPages.length - 1, husbandryBookPageIndex + 2);
+            RenderHusbandryBookPage();
+        }
+    });
+    husbandryBookOverlay.addEventListener('click', function (event) {
+        if (event.target === husbandryBookOverlay) {
+            CloseHusbandryBook();
+        }
+    });
+    window.addEventListener('keydown', function (event) {
+        if (husbandryBookOverlay.classList.contains('dialogHidden')) {
+            return;
+        }
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            CloseHusbandryBook();
+        }
+        else if (event.key === 'ArrowLeft' && husbandryBookPageIndex > 0) {
+            event.preventDefault();
+            husbandryBookPageIndex = husbandryBookPageIndex <= 1 ? 0 : Math.max(1, husbandryBookPageIndex - 2);
+            RenderHusbandryBookPage();
+        }
+        else if (event.key === 'ArrowRight' && husbandryBookPageIndex < husbandryBookPages.length - 2) {
+            event.preventDefault();
+            husbandryBookPageIndex = husbandryBookPageIndex === 0 ? 1 : Math.min(husbandryBookPages.length - 1, husbandryBookPageIndex + 2);
+            RenderHusbandryBookPage();
+        }
+    });
+
     // ============================================================================
     // MODULE: MAIN RENDER LOOP
     // ============================================================================
