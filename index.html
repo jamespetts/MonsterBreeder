@@ -7,10 +7,7 @@
    Monster Breeder
   </title>
   <style>
-   html, body {
-    margin: 0;
-    min-height: 100%;
-}
+   
 body {
     overflow: hidden;
 }
@@ -31,7 +28,7 @@ body {
     opacity: 0.9;
 }
 #seasonDisplay {
-    align-self: center;
+    
     padding: 0.35rem 0.75rem;
     font-weight: 800;
     white-space: nowrap;
@@ -71,7 +68,7 @@ body {
 }
 #closeManagementButton {
     position: sticky;
-    float: right;
+    
     top: 0;
     z-index: 7;
     width: 1.8rem;
@@ -85,10 +82,7 @@ body {
     flex-wrap: wrap;
     gap: 0.5rem;
 }
-button {
-    padding: 0.55rem 0.75rem;
-    cursor: pointer;
-}
+
 #layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 340px;
@@ -126,8 +120,8 @@ button {
 #managementDrawer {
     position: absolute;
     left: 0.75rem;
-    right: 0.75rem;
-    top: 0.75rem;
+    
+    
     border: 2px solid #394732;
     padding: 0.75rem;
     box-sizing: border-box;
@@ -194,7 +188,7 @@ button {
     align-items: stretch;
 }
 #cageViewport {
-    min-height: 190px;
+    
     border: 2px solid #6b5a3a;
     padding: 0.55rem;
     overflow: auto;
@@ -773,17 +767,17 @@ button {
 }
 #gameToast {
     position: fixed;
-    left: 50%;
-    bottom: 1.25rem;
+    
+    
     z-index: 45;
-    transform: translate(-50%, 1rem);
-    max-width: min(520px, calc(100vw - 2rem));
+    
+    
     padding: 0.65rem 0.9rem;
     border: 1px solid rgba(255,255,255,0.28);
     font-weight: 800;
     opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.18s ease, transform 0.18s ease;
+    
+    
 }
 #gameToast.toastVisible {
     transform: translate(-50%, 0);
@@ -859,8 +853,8 @@ button {
 }
 #treasureSpendControl label {
     display: grid;
-    gap: 0.55rem;
-    align-items: center;
+    
+    
     font-weight: 700;
 }
 #treasureSpendInput {
@@ -973,12 +967,31 @@ button {
 }
 .thermometer {
     position:relative;
+    
+    
+    
+    border-radius:999px 999px .3rem .3rem
+;}
+
+.thermometerFill {
+    position:absolute;
+    
+    
+    
+    border-radius:999px
+;}
+/* Keep the full temperature scale visible against every climate colour. */
+.thermometer {
+    box-sizing:border-box;
+    border:2px solid var(--ui-border-dark,#33281b)
+;
     width:.78rem;
     height:4.4rem;
-    margin:0 auto .55rem;
-    border-radius:999px 999px .3rem .3rem
-}
+    margin:0 auto .55rem;}
 .thermometer:after {
+    box-sizing:border-box;
+    border:2px solid var(--ui-border-dark,#33281b)
+;
     content:"";
     position:absolute;
     left:50%;
@@ -988,23 +1001,7 @@ button {
     transform:translateX(-50%);
     border-radius:50%;
     background:currentColor
-}
-.thermometerFill {
-    position:absolute;
-    left:.13rem;
-    right:.13rem;
-    bottom:0;
-    border-radius:999px
-}
-/* Keep the full temperature scale visible against every climate colour. */
-.thermometer {
-    box-sizing:border-box;
-    border:2px solid var(--ui-border-dark,#33281b)
-}
-.thermometer:after {
-    box-sizing:border-box;
-    border:2px solid var(--ui-border-dark,#33281b)
-}
+;}
 .climateValue {
     font-size:1.35rem;
     font-weight:900
@@ -1051,11 +1048,11 @@ button {
 .balanceTrack:after {
     content:"";
     position:absolute;
-    left:50%;
+    
     top:-.2rem;
-    bottom:-.2rem;
+    
     width:2px
-}
+;}
 .balanceBar {
     position:absolute;
     border-radius:999px
@@ -1155,13 +1152,12 @@ button {
         grid-template-columns:1fr
     }
 }
-.dashboardCard.statClickable {
-    cursor:pointer;
-    transition:border-color .15s,transform .15s
-}
+
 .thermometerFill {
-    background:currentColor!important
-}
+    background:currentColor!important;
+    left:.13rem;
+    right:.13rem;
+    bottom:0;}
 .treasureLegend {
     grid-template-columns:repeat(3,1fr)
 }
@@ -1267,8 +1263,7 @@ button {
 }
 #interactionModeSection {
     overflow:visible!important;
-    padding:.35rem .65rem!important
-}
+    }
 .interactionModeButtons {
     display:grid;
     grid-template-columns:repeat(4,1fr);
@@ -1281,12 +1276,7 @@ button {
     align-items:center;
     justify-content:center
 }
-.interactionModeButton svg {
-    fill:none;
-    stroke-width:2;
-    stroke-linecap:round;
-    stroke-linejoin:round
-}
+
 .interactionModeButton[aria-pressed=true] {
     color:#1f2730;
     box-shadow:inset 0 2px 5px #0005
@@ -1354,25 +1344,12 @@ button {
 }
 .dashboardCard.statClickable {
     position:relative;
-    transform:none!important
-}
-.dashboardCard.statClickable:hover {
-    transform:none!important
-}
-.dashboardCard.statClickable[data-tooltip]:hover:after,.dashboardCard.statClickable[data-tooltip]:focus-visible:after {
-    position:absolute;
-    z-index:20;
-    right:.45rem;
-    top:.35rem;
-    padding:.25rem .45rem;
-    border-radius:.3rem;
-    font-size:.75rem;
-    font-weight:700;
-    line-height:1.2;
-    white-space:nowrap;
-    box-shadow:0 3px 10px #0008;
-    pointer-events:none
-}
+    transform:none!important;
+    cursor:pointer;
+    transition:border-color .15s,transform .15s
+;}
+
+
 #objectDetails {
     flex:1 1 auto;
     min-height:4rem;
@@ -1381,10 +1358,10 @@ button {
 /* Final sidebar sizing: campaign always fully visible; interaction strip is compact;
    selected-object area receives the remaining height. */
 #sidePanel {
-    grid-template-rows:auto auto minmax(0,1fr)!important;
-    gap:.35rem!important;
+    
+    
     overflow:visible
-}
+;}
 #campaignStatsSection {
     overflow:visible!important;
     min-height:max-content!important;
@@ -1398,8 +1375,8 @@ button {
 }
 #interactionModeSection {
     height:auto!important;
-    min-height:0!important
-}
+    min-height:0!important;
+    padding:.35rem .65rem!important;}
 #selectionSection {
     min-height:0!important;
     height:auto!important;
@@ -1412,8 +1389,20 @@ button {
 }
 .dashboardCard.statClickable[data-tooltip]:hover:after,.dashboardCard.statClickable[data-tooltip]:focus-visible:after {
     content:none!important;
-    display:none!important
-}
+    display:none!important;
+    position:absolute;
+    z-index:20;
+    right:.45rem;
+    top:.35rem;
+    padding:.25rem .45rem;
+    border-radius:.3rem;
+    font-size:.75rem;
+    font-weight:700;
+    line-height:1.2;
+    white-space:nowrap;
+    box-shadow:0 3px 10px #0008;
+    pointer-events:none
+;}
 #raidCanvas.modeInspect {
     cursor:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2232%22%20viewBox%3D%220%200%2048%2048%22%3E%3Ccircle%20cx%3D%2218%22%20cy%3D%2218%22%20r%3D%2212%22%20fill%3D%22%23dbeafe%22%20stroke%3D%22%231e3a5f%22%20stroke-width%3D%224%22%2F%3E%3Cpath%20d%3D%22M27%2027l16%2016%22%20stroke%3D%22%236b4423%22%20stroke-width%3D%228%22%2F%3E%3C%2Fsvg%3E") 4 4, crosshair
 }
@@ -1430,31 +1419,28 @@ button {
 #campaignStatsSection {
     padding-top:.5rem!important
 }
-.interactionModeButton svg {
-    stroke:none!important
-}
+
 .interactionModeButton svg {
     width:2.2rem!important;
     height:2.2rem!important;
     display:block;
     pointer-events:none;
     overflow:visible
-}
+;
+    fill:none;
+    stroke-width:2;
+    stroke-linecap:round;
+    stroke-linejoin:round
+;
+    stroke:none!important;}
 .treasureLegend {
     display:flex!important;
     justify-content:center!important;
     gap:1rem!important;
     margin-top:.45rem!important
 }
-.treasureLegendItem {
-    padding:0!important;
-    border-radius:.25rem!important;
-    box-sizing:border-box!important;
-    cursor:help!important
-}
-.treasureLegendItem .legendSwatch {
-    display:block!important
-}
+
+
 .treasureTrack {
     cursor:help
 }
@@ -1479,20 +1465,18 @@ button {
     align-items:center!important;
     gap:.28rem!important;
     border:0!important;
-    background:transparent!important
-}
+    background:transparent!important;
+    padding:0!important;
+    border-radius:.25rem!important;
+    box-sizing:border-box!important;
+    cursor:help!important;}
 .treasureLegendIcon {
     width:1.1rem;
     height:1.1rem;
     display:block;
     flex:none
 }
-.treasureLegendItem .legendSwatch {
-    width:.72rem!important;
-    height:.72rem!important;
-    border-radius:.14rem!important;
-    flex:none
-}
+
 /* Selected-object card: concise, icon-led and consistent with dashboard headings. */
 .selectionTitle {
     display:flex;
@@ -1624,21 +1608,17 @@ button {
 }
 /* Revised monster management: portrait roster plus detailed inspector. */
 #managementDrawer {
-    max-height:72%;
+    
     overflow:hidden;
     display:flex;
-    flex-direction:column
-}
+    }
 #managementDrawer>h2,#managementDrawer>#managementSummary,#managementDrawer>#managementActions {
     flex:0 0 auto
 }
 #managementBody {
     grid-template-columns:minmax(330px,1fr) minmax(330px,1fr);
-    flex:1 1 auto
-}
-#cageViewport,#selectedMonsterPanel {
-    overflow:auto
-}
+    }
+
 #rosterList {
     display:block
 }
@@ -1668,10 +1648,10 @@ button {
     min-width:0;
     display:grid;
     align-items:center;
-    justify-items:center;
+    
     border:2px solid #8b795b;
     cursor:pointer
-}
+;}
 .monsterPortrait.touchBreedingSelected {
     outline:4px solid #2563eb;
     outline-offset:-1px;
@@ -1709,14 +1689,14 @@ button {
 }
 .monsterPortraitControls {
     position:absolute;
-    left:.22rem;
+    
     right:.22rem;
     top:.18rem;
     display:flex;
     justify-content:space-between;
     align-items:center;
     pointer-events:none
-}
+;}
 .portraitDeployControl {
     display:flex;
     align-items:center;
@@ -1808,24 +1788,17 @@ button {
     background:#fee2e2;
     color:#991b1b
 }
-.managementSection {
-    padding-top:.62rem;
-    border-top:1px solid #d8d0b8
-}
+
 .managementSection h4 {
     margin:0 0 .38rem
 }
 .iconBulletList {
-    list-style:none;
-    margin:.2rem 0;
+    
+    
     padding:0;
     display:grid
-}
-.iconBulletList li {
-    display:grid;
-    gap:.35rem;
-    align-items:start
-}
+;}
+
 .featureIcon {
     display:flex;
     align-items:center;
@@ -1845,11 +1818,11 @@ button {
 }
 .ageExpectedMarker {
     position:absolute;
-    right:0;
-    top:-.15rem;
+    
+    
     bottom:-.15rem;
     width:3px
-}
+;}
 .ageOverflow {
     padding:.22rem .4rem;
     border-left:4px solid #7c3aed;
@@ -1947,10 +1920,10 @@ button {
     gap:.55rem
 }
 .managementPrimaryActions {
-    margin-left:auto;
+    
     display:flex;
     gap:.45rem
-}
+;}
 #managementHint {
     display:none!important
 }
@@ -1980,30 +1953,28 @@ button {
 .familyGeneration:not(:last-child):after {
     content:"";
     position:absolute;
-    right:-.65rem;
+    
     top:5%;
-    bottom:5%;
+    
     width:2px
-}
+;}
 .familyGenerationTitle {
     text-align:center;
     font-size:.72rem;
     font-weight:850;
-    text-transform:uppercase
-}
+    }
 .familyTreeGraphNode {
     padding:.45rem;
     border-radius:.45rem;
-    text-align:left
-}
+    }
 .familyTreeGraphNode:after {
-    content:"";
-    position:absolute;
-    right:-.65rem;
-    top:50%;
-    width:.65rem;
+    
+    
+    
+    
+    
     height:2px
-}
+;}
 .familyGeneration:last-child .familyTreeGraphNode:after {
     display:none
 }
@@ -2058,13 +2029,13 @@ button {
     overflow:visible
 }
 .monsterPortraitStatus {
-    white-space:normal;
+    
     overflow:visible;
-    text-overflow:clip
-}
+    }
 .monsterPortraitControls {
     gap:.2rem
-}
+;
+    left:.22rem;}
 .portraitDeployControl:has(input:disabled) {
     color:#6b7280
 }
@@ -2086,11 +2057,11 @@ button {
 #selectedMonsterPanel {
     overflow:hidden!important;
     display:grid;
-    grid-template-columns:1fr 1fr;
-    grid-auto-rows:min-content;
+    
+    
     gap:.48rem .65rem;
     font-size:.82rem
-}
+;}
 .selectedMonsterHeader {
     grid-column:1/-1;
     grid-template-columns:minmax(130px,28%) minmax(0,1fr);
@@ -2109,22 +2080,30 @@ button {
     border-radius:.45rem;
     background:#fffdf7;
     min-width:0
-}
+;
+    padding-top:.62rem;
+    border-top:1px solid #d8d0b8
+;}
 .managementSection h4 {
     font-size:.86rem;
-    margin-bottom:.24rem
-}
+    }
 .managementSection p {
     margin:.18rem 0;
     font-size:.76rem
 }
 .iconBulletList {
     gap:.18rem
-}
+;
+    list-style:none;
+    margin:.2rem 0;}
 .iconBulletList li {
     font-size:.76rem;
     grid-template-columns:1.25rem minmax(0,1fr)
-}
+;
+    display:grid;
+    gap:.35rem;
+    align-items:start
+;}
 .featureIcon {
     width:1.15rem;
     height:1.15rem;
@@ -2236,17 +2215,25 @@ button {
 }
 .familyGeneration:not(:last-child):after {
     display:none
-}
+;
+    right:-.65rem;
+    bottom:5%;}
 .familyGenerationTitle {
     display:none
-}
+;
+    text-transform:uppercase
+;}
 .familyTreeGraphNode:after {
     display:none
-}
+;
+    content:"";
+    position:absolute;
+    right:-.65rem;
+    top:50%;
+    width:.65rem;}
 .familyTreeRecordDetails {
     overflow:auto;
-    margin:0
-}
+    }
 #monsterExportSection {
     display:none!important
 }
@@ -2256,11 +2243,10 @@ button {
 .portraitExportControl {
     left:.22rem;
     bottom:.22rem;
-    z-index:3
-}
+    }
 .exportModeBar {
     display:flex;
-    align-items:center;
+    
     gap:.4rem;
     padding:.35rem .5rem;
     border:1px solid #60a5fa;
@@ -2268,13 +2254,11 @@ button {
     background:#eff6ff;
     color:#1e3a8a;
     font-size:.75rem
-}
+;}
 .exportModeBar.hidden {
     display:none
 }
-.managementPrimaryActions {
-    align-items:center
-}
+
 @media(max-width:1100px) {
     #selectedMonsterPanel {
         font-size:.76rem;
@@ -2291,8 +2275,9 @@ button {
     }
 }
 .ageExpectedMarker {
-    display:none!important
-}
+    display:none!important;
+    right:0;
+    top:-.15rem;}
 .nutritionOverlayBar {
     position:relative;
     height:1.15rem;
@@ -2356,7 +2341,9 @@ button {
     font-size:.64rem;
     font-weight:850;
     pointer-events:auto
-}
+;
+    z-index:3
+;}
 .portraitExportControl input {
     margin:0
 }
@@ -2366,25 +2353,25 @@ button {
     box-shadow:none!important;
     flex:1 1 auto;
     min-width:0
-}
+;
+    align-items:center;}
 .managementPrimaryActions {
     flex:0 0 auto
-}
+;
+    margin-left:auto;
+    align-items:center
+;}
 #managementActions {
     position:relative;
     z-index:3;
-    padding-top:.35rem
-}
-.familyTreeGraphNode {
-    position:relative
-}
+    }
+
 .familyTreeDialog {
     width:min(1500px,calc(100vw - 1rem))!important;
     height:calc(100vh - 1rem)!important;
-    max-height:none!important;
+    
     box-sizing:border-box;
-    grid-template-rows:auto minmax(0,1fr) 150px auto!important
-}
+    }
 .familyGeneration {
     position:relative!important;
     display:flex!important;
@@ -2406,7 +2393,11 @@ button {
     display:grid;
     grid-template-rows:56px auto auto;
     align-content:center
-}
+;
+    text-align:left
+;
+    position:relative
+;}
 .familyNodeIcon {
     display:flex!important;
     align-items:center;
@@ -2431,23 +2422,19 @@ button {
     height:150px!important;
     min-height:150px!important;
     box-sizing:border-box
-}
-.monsterPortrait>div:not(.monsterPortraitControls) {
-    width:100%;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    overflow:hidden
-}
+;
+    margin:0
+;}
+
 .monsterPortrait svg {
-    display:block!important;
+    
     width:100%!important;
     height:100%!important;
     max-width:100%!important;
     overflow:visible!important;
     transform:scale(.74);
     transform-origin:center
-}
+;}
 .breedingParent {
     min-width:0;
     min-height:174px;
@@ -2523,33 +2510,31 @@ button {
     margin-top:1rem
 }
 #preMenuOverlay {
-    position:fixed;
-    inset:0;
-    z-index:2000;
+    
+    
+    
     display:flex;
     align-items:center;
-    justify-content:center;
-    cursor:pointer;
+    
+    
     text-align:center
-}
+;}
 #preMenuOverlay.preMenuHidden {
     display:none
 }
 #preMenuPanel h1 {
     margin:0 0 .65rem;
     font-size:clamp(2.8rem,8vw,6rem);
-    line-height:1
-}
+    }
 #preMenuPanel p {
     margin:0 0 1.7rem;
     font-size:clamp(1rem,2.3vw,1.35rem)
 }
 #preMenuPanel strong {
-    display:block;
+    
     margin-top:1.7rem;
-    font-size:1.15rem;
-    animation:preMenuPulse 1.5s ease-in-out infinite
-}
+    
+    }
 @keyframes preMenuPulse {
     50% {
         opacity:.45
@@ -2564,9 +2549,7 @@ button {
     text-transform:uppercase;
     letter-spacing:.05em
 }
-.roundHistoryTable tr.mostRecentRound {
-    outline-offset:-2px
-}
+
 .roundHistoryTable tr.mostRecentRound td {
     font-weight:800
 }
@@ -2576,29 +2559,37 @@ button {
 }
 #managementBody {
     min-height:0!important;
-    overflow:hidden!important
-}
+    overflow:hidden!important;
+    flex:1 1 auto
+;}
 #cageViewport,#selectedMonsterPanel {
     min-height:0!important;
     height:100%!important;
     overflow-y:auto!important;
     overflow-x:hidden!important;
     scrollbar-gutter:stable
-}
+;
+    overflow:auto
+;}
 #selectedMonsterPanel {
-    align-content:start!important
-}
+    align-content:start!important;
+    grid-template-columns:1fr 1fr;
+    grid-auto-rows:min-content;}
 .monsterPortrait {
     min-height:108px!important;
-    grid-template-rows:58px auto minmax(2.15em,auto)!important;
-    padding:.2rem!important
-}
+    
+    padding:.2rem!important;}
 .monsterPortrait>div:not(.monsterPortraitControls) {
-    height:58px!important
-}
+    height:58px!important;
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden
+;}
 .monsterPortrait svg {
-    max-height:56px!important
-}
+    max-height:56px!important;
+    display:block!important;}
 .monsterPortraitName {
     font-size:.74rem!important;
     line-height:1.05!important
@@ -2609,7 +2600,10 @@ button {
     min-height:2.15em!important;
     padding:.04rem .1rem!important;
     overflow-wrap:anywhere
-}
+;
+    white-space:normal;
+    text-overflow:clip
+;}
 .monsterPortraitGrid {
     gap:.32rem!important
 }
@@ -2642,60 +2636,14 @@ button {
 /* Change these custom properties to create later UI themes without editing   */
 /* component rules. Canvas and in-world graphical rendering remain separate.  */
 /* ========================================================================== */
-:root {
-    --ui-font-body: Georgia, "Times New Roman", serif;
-    --ui-font-display: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
-    --ui-ink: #30291d;
-    --ui-ink-muted: #685f4c;
-    --ui-ink-inverse: #f1e8c9;
-    --ui-ink-faint-inverse: #d4c9a7;
-    --ui-heading: #40371f;
-    --ui-heading-inverse: #e3d495;
-    --ui-parchment: #d8c99e;
-    --ui-parchment-light: #eadfbd;
-    --ui-parchment-bright: #f3e9c9;
-    --ui-parchment-dark: #b9a878;
-    --ui-parchment-recessed: #c9ba8e;
-    --ui-green-deep: #303b24;
-    --ui-green: #4f5d35;
-    --ui-green-light: #69764b;
-    --ui-green-yellow: #7d8250;
-    --ui-green-muted: #626d49;
-    --ui-brown-deep: #34271b;
-    --ui-brown: #57422c;
-    --ui-brown-light: #806744;
-    --ui-border: #665338;
-    --ui-border-dark: #33281b;
-    --ui-border-light: #9c8b61;
-    --ui-accent: #b79a43;
-    --ui-accent-hover: #cbb35d;
-    --ui-accent-pressed: #927a34;
-    --ui-focus: #d6c26c;
-    --ui-good: #627a3f;
-    --ui-warning: #a56d2a;
-    --ui-danger: #873f2d;
-    --ui-info: #596f69;
-    --ui-overlay: rgba(27, 22, 14, 0.91);
-    --ui-overlay-strong: rgba(23, 19, 12, 0.96);
-    --ui-shadow: rgba(31, 23, 13, 0.42);
-    --ui-shadow-heavy: rgba(20, 15, 9, 0.66);
-    --ui-highlight: rgba(255, 247, 210, 0.28);
-    --ui-border-width: 2px;
-    --ui-border-width-heavy: 3px;
-    --ui-radius-small: 2px;
-    --ui-radius-medium: 4px;
-    --ui-radius-large: 6px;
-    --ui-shadow-small: 2px 3px 0 var(--ui-shadow);
-    --ui-shadow-medium: 4px 5px 0 var(--ui-shadow);
-    --ui-shadow-large: 7px 9px 0 var(--ui-shadow-heavy);
-    --ui-inset: inset 0 0 0 1px var(--ui-highlight);
-    --ui-letter-spacing: 0.025em;
-}
+
 /* Shared typography and controls. */
 html, body {
     font-family: var(--ui-font-body);
     color: var(--ui-ink);
     background: var(--ui-parchment-dark);
+    margin: 0;
+    min-height: 100%;
 }
 button, input, select, textarea {
     font: inherit;
@@ -2706,9 +2654,9 @@ button {
     color: var(--ui-ink);
     box-shadow: var(--ui-shadow-small), var(--ui-inset);
     font-family: var(--ui-font-utility);
-    font-weight: 800;
+    
     letter-spacing: var(--ui-letter-spacing);
-    text-shadow: 0 1px rgba(255, 244, 204, 0.35);
+    
 }
 button:hover {
     background: var(--ui-accent-hover);
@@ -2761,6 +2709,7 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
     color: var(--ui-ink-inverse);
     box-shadow: var(--ui-inset);
     font-family: var(--ui-font-display);
+    align-self: center;
 }
 #layout {
     background: var(--ui-parchment-dark);
@@ -2777,6 +2726,8 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
 #sidePanel {
     background: var(--ui-parchment);
     color: var(--ui-ink);
+    grid-template-rows:auto auto minmax(0,1fr)!important;
+    gap:.35rem!important;
 }
 #sidePanel h2, #sidePanel h3, .dashboardHeading, .statTile strong, #statDetailPanel h2, #roundHistoryPanel h2, #optionsPanel h2 {
     color: var(--ui-heading);
@@ -2817,9 +2768,17 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
 }
 .balanceTrack:after {
     background: var(--ui-parchment-bright);
+    left:50%;
+    bottom:-.2rem;
 }
 .treasureLegendItem .legendSwatch {
     border-color: var(--ui-border-dark);
+    display:block!important;
+    width:.72rem!important;
+    height:.72rem!important;
+    border-radius:.14rem!important;
+    flex:none
+;
 }
 /* Management frame and cards. Generated monster/egg artwork is intentionally unchanged. */
 #managementDrawer {
@@ -2828,6 +2787,11 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
     background: var(--ui-parchment-light);
     color: var(--ui-ink);
     box-shadow: var(--ui-shadow-large), var(--ui-inset);
+    right: 0.75rem;
+    top: 0.75rem;
+    max-height:72%;
+    flex-direction:column
+;
 }
 #monsterManagementTab, #viewportTopControls #startSeasonButton {
     border-color: var(--ui-border-dark);
@@ -2841,6 +2805,7 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
     border-color: var(--ui-border);
     background: var(--ui-parchment-recessed);
     color: var(--ui-ink);
+    float: right;
 }
 #cageViewport {
     border-color: var(--ui-border-dark);
@@ -2871,6 +2836,8 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
     background: var(--ui-parchment-bright);
     color: var(--ui-ink);
     box-shadow: 1px 2px 0 rgba(49, 36, 20, 0.2);
+    justify-items:center;
+    grid-template-rows:58px auto minmax(2.15em,auto)!important;
 }
 .monsterPortrait:hover {
     border-color: var(--ui-green-deep);
@@ -2894,18 +2861,20 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
 }
 #managementActions {
     background: var(--ui-parchment-light);
+    padding-top:.35rem
+;
 }
 .managementSection h4 {
     color: var(--ui-green-deep);
+    margin-bottom:.24rem
+;
 }
 /* Menus, dialogs, overlays and transient feedback. */
 #preMenuOverlay, #mainMenuOverlay, #worldLoadingOverlay, #saveLoadOverlay, #monsterTransferOverlay, #unsavedActionOverlay, #foodShortageOverlay, #roundHistoryOverlay, #statDetailOverlay, #familyTreeOverlay, #breedingPairOverlay, #optionsOverlay {
     background: var(--ui-overlay-strong);
     color: var(--ui-ink-inverse);
 }
-#preMenuPanel h1 {
-    font-family: var(--ui-font-display);
-}
+
 #preMenuPanel p, #mainMenuPanel p, #saveLoadDescription, #unsavedActionPanel p, #treasureSpendHint {
     color: var(--ui-ink-faint-inverse);
 }
@@ -2967,6 +2936,12 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
     background: var(--ui-green-deep);
     color: var(--ui-ink-inverse);
     box-shadow: var(--ui-shadow-medium);
+    left: 50%;
+    bottom: 1.25rem;
+    transform: translate(-50%, 1rem);
+    max-width: min(520px, calc(100vw - 2rem));
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
 }
 .dialogSecondary {
     background: var(--ui-brown-light);
@@ -2990,19 +2965,14 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
 .selectionStatusGood {
     color: var(--ui-good);
 }
-.roundHistoryTable th, .roundHistoryTable td {
-    border-bottom-color: var(--ui-border);
-}
+
 /* UI geometry uses deliberately chunky vector edges: more pixels in spirit, not pixel art. */
 .dashboardCard, .monsterPortrait, .managementSection, .saveSlotRow, .foodAllocationRow, .statTile, .typeTile, .familyTreeGraphNode, .breedingParent, .exportModeBar, .foodEconomySummary {
     border-radius: var(--ui-radius-small);
 }
 /* ========================================================================== */
 /* ========================================================================== */
-:root {
-    /* One serif family is used throughout the non-diegetic interface. */
-    --ui-font-utility: var(--ui-font-body);
-}
+
 html, body, button, input, select, textarea, #mainMenuPanel, #saveLoadPanel, #monsterTransferPanel, #unsavedActionPanel, #foodShortagePanel, #roundHistoryPanel, #statDetailPanel, .familyTreeDialog, .breedingPairDialog, #optionsPanel, .familyTreeGraphNode, .familyTreeRecordDetails {
     font-family: var(--ui-font-body);
 }
@@ -3108,7 +3078,7 @@ html, body, button, input, select, textarea, #mainMenuPanel, #saveLoadPanel, #mo
     position: relative;
     display: block;
     min-width: 100%;
-    min-height: 100%;
+    
     padding: 0;
     overflow: auto;
     box-sizing: border-box;
@@ -3129,20 +3099,20 @@ html, body, button, input, select, textarea, #mainMenuPanel, #saveLoadPanel, #mo
     margin: 0;
 }
 .familyTreeConnections {
-    position: absolute;
-    left: 0;
-    top: 0;
-    z-index: 1;
-    display: block;
-    width: auto;
-    height: auto;
+    
+    
+    
+    
+    
+    
+    
     min-width: 0;
     min-height: 0;
-    max-width: none;
-    max-height: none;
+    
+    
     overflow: visible;
-    pointer-events: none;
-    transform: none;
+    
+    
 }
 /* ========================================================================== */
 /* FOOD SHORTAGE WORKSPACE AND STAT-CHART CONTRAST                            */
@@ -3214,6 +3184,8 @@ html, body, button, input, select, textarea, #mainMenuPanel, #saveLoadPanel, #mo
 }
 #treasureSpendControl label {
     grid-template-columns: minmax(0, 1fr) 6.5rem;
+    gap: 0.55rem;
+    align-items: center;
 }
 #foodSalePreview {
     min-height: 0;
@@ -3342,10 +3314,19 @@ html, body, button, input, select, textarea, #mainMenuPanel, #saveLoadPanel, #mo
 /* Authoritative non-diegetic theme completion. */
 button {
     border-radius: var(--ui-radius-small) !important;
+    padding: 0.55rem 0.75rem;
+    cursor: pointer;
+    font-weight: 800;
+    text-shadow: 0 1px rgba(255, 244, 204, 0.35);
 }
 #preMenuOverlay {
     background: #000;
     color: var(--ui-ink);
+    position:fixed;
+    inset:0;
+    z-index:2000;
+    justify-content:center;
+    cursor:pointer;
 }
 #preMenuPanel {
     max-width: 42rem;
@@ -3359,12 +3340,19 @@ button {
 #preMenuPanel h1 {
     color: var(--ui-heading);
     text-shadow: 3px 3px 0 var(--ui-parchment-recessed);
+    line-height:1
+;
+    font-family: var(--ui-font-display);
 }
 #preMenuPanel p {
     color: var(--ui-ink-muted);
 }
 #preMenuPanel strong {
     color: var(--ui-warning);
+    display:block;
+    font-size:1.15rem;
+    animation:preMenuPulse 1.5s ease-in-out infinite
+;
 }
 #mainMenuOverlay {
     background: var(--ui-overlay-strong);
@@ -3400,6 +3388,8 @@ button {
 .roundHistoryTable tr.mostRecentRound {
     background: var(--ui-parchment-recessed);
     outline-color: var(--ui-focus);
+    outline-offset:-2px
+;
 }
 #roundHistoryOutcome.victory {
     color: var(--ui-good);
@@ -3429,6 +3419,17 @@ button {
 }
 .familyTreeConnections {
     color: var(--ui-border);
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 1;
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: none;
+    max-height: none;
+    pointer-events: none;
+    transform: none;
 }
 .familyTreeGraphNode.dead {
     background: var(--ui-parchment-recessed) !important;
@@ -3462,6 +3463,7 @@ button {
 }
 .dashboardCard.statClickable:hover {
     border-color: var(--ui-accent);
+    transform:none!important;
 }
 .dashboardCard.statClickable[data-tooltip]:hover:after, .dashboardCard.statClickable[data-tooltip]:focus-visible:after {
     border-color: var(--ui-border);
@@ -3515,17 +3517,14 @@ button {
     color:var(--ui-ink-muted)
 }
 .familyTreeRecordDetailsExpanded {
-    display:grid;
+    
     grid-template-columns:1fr 1fr;
-    gap:.45rem;
-    align-content:start
-}
+    
+    }
 .familyTreeRecordDetailsExpanded>header {
     grid-column:1/-1
 }
-.familyTreeRecordDetailsExpanded .managementSection {
-    margin:0
-}
+
 @media(max-width:750px) {
     #leaderboardColumns,.familyTreeRecordDetailsExpanded {
         grid-template-columns:1fr
@@ -3534,23 +3533,17 @@ button {
 /* Family-tree final layout: the details area is fully visible without a nested
    scrollbar; only an exceptionally large pedigree graph itself may scroll. */
 .familyTreeDialog {
-    grid-template-rows:auto minmax(0,1fr) 238px auto!important;
+    
     overflow:hidden!important;
 }
-.familyTreeRecordDetails, .familyTreeRecordDetailsExpanded {
-    height:238px!important;
-    min-height:238px!important;
-    overflow:hidden!important;
-    box-sizing:border-box!important;
-}
-.familyTreeRecordDetailsExpanded .managementSection {
-    overflow:visible!important;
-}
+
+
 /* Family-tree details height correction. The record row now sizes to its actual
    contents; the graph yields vertical space inside the fixed-height dialog. */
 .familyTreeDialog {
     grid-template-rows:auto minmax(0,1fr) auto auto!important;
     min-height:0!important;
+    max-height:none!important;
 }
 .familyTreeGraph {
     min-height:0!important;
@@ -3561,15 +3554,20 @@ button {
     max-height:none!important;
     overflow:visible!important;
     align-self:stretch!important;
+    box-sizing:border-box!important;
 }
 .familyTreeRecordDetailsExpanded {
     align-content:start!important;
+    display:grid;
+    gap:.45rem;
 }
 .familyTreeRecordDetailsExpanded .managementSection {
     min-height:0!important;
     height:auto!important;
     box-sizing:border-box!important;
     overflow:visible!important;
+    margin:0
+;
 }
 /* Monster-management left viewport: keep its border and native scrollbar controls
    wholly inside the available grid cell. */
@@ -3598,6 +3596,54 @@ button {
     --ui-scrollbar-thumb: var(--ui-brown-light);
     --ui-scrollbar-thumb-hover: var(--ui-brown);
     --ui-scrollbar-size: 14px;
+    --ui-font-body: Georgia, "Times New Roman", serif;
+    --ui-font-display: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --ui-ink: #30291d;
+    --ui-ink-muted: #685f4c;
+    --ui-ink-inverse: #f1e8c9;
+    --ui-ink-faint-inverse: #d4c9a7;
+    --ui-heading: #40371f;
+    --ui-heading-inverse: #e3d495;
+    --ui-parchment: #d8c99e;
+    --ui-parchment-light: #eadfbd;
+    --ui-parchment-bright: #f3e9c9;
+    --ui-parchment-dark: #b9a878;
+    --ui-parchment-recessed: #c9ba8e;
+    --ui-green-deep: #303b24;
+    --ui-green: #4f5d35;
+    --ui-green-light: #69764b;
+    --ui-green-yellow: #7d8250;
+    --ui-green-muted: #626d49;
+    --ui-brown-deep: #34271b;
+    --ui-brown: #57422c;
+    --ui-brown-light: #806744;
+    --ui-border: #665338;
+    --ui-border-dark: #33281b;
+    --ui-border-light: #9c8b61;
+    --ui-accent: #b79a43;
+    --ui-accent-hover: #cbb35d;
+    --ui-accent-pressed: #927a34;
+    --ui-focus: #d6c26c;
+    --ui-good: #627a3f;
+    --ui-warning: #a56d2a;
+    --ui-danger: #873f2d;
+    --ui-info: #596f69;
+    --ui-overlay: rgba(27, 22, 14, 0.91);
+    --ui-overlay-strong: rgba(23, 19, 12, 0.96);
+    --ui-shadow: rgba(31, 23, 13, 0.42);
+    --ui-shadow-heavy: rgba(20, 15, 9, 0.66);
+    --ui-highlight: rgba(255, 247, 210, 0.28);
+    --ui-border-width: 2px;
+    --ui-border-width-heavy: 3px;
+    --ui-radius-small: 2px;
+    --ui-radius-medium: 4px;
+    --ui-radius-large: 6px;
+    --ui-shadow-small: 2px 3px 0 var(--ui-shadow);
+    --ui-shadow-medium: 4px 5px 0 var(--ui-shadow);
+    --ui-shadow-large: 7px 9px 0 var(--ui-shadow-heavy);
+    --ui-inset: inset 0 0 0 1px var(--ui-highlight);
+    --ui-letter-spacing: 0.025em;
+    --ui-font-utility: var(--ui-font-body);
 }
 #uiTooltip {
     position: fixed;
