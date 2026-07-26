@@ -10357,6 +10357,9 @@ html {
             this.willingnessToFight = rng.range(profile.willingnessToFightMin || 0.25, profile.willingnessToFightMax || 0.85);
             this.terrainUse = rng.range(profile.terrainUseMin || 0.25, profile.terrainUseMax || 0.85);
             this.sightRange = 1250 + this.perception * 900;
+            // Humans have a modest close-range scent sense. This must be a finite
+            // value because shared threat-detection code compares both senses.
+            this.scentRange = 90 + this.perception * 45;
             this.hearingThreshold = DEFAULT_ADVENTURER_HEARING_THRESHOLD;
             this.eyeHeight = 5;
             this.foodValue = HUMAN_FOOD_VALUE;
@@ -17316,6 +17319,9 @@ html {
             this.perception = this.species === 'hare' ? 0.72 : ((this.species === 'deer' || this.species === 'reindeer') ? 0.62 : 0.48);
             this.eyeHeight = this.species === 'bear' || this.species === 'walrus' ? 4 : 3;
             this.sightRange = 1100 + this.perception * 700;
+            // Macrofauna use scent only at close range; sight remains their primary
+            // sense. Keep this finite for the shared threat-detection code.
+            this.scentRange = 140 + this.perception * 110;
             this.hearingThreshold = DEFAULT_HEARING_THRESHOLD;
         }
         applyEnvironmentAppearance(world) {
@@ -24881,6 +24887,9 @@ html {
     var workerSource = document.getElementById('simulationWorkerSource').textContent, workerBlob = new Blob([workerSource], {
         type: 'text/javascript'
     }), workerUrl = URL.createObjectURL(workerBlob), worker = new Worker(workerUrl);
+    // The Worker retains the Blob after construction; the temporary object URL is
+    // no longer needed and must not be left allocated for the lifetime of the page.
+    URL.revokeObjectURL(workerUrl);
     function FormatNumber(value) {
         if (value === null || value === undefined || !Number.isFinite(value)) {
             return 'n/a';
@@ -25616,7 +25625,7 @@ html {
             }
             var box = document.createElement('div');
             box.className = 'breedingParent';
-            box.innerHTML = MonsterIconSvg(monster) + '<strong>' + monster.name + '</strong><div>' + MonsterSexWithSymbol(monster) + ' \u00b7 ' + MonsterAgeLabel(monster) + '</div><div>' + FormatNutritionLine(monster) + '</div>';
+            box.innerHTML = MonsterIconSvg(monster) + '<strong>' + EscapeHtml(monster.name) + '</strong><div>' + EscapeHtml(MonsterSexWithSymbol(monster)) + ' \u00b7 ' + EscapeHtml(MonsterAgeLabel(monster)) + '</div><div>' + EscapeHtml(FormatNutritionLine(monster)) + '</div>';
             grid.appendChild(box);
         });
         var records = ((currentSnapshot && currentSnapshot.management) || {}).familyTree || [];
@@ -25680,7 +25689,7 @@ html {
         target.className = 'familyTreeRecordDetails familyTreeRecordDetailsExpanded';
         target.setAttribute('data-displayed-family-id', String(record.id));
         var header = document.createElement('header');
-        header.innerHTML = '<strong>' + record.name + '</strong><br>' + MonsterSexWithSymbol(record) + ' · ' + MonsterAgeLabel(record) + (record.alive ? '' : ' · Deceased') + (record.causeOfDeath ? '<br>Observed cause of death: ' + record.causeOfDeath : '') + '<br>Nutrition per season: ' + FormatNumber(GetFoodRequirement(monster));
+        header.innerHTML = '<strong>' + EscapeHtml(record.name) + '</strong><br>' + EscapeHtml(MonsterSexWithSymbol(record)) + ' · ' + EscapeHtml(MonsterAgeLabel(record)) + (record.alive ? '' : ' · Deceased') + (record.causeOfDeath ? '<br>Observed cause of death: ' + EscapeHtml(record.causeOfDeath) : '') + '<br>Nutrition per season: ' + EscapeHtml(FormatNumber(GetFoodRequirement(monster)));
         target.appendChild(header);
         target.appendChild(BuildPhysicalCharacteristicsSection(monster));
         target.appendChild(BuildObservedPerformanceSection(monster));
@@ -25955,7 +25964,7 @@ html {
             button.style.top = node.y + 'px';
             var live = (management.ownedMonsters || []).find(function (candidate) { return candidate.id === id; });
             var iconRecord = live || record;
-            button.innerHTML = '<span class="familyNodeIcon">' + (iconRecord && iconRecord.phenotype ? MonsterIconSvg(iconRecord) : '') + '</span><span class="familyNodeName">' + record.name + '</span><span class="familyNodeMeta">' + MonsterSexWithSymbol(record) + (record.alive === false ? ' · Deceased' : '') + '</span>';
+            button.innerHTML = '<span class="familyNodeIcon">' + (iconRecord && iconRecord.phenotype ? MonsterIconSvg(iconRecord) : '') + '</span><span class="familyNodeName">' + EscapeHtml(record.name) + '</span><span class="familyNodeMeta">' + EscapeHtml(MonsterSexWithSymbol(record)) + (record.alive === false ? ' · Deceased' : '') + '</span>';
             canvas.appendChild(button);
         });
         canvas.addEventListener('click', function (event) {
@@ -26123,7 +26132,7 @@ html {
         if (!isEgg) {
             var expected = MonsterExpectedLifespanSeasons(), actual = monster.ageInSeasons || 0, percent = actual / expected * 100, agePhase = actual < 4 ? 'infant' : (actual < 12 ? 'young' : (actual < 16 ? 'prime' : (actual < 24 ? 'mature' : (actual < 28 ? 'old' : 'senescent')))), age = document.createElement('div');
             age.className = 'ageGraphic';
-            age.innerHTML = '<div class="ageTrack"><div class="ageFill ageFill-' + agePhase + '" style="width:' + Math.min(100, percent).toFixed(1) + '%"></div></div><div class="ageLegend"><span>' + MonsterAgeLabel(monster) + '</span><span>Expected lifespan: 6 years</span></div>' + (percent > 100 ? '<div class="ageOverflow">' + Math.round(percent - 100) + '% beyond expected lifespan</div>' : '');
+            age.innerHTML = '<div class="ageTrack"><div class="ageFill ageFill-' + agePhase + '" style="width:' + Math.min(100, percent).toFixed(1) + '%"></div></div><div class="ageLegend"><span>' + EscapeHtml(MonsterAgeLabel(monster)) + '</span><span>Expected lifespan: 6 years</span></div>' + (percent > 100 ? '<div class="ageOverflow">' + Math.round(percent - 100) + '% beyond expected lifespan</div>' : '');
             summary.appendChild(age);
         }
         header.appendChild(summary);
@@ -26131,7 +26140,7 @@ html {
         if (isEgg) {
             var eggInfo = document.createElement('section');
             eggInfo.className = 'managementSection';
-            eggInfo.innerHTML = '<h4>Egg record</h4><p>' + (monster.eggFailureReason || ('Expected to hatch after ' + (monster.incubationSeasonsRemaining || 1) + ' season.')) + '</p>';
+            eggInfo.innerHTML = '<h4>Egg record</h4><p>' + EscapeHtml(monster.eggFailureReason || ('Expected to hatch after ' + (monster.incubationSeasonsRemaining || 1) + ' season.')) + '</p>';
             selectedMonsterPanel.appendChild(eggInfo);
             return;
         }
@@ -26174,7 +26183,7 @@ html {
         selectedMonsterPanel.appendChild(family);
         var management = document.createElement('section');
         management.className = 'managementSection releaseSection';
-        management.innerHTML = '<h4>Management</h4><p>' + MonsterOriginLabel(monster) + '</p>';
+        management.innerHTML = '<h4>Management</h4><p>' + EscapeHtml(MonsterOriginLabel(monster)) + '</p>';
         if (currentSnapshot && currentSnapshot.phase !== 'raid' && monster.alive) {
             var releaseButton = document.createElement('button');
             releaseButton.type = 'button';
