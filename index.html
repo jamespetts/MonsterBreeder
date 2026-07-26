@@ -22478,9 +22478,13 @@ html {
         satiatedHunter.hunger = 1.0;
         var fatFoodRequirement = NutritionSystem.getMonsterRequirement(satiatedHunter);
         satiatedHunter.foodFromCaptiveMacrofaunaThisSeason = fatFoodRequirement;
+        var surplusFoodCarcass = new Macrofauna('surplus_food_carcass', 'hare', 320, 320, new SeededRng(424270));
+        surplusFoodCarcass.alive = false;
+        surplusFoodCarcass.corpseState = 'corpse';
+        surplusFoodCarcass.edibleFoodRemaining = 1;
         var fatMassBeforeSurplus = satiatedHunter.currentFatMass;
-        var surplusConsumed = NutritionSystem.consumeOneFoodFromCarcass(satiatedHunter, catHuntHare);
-        NutritionSystem.applyNutritionStateFromSeason(satiatedHunter, new SeededRng(424270));
+        var surplusConsumed = NutritionSystem.consumeOneFoodFromCarcass(satiatedHunter, surplusFoodCarcass);
+        NutritionSystem.applyNutritionStateFromSeason(satiatedHunter, new SeededRng(424271));
         AddRegressionResult(results, 'Independent hunger permits surplus eating to increase genetically regulated fat mass', surplusConsumed === 1 && satiatedHunter.currentFatMass > fatMassBeforeSurplus, 'consumed=' + surplusConsumed + ', fat=' + fatMassBeforeSurplus.toFixed(2) + '->' + satiatedHunter.currentFatMass.toFixed(2));
         AddRegressionResult(results, 'Behaviour genetics are registered as a phenotype trait', MonsterGenePool.traitDefinitions.indexOf(MonsterBehaviourTraitDefinition) >= 0 && MonsterGenePool.behaviourChromosomeSlots.length === BEHAVIOUR_CHROMOSOME_SLOT_COUNT, 'slots=' + (MonsterGenePool.behaviourChromosomeSlots ? MonsterGenePool.behaviourChromosomeSlots.length : -1));
         var behaviourContext = new MonsterPhenotypeExpressionContext();

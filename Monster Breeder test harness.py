@@ -149,7 +149,7 @@ const mainContext = {
     document,
     window: { innerWidth: 1280, innerHeight: 800, addEventListener() {} },
     Blob: function () {},
-    URL: { createObjectURL() { return 'blob:renderer-test'; } },
+    URL: { createObjectURL() { return 'blob:renderer-test'; }, revokeObjectURL() {} },
     Worker: WorkerStub,
     requestAnimationFrame(callback) { frameCallback = callback; },
     Set, Math, Date, JSON, Number, String, Boolean, Object, Array,
