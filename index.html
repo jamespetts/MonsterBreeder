@@ -2495,14 +2495,30 @@ body {
 .optionsControl label {
     font-weight:800
 }
-#musicVolumeInput {
-    width:min(240px,48vw)
+#musicVolumeInput, #foodAvailabilityInput, #textSizeInput {
+    width:min(240px,48vw);
+    accent-color:var(--ui-accent)
 }
-#musicVolumeValue {
+#musicVolumeValue, #foodAvailabilityValue, #textSizeValue {
     display:inline-block;
-    min-width:3.5rem;
+    min-width:6.5rem;
     text-align:right;
     font-variant-numeric:tabular-nums
+}
+.optionsControlWide {
+    grid-template-columns:1fr
+}
+.optionsControlDescription {
+    margin:.15rem 0 0;
+    color:var(--ui-ink-muted);
+    font-size:.84rem;
+    line-height:1.35
+}
+.optionsSliderRow {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 6.5rem;
+    gap:.55rem;
+    align-items:center
 }
 #optionsActions {
     display:flex;
@@ -4917,15 +4933,52 @@ html {
      </label>
      <input id="muteMusicInput" type="checkbox"/>
     </div>
-    <div class="optionsControl">
+    <div class="optionsControl optionsControlWide">
      <label for="musicVolumeInput">
       Music volume
      </label>
-     <div>
+     <div class="optionsSliderRow">
       <input id="musicVolumeInput" max="100" min="0" step="1" type="range" value="25"/>
       <span id="musicVolumeValue">
        25%
       </span>
+     </div>
+    </div>
+    <div class="optionsControl optionsControlWide">
+     <div>
+      <label for="foodAvailabilityInput">
+       Food availability
+      </label>
+      <p class="optionsControlDescription">
+       This setting applies to new games only
+      </p>
+     </div>
+     <div class="optionsSliderRow">
+      <input id="foodAvailabilityInput" list="foodAvailabilityLevels" max="2" min="0" step="1" type="range" value="1"/>
+      <span aria-live="polite" id="foodAvailabilityValue">
+       Moderate
+      </span>
+      <datalist id="foodAvailabilityLevels">
+       <option label="Restricted" value="0"></option>
+       <option label="Moderate" value="1"></option>
+       <option label="Abundant" value="2"></option>
+      </datalist>
+     </div>
+    </div>
+    <div class="optionsControl optionsControlWide">
+     <label for="textSizeInput">
+      Text size
+     </label>
+     <div class="optionsSliderRow">
+      <input id="textSizeInput" list="textSizeLevels" max="2" min="0" step="1" type="range" value="1"/>
+      <span aria-live="polite" id="textSizeValue">
+       Medium
+      </span>
+      <datalist id="textSizeLevels">
+       <option label="Small" value="0"></option>
+       <option label="Medium" value="1"></option>
+       <option label="Large" value="2"></option>
+      </datalist>
      </div>
     </div>
     <div id="optionsActions">
@@ -5204,7 +5257,7 @@ html {
     // Save format versions are independent of the worker message protocol. Each
     // future incompatible state change must add a migration from the preceding
     // format instead of changing old save data in place.
-    var SAVE_FORMAT_VERSION = 3;
+    var SAVE_FORMAT_VERSION = 4;
     var MIN_SUPPORTED_SAVE_FORMAT_VERSION = 1;
     var REFERENCE_MAP_WIDTH = 1800;
     var REFERENCE_MAP_HEIGHT = 1200;
@@ -5292,6 +5345,17 @@ html {
     var LARGE_MACROFAUNA_FOOD_VALUE = 10;
     var MACROFAUNA_COUNT_MIN = 0;
     var MACROFAUNA_COUNT_MAX = 4;
+    var FOOD_AVAILABILITY = Object.freeze({
+        restricted: { displayName: 'Restricted', multiplier: 1.0 },
+        moderate: { displayName: 'Moderate', multiplier: 1.2 },
+        abundant: { displayName: 'Abundant', multiplier: 1.5 }
+    });
+    function NormaliseFoodAvailabilityKey(value) {
+        return typeof value === 'string' && FOOD_AVAILABILITY[value] ? value : 'restricted';
+    }
+    function FoodAvailabilityMultiplier(value) {
+        return FOOD_AVAILABILITY[NormaliseFoodAvailabilityKey(value)].multiplier;
+    }
     var MACROFAUNA_FLEE_RANGE = 210;
     var MACROFAUNA_WANDER_RETARGET_TICKS_MIN = 90;
     var MACROFAUNA_WANDER_RETARGET_TICKS_MAX = 240;
@@ -8139,7 +8203,8 @@ html {
                 windSpeed: Number.isFinite(settings.windSpeed) ? Clamp(settings.windSpeed, 0, 1) : rng.range(0.08, 0.92),
                 windDirectionRadians: Number.isFinite(settings.windDirectionRadians) ? settings.windDirectionRadians : rng.range(-Math.PI, Math.PI),
                 campaignRound: campaignRound,
-                forceCoastline: settings.forceCoastline
+                forceCoastline: settings.forceCoastline,
+                foodAvailabilityKey: NormaliseFoodAvailabilityKey(settings.foodAvailabilityKey)
             };
         }
         static createSettlementDistanceMiles(rng, environment, settings) {
@@ -12891,8 +12956,13 @@ html {
             }
             var availability = this.macrofaunaAvailability(world);
             var mapScale = Math.sqrt((world.width * world.height) / (REFERENCE_MAP_WIDTH * REFERENCE_MAP_HEIGHT));
-            var baseMax = Math.max(MACROFAUNA_COUNT_MIN, Math.round(MACROFAUNA_COUNT_MAX * availability * Clamp(mapScale, 0.55, 2.2)));
-            var capacity = Clamp(baseMax, 0, Math.max(1, Math.round(MACROFAUNA_COUNT_MAX * 2.4)));
+            var foodAvailabilityMultiplier = FoodAvailabilityMultiplier(world.environment && world.environment.foodAvailabilityKey);
+            // Food availability changes the number of animals in the environment.
+            // Individual species food values remain unchanged.
+            var restrictedBaseMax = Math.max(MACROFAUNA_COUNT_MIN, Math.round(MACROFAUNA_COUNT_MAX * availability * Clamp(mapScale, 0.55, 2.2)));
+            var scaledBaseMax = Math.round(restrictedBaseMax * foodAvailabilityMultiplier);
+            var maximumCapacity = Math.max(1, Math.round(MACROFAUNA_COUNT_MAX * 2.4 * foodAvailabilityMultiplier));
+            var capacity = Clamp(scaledBaseMax, 0, maximumCapacity);
             return capacity <= 0 ? 0 : (MACROFAUNA_COUNT_MIN + capacity) / 2;
         },
         macrofaunaEcologyProfile: function (world) {
@@ -18482,7 +18552,8 @@ html {
         estimateMacrofaunaCapacity() {
             var expectedCount = MonsterMetabolismSystem.expectedMacrofaunaCapacity(this.world);
             var capacity = Math.round(expectedCount * 2 - MACROFAUNA_COUNT_MIN);
-            return Clamp(capacity, 0, Math.max(1, Math.round(MACROFAUNA_COUNT_MAX * 2.4)));
+            var foodAvailabilityMultiplier = FoodAvailabilityMultiplier(this.world.environment && this.world.environment.foodAvailabilityKey);
+            return Clamp(capacity, 0, Math.max(1, Math.round(MACROFAUNA_COUNT_MAX * 2.4 * foodAvailabilityMultiplier)));
         }
         createMacrofauna() {
             var animals = [];
@@ -19891,6 +19962,8 @@ html {
             this.campaignRoundLimit = this.mode === 'tutorial' ? 1 : (this.mode === 'advancedCampaign' ? ADVANCED_CAMPAIGN_ROUNDS : (this.mode === 'campaign' ? STANDARD_CAMPAIGN_ROUNDS : 1));
             this.adventurerEntryEdge = options && ADVENTURER_ENTRY_EDGES.indexOf(options.adventurerEntryEdge) >= 0 ? options.adventurerEntryEdge : null;
             this.baseWorldOptions = options && options.worldOptions ? Object.assign({}, options.worldOptions) : {};
+            this.foodAvailabilityKey = NormaliseFoodAvailabilityKey(this.baseWorldOptions.foodAvailabilityKey);
+            this.baseWorldOptions.foodAvailabilityKey = this.foodAvailabilityKey;
             this.roundNumber = 1;
             this.seasonNumber = 1;
             this.phase = 'management';
@@ -19946,6 +20019,7 @@ html {
         }
         getWorldOptions(baseOptions) {
             var result = Object.assign({}, baseOptions || {});
+            result.foodAvailabilityKey = NormaliseFoodAvailabilityKey(this.foodAvailabilityKey);
             if (this.adventurerEntryEdge) {
                 result.adventurerEntryEdge = this.adventurerEntryEdge;
             }
@@ -23103,6 +23177,13 @@ html {
                 migrated = Object.assign({}, migrated, { formatVersion: 3, minimumReaderVersion: 1 });
                 continue;
             }
+            if (migrated.formatVersion === 3) {
+                // Version 4 stores the food-availability selection in the game
+                // session. Normalisation assigns Restricted to older saves, which
+                // preserves the calibration used when those games were started.
+                migrated = Object.assign({}, migrated, { formatVersion: 4, minimumReaderVersion: 1 });
+                continue;
+            }
             throw new Error('No migration is registered for save format ' + migrated.formatVersion + '.');
         }
         return migrated;
@@ -23171,6 +23252,14 @@ html {
         }
         if (!session.baseWorldOptions || typeof session.baseWorldOptions !== 'object') {
             session.baseWorldOptions = {};
+        }
+        session.foodAvailabilityKey = NormaliseFoodAvailabilityKey(session.foodAvailabilityKey);
+        session.baseWorldOptions.foodAvailabilityKey = session.foodAvailabilityKey;
+        if (session.world && session.world.environment) {
+            session.world.environment.foodAvailabilityKey = session.foodAvailabilityKey;
+            // Rebuild this derived cache so its expected animal count agrees with
+            // the migrated authoritative game setting.
+            delete session.world.macrofaunaEcologyProfile;
         }
         if (!Number.isFinite(session.roundNumber)) {
             session.roundNumber = 1;
@@ -30437,6 +30526,8 @@ html {
     function StartNewGame(mode, options) {
         acceptGameSnapshots = true;
         var startOptions = options || {};
+        startOptions.worldOptions = Object.assign({}, startOptions.worldOptions || {});
+        startOptions.worldOptions.foodAvailabilityKey = selectedFoodAvailabilityKey;
         gameStarted = true;
         mainMenuOverlay.style.display = '';
         newGameMessagePending = true;
@@ -30602,8 +30693,70 @@ html {
     document.getElementById('closeLeaderboardButton').addEventListener('click', HideLeaderboards);
     document.getElementById('leaderboardOverlay').addEventListener('click', function (e) { if (e.target === this)
         HideLeaderboards(); });
-    var optionsOverlay = document.getElementById('optionsOverlay'), muteMusicInput = document.getElementById('muteMusicInput'), musicVolumeInput = document.getElementById('musicVolumeInput'), musicVolumeValue = document.getElementById('musicVolumeValue');
-    function ShowOptions() { muteMusicInput.checked = musicMuted; musicVolumeInput.value = String(Math.round(musicVolume * 100)); musicVolumeValue.textContent = musicVolumeInput.value + '%'; optionsOverlay.classList.remove('dialogHidden'); }
+    var optionsOverlay = document.getElementById('optionsOverlay'), muteMusicInput = document.getElementById('muteMusicInput'), musicVolumeInput = document.getElementById('musicVolumeInput'), musicVolumeValue = document.getElementById('musicVolumeValue'), foodAvailabilityInput = document.getElementById('foodAvailabilityInput'), foodAvailabilityValue = document.getElementById('foodAvailabilityValue'), textSizeInput = document.getElementById('textSizeInput'), textSizeValue = document.getElementById('textSizeValue');
+    var OPTIONS_STORAGE_KEY = 'monster-breeder-options-v1';
+    var foodAvailabilitySliderKeys = ['restricted', 'moderate', 'abundant'];
+    var textSizeSliderKeys = ['small', 'medium', 'large'];
+    var selectedFoodAvailabilityKey = 'moderate';
+    var selectedTextSizeKey = 'medium';
+    function ReadUserOptions() {
+        try {
+            var storedOptions = JSON.parse(localStorage.getItem(OPTIONS_STORAGE_KEY) || '{}');
+            if (foodAvailabilitySliderKeys.indexOf(storedOptions.foodAvailabilityKey) >= 0) {
+                selectedFoodAvailabilityKey = storedOptions.foodAvailabilityKey;
+            }
+            if (textSizeSliderKeys.indexOf(storedOptions.textSizeKey) >= 0) {
+                selectedTextSizeKey = storedOptions.textSizeKey;
+            }
+        }
+        catch (error) {
+            selectedFoodAvailabilityKey = 'moderate';
+            selectedTextSizeKey = 'medium';
+        }
+    }
+    function WriteUserOptions() {
+        try {
+            localStorage.setItem(OPTIONS_STORAGE_KEY, JSON.stringify({
+                foodAvailabilityKey: selectedFoodAvailabilityKey,
+                textSizeKey: selectedTextSizeKey
+            }));
+        }
+        catch (error) {
+            // The current choices remain active when browser storage is unavailable.
+        }
+    }
+    function UpdateFoodAvailabilityControl(shouldPersist) {
+        var sliderIndex = Math.max(0, Math.min(foodAvailabilitySliderKeys.length - 1, Math.round(Number(foodAvailabilityInput.value) || 0)));
+        var displayNames = ['Restricted', 'Moderate', 'Abundant'];
+        selectedFoodAvailabilityKey = foodAvailabilitySliderKeys[sliderIndex];
+        foodAvailabilityInput.value = String(sliderIndex);
+        foodAvailabilityValue.textContent = displayNames[sliderIndex];
+        foodAvailabilityInput.setAttribute('aria-valuetext', displayNames[sliderIndex]);
+        if (shouldPersist) {
+            WriteUserOptions();
+        }
+    }
+    function UpdateTextSizeControl(shouldPersist) {
+        var sliderIndex = Math.max(0, Math.min(textSizeSliderKeys.length - 1, Math.round(Number(textSizeInput.value) || 0)));
+        var displayNames = ['Small', 'Medium', 'Large'];
+        var rootFontSizes = ['100%', '112.5%', '125%'];
+        selectedTextSizeKey = textSizeSliderKeys[sliderIndex];
+        textSizeInput.value = String(sliderIndex);
+        textSizeValue.textContent = displayNames[sliderIndex];
+        textSizeInput.setAttribute('aria-valuetext', displayNames[sliderIndex]);
+        if (document.documentElement) {
+            document.documentElement.style.fontSize = rootFontSizes[sliderIndex];
+        }
+        if (shouldPersist) {
+            WriteUserOptions();
+        }
+    }
+    ReadUserOptions();
+    foodAvailabilityInput.value = String(foodAvailabilitySliderKeys.indexOf(selectedFoodAvailabilityKey));
+    textSizeInput.value = String(textSizeSliderKeys.indexOf(selectedTextSizeKey));
+    UpdateFoodAvailabilityControl(false);
+    UpdateTextSizeControl(false);
+    function ShowOptions() { muteMusicInput.checked = musicMuted; musicVolumeInput.value = String(Math.round(musicVolume * 100)); musicVolumeValue.textContent = musicVolumeInput.value + '%'; foodAvailabilityInput.value = String(foodAvailabilitySliderKeys.indexOf(selectedFoodAvailabilityKey)); textSizeInput.value = String(textSizeSliderKeys.indexOf(selectedTextSizeKey)); UpdateFoodAvailabilityControl(false); UpdateTextSizeControl(false); optionsOverlay.classList.remove('dialogHidden'); }
     function HideOptions() { optionsOverlay.classList.add('dialogHidden'); }
     document.getElementById('optionsMenuButton').addEventListener('click', ShowOptions);
     document.getElementById('closeOptionsButton').addEventListener('click', HideOptions);
@@ -30611,6 +30764,8 @@ html {
         HideOptions(); });
     muteMusicInput.addEventListener('change', function () { musicMuted = muteMusicInput.checked; ApplyMusicPreferences(); });
     musicVolumeInput.addEventListener('input', function () { musicVolume = Math.max(0, Math.min(1, Number(musicVolumeInput.value) / 100)); musicVolumeValue.textContent = Math.round(musicVolume * 100) + '%'; ApplyMusicPreferences(); });
+    foodAvailabilityInput.addEventListener('input', function () { UpdateFoodAvailabilityControl(true); });
+    textSizeInput.addEventListener('input', function () { UpdateTextSizeControl(true); });
     function RegisterMusicUserInteraction() { musicUserInteractionSeen = true; UpdateMusicForState(); }
     window.addEventListener('pointerdown', RegisterMusicUserInteraction, { once: true });
     window.addEventListener('keydown', RegisterMusicUserInteraction, { once: true });
@@ -30895,6 +31050,8 @@ html {
     var closeHusbandryBookButton = document.getElementById('closeHusbandryBookButton');
     var husbandryBookPageIndex = 0;
     var husbandryBookReturnFocus = null;
+    var husbandryBookPages = [];
+    var husbandryBookResizeTimer = null;
 
     function HusbandryIllustration(kind) {
         var frame = '<path class="fine" d="M20 166c36 11 73 13 110 7 35-6 69-6 103 0 37 6 73 4 107-7"/>';
@@ -30923,7 +31080,7 @@ html {
         return '<svg class="husbandryIllustration" viewBox="0 0 360 190" role="img" aria-label="A hand-painted husbandry figure">' + (drawings[kind] || drawings.witness) + frame + '</svg>';
     }
 
-    var husbandryBookPages = [
+    var husbandryBookSourcePages = [
         { title: 'The Book of Monster Husbandry', initial: '', className: 'outerCover', illustration: 'witness', body: '<div class="husbandryCoverDeviceText">The received counsel of keepers and brood-masters</div>' },
         { title: '', initial: 'B', className: 'openingLeaf', illustration: 'witness', body: '<p>Being the gathered witness of keepers, wardens, egg-tenders and brood-masters, set down for the better continuance of sound stock.</p><p>Defenders of treasure would be well counselled to study the accumulated wisdom of the ages with great care.</p><div class="husbandryMarginalia">Let each keeper add faithful witness, but amend no counsel upon one strange happening alone.</div>' },
         { title: 'Of the Authority of This Work', initial: 'W', illustration: 'witness', body: '<p>We write of that which may be known from the stall, the nesting floor, the feeding trough and the field. What lies hidden within blood, seed or flesh is beyond our sight. Yet the same outward signs, returning in many broods and under many keepers, deserve a place in memory.</p><p>Thus, where this book says that one thing follows another, understand the manner of the saying: it has followed often enough that a prudent keeper prepares for it. No leaf herein promises that every beast will answer alike.</p><div class="husbandryMarginalia">The wise breeder marks the line, the season, the feeding and the mishap; the unwise remembers only the finest hatchling.</div>' },
@@ -30945,6 +31102,109 @@ html {
         { title: 'A Keeper\'s Rule of Judgment', initial: 'K', illustration: 'counsel', body: '<p>Keep names, parentage and outcomes together. Mark not only victories, but food consumed, wounds carried home, seasons needed for recovery, afflictions shown, eggs laid, eggs cracked and young that failed to hatch.</p><p>Prefer repeated witness to a single marvel. Compare kin raised under like conditions. When a weakness appears, first examine feeding, age, handling, climate and injury; then consider whether the family itself bears a tendency.</p><p>Above all, breed the monster that continues sound in the work required of it. Beauty without endurance, power without frame, appetite without service and fertility without viable young are costly ornaments.</p><div class="husbandryMarginalia">So ends the common counsel. The next brood will amend it, if its keeper has patience to observe.</div>' }
     ];
 
+    function HusbandryPageBodyNodes(page) {
+        var template = document.createElement('template');
+        template.innerHTML = page.body;
+        return Array.prototype.slice.call(template.content.childNodes).filter(function (node) {
+            return node.nodeType === 1 || (node.nodeType === 3 && node.textContent.trim());
+        });
+    }
+    function HusbandryPageWithBody(sourcePage, bodyHtml, isFirstLeaf) {
+        return {
+            title: isFirstLeaf ? sourcePage.title : '',
+            initial: isFirstLeaf ? sourcePage.initial : '',
+            className: sourcePage.className || '',
+            illustration: isFirstLeaf ? sourcePage.illustration : '',
+            body: bodyHtml
+        };
+    }
+    function HusbandryLeafFits(measurementSpread, page) {
+        measurementSpread.innerHTML = HusbandryLeafHtml(page, 'leftLeaf') + '<section class="husbandryLeaf blankLeaf rightLeaf" aria-hidden="true"></section>';
+        var leaf = measurementSpread.firstElementChild;
+        return leaf.scrollHeight <= leaf.clientHeight + 1;
+    }
+    function HusbandryLargestFittingText(measurementSpread, sourcePage, prefixHtml, node, isFirstLeaf) {
+        var words = node.textContent.trim().split(/\s+/);
+        var low = 0;
+        var high = words.length;
+        while (low < high) {
+            var middle = Math.ceil((low + high) / 2);
+            var trial = node.cloneNode(false);
+            trial.textContent = words.slice(0, middle).join(' ');
+            var trialPage = HusbandryPageWithBody(sourcePage, prefixHtml + trial.outerHTML, isFirstLeaf);
+            if (HusbandryLeafFits(measurementSpread, trialPage)) {
+                low = middle;
+            }
+            else {
+                high = middle - 1;
+            }
+        }
+        return { fittingWords: words.slice(0, low), remainingWords: words.slice(low) };
+    }
+    function PaginateHusbandryChapter(measurementSpread, sourcePage) {
+        var generatedPages = [];
+        var pendingNodes = HusbandryPageBodyNodes(sourcePage);
+        var isFirstLeaf = true;
+        while (pendingNodes.length) {
+            var bodyHtml = '';
+            var madeProgress = false;
+            while (pendingNodes.length) {
+                var node = pendingNodes[0];
+                var candidatePage = HusbandryPageWithBody(sourcePage, bodyHtml + node.outerHTML, isFirstLeaf);
+                if (HusbandryLeafFits(measurementSpread, candidatePage)) {
+                    bodyHtml += node.outerHTML;
+                    pendingNodes.shift();
+                    madeProgress = true;
+                    continue;
+                }
+                var canSplitText = node.nodeType === 1 && node.textContent.trim().indexOf(' ') >= 0;
+                if (canSplitText) {
+                    var split = HusbandryLargestFittingText(measurementSpread, sourcePage, bodyHtml, node, isFirstLeaf);
+                    if (split.fittingWords.length) {
+                        var fittingNode = node.cloneNode(false);
+                        fittingNode.textContent = split.fittingWords.join(' ');
+                        bodyHtml += fittingNode.outerHTML;
+                        madeProgress = true;
+                        if (split.remainingWords.length) {
+                            var remainingNode = node.cloneNode(false);
+                            remainingNode.textContent = split.remainingWords.join(' ');
+                            pendingNodes[0] = remainingNode;
+                        }
+                        else {
+                            pendingNodes.shift();
+                        }
+                    }
+                }
+                break;
+            }
+            if (!madeProgress) {
+                // Never discard manually edited content. An indivisible oversized
+                // element receives its own leaf and may scroll as a last resort.
+                bodyHtml = pendingNodes.shift().outerHTML;
+            }
+            generatedPages.push(HusbandryPageWithBody(sourcePage, bodyHtml, isFirstLeaf));
+            isFirstLeaf = false;
+        }
+        if (!generatedPages.length) {
+            generatedPages.push(HusbandryPageWithBody(sourcePage, '', true));
+        }
+        return generatedPages;
+    }
+    function PaginateHusbandryBook() {
+        husbandryBookPages = [husbandryBookSourcePages[0]];
+        var measurementSpread = document.createElement('div');
+        measurementSpread.className = 'husbandrySpread';
+        measurementSpread.style.visibility = 'hidden';
+        measurementSpread.setAttribute('aria-hidden', 'true');
+        husbandryBookPage.classList.remove('outerCoverShown');
+        husbandryBookPage.innerHTML = '';
+        husbandryBookPage.appendChild(measurementSpread);
+        for (var sourceIndex = 1; sourceIndex < husbandryBookSourcePages.length; sourceIndex += 1) {
+            husbandryBookPages = husbandryBookPages.concat(PaginateHusbandryChapter(measurementSpread, husbandryBookSourcePages[sourceIndex]));
+        }
+        husbandryBookPage.innerHTML = '';
+    }
+
     function HusbandryLeafHtml(page, sideClass) {
         if (!page) {
             return '<section class="husbandryLeaf blankLeaf ' + sideClass + '" aria-hidden="true"></section>';
@@ -30955,8 +31215,9 @@ html {
             body = body.replace(firstLetterPattern, '$1<span aria-hidden="true" class="illuminatedInitial">' + page.initial + '</span>');
         }
         var title = page.title ? '<h2>' + page.title + '</h2>' : '';
+        var illustration = page.illustration ? HusbandryIllustration(page.illustration) : '';
         return '<section class="husbandryLeaf ' + sideClass + ' ' + (page.className || '') + '">' +
-            title + HusbandryIllustration(page.illustration) + '<div class="husbandryLeafText">' + body + '</div></section>';
+            title + illustration + '<div class="husbandryLeafText">' + body + '</div></section>';
     }
     function RenderHusbandryBookPage() {
         var page = husbandryBookPages[husbandryBookPageIndex];
@@ -30981,8 +31242,9 @@ html {
     function OpenHusbandryBook() {
         husbandryBookReturnFocus = document.activeElement;
         husbandryBookPageIndex = 0;
-        RenderHusbandryBookPage();
         husbandryBookOverlay.classList.remove('dialogHidden');
+        PaginateHusbandryBook();
+        RenderHusbandryBookPage();
         closeHusbandryBookButton.focus();
     }
     function CloseHusbandryBook() {
@@ -31009,6 +31271,18 @@ html {
         if (event.target === husbandryBookOverlay) {
             CloseHusbandryBook();
         }
+    });
+    window.addEventListener('resize', function () {
+        if (husbandryBookOverlay.classList.contains('dialogHidden')) {
+            return;
+        }
+        window.clearTimeout(husbandryBookResizeTimer);
+        husbandryBookResizeTimer = window.setTimeout(function () {
+            husbandryBookPageIndex = Math.min(husbandryBookPageIndex, husbandryBookPages.length - 1);
+            PaginateHusbandryBook();
+            husbandryBookPageIndex = Math.min(husbandryBookPageIndex, Math.max(0, husbandryBookPages.length - 1));
+            RenderHusbandryBookPage();
+        }, 120);
     });
     window.addEventListener('keydown', function (event) {
         if (husbandryBookOverlay.classList.contains('dialogHidden')) {
