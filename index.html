@@ -24246,8 +24246,8 @@ html {
         }
         var incomplete = !TutorialHasBeenCompleted();
         button.classList.toggle('tutorialIncomplete', incomplete);
-        button.setAttribute('aria-label', incomplete ? 'Tutorial - not yet completed' : 'Tutorial');
-        button.title = incomplete ? 'Tutorial not yet completed' : '';
+        button.setAttribute('aria-label', incomplete ? 'Tutorial - start here' : 'Tutorial');
+        button.title = incomplete ? 'Tutorial - start here' : '';
     }
     function RecordTutorialCompletion() {
         try {
