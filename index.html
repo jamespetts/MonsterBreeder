@@ -3952,9 +3952,7 @@ html {
 #husbandryBookPage {
     position: relative;
     min-height: 0;
-    overflow: auto;
     box-sizing: border-box;
-    padding: clamp(1.25rem, 3vw, 2.7rem) clamp(1.35rem, 4vw, 4rem);
     background:
         radial-gradient(circle at 13% 18%, rgba(108,78,33,.08) 0 2px, transparent 3px),
         radial-gradient(circle at 85% 72%, rgba(108,78,33,.06) 0 1px, transparent 2px),
@@ -3962,8 +3960,6 @@ html {
     background-size: 79px 67px, 91px 83px, auto;
     color: #342817;
     font-family: Georgia, "Liberation Serif", "Times New Roman", serif;
-    font-size: clamp(1rem, 1.55vw, 1.2rem);
-    line-height: 1.55;
     scrollbar-color: #76542f #d6c48e;
 }
 #husbandryBookPage:after {
@@ -4001,7 +3997,6 @@ html {
     margin: 0 0 .8rem;
     color: #4b351d;
     font-family: "Palatino Linotype", Palatino, Georgia, serif;
-    font-size: clamp(1.55rem, 3vw, 2.45rem);
     line-height: 1.1;
     text-align: center;
     font-variant: small-caps;
@@ -4016,7 +4011,6 @@ html {
     break-after: avoid;
 }
 .husbandryPageContent p {
-    margin: 0 0 .85rem;
     text-align: justify;
     hyphens: auto;
 }
@@ -4026,12 +4020,7 @@ html {
 }
 .husbandryPageContent li { margin: .28rem 0; }
 .illuminatedInitial {
-    float: left;
     position: relative;
-    width: 3.25rem;
-    height: 3.25rem;
-    margin: .08rem .55rem .1rem 0;
-    display: flex;
     align-items: center;
     justify-content: center;
     border: 3px double #6f2f25;
@@ -4042,42 +4031,27 @@ html {
     color: #f4df79;
     box-shadow: inset 0 0 0 3px #d1a949;
     font-family: "Palatino Linotype", Palatino, serif;
-    font-size: 2.45rem;
     font-weight: 900;
-    line-height: 1;
     text-shadow: 1px 2px #29150f;
 }
 .husbandryMarginalia {
-    margin: .7rem 0 1rem;
-    padding: .55rem .7rem;
     border-left: 4px solid #824235;
-    background: rgba(151,116,55,.12);
-    color: #533d24;
-    font-size: .92em;
-    font-style: italic;
     break-inside: avoid;
 }
 .husbandryIllustration {
     display: block;
-    width: min(100%, 360px);
-    max-height: 190px;
-    margin: .6rem auto 1rem;
     color: #563a22;
     break-inside: avoid;
 }
-.husbandryIllustration .ink { fill: none; stroke: currentColor; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
-.husbandryIllustration .wash { fill: #9b6a3f; opacity: .22; stroke: #563a22; stroke-width: 3; }
-.husbandryIllustration .rubric { fill: none; stroke: #7b3028; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+
+
+
 .husbandryCoverDevice {
     width: min(330px, 72%);
     margin: 1rem auto;
     color: #5d3d20;
 }
-.husbandryCoverSubtitle {
-    max-width: 38rem;
-    color: #604b2f;
-    font-style: italic;
-}
+
 .husbandryDiseaseEntry {
     break-inside: avoid;
     margin-bottom: .8rem;
@@ -4113,26 +4087,9 @@ html {
 /* ========================================================================== */
 /* AUTHORITATIVE MANUSCRIPT BOOK REVISION                                     */
 /* ========================================================================== */
-#husbandryBookPage,
-.husbandryPageContent,
-.husbandryPageContent p,
-.husbandryMarginalia,
-.husbandryCoverSubtitle {
-    font-family: "Segoe Print", "Bradley Hand ITC", "Bradley Hand", "Lucida Handwriting", "Apple Chancery", "URW Chancery L", "Comic Sans MS", cursive;
-}
-.husbandryBookHeader,
-.husbandryBookFooter,
-#husbandryBookRunningTitle,
-.husbandryPageContent h2,
-.husbandryPageContent h3,
-.illuminatedInitial {
-    font-family: "Uncial Antiqua", "IM FELL English SC", "Copperplate Gothic", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
-}
-#husbandryBookPage {
-    overflow: hidden;
-    font-size: clamp(.93rem, 1.32vw, 1.08rem);
-    line-height: 1.48;
-}
+
+
+
 .husbandryPageContent {
     height: 100%;
     box-sizing: border-box;
@@ -4146,19 +4103,14 @@ html {
 .husbandryPageContent.singleColumn .husbandryIllustration {
     max-height: 230px;
 }
-.husbandryPageContent h2 {
-    font-size: clamp(1.45rem, 2.7vw, 2.25rem);
-}
+
 .husbandryMarginalia {
     position: relative;
-    margin: .85rem .35rem 1rem;
-    padding: .5rem .75rem .45rem 1.75rem;
     border: 0;
     border-top: 2px solid #9a6a3a;
     border-bottom: 1px solid #b18a52;
     background: transparent;
     color: #762f26;
-    font-size: .88em;
     font-style: normal;
     transform: rotate(-.35deg);
 }
@@ -4169,7 +4121,6 @@ html {
     top: .2rem;
     color: #8a3027;
     font-family: "Uncial Antiqua", "IM FELL English SC", Georgia, serif;
-    font-size: 1.45rem;
     font-weight: 900;
 }
 .husbandryCoverSubtitle {
@@ -4178,10 +4129,7 @@ html {
     font-style: normal;
     letter-spacing: .015em;
 }
-.husbandryIllustration {
-    width: min(100%, 390px);
-    max-height: 205px;
-}
+
 .husbandryIllustration .ink {
     fill: none;
     stroke: #4e3320;
@@ -4216,7 +4164,7 @@ html {
     stroke-linejoin: round;
 }
 @media (max-width: 760px) {
-    #husbandryBookPage { overflow: auto; }
+    
     .husbandryPageContent { height: auto; }
 }
 
@@ -4239,12 +4187,7 @@ html {
 .illuminatedInitial {
     font-family: "IM FELL English SC", "Uncial Antiqua", "Junicode", "Cormorant SC", "Palatino Linotype", Palatino, Georgia, serif;
 }
-#husbandryBookPage {
-    overflow: hidden;
-    padding: clamp(1rem, 2.2vw, 2rem) clamp(1.15rem, 3vw, 3rem);
-    font-size: clamp(.94rem, 1.23vw, 1.08rem);
-    line-height: 1.48;
-}
+
 .husbandryPageContent,
 .husbandryPageContent.singleColumn,
 .husbandryPageContent.coverPage {
@@ -4270,10 +4213,7 @@ html {
 .husbandryPageContent p {
     margin: 0 0 .66rem;
 }
-.husbandryMarginalia {
-    margin: .55rem .15rem .3rem;
-    padding: .38rem .5rem .35rem 1.55rem;
-}
+
 .husbandryPageContent.outerCover {
     position: absolute;
     inset: 0;
@@ -4318,15 +4258,7 @@ html {
     color: #d5b461;
     filter: sepia(.25);
 }
-.husbandryCoverDeviceText {
-    max-width: 30rem;
-    padding: .7rem 1rem;
-    border-top: 1px solid #c89d55;
-    border-bottom: 1px solid #c89d55;
-    color: #dec581;
-    font-variant: small-caps;
-    letter-spacing: .075em;
-}
+
 .husbandryPageContent.openingLeaf .illuminatedInitial {
     width: 6.6rem;
     height: 6.6rem;
@@ -4342,7 +4274,7 @@ html {
     display: none;
 }
 @media (max-width: 760px) {
-    #husbandryBookPage { overflow: auto; }
+    
     .husbandryPageContent,
     .husbandryPageContent.singleColumn,
     .husbandryPageContent.coverPage {
