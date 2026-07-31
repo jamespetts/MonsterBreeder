@@ -66,17 +66,7 @@ body {
     padding: 0.35rem 1rem 0.45rem;
     box-shadow: 0 3px 10px rgba(0,0,0,0.25);
 }
-#closeManagementButton {
-    position: sticky;
-    
-    top: 0;
-    z-index: 7;
-    width: 1.8rem;
-    height: 1.8rem;
-    padding: 0;
-    font-size: 1.15rem;
-    line-height: 1.8rem;
-}
+
 #controls {
     display: flex;
     flex-wrap: wrap;
@@ -133,19 +123,12 @@ body {
     opacity: 0;
     pointer-events: none;
 }
-#monsterTooltip {
-    display: none;
-}
-#monsterTooltip.tooltipHidden {
-    display: none;
-}
+
+
 #managementDrawer.raidDrawer {
     max-height: 46%;
 }
-.deployNowButton {
-    padding: 0.25rem 0.45rem;
-    font-size: 0.82rem;
-}
+
 #managementDrawer h2 {
     margin: 0 0 0.25rem;
     font-size: 1.05rem;
@@ -153,32 +136,11 @@ body {
 #managementDrawer p {
     margin: 0.25rem 0 0.6rem;
 }
-.rosterRow {
-    display: grid;
-    grid-template-columns: auto 1fr auto auto;
-    gap: 0.55rem;
-    align-items: center;
-    padding: 0.45rem 0.55rem;
-    border: 1px solid #d8d0b8;
-    border-radius: 0.45rem;
-    background: #fffaf0;
-}
-.rosterRow.dead {
-    opacity: 0.55;
-}
-.rosterName {
-    font-weight: 700;
-}
-.rosterMeta {
-    color: #526052;
-    font-size: 0.9rem;
-}
-.rosterBadge {
-    border-radius: 999px;
-    padding: 0.2rem 0.45rem;
-    background: #e9dfbd;
-    font-size: 0.82rem;
-}
+
+
+
+
+
 #startSeasonButton {
     margin-right: 0.5rem;
 }
@@ -191,90 +153,26 @@ body {
     
     border: 2px solid #6b5a3a;
     padding: 0.55rem;
-    overflow: auto;
 }
 #rosterList {
     grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
     gap: 0.55rem;
     margin: 0;
 }
-.monsterCard {
-    position: relative;
-    min-height: 150px;
-    display: grid;
-    grid-template-rows: auto 1fr auto;
-    gap: 0.25rem;
-    border: 2px solid rgba(57,71,50,0.55);
-    border-radius: 0.55rem;
-    background: rgba(255,250,240,0.92);
-    padding: 0.45rem;
-    text-align: left;
-    box-sizing: border-box;
-    cursor: pointer;
-}
-.monsterCard:hover {
-    background: #fff8dc;
-    border-color: #394732;
-}
-.monsterCard.selected {
-    border-color: #1f2730;
-}
-.monsterCard.dead {
-    opacity: 0.55;
-    cursor: default;
-}
-.monsterCard svg {
-    width: 100%;
-    height: 78px;
-    display: block;
-}
-.monsterCardHeader {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.35rem;
-}
-.monsterCardName {
-    font-weight: 800;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.monsterDeployControl {
-    display: flex;
-    gap: 0.3rem;
-    align-items: center;
-    font-size: 0.82rem;
-    font-weight: 700;
-}
-.monsterCardMeta {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.35rem;
-    font-size: 0.82rem;
-    color: #526052;
-}
-.monsterHpBar {
-    height: 0.42rem;
-    border-radius: 999px;
-    background: #5a1f1f;
-    overflow: hidden;
-    border: 1px solid rgba(31,39,48,0.5);
-}
-.monsterHpFill {
-    height: 100%;
-    background: #2f855a;
-}
-.monsterHpFill.low {
-    background: #c05621;
-}
-.nutritionShortfall {
-    color: #b91c1c;
-    font-weight: 800;
-}
-#sidePanel .nutritionShortfall {
-    color: #f87171;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #selectedMonsterPanel {
     border: 1px solid #d8d0b8;
     border-radius: 0.55rem;
@@ -305,69 +203,20 @@ body {
 #managementActions {
     margin-top: 0.65rem;
 }
-.breedingPanel {
-    margin-top: 0.65rem;
-    border-top: 1px solid #d8d0b8;
-    padding-top: 0.6rem;
-}
-.breedingPanel h4 {
-    margin: 0 0 0.35rem;
-    font-size: 0.95rem;
-    color: #394732;
-}
-.breedingPanel p {
-    margin: 0.25rem 0 0.45rem;
-    font-size: 0.88rem;
-}
-.breedingPanel select {
-    width: 100%;
-    box-sizing: border-box;
-    margin: 0.2rem 0 0.45rem;
-    padding: 0.35rem;
-}
-.breedingPanel button {
-    width: 100%;
-    margin-top: 0.2rem;
-}
-.breedingStatus {
-    font-size: 0.84rem;
-    color: #526052;
-}
-.breedingBlocked {
-    color: #9f4211;
-    font-weight: 700;
-}
-.familyPanel, .performancePanel {
-    margin-top: 0.65rem;
-    border-top: 1px solid #d8d0b8;
-    padding-top: 0.6rem;
-}
-.familyPanel h4, .performancePanel h4 {
-    margin: 0 0 0.35rem;
-    font-size: 0.95rem;
-    color: #394732;
-}
-.familyPanel p, .performancePanel p {
-    margin: 0.25rem 0 0.45rem;
-    font-size: 0.88rem;
-}
-.familyList {
-    margin: 0.2rem 0 0;
-    padding-left: 1.1rem;
-    font-size: 0.87rem;
-}
-.familyList li {
-    margin: 0.18rem 0;
-}
-.eggCard {
-    min-height: 150px;
-    border-color: #8b6f47;
-    background: #fff7dd;
-}
-.eggCard.unhatched {
-    filter: grayscale(1);
-    opacity: 0.62;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 .eggVisual {
     display: flex;
     align-items: center;
@@ -382,29 +231,16 @@ body {
     border: 3px solid #6b4f2d;
     box-shadow: inset -8px -10px 12px rgba(70,45,20,0.18);
 }
-.eggCard.cracked .eggShape {
-    background: linear-gradient(115deg, transparent 47%, #5b4633 48% 52%, transparent 53%), radial-gradient(circle at 34% 28%, #eee 0 10%, #bbb 48%, #777 100%);
-}
+
 .familyTree {
     margin-top: 0.4rem;
     padding-left: 0.5rem;
     border-left: 3px solid #d8d0b8;
 }
-.familyTreeNode {
-    margin: 0.28rem 0 0.28rem 0.65rem;
-}
-.familyTreeButton {
-    width: auto;
-    padding: 0.22rem 0.42rem;
-    text-align: left;
-    font-size: 0.83rem;
-}
-.familyTreeDead {
-    color: #6b7280;
-}
-.performanceMuted {
-    color: #687068;
-}
+
+
+
+
 @media (max-width: 900px) {
     #managementBody {
         grid-template-columns: 1fr;
@@ -443,15 +279,8 @@ body {
 #monsterPortrait {
     display: none;
 }
-.selectionActions {
-    margin-top: 0.6rem;
-    display: flex;
-    gap: 0.45rem;
-    flex-wrap: wrap;
-}
-.selectionActions button {
-    padding: 0.4rem 0.55rem;
-}
+
+
 #mainMenuOverlay {
     position: fixed;
     inset: 0;
@@ -679,91 +508,25 @@ body {
     background: #dc2626;
     color: white;
 }
-#monsterTransferOverlay {
-    position: fixed;
-    inset: 0;
-    z-index: 35;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(2,6,23,0.94);
-}
-#monsterTransferOverlay.dialogHidden {
-    display: none;
-}
-#monsterTransferPanel {
-    width: min(780px, calc(100vw - 2rem));
-    max-height: min(820px, calc(100vh - 2rem));
-    overflow: auto;
-    border-radius: 0.85rem;
-    padding: 1rem;
-    box-shadow: 0 18px 60px rgba(0,0,0,0.65);
-    box-sizing: border-box;
-}
-#monsterTransferPanel h2, #monsterTransferPanel h3 {
-    margin: 0 0 0.45rem;
-}
-#monsterTransferStatus {
-    min-height: 1.3rem;
-    color: #fcd34d;
-    white-space: pre-line;
-}
-.monsterTransferGrid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.8rem;
-}
-.monsterTransferSection {
-    border-radius: 0.55rem;
-    padding: 0.75rem;
-}
-.monsterTransferSection select, .monsterTransferSection input {
-    width: 100%;
-    box-sizing: border-box;
-    margin: 0.4rem 0 0.6rem;
-}
-.monsterExportList {
-    max-height: 18rem;
-    overflow: auto;
-    border-radius: 0.4rem;
-    margin: 0.45rem 0 0.7rem;
-}
-.monsterExportChoice {
-    display: flex;
-    gap: 0.55rem;
-    align-items: center;
-    padding: 0.48rem 0.55rem;
-    cursor: pointer;
-}
-.monsterExportChoice:last-child {
-    border-bottom: 0;
-}
-.monsterExportChoice input {
-    width: auto;
-    margin: 0;
-}
-#monsterExportToolbar {
-    margin-top: 0.35rem;
-}
-#monsterTransferPanel.advancedCampaignSetup #monsterExportSection {
-    display: none;
-}
-#monsterTransferPanel.advancedCampaignSetup .monsterTransferGrid {
-    grid-template-columns: 1fr;
-}
-#monsterTransferPanel.advancedCampaignSetup #monsterImportSection {
-    width: 100%;
-    box-sizing: border-box;
-}
-#monsterTransferActions {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 0.8rem;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 @media (max-width: 650px) {
-    .monsterTransferGrid {
-        grid-template-columns: 1fr;
-    }
+    
 }
 #gameToast {
     position: fixed;
@@ -891,16 +654,7 @@ body {
     background: #dc7b20;
     color: #fff;
 }
-.foodEconomySummary {
-    margin: 0.5rem 0;
-    padding: 0.55rem;
-    border: 1px solid #d8d0b8;
-    border-radius: 0.45rem;
-    background: #fff4cf;
-    color: #3f3522;
-    font-weight: 700;
-    white-space: pre-line;
-}
+
 @media (max-width: 650px) {
     .foodAllocationRow {
         grid-template-columns: 1fr 5.5rem;
@@ -1039,9 +793,7 @@ body {
     font-weight:900;
     text-shadow:0 1px 2px #000
 }
-.goalDescription {
-    font-size:.82rem
-}
+
 .balanceTrack {
     overflow:visible
 }
@@ -1703,8 +1455,6 @@ body {
     gap:.15rem;
     padding:.08rem .2rem;
     border:1px solid #8b795b;
-    border-radius:.25rem;
-    background:#fffffff2;
     font-size:.64rem;
     font-weight:800;
     pointer-events:auto
@@ -1726,14 +1476,7 @@ body {
     font-weight:900;
     pointer-events:auto
 }
-.portraitSex {
-    padding:.08rem .25rem;
-    border:1px solid #8b795b;
-    border-radius:.25rem;
-    background:#fffffff2;
-    font-size:.68rem;
-    font-weight:900
-}
+
 .monsterPortrait.mortuary {
     opacity:1;
     filter:none;
@@ -1761,16 +1504,8 @@ body {
 .selectedMonsterPortrait svg {
     width:100%
 }
-.selectedMonsterTitleRow {
-    display:flex;
-    justify-content:space-between;
-    align-items:start;
-    gap:.5rem
-}
-.selectedMonsterTitleRow h3 {
-    margin:0;
-    font-size:1.22rem
-}
+
+
 .selectedMonsterBadges {
     display:flex;
     flex-wrap:wrap;
@@ -1816,58 +1551,23 @@ body {
 .ageFill {
     height:100%
 }
-.ageExpectedMarker {
-    position:absolute;
-    
-    
-    bottom:-.15rem;
-    width:3px
-;}
+
 .ageOverflow {
     padding:.22rem .4rem;
     border-left:4px solid #7c3aed;
     font-weight:750
 }
-.ageLegend,.nutritionLegend {
+.ageLegend{
     display:flex;
     justify-content:space-between;
     gap:.5rem;
     margin-top:.22rem;
-    color:#657066;
-    font-size:.72rem
-}
-.nutritionCompare {
-    margin-top:.4rem
-}
-.nutritionTrack {
-    position:relative;
-    height:1.35rem;
-    border:1px solid #8b795b;
-    border-radius:999px;
-    background:#e5dfcf;
-    overflow:hidden
-}
-.biomeFoodFill {
-    position:absolute;
-    inset:0 auto 0 0;
-    background:#86efac
-}
-.monsterNeedFill {
-    position:absolute;
-    background:#b45309;
-    border-radius:999px
-}
-.nutritionTrackLabel {
-    position:absolute;
-    inset:0;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    color:#1f2730;
-    font-size:.7rem;
-    font-weight:900;
-    text-shadow:0 1px #fff
-}
+    color:#657066;}
+
+
+
+
+
 .injuryList {
     display:grid
 }
@@ -1894,23 +1594,9 @@ body {
 .injuryBarFill.severe {
     background:#dc2626
 }
-.historicInjury {
-    color:#7c2d12;
-    font-weight:750
-}
-.deadFieldInjuryNote {
-    padding:.45rem;
-    border:1px solid #f59e0b;
-    border-radius:.4rem;
-    background:#fff7d6;
-    font-size:.78rem
-}
-.performanceBehaviour {
-    padding:.45rem;
-    border-radius:.4rem;
-    background:#f3eedf;
-    font-size:.8rem
-}
+
+
+
 .openFamilyTreeButton {
     width:100%
 }
@@ -1924,9 +1610,7 @@ body {
     display:flex;
     gap:.45rem
 ;}
-#managementHint {
-    display:none!important
-}
+
 #familyTreeOverlay,#breedingPairOverlay {
     position:fixed;
     inset:0;
@@ -1950,19 +1634,8 @@ body {
 .familyTreeDialog h2,.breedingPairDialog h2 {
     margin:0 0 .65rem
 }
-.familyGeneration:not(:last-child):after {
-    content:"";
-    position:absolute;
-    
-    top:5%;
-    
-    width:2px
-;}
-.familyGenerationTitle {
-    text-align:center;
-    font-size:.72rem;
-    font-weight:850;
-    }
+
+
 .familyTreeGraphNode {
     padding:.45rem;
     border-radius:.45rem;
@@ -1975,9 +1648,7 @@ body {
     
     height:2px
 ;}
-.familyGeneration:last-child .familyTreeGraphNode:after {
-    display:none
-}
+
 .familyNodeName {
     display:block;
     font-weight:900
@@ -1988,7 +1659,6 @@ body {
     font-size:.72rem
 }
 .familyTreeRecordDetails {
-    margin-top:.7rem;
     padding:.65rem;
     border-radius:.5rem
 }
@@ -2020,9 +1690,7 @@ body {
     .selectedMonsterHeader {
         grid-template-columns:1fr
     }
-    .infoColumns {
-        grid-template-columns:1fr
-    }
+    
 }
 .monsterPortrait {
     height:auto;
@@ -2042,9 +1710,7 @@ body {
 .portraitDeployControl input:disabled {
     opacity:.55
 }
-.monsterPortraitTooltip {
-    display:none
-}
+
 .monsterPortrait[title] {
     position:relative
 }
@@ -2122,9 +1788,7 @@ body {
 .ageTrack {
     height:.9rem
 }
-.ageExpectedMarker {
-    background:#263238
-}
+
 .ageLegend {
     font-size:.67rem
 }
@@ -2132,33 +1796,12 @@ body {
     font-size:.68rem;
     margin-top:.16rem
 }
-.nutritionComparisonRows {
-    display:grid;
-    gap:.28rem
-}
-.nutritionComparisonRow {
-    display:grid;
-    grid-template-columns:7.3rem minmax(0,1fr) 3.5rem;
-    gap:.35rem;
-    align-items:center;
-    font-size:.72rem
-}
-.nutritionBar {
-    height:1rem;
-    border:1px solid #8b795b;
-    border-radius:.25rem;
-    background:#ece8df;
-    overflow:hidden
-}
-.nutritionBarFill {
-    height:100%
-}
-.nutritionNeedFill {
-    background:#355f8a
-}
-.nutritionProductionFill {
-    background:#d59b35
-}
+
+
+
+
+
+
 .nutritionStatusLine {
     margin-top:.25rem;
     font-weight:800
@@ -2210,19 +1853,9 @@ body {
 .familyTreeDialog {
     display:grid
 }
-.familyGeneration {
-    min-width:0
-}
-.familyGeneration:not(:last-child):after {
-    display:none
-;
-    right:-.65rem;
-    bottom:5%;}
-.familyGenerationTitle {
-    display:none
-;
-    text-transform:uppercase
-;}
+
+
+
 .familyTreeGraphNode:after {
     display:none
 ;
@@ -2234,9 +1867,7 @@ body {
 .familyTreeRecordDetails {
     overflow:auto;
     }
-#monsterExportSection {
-    display:none!important
-}
+
 .exportModeActive .monsterPortrait {
     cursor:pointer
 }
@@ -2274,10 +1905,7 @@ body {
         height:90px
     }
 }
-.ageExpectedMarker {
-    display:none!important;
-    right:0;
-    top:-.15rem;}
+
 .nutritionOverlayBar {
     position:relative;
     height:1.15rem;
@@ -2372,18 +2000,7 @@ body {
     
     box-sizing:border-box;
     }
-.familyGeneration {
-    position:relative!important;
-    display:flex!important;
-    flex-direction:row!important;
-    align-items:center!important;
-    justify-content:space-around!important;
-    flex-wrap:nowrap!important;
-    gap:34px!important;
-    min-height:174px!important;
-    padding:36px 10px!important;
-    box-sizing:border-box
-}
+
 .familyTreeGraphNode {
     width:174px!important;
     min-width:174px!important;
@@ -2415,7 +2032,7 @@ body {
     transform:scale(.74);
     transform-origin:center
 }
-.familyGeneration,.familyTreeGraphNode {
+.familyTreeGraphNode{
     z-index:1
 }
 .familyTreeRecordDetails {
@@ -2817,19 +2434,14 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
 #monsterManagementTab:hover, #viewportTopControls #startSeasonButton:hover {
     background: var(--ui-green-light);
 }
-#closeManagementButton {
-    border-color: var(--ui-border);
-    background: var(--ui-parchment-recessed);
-    color: var(--ui-ink);
-    float: right;
-}
+
 #cageViewport {
     border-color: var(--ui-border-dark);
     border-radius: var(--ui-radius-small);
     background: var(--ui-parchment-recessed);
     box-shadow: inset 3px 3px 0 rgba(49, 36, 20, 0.16);
 }
-#selectedMonsterPanel, .managementSection, .performanceBehaviour, .familyTreeRecordDetails, .breedingParent {
+#selectedMonsterPanel, .managementSection, .familyTreeRecordDetails, .breedingParent{
     border-color: var(--ui-border);
     border-radius: var(--ui-radius-small);
     background: var(--ui-parchment-bright);
@@ -2866,10 +2478,10 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
 .monsterPortraitName {
     font-family: var(--ui-font-display);
 }
-.monsterPortraitStatus, .rosterMeta, .monsterCardMeta, .breedingStatus, .performanceMuted, .ageLegend, .nutritionLegend {
+.monsterPortraitStatus, .ageLegend{
     color: var(--ui-ink-muted);
 }
-.portraitDeployControl, .portraitSex {
+.portraitDeployControl{
     border-color: var(--ui-border);
     border-radius: var(--ui-radius-small);
     background: var(--ui-parchment-bright);
@@ -2886,7 +2498,7 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
 ;
 }
 /* Menus, dialogs, overlays and transient feedback. */
-#preMenuOverlay, #mainMenuOverlay, #worldLoadingOverlay, #saveLoadOverlay, #monsterTransferOverlay, #unsavedActionOverlay, #foodShortageOverlay, #roundHistoryOverlay, #statDetailOverlay, #familyTreeOverlay, #breedingPairOverlay, #optionsOverlay {
+#preMenuOverlay, #mainMenuOverlay, #worldLoadingOverlay, #saveLoadOverlay, #unsavedActionOverlay, #foodShortageOverlay, #roundHistoryOverlay, #statDetailOverlay, #familyTreeOverlay, #breedingPairOverlay, #optionsOverlay{
     background: var(--ui-overlay-strong);
     color: var(--ui-ink-inverse);
 }
@@ -2894,14 +2506,14 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
 #preMenuPanel p, #mainMenuPanel p, #saveLoadDescription, #unsavedActionPanel p, #treasureSpendHint {
     color: var(--ui-ink-faint-inverse);
 }
-#mainMenuPanel, #worldLoadingPanel, #saveLoadPanel, #monsterTransferPanel, #unsavedActionPanel, #foodShortagePanel, #roundHistoryPanel, #statDetailPanel, .familyTreeDialog, .breedingPairDialog, #optionsPanel {
+#mainMenuPanel, #worldLoadingPanel, #saveLoadPanel, #unsavedActionPanel, #foodShortagePanel, #roundHistoryPanel, #statDetailPanel, .familyTreeDialog, .breedingPairDialog, #optionsPanel{
     border: var(--ui-border-width-heavy) solid var(--ui-border-dark);
     border-radius: var(--ui-radius-medium);
     background: var(--ui-parchment-light);
     color: var(--ui-ink);
     box-shadow: var(--ui-shadow-large), var(--ui-inset);
 }
-#mainMenuPanel h2, #worldLoadingPanel h2, #saveLoadPanel h2, #monsterTransferPanel h2, #monsterTransferPanel h3, #unsavedActionPanel h2, #foodShortagePanel h2, #foodShortagePanel h3, .familyTreeDialog h2, .breedingPairDialog h2 {
+#mainMenuPanel h2, #worldLoadingPanel h2, #saveLoadPanel h2, #unsavedActionPanel h2, #foodShortagePanel h2, #foodShortagePanel h3, .familyTreeDialog h2, .breedingPairDialog h2{
     color: var(--ui-heading);
 }
 #mainMenuPanel p, #saveLoadDescription, #unsavedActionPanel p, #foodShortageSummary, #treasureSpendHint {
@@ -2921,7 +2533,7 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
     background: var(--ui-parchment-bright);
     color: var(--ui-ink);
 }
-.saveSlotRow, .monsterTransferSection, .monsterExportList, .foodAllocationRow, #treasureSpendControl, #foodSalePreview, .statChart, .familyTreeGraphNode {
+.saveSlotRow, .foodAllocationRow, #treasureSpendControl, #foodSalePreview, .statChart, .familyTreeGraphNode{
     border-color: var(--ui-border);
     border-radius: var(--ui-radius-small);
     background: var(--ui-parchment-bright);
@@ -2933,12 +2545,8 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
 .saveSlotMetadata, .familyNodeMeta, #musicVolumeValue {
     color: var(--ui-ink-muted);
 }
-.monsterExportChoice {
-    border-bottom-color: var(--ui-border-light);
-}
-.monsterExportChoice:hover {
-    background: var(--ui-parchment-recessed);
-}
+
+
 #worldLoadingTrack {
     background: var(--ui-brown-deep);
     border-radius: var(--ui-radius-small);
@@ -2970,12 +2578,12 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
 .saveSlotDeleteButton:hover, #discardCurrentGameButton:hover, #confirmSaveLoadActionButton:hover {
     background: #9a4c35;
 }
-#saveLoadConfirmation, .breedingWarning, .deadFieldInjuryNote {
+#saveLoadConfirmation, .breedingWarning{
     border-color: var(--ui-warning);
     background: #e6d5a6;
     color: var(--ui-ink);
 }
-#customGameError, #saveLoadMessage, .nutritionShortfall {
+#customGameError, #saveLoadMessage{
     color: var(--ui-danger);
 }
 .selectionStatusGood {
@@ -2983,13 +2591,13 @@ h1, h2, h3, h4, .dashboardHeading, .selectionTitle, .monsterRosterHeading {
 }
 
 /* UI geometry uses deliberately chunky vector edges: more pixels in spirit, not pixel art. */
-.dashboardCard, .monsterPortrait, .managementSection, .saveSlotRow, .foodAllocationRow, .statTile, .typeTile, .familyTreeGraphNode, .breedingParent, .exportModeBar, .foodEconomySummary {
+.dashboardCard, .monsterPortrait, .managementSection, .saveSlotRow, .foodAllocationRow, .statTile, .typeTile, .familyTreeGraphNode, .breedingParent, .exportModeBar{
     border-radius: var(--ui-radius-small);
 }
 /* ========================================================================== */
 /* ========================================================================== */
 
-html, body, button, input, select, textarea, #mainMenuPanel, #saveLoadPanel, #monsterTransferPanel, #unsavedActionPanel, #foodShortagePanel, #roundHistoryPanel, #statDetailPanel, .familyTreeDialog, .breedingPairDialog, #optionsPanel, .familyTreeGraphNode, .familyTreeRecordDetails {
+html, body, button, input, select, textarea, #mainMenuPanel, #saveLoadPanel, #unsavedActionPanel, #foodShortagePanel, #roundHistoryPanel, #statDetailPanel, .familyTreeDialog, .breedingPairDialog, #optionsPanel, .familyTreeGraphNode, .familyTreeRecordDetails{
     font-family: var(--ui-font-body);
 }
 /* Biome and related environment text use ordinary dark ink on parchment. */
@@ -3010,22 +2618,20 @@ html, body, button, input, select, textarea, #mainMenuPanel, #saveLoadPanel, #mo
     color: #211c14 !important;
     font-family: var(--ui-font-body);
 }
-.familyNodeMeta, .familyGenerationTitle {
+.familyNodeMeta{
     color: #5d5442 !important;
     font-family: var(--ui-font-body);
 }
 /* All horizontal meter tracks and fills use the same square, full-height idiom. */
-.progressTrack, .balanceTrack, .treasureTrack, .selectionBar, .barTrack, .monsterHpBar, .ageTrack, .nutritionTrack, .nutritionBar, .nutritionOverlayBar, .injuryBar, .typeColour, #worldLoadingTrack, .progressFill, .balanceBar, .treasureSegment, .selectionBarFill, .selectionBarRemoved, .barFill, .monsterHpFill, .ageFill, .biomeFoodFill, .monsterNeedFill, .nutritionBarFill, .nutritionOverlayProduction, .nutritionOverlayNeed, .injuryBarFill, #worldLoadingFill {
+.progressTrack, .balanceTrack, .treasureTrack, .selectionBar, .barTrack, .ageTrack, .nutritionOverlayBar, .injuryBar, .typeColour, #worldLoadingTrack, .progressFill, .balanceBar, .treasureSegment, .selectionBarFill, .selectionBarRemoved, .barFill, .ageFill, .nutritionOverlayProduction, .nutritionOverlayNeed, .injuryBarFill, #worldLoadingFill{
     border-radius: 0 !important;
 }
-.progressFill, .balanceBar, .treasureSegment, .selectionBarFill, .selectionBarRemoved, .barFill, .monsterHpFill, .ageFill, .biomeFoodFill, .monsterNeedFill, .nutritionBarFill, .nutritionOverlayProduction, .nutritionOverlayNeed, .injuryBarFill, #worldLoadingFill {
+.progressFill, .balanceBar, .treasureSegment, .selectionBarFill, .selectionBarRemoved, .barFill, .ageFill, .nutritionOverlayProduction, .nutritionOverlayNeed, .injuryBarFill, #worldLoadingFill{
     top: 0 !important;
     bottom: 0 !important;
     height: 100% !important;
 }
-.monsterNeedFill {
-    inset: 0 auto 0 0 !important;
-}
+
 .balanceBar {
     top: 0 !important;
     bottom: 0 !important;
@@ -3306,24 +2912,12 @@ html, body, button, input, select, textarea, #mainMenuPanel, #saveLoadPanel, #mo
 .ageFill {
     background: #69764b;
 }
-.ageFill-infant {
-    background: #b49a59;
-}
-.ageFill-young {
-    background: #7d8250;
-}
-.ageFill-prime {
-    background: #596b3c;
-}
-.ageFill-mature {
-    background: #7a673e;
-}
-.ageFill-old {
-    background: #8a5938;
-}
-.ageFill-senescent {
-    background: #754438;
-}
+
+
+
+
+
+
 .dashboardFootnote, .victoryOrText {
     color: var(--ui-ink);
 }
@@ -3383,7 +2977,7 @@ button {
 #mainMenuPanel h2, #roundHistoryPanel h2, #statDetailPanel h2, .familyTreeDialog h2, .breedingPairDialog h2, #optionsPanel h2 {
     color: var(--ui-heading);
 }
-#mainMenuPanel p, .familyNodeMeta, .familyGenerationTitle, #musicVolumeValue {
+#mainMenuPanel p, .familyNodeMeta, #musicVolumeValue{
     color: var(--ui-ink-muted);
 }
 .roundHistoryTable th, .roundHistoryTable td {
@@ -3973,52 +3567,14 @@ html {
     box-shadow: -5px 0 12px rgba(48,34,13,.18), 5px 0 12px rgba(48,34,13,.18);
     pointer-events: none;
 }
-.husbandryPageContent {
-    max-width: 920px;
-    margin: 0 auto;
-    column-count: 2;
-    column-gap: clamp(2.3rem, 7vw, 5.5rem);
-    column-rule: 1px solid rgba(105,79,38,.35);
-}
-.husbandryPageContent.coverPage,
-.husbandryPageContent.singleColumn {
-    column-count: 1;
-    max-width: 760px;
-}
-.husbandryPageContent.coverPage {
-    min-height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-}
-.husbandryPageContent h2 {
-    margin: 0 0 .8rem;
-    color: #4b351d;
-    font-family: "Palatino Linotype", Palatino, Georgia, serif;
-    line-height: 1.1;
-    text-align: center;
-    font-variant: small-caps;
-    letter-spacing: .06em;
-    break-after: avoid;
-}
-.husbandryPageContent h3 {
-    margin: 1rem 0 .25rem;
-    color: #6f2f25;
-    font-size: 1.08em;
-    font-variant: small-caps;
-    break-after: avoid;
-}
-.husbandryPageContent p {
-    text-align: justify;
-    hyphens: auto;
-}
-.husbandryPageContent ul {
-    margin: .2rem 0 .9rem;
-    padding-left: 1.2rem;
-}
-.husbandryPageContent li { margin: .28rem 0; }
+
+
+
+
+
+
+
+
 .illuminatedInitial {
     position: relative;
     align-items: center;
@@ -4035,7 +3591,6 @@ html {
     text-shadow: 1px 2px #29150f;
 }
 .husbandryMarginalia {
-    border-left: 4px solid #824235;
     break-inside: avoid;
 }
 .husbandryIllustration {
@@ -4046,16 +3601,9 @@ html {
 
 
 
-.husbandryCoverDevice {
-    width: min(330px, 72%);
-    margin: 1rem auto;
-    color: #5d3d20;
-}
 
-.husbandryDiseaseEntry {
-    break-inside: avoid;
-    margin-bottom: .8rem;
-}
+
+
 #husbandryBookPageNumber {
     min-width: 8rem;
     text-align: center;
@@ -4077,7 +3625,7 @@ html {
     #husbandryBookTome { border-width: 10px 14px; }
     #husbandryBookPage { padding: 1.2rem; }
     #husbandryBookPage:after { display: none; }
-    .husbandryPageContent { column-count: 1; }
+    
     .husbandryBookFooter { gap: .35rem; padding: .42rem; }
     #husbandryBookPreviousButton,
     #husbandryBookNextButton { min-width: 0; padding: .45rem; }
@@ -4090,19 +3638,9 @@ html {
 
 
 
-.husbandryPageContent {
-    height: 100%;
-    box-sizing: border-box;
-}
-.husbandryPageContent.singleColumn {
-    max-width: 780px;
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
-    align-content: start;
-}
-.husbandryPageContent.singleColumn .husbandryIllustration {
-    max-height: 230px;
-}
+
+
+
 
 .husbandryMarginalia {
     position: relative;
@@ -4123,12 +3661,7 @@ html {
     font-family: "Uncial Antiqua", "IM FELL English SC", Georgia, serif;
     font-weight: 900;
 }
-.husbandryCoverSubtitle {
-    max-width: 38rem;
-    color: #604b2f;
-    font-style: normal;
-    letter-spacing: .015em;
-}
+
 
 .husbandryIllustration .ink {
     fill: none;
@@ -4165,129 +3698,42 @@ html {
 }
 @media (max-width: 760px) {
     
-    .husbandryPageContent { height: auto; }
+    
 }
 
 
 /* ========================================================================== */
 /* AUTHORITATIVE SINGLE-LEAF MANUSCRIPT AND OUTER-COVER REVISION              */
 /* ========================================================================== */
-#husbandryBookPage,
-.husbandryPageContent,
-.husbandryPageContent p,
-.husbandryMarginalia,
-.husbandryCoverSubtitle {
+#husbandryBookPage, .husbandryMarginalia{
     font-family: "IM FELL English", "Junicode", "EB Garamond", "Cormorant Garamond", "Bookman Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
 }
-.husbandryBookHeader,
-.husbandryBookFooter,
-#husbandryBookRunningTitle,
-.husbandryPageContent h2,
-.husbandryPageContent h3,
-.illuminatedInitial {
+.husbandryBookHeader, .husbandryBookFooter, #husbandryBookRunningTitle, .illuminatedInitial{
     font-family: "IM FELL English SC", "Uncial Antiqua", "Junicode", "Cormorant SC", "Palatino Linotype", Palatino, Georgia, serif;
 }
 
-.husbandryPageContent,
-.husbandryPageContent.singleColumn,
-.husbandryPageContent.coverPage {
-    width: calc(50% - clamp(1.7rem, 4vw, 3.8rem));
-    max-width: none;
-    height: 100%;
-    margin: 0 auto 0 0;
-    padding: 0 clamp(.3rem, 1vw, .8rem);
-    column-count: 1;
-    column-rule: 0;
-    box-sizing: border-box;
-    overflow: hidden;
-}
-.husbandryPageContent h2 {
-    margin-bottom: .45rem;
-    font-size: clamp(1.35rem, 2.3vw, 2rem);
-}
+
+
 .husbandryIllustration {
     width: min(100%, 330px);
     max-height: 150px;
     margin: .25rem auto .55rem;
 }
-.husbandryPageContent p {
-    margin: 0 0 .66rem;
-}
 
-.husbandryPageContent.outerCover {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    padding: clamp(2rem, 6vw, 5rem);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    border: 12px double #bb8b48;
-    background:
-        radial-gradient(circle at 50% 42%, rgba(196,139,65,.12), transparent 38%),
-        linear-gradient(135deg, #2c170d, #714326 48%, #3b2012);
-    color: #e4c779;
-    box-shadow: inset 0 0 55px #120a06, inset 0 0 0 8px #372013;
-    text-align: center;
-}
-.husbandryPageContent.outerCover:before,
-.husbandryPageContent.outerCover:after {
-    content: '';
-    position: absolute;
-    inset: 5%;
-    border: 3px solid #a97a3d;
-    pointer-events: none;
-}
-.husbandryPageContent.outerCover:after {
-    inset: 7%;
-    border-width: 1px;
-}
-.husbandryPageContent.outerCover h2 {
-    max-width: 36rem;
-    color: #efd78f;
-    font-size: clamp(2.2rem, 5.4vw, 4.8rem);
-    line-height: 1.08;
-    text-shadow: 0 3px #1d0e08;
-}
-.husbandryPageContent.outerCover .husbandryIllustration {
-    width: min(360px, 55%);
-    max-height: 210px;
-    color: #d5b461;
-    filter: sepia(.25);
-}
 
-.husbandryPageContent.openingLeaf .illuminatedInitial {
-    width: 6.6rem;
-    height: 6.6rem;
-    margin: .1rem .8rem .3rem 0;
-    font-size: 5.2rem;
-    border-width: 5px;
-    box-shadow: inset 0 0 0 5px #d1a949;
-}
-.husbandryPageContent.openingLeaf .husbandryIllustration {
-    display: none;
-}
-.husbandryPageContent.openingLeaf h2 {
-    display: none;
-}
+
+
+
+
+
+
+
+
+
 @media (max-width: 760px) {
     
-    .husbandryPageContent,
-    .husbandryPageContent.singleColumn,
-    .husbandryPageContent.coverPage {
-        width: 100%;
-        height: auto;
-        margin: 0;
-        overflow: visible;
-    }
-    .husbandryPageContent.outerCover {
-        position: absolute;
-        height: 100%;
-        overflow: hidden;
-    }
+    
+    
 }
 
 
