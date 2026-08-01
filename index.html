@@ -4837,6 +4837,7 @@ html {
     var AGENT_MOVEMENT_RATE_MULTIPLIER = 2;
     var NAV_CELL_SIZE = 60;
     var MOVEMENT_CLEARANCE_MARGIN = 3;
+    var IMPASSABLE_MOVEMENT_COST = 9999;
     var PATH_REACHED_DISTANCE = 14;
     var PATH_STUCK_REPATH_TICKS = 8;
     var PATH_TARGET_MOVE_REPATH_DISTANCE = 90;
@@ -5350,18 +5351,18 @@ html {
             } else if (terrainType === TERRAIN_TYPE.FOREST) {
                 base = 1.2;
             } else if (terrainType === TERRAIN_TYPE.MARSH) {
-                base = agent.isMounted ? 9999 : 2.4;
+                base = agent.isMounted ? IMPASSABLE_MOVEMENT_COST : 2.4;
             } else if (terrainType === TERRAIN_TYPE.STREAM) {
                 base = agent.isMounted ? 1.9 : 1.55;
             } else if (terrainType === TERRAIN_TYPE.LAKE) {
-                base = agent.canEnterDeepWater ? 1.15 : 9999;
+                base = agent.canEnterDeepWater ? 1.15 : IMPASSABLE_MOVEMENT_COST;
             } else if (terrainType === TERRAIN_TYPE.ICE) {
                 base = 1.7;
             } else if (terrainType === TERRAIN_TYPE.DESERT) {
                 base = 1.25;
             }
             if (slope >= TERRAIN_CLIFF_SLOPE) {
-                return 9999;
+                return IMPASSABLE_MOVEMENT_COST;
             }
             var morphologyMultiplier =
                 agent && typeof agent.terrainMovementCostMultiplier === "function"
@@ -5378,19 +5379,19 @@ html {
             toSlope,
         ) {
             var base = this.movementCostFor(agent, toTerrainType, toSlope);
-            if (base >= 9999) {
+            if (base >= IMPASSABLE_MOVEMENT_COST) {
                 return base;
             }
             var heightDelta = toHeight - fromHeight;
             if (Math.abs(heightDelta) >= TERRAIN_CLIFF_SLOPE) {
-                return 9999;
+                return IMPASSABLE_MOVEMENT_COST;
             }
             var uphillPenalty = Math.max(0, heightDelta) * (agent.isMounted ? 0.16 : 0.105);
             var downhillPenalty = Math.max(0, -heightDelta - 4) * 0.035;
             return base + uphillPenalty + downhillPenalty;
         },
         canTraverse: function (agent, terrainType, slope) {
-            return this.movementCostFor(agent, terrainType, slope) < 9999;
+            return this.movementCostFor(agent, terrainType, slope) < IMPASSABLE_MOVEMENT_COST;
         },
         visibilityPenaltyFor: function (terrainType, slope) {
             // Terrain height itself is handled by terrainAndElevationAllowSight(),
@@ -5741,6 +5742,7 @@ html {
                 cols,
                 rows,
                 heights,
+                drain,
                 flow,
                 runoff,
                 waterKind,
@@ -6005,6 +6007,7 @@ html {
             cols,
             rows,
             heights,
+            drain,
             flow,
             runoff,
             waterKind,
@@ -6031,7 +6034,7 @@ html {
                         i,
                         cols,
                         rows,
-                        heights,
+                        drain,
                         flow,
                         threshold,
                     );
@@ -6075,39 +6078,7 @@ html {
             }
             return candidates;
         }
-        static neighbourDrainsTo(neighbourIndex, targetIndex, cols, rows, heights) {
-            return (
-                TerrainGrid.createFlowDirectionForIndex(neighbourIndex, cols, rows, heights) ===
-                targetIndex
-            );
-        }
-        static createFlowDirectionForIndex(index, cols, rows, heights) {
-            var x = index % cols;
-            var y = Math.floor(index / cols);
-            var hereRank = TerrainGrid.hydrologyFlowRank(index, cols, rows, heights);
-            var best = -1;
-            var bestRank = hereRank;
-            for (var dy = -1; dy <= 1; dy += 1) {
-                for (var dx = -1; dx <= 1; dx += 1) {
-                    if (dx === 0 && dy === 0) {
-                        continue;
-                    }
-                    var nx = x + dx;
-                    var ny = y + dy;
-                    if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) {
-                        continue;
-                    }
-                    var ni = ny * cols + nx;
-                    var neighbourRank = TerrainGrid.hydrologyFlowRank(ni, cols, rows, heights);
-                    if (neighbourRank < bestRank) {
-                        bestRank = neighbourRank;
-                        best = ni;
-                    }
-                }
-            }
-            return best;
-        }
-        static hasUpstreamNeighbourAboveThreshold(index, cols, rows, heights, flow, threshold) {
+        static hasUpstreamNeighbourAboveThreshold(index, cols, rows, drain, flow, threshold) {
             var x = index % cols;
             var y = Math.floor(index / cols);
             for (var dy = -1; dy <= 1; dy += 1) {
@@ -6121,10 +6092,7 @@ html {
                         continue;
                     }
                     var ni = ny * cols + nx;
-                    if (
-                        flow[ni] >= threshold &&
-                        TerrainGrid.neighbourDrainsTo(ni, index, cols, rows, heights)
-                    ) {
+                    if (flow[ni] >= threshold && drain[ni] === index) {
                         return true;
                     }
                 }
@@ -6246,7 +6214,7 @@ html {
                 return null;
             }
             var path = [startIndex];
-            var seen = {};
+            var seen = new Uint8Array(cols * rows);
             var current = startIndex;
             for (var guard = 0; guard < cols * rows; guard += 1) {
                 if (seen[current]) {
@@ -6302,7 +6270,7 @@ html {
         }
         static routePathToNearestMapEdge(cols, rows, heights, flow, startIndex) {
             var path = [startIndex];
-            var seen = {};
+            var seen = new Uint8Array(cols * rows);
             var current = startIndex;
             for (var guard = 0; guard < cols * rows; guard += 1) {
                 if (seen[current]) {
@@ -6388,7 +6356,7 @@ html {
                     continue;
                 }
                 var path = [];
-                var seen = {};
+                var seen = new Uint8Array(cols * rows);
                 var current = start;
                 var terminatesAtOutletOrAcceptedStream = false;
                 for (var stepIndex = 0; stepIndex < cols * rows; stepIndex += 1) {
@@ -6986,7 +6954,7 @@ html {
         }
         static routePathToTargetEdge(cols, rows, heights, flow, startIndex, targetEdge, seed) {
             var path = [startIndex];
-            var seen = {};
+            var seen = new Uint8Array(cols * rows);
             var current = startIndex;
             for (var guard = 0; guard < cols * rows; guard += 1) {
                 if (seen[current]) {
@@ -7789,14 +7757,14 @@ html {
                     ty: startY,
                 },
             ];
-            var seen = {};
+            var seen = new Uint8Array(this.cols * this.rows);
             while (stack.length > 0) {
                 var tile = stack.pop();
-                var key = tile.tx + "," + tile.ty;
-                if (seen[key]) {
+                var index = tile.ty * this.cols + tile.tx;
+                if (seen[index]) {
                     continue;
                 }
-                seen[key] = true;
+                seen[index] = true;
                 if (
                     tile.tx === 0 ||
                     tile.ty === 0 ||
@@ -9747,7 +9715,7 @@ html {
                         World.treasureProbeMovementCostBetween(grid, current, {
                             cx: nx,
                             cy: ny,
-                        }) >= 9999
+                        }) >= IMPASSABLE_MOVEMENT_COST
                     ) {
                         continue;
                     }
@@ -10309,7 +10277,7 @@ html {
             if (cache[index] !== undefined) {
                 return cache[index];
             }
-            if (this.getNavCellMovementCost(agent, cx, cy) >= 9999) {
+            if (this.getNavCellMovementCost(agent, cx, cy) >= IMPASSABLE_MOVEMENT_COST) {
                 cache[index] = true;
                 return true;
             }
@@ -11104,7 +11072,7 @@ html {
                 toHeight,
                 toSlope,
             );
-            if (movementCost >= 9999) {
+            if (movementCost >= IMPASSABLE_MOVEMENT_COST) {
                 return 0;
             }
             var bushMultiplier =
