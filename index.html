@@ -36006,11 +36006,11 @@ html {
         saveSlotList.appendChild(row);
     }
     function RenderSaveLoadSlots() {
-        saveSlotList.innerHTML = "";
+        saveSlotList.textContent = "";
         saveLoadMessage.textContent = "Reading browser storage...";
         GetAllStoredSaveRecords()
             .then(function (records) {
-                saveSlotList.innerHTML = "";
+                saveSlotList.textContent = "";
                 saveLoadMessage.textContent = "";
                 for (var slotNumber = 1; slotNumber <= SAVE_SLOT_COUNT; slotNumber += 1) {
                     var slotId = SaveSlotIdForNumber(slotNumber);
@@ -36403,7 +36403,7 @@ html {
             return;
         }
         lastCampaignDashboardKey = dashboardKey;
-        statusBox.innerHTML = "";
+        statusBox.textContent = "";
         var d = E("div", "campaignDashboard"),
             cl = E("section", "dashboardCard climateCard"),
             br = E("div", "climateBiomeRow"),
@@ -36826,7 +36826,7 @@ html {
             body = document.getElementById("statDetailBody"),
             title = document.getElementById("statDetailTitle"),
             history = s.roundSeasonHistory || [];
-        body.innerHTML = "";
+        body.textContent = "";
         if (kind === "temperature") {
             title.textContent = "Temperature and biome";
             var bh = E("div", "climateBiomeRow");
@@ -37073,7 +37073,7 @@ html {
     function RenderRoundHistory(s) {
         var body = document.getElementById("roundHistoryBody"),
             outcome = document.getElementById("roundHistoryOutcome");
-        body.innerHTML = "";
+        body.textContent = "";
         outcome.textContent = "";
         outcome.className = "";
         var history = CompletedRoundHistoryForSnapshot(s);
@@ -37972,7 +37972,7 @@ html {
             fatherId: father.id,
         };
         var grid = document.getElementById("breedingPairGrid");
-        grid.innerHTML = "";
+        grid.textContent = "";
         [father, mother].forEach(function (monster, index) {
             if (index === 1) {
                 var cross = document.createElement("div");
@@ -38075,7 +38075,7 @@ html {
             return;
         }
         var monster = FamilyTreeDisplayMonster(record);
-        target.innerHTML = "";
+        target.textContent = "";
         target.className = "familyTreeRecordDetails familyTreeRecordDetailsExpanded";
         target.setAttribute("data-displayed-family-id", String(record.id));
         var header = document.createElement("header");
@@ -38500,7 +38500,7 @@ html {
         });
         var levelCount = maximumGeneration - minimumGeneration + 1;
         var canvasHeight = topPadding + levelCount * rowGap - rowGap + 116 + bottomPadding;
-        graph.innerHTML = "";
+        graph.textContent = "";
         var canvas = document.createElement("div");
         canvas.className = "familyTreeCanvas";
         canvas.setAttribute("data-canvas-width", canvasWidth);
@@ -38790,7 +38790,7 @@ html {
         document.getElementById("confirmRosterExportButton").disabled = !ids.length;
     }
     function RenderSelectedMonsterPanel(monster) {
-        selectedMonsterPanel.innerHTML = "";
+        selectedMonsterPanel.textContent = "";
         if (!monster) {
             return;
         }
@@ -39296,7 +39296,7 @@ html {
             " food\nShortage if every monster is fully fed: " +
             FormatNumber(plan.shortage) +
             " food";
-        foodAllocationList.innerHTML = "";
+        foodAllocationList.textContent = "";
         plan.monsters.forEach(function (monster) {
             var row = document.createElement("label");
             row.className = "foodAllocationRow";
@@ -39422,7 +39422,7 @@ html {
             phase === "raid"
                 ? "Season in progress. Use Deploy on a reserve monster to send it in from the far right edge."
                 : "Choose which monsters to deploy for the next season. Breed monsters by dragging a male onto a female or vice versa.";
-        rosterList.innerHTML = "";
+        rosterList.textContent = "";
         var sections = {};
         [
             ["males", "Males"],
@@ -46794,8 +46794,13 @@ html {
         WriteLeaderboards(data);
         ShowLeaderboards(s.gameMode);
     }
+    function AppendLeaderboardCell(row, tagName, value) {
+        var cell = document.createElement(tagName);
+        cell.textContent = String(value);
+        row.appendChild(cell);
+    }
     function RenderLeaderboard(target, rows) {
-        target.innerHTML = "";
+        target.textContent = "";
         if (!rows.length) {
             target.className = "leaderboardEmpty";
             target.textContent = "No completed campaigns yet.";
@@ -46804,25 +46809,31 @@ html {
         target.className = "";
         var table = document.createElement("table");
         table.className = "leaderboardTable";
-        table.innerHTML =
-            "<thead><tr><th>Class</th><th>Rounds won</th><th>Treasure retained</th><th>Completed</th><th>Seed</th></tr></thead>";
+        var head = document.createElement("thead");
+        var headingRow = document.createElement("tr");
+        ["Class", "Rounds won", "Treasure retained", "Completed", "Seed"].forEach(
+            function (heading) {
+                AppendLeaderboardCell(headingRow, "th", heading);
+            },
+        );
+        head.appendChild(headingRow);
+        table.appendChild(head);
         var body = document.createElement("tbody");
-        rows.forEach(function (r) {
-            var tr = document.createElement("tr");
-            if (r.latest) tr.className = "latestResult";
-            tr.innerHTML =
-                "<td>" +
-                r.rating +
-                "</td><td>" +
-                Math.round(r.winRate * 100) +
-                "%</td><td>" +
-                Math.round(r.treasureRetained * 100) +
-                "%</td><td>" +
-                new Date(r.date).toLocaleDateString() +
-                "</td><td>" +
-                r.seed +
-                "</td>";
-            body.appendChild(tr);
+        rows.forEach(function (result) {
+            var row = document.createElement("tr");
+            if (result.latest) {
+                row.className = "latestResult";
+            }
+            AppendLeaderboardCell(row, "td", result.rating);
+            AppendLeaderboardCell(row, "td", Math.round(result.winRate * 100) + "%");
+            AppendLeaderboardCell(
+                row,
+                "td",
+                Math.round(result.treasureRetained * 100) + "%",
+            );
+            AppendLeaderboardCell(row, "td", new Date(result.date).toLocaleDateString());
+            AppendLeaderboardCell(row, "td", result.seed);
+            body.appendChild(row);
         });
         table.appendChild(body);
         target.appendChild(table);
@@ -47645,14 +47656,14 @@ html {
         measurementSpread.style.visibility = "hidden";
         measurementSpread.setAttribute("aria-hidden", "true");
         husbandryBookPage.classList.remove("outerCoverShown");
-        husbandryBookPage.innerHTML = "";
+        husbandryBookPage.textContent = "";
         husbandryBookPage.appendChild(measurementSpread);
         for (var sourceIndex = 1; sourceIndex < husbandryBookSourcePages.length; sourceIndex += 1) {
             husbandryBookPages = husbandryBookPages.concat(
                 PaginateHusbandryChapter(measurementSpread, husbandryBookSourcePages[sourceIndex]),
             );
         }
-        husbandryBookPage.innerHTML = "";
+        husbandryBookPage.textContent = "";
     }
     function HusbandryLeafHtml(page, sideClass) {
         if (!page) {
